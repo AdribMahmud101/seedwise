@@ -141,3 +141,9 @@ Every call below was **run live on 8 Nov 2026** at Mithapukur (lat 25.54, lon 89
 3. **Missing stays missing.** `-999`, `null`, fill values and cloudy pixels → `UNKNOWN`, never 0.
 4. **Label the detail.** Save the native grid size (POWER ~50 km, IMERG ~10 km, SMAP ~9 km, Landsat 30 m) and show it with the value.
 5. **Never commit keys.** FIRMS MAP_KEY, Earthdata and FFWC credentials go in an untracked `.env`.
+
+## Credentials we have
+
+| Key | Where it lives | Valid until | How scripts use it |
+|---|---|---|---|
+| `EARTHDATA_TOKEN` (+ `EARTHDATA_USER`) | Phone: `/root/projects/ropon-radar/.env` (git-ignored, mode 600). Laptop: `~/.config/ropon-radar/earthdata.env` | **7 Jan 2027**, then renew at https://urs.earthdata.nasa.gov → Generate Token | Load `.env`, then send header `Authorization: Bearer $EARTHDATA_TOKEN`. Tested 9 Nov 2026: SMAP L4 file → 206 with token, 401 without |
