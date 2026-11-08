@@ -397,21 +397,7 @@ function updateTerrainViewDOM(containerEl) {
   const doc = containerEl.ownerDocument || (typeof document !== "undefined" ? document : null);
   if (!doc) return;
 
-  // Add "Smoothed surface model" line to exaggeration chip / terrain chips
-  const chipsContainer = doc.querySelector(".terrain-chips");
-  if (chipsContainer && !doc.querySelector(".chip-smoothed-model")) {
-    const smoothedChip = doc.createElement("span");
-    smoothedChip.className = "chip-smoothed-model tag";
-    smoothedChip.textContent = "Smoothed surface model";
-    chipsContainer.appendChild(smoothedChip);
-  }
 
-  // Update low elevation water text to:
-  // "Lower ground — water may collect after heavy rain (check locally)"
-  const legendText = doc.querySelector(".terrain-water-legend .legend-text");
-  if (legendText) {
-    legendText.textContent = "Lower ground — water may collect after heavy rain (check locally)";
-  }
 }
 
 // Mount and render the 3D scene in the target container element
