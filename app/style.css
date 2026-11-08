@@ -2675,3 +2675,178 @@ dialog .modal-body {
 
 /* Hide the image chip while a tap card is open so they never overlap on phones. */
 .map-shell:has(.leaflet-popup) .map-overline { visibility: hidden; }
+
+/* MAP3: Map layer switcher, timeline, opacity slider, context lines, legend */
+.map-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.map-segmented {
+  display: inline-flex;
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 3px;
+  border-radius: 4px;
+}
+.map-segmented .button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 150ms ease, color 150ms ease;
+}
+.map-segmented .button.active {
+  background: var(--light);
+  font-weight: 600;
+  color: var(--green);
+}
+.map-segmented .button:hover:not(.active),
+.map-segmented .button:focus-visible:not(.active) {
+  background: rgba(49, 92, 61, 0.08);
+}
+.map-subcontrols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.map-opacity-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.map-opacity-control label {
+  cursor: pointer;
+  white-space: nowrap;
+}
+.map-opacity-control input[type="range"] {
+  width: 90px;
+  min-height: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+.map-legend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.map-legend-bar strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.map-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  display: inline-block;
+}
+.map-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.map-timeline-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+.map-timeline-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.map-timeline-dates .button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 4px;
+}
+.map-timeline-dates .button.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 600;
+}
+.map-timeline-status {
+  margin-left: auto;
+  font-size: 12px;
+}
+.osm-village-label {
+  background: rgba(255, 254, 249, 0.92);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 12px;
+  font-family: Plex, Bangla, sans-serif;
+  padding: 3px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(36, 57, 44, 0.15);
+  pointer-events: none;
+}
+@media (max-width: 700px) {
+  .map-switcher {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .map-segmented {
+    width: 100%;
+    display: flex;
+  }
+  .map-segmented .button {
+    flex: 1;
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+  .map-subcontrols {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .map-timeline {
+    padding: 8px 12px;
+  }
+  .map-legend-bar {
+    padding: 8px 12px;
+  }
+}
+

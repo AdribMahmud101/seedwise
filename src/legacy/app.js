@@ -21,6 +21,7 @@ import {
   disposeMap,
   setField,
   fieldAction,
+  fieldInput,
   fieldSubmit,
   searchResults,
 } from "./fields.js";
@@ -171,6 +172,7 @@ document.addEventListener("input", (event) => {
     );
     return;
   }
+  fieldInput(el);
   rotationInput(el);
   plannerInput(el);
   waterInput(el);
