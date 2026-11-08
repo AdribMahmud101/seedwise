@@ -63,6 +63,6 @@ Credits and licences: see CORE/CR. That covers geoBoundaries (CC BY 3.0 IGO), Le
 | FFWC / flood magnitude | https://ffwc.gov.bd/ · https://ffwc.gov.bd/app/flood-magnitude |
 | BARC Crop Zoning (updated Khamari link) | http://cropzoning.barcapps.gov.bd/ |
 | **Sarker et al. (2026)** Burirhat RARS trial | https://doi.org/10.1155/ioa/9089088 |
-| Ropon Radar 18-Feature Spec Doc (Google Doc) | https://docs.google.com/document/d/1vlfe5dOtPcZaap785YjsoPi4sF3HY5x4QCFyhtxKLoo/edit — not read (private link) |
+| Ropon Radar 18-Feature Spec Doc (Google Doc) | https://docs.google.com/document/d/1vlfe5dOtPcZaap785YjsoPi4sF3HY5x4QCFyhtxKLoo/edit — public; text identical to F18 (checked 9 Nov 2026) |
 
 DS-H records the link migrations it made: Khamari `khamari.barcapps.gov.bd` → `cropzoning.barcapps.gov.bd`; SRDI old page → new static page; FFWC `http` → `https`.

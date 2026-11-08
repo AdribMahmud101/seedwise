@@ -47,7 +47,7 @@ All recommendations below were validated by the project owner on 8 Nov 2026 and 
 | Q3 | BARC/SRDI reuse | Use only published documents with page-level citations (as CORE does); no bulk scraping. | ✅ |
 | Q4 | Deployment | **Offline static export** (CORE today). Auth/service is post-hackathon. | ✅ |
 | Q5 | IVR/SMS channel | **Out of scope.** Keep the Banglish message templates (11 §3) for on-screen action cards. | ✅ |
-| Q6 | 18-Feature Google Doc | Export it into `specs/` so it can be checked against F18. | ✅ |
+| Q6 | 18-Feature Google Doc | **Resolved 9 Nov 2026:** the Google Doc is public and its text is identical to F18 (`specs/Shob plan aar features…txt`). No export needed. | ✅ |
 
 ## Resulting build order (if all accepted)
 
