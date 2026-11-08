@@ -2,7 +2,13 @@
 
 **Spatial support.** Initial field outlines and planning profiles are illustrative. Area uses a local equirectangular projection and shoelace formula. Redrawing an outline changes planting area. Climate estimates and optical samples retain their original grid or window. Nearby fields may share the same regional value.
 
-**Weather and wetness.** POWER supplies temperature, corrected precipitation, radiation, humidity, pressure, wind and modeled wetness. IMERG rainfall is requested independently through POWER. The POWER meteorology anchors are 89.375° E / 25.5° N and 89.375° E / 26.0° N. IMERG requests use the three prepared centres. Missing values remain null. GWETTOP and GWETROOT are dimensionless indices. A logger can record a separate local probe reading with its depth and volumetric unit. This release includes no SMAP volumetric measurement or BMD gauge archive.
+**Weather and wetness.** POWER supplies temperature, corrected precipitation, radiation, humidity, pressure, wind and modeled wetness on a ~0.5° × 0.625° (MERRA-2) grid. IMERG rainfall is requested independently through POWER. The POWER meteorology anchors are 89.375° E / 25.5° N and 89.375° E / 26.0° N. IMERG requests use the three prepared centres. Missing values remain null. GWETTOP and GWETROOT are dimensionless indices. A logger can record a separate local probe reading with its depth and volumetric unit.
+
+**Sentinel-2 map tiles.** Offline map tiles from Sentinel-2 Level-2A provide true-colour imagery at 10 m resolution from two acquisition dates. The tiles are accessed anonymously through Microsoft Planetary Computer, with scene IDs, processing baselines, product metadata, request patterns and fetch receipts preserved in the data assets.
+
+**NASADEM terrain.** NASADEM Merged DEM Global 1 arc second provides surface elevation data. NASADEM is a surface model that includes trees and houses. Height grids for field 3D terrain models are preserved with acquisition notes and bounds.
+
+**NASA SMAP L4 soil moisture.** NASA SMAP L4 Global provides volumetric soil moisture (m³/m³) at ~9 km resolution as a model-assimilated product combining SMAP radiometer observations with land surface model simulations. Values include SFMC (0–5 cm), RZMC (root zone 0–100 cm), and percentiles. This is distinct from the POWER 0–1 wetness index.
 
 **History.** The 2021–2025 archive aggregates daily values to months. Rain and ETo are totals. Temperature and wetness are means. Valid counts are included. A detailed UTC 2024 replay supports daily QA. Four other years supply the same-month reference. This short comparison is not a long-term climate normal.
 

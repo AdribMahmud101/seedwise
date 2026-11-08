@@ -36,16 +36,16 @@ try {
 const state = { ...structuredClone(defaults), ...saved };
 for (const key of ["weights", "planner", "clinic", "tabs", "water"])
   state[key] = { ...defaults[key], ...saved[key] };
-let earth, agronomy, archive;
+let earth, agronomy, archive, smap;
 async function loadData() {
   const responses = await Promise.all(
-    ["data/earth-data.json", "data/agronomy.json", "data/history.json"].map(
+    ["data/earth-data.json", "data/agronomy.json", "data/history.json", "data/smap.json"].map(
       (path) => fetch(new URL(path, document.baseURI)),
     ),
   );
   if (responses.some((r) => !r.ok))
     throw new Error("The prepared data could not be loaded.");
-  [earth, agronomy, archive] = await Promise.all(
+  [earth, agronomy, archive, smap] = await Promise.all(
     responses.map((r) => r.json()),
   );
   if (!earth.fields.some((f) => f.id === state.fieldId))
@@ -365,6 +365,7 @@ export {
   earth,
   agronomy,
   archive,
+  smap,
   loadData,
   persist,
   t,

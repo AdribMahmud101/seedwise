@@ -1,6 +1,7 @@
 import {
   state,
   agronomy,
+  smap,
   persist,
   t,
   esc,
@@ -26,6 +27,71 @@ import {
   repaint,
 } from "./ui.js";
 import { STRATEGIES } from "./engine.js";
+
+function smapCard() {
+  const siteId = state.fieldId;
+  const year = 2024;
+  const monthIndex = state.month;
+  const monthStr = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+  // Get SMAP data for this site and month
+  const siteData = smap?.sites?.[siteId];
+  if (!siteData) return "";
+
+  const monthly = siteData.monthly || [];
+  const monthEntry = monthly.find((m) => m.month === monthStr);
+
+  if (!monthEntry) return "";
+
+  const sfmc = monthEntry.SFMC_mean;
+  const rzmc = monthEntry.RZMC_mean;
+  const rzmcPrcntl = monthEntry.RZMC_PRCNTL_mean;
+
+  // Determine status word from RZMC percentile
+  function statusWord(prcntl) {
+    if (prcntl === null || prcntl === undefined) return t("Unknown", "অজানা");
+    if (prcntl < 30) return t("Dry", "শুষ্ক");
+    if (prcntl <= 70) return t("Normal", "স্বাভাবিক");
+    return t("Wet", "ভিজা");
+  }
+
+  const sfmcStatus = statusWord(monthEntry.SFMC_PRCNTL_mean);
+  const rzmcStatus = statusWord(rzmcPrcntl);
+
+  // Build the sentence
+  const monthLabel = monthName(monthIndex);
+  let sentence = "";
+  if (rzmcPrcntl !== null && rzmcPrcntl !== undefined) {
+    sentence = `${monthLabel} ${year}: ${t("root zone", "মূল অঞ্চল")} ${rzmcStatus === t("Wet", "ভিজা") ? t("wetter than usual", "স্বাভাবিকের চেয়ে ভিজা") : rzmcStatus === t("Dry", "শুষ্ক") ? t("drier than usual", "স্বাভাবিকের চেয়ে শুষ্ক") : t("about usual", "স্বাভাবিক")} (${num(rzmcPrcntl, 0)}th ${t("percentile", "পারসেন্টাইল")}).`;
+  } else {
+    sentence = `${monthLabel} ${year}: ${t("root zone moisture unknown", "মূল অঞ্চলের আর্দ্রতা অজানা")}.`;
+  }
+
+  // Format values
+  const formatValue = (val) => {
+    if (val === null || val === undefined) return t("No data", "তথ্য নেই");
+    return `${num(val, 2)} m³/m³`;
+  };
+
+  return panel(
+    t("Soil water (NASA SMAP)", "মাটির পানি (NASA SMAP)"),
+    `<div class="eyebrow">${t("2024 monthly · regional cell", "২০২৪ সালের মাসিক · আঞ্চলিক কোষ")}</div>
+    <div class="water-visual">
+      <div class="water-bar" style="height:${Math.max(2, ((sfmc || 0) / 0.5) * 128)}px">
+        <strong>${formatValue(sfmc)}</strong>
+        <label>${t("Top 0–5 cm", "উপরের ০–৫ সেমি")}<br>${sfmcStatus}</label>
+      </div>
+      <div class="water-bar" style="height:${Math.max(2, ((rzmc || 0) / 0.5) * 128)}px">
+        <strong>${formatValue(rzmc)}</strong>
+        <label>${t("Root zone 0–100 cm", "শিকড় অঞ্চল ০–১০০ সেমি")}<br>${rzmcStatus}</label>
+      </div>
+    </div>
+    <p>${sentence}</p>
+    <p class="note">${tag(t("Estimated", "স্যাটেলাইট অনুমান"), "")} · ${t("NASA SMAP L4 · ~9 km cell · model + satellite · 2024 monthly", "NASA SMAP L4 · ~৯ কিমি কোষ · মডেল + স্যাটেলাইট · ২০২৪ সালের মাসিক")}</p>
+    <p class="note">${t("This is a regional cell, not your field. A soil probe or AWD pipe gives your field's real value.", "এটি একটি আঞ্চলিক কোষ, আপনার জমির নয়। মাটি পরীক্ষা বা AWD পাইপ আপনার জমির সঠিক মান দেয়।")} <a href="#research" class="source-link">${t("Research lab logger", "গবেষণা ল্যাব লগার")}</a></p>`,
+    tag(t("Estimated", "স্যাটেলাইট অনুমান"), ""),
+  );
+}
 
 function water() {
   const id = state.tabs.water;
@@ -107,7 +173,8 @@ function budget() {
  <div class="form-field wide"><b>${t("Aquifer accounting assumptions", "ভূগর্ভস্থ পানির হিসাবের অনুমান")}</b><span class="form-help">${t("Leave unknown recharge or area blank. Rainfall alone cannot supply these values.", "পুনর্ভরণ বা এলাকা জানা না থাকলে ফাঁকা রাখুন। শুধু বৃষ্টি থেকে এগুলো পাওয়া যায় না।")}</span></div>
  ${input(t("Recharge (mm/year)", "পুনর্ভরণ (মিমি/বছর)"), "recharge", w.recharge, 'min="0" max="5000" step="any" placeholder="—"')}${input(t("Aquifer accounting area (ha)", "হিসাবের এলাকা (হেক্টর)"), "aquiferArea", w.aquiferArea, 'min=".001" max="100000000" step="any" placeholder="—"')}${input(t("Farm allocation of recharge (%)", "খামারের বরাদ্দ (%)"), "allocated", w.allocated, 'min="0" max="100"')}${input(t("Other allocated withdrawals (m³/year)", "অন্যান্য উত্তোলন (ঘনমিটার/বছর)"), "other", w.other, 'min="0" step="any"')}${input(t("Replay years", "পুনরাবৃত্ত বছর"), "years", w.years, 'min="1" max="30"')}</form>`,
   )}
- ${panel(t("Groundwater scenario", "ভূগর্ভস্থ পানির দৃশ্য"), `<div id="water-result">${budgetResult()}</div><div class="spacer"></div>${monthControl()}<p class="note">${sources(["fao56", "power", "gpm"])}</p>`, tag(t("Scenario", "অনুমান"), "amber"))}</div>`;
+ ${panel(t("Groundwater scenario", "ভূগর্ভস্থ পানির দৃশ্য"), `<div id="water-result">${budgetResult()}</div><div class="spacer"></div>${monthControl()}<p class="note">${sources(["fao56", "power", "gpm"])}</p>`, tag(t("Scenario", "অনুমান"), "amber"))}
+ ${smapCard()}</div>`;
 }
 function soil() {
   const a = agronomy.aez,

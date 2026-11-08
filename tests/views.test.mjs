@@ -12,6 +12,69 @@ import { recovery } from "../src/legacy/recovery.js";
 import { examples, references } from "../src/legacy/recovery-data.js";
 import { units } from "../src/legacy/boundary.js";
 
+test("SMAP card renders correctly in EN and BN", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  for (const lang of ["en", "bn"]) {
+    state.lang = lang;
+    for (const id of ["mithapukur", "pirganj", "gangachara"]) {
+      state.fieldId = id;
+      state.tabs.water = "budget";
+      state.month = 10;
+      const html = water();
+
+      // Check SMAP card is rendered (EN: "Soil water (NASA SMAP)", BN: "মাটির পানি (NASA SMAP)")
+      assert.ok(html.includes("Soil water (NASA SMAP)") || html.includes("মাটির পানি (NASA SMAP)"), `SMAP card title in ${lang} for ${id}`);
+      
+      // Check m³/m³ is shown
+      assert.ok(html.includes("m³/m³"), `m³/m³ shown in ${lang} for ${id}`);
+
+      // Check % is NOT shown next to SFMC or RZMC values
+      // Extract the SMAP card section and check within it
+      const smapTitle = lang === "bn" ? "মাটির পানি (NASA SMAP)" : "Soil water (NASA SMAP)";
+      const smapStart = html.indexOf(smapTitle);
+      const smapEnd = html.indexOf("</section>", smapStart);
+      const smapHtml = html.substring(smapStart, smapEnd);
+      assert.ok(smapStart !== -1, `SMAP card found in ${lang} for ${id}`);
+      assert.ok(!smapHtml.includes("%"), `No % in SMAP card for ${lang} ${id}`);
+
+      // Check truth label
+      assert.ok(smapHtml.includes("Estimated") || smapHtml.includes("স্যাটেলাইট অনুমান"), `Estimated label in ${lang} for ${id}`);
+    }
+  }
+});
+
+test("SMAP card handles null values", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  // Test with a month where percentiles are null (January 2024)
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  state.tabs.water = "budget";
+  state.month = 0; // January
+  const html = water();
+
+  // Extract the SMAP card section
+  const smapStart = html.indexOf("Soil water (NASA SMAP)");
+  const smapEnd = html.indexOf("</section>", smapStart);
+  const smapHtml = html.substring(smapStart, smapEnd);
+
+  // For null percentiles, the status should show "Unknown" (which is acceptable)
+  // The values themselves should still show m³/m³
+  assert.ok(smapHtml.includes("m³/m³"), "Still shows m³/m³ for non-null values");
+  assert.ok(smapHtml.includes("Unknown") || smapHtml.includes("অজানা"), "Shows status for null percentile");
+});
+
 test("area-unit conversion outputs shotok, bigha, katha, acre, and ha in EN and BN", () => {
   // 1 ha test
   state.lang = "en";
