@@ -15,6 +15,52 @@ Plain-language map of every screen (route) in Ropon Radar and the NASA data behi
 
 None of these is a live reading of today. They are saved past records, so the app works offline.
 
+## Data sources, links, and what each one helps with
+
+URLs are the exact ones recorded in the app's data files (`public/data/earth-data.json`, `agronomy.json`) and `docs/credits.md`.
+
+### NASA and partner satellite data
+
+| Source | Link | Helps with | Used on |
+|---|---|---|---|
+| NASA POWER (weather + soil wetness) | https://power.larc.nasa.gov/docs/services/api/temporal/daily/ | Temperature, humidity, wind, sunshine, rain, top/root soil wetness score; inputs for crop water need | My field, Past seasons, Recovery, Research, Report |
+| NASA GPM IMERG (rain) | https://gpm.nasa.gov/data/imerg | Satellite rain totals; how much water the sky gives the crop | My field, Past seasons, Rotations, Water, Recovery, Research, Report |
+| Landsat 8/9 Collection 2 Level 2 (NASA/USGS, via Microsoft Planetary Computer) | https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2 | Real photo of the field; plant greenness (NDVI) | My field, Past seasons, Research |
+| Landsat quality bands (USGS) | https://www.usgs.gov/landsat-missions/landsat-collection-2-quality-assessment-bands | Finding clouds and shadows so cloudy pixels aren't counted | Past seasons, Research |
+| Landsat surface reflectance (USGS) | https://www.usgs.gov/landsat-missions/landsat-collection-2-surface-reflectance | Turning raw image numbers into real brightness for greenness | Past seasons, Research |
+| Sentinel-2 L2A (ESA Copernicus, via Planetary Computer) | https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2A_MSIL2A_20240309T043701_R033_T45RYJ_20240309T091652 | A sharper 10 m photo of the field area (9 Mar 2024) | My field |
+
+### Methods and calculation guides
+
+| Source | Link | Helps with | Used on |
+|---|---|---|---|
+| FAO-56 (crop water need method) | https://www.fao.org/4/X0490E/x0490e08.htm | Calculating ETo, how much water plants lose each day, from POWER weather | My field, Past seasons, Rotations, Water, Report |
+| FAO-56 Chapter 6 (crop coefficients) | https://www.fao.org/4/X0490E/x0490e0b.htm | Turning ETo into the need of rice, mustard, potato (ETc = Kc × ETo) | Rotations, Water |
+
+### Bangladesh farming evidence (not NASA, used together with it)
+
+| Source | Link | Helps with | Used on |
+|---|---|---|---|
+| BARC Fertilizer Recommendation Guide 2024 | https://apps.barc.gov.bd/fertilizer_recommendation/FRG%20English%2030.10.2024.pdf | Soil classes for the Rangpur area (AEZ-3); fertilizer product conversion (urea, TSP, MOP) | Water, Clinic |
+| BARC Khamari | https://portal.cropzoning.gov.bd/aboutKhamari | Location-based crop and nutrient planning reference | Clinic, evidence register |
+| Hossain et al. 2022 (Mithapukur & Pirganj trials) | https://doi.org/10.1155/2022/6288494 | Real local yields and irrigation totals for the rotation options | Rotations, Planner |
+| Islam et al. 2014 (Gangachara trial) | https://www.banglajol.info/index.php/IJARIT/article/view/22645 | The short Aman → potato → mungbean option | Rotations, Recovery |
+| BARI mustard production technology | https://baritechnology.org/m/crops/tech_detail/353 | Mustard seed rate (7 kg/ha) | Planner |
+| BRRI dhan71 variety page | https://riceprofile.brri.gov.bd/varieties/80 | Rice duration for recovery planting windows | Recovery |
+| DAE/BAMIS Rangpur bulletin (Oct 2020) | https://www.bamis.gov.bd/res/bulletins/2020/10/08/22190.pdf#page=5 | Mustard sowing window | Recovery |
+| BRRI rice disease guide | https://riceprofile.brri.gov.bd/cultivation/disease | Rice symptom checks | Clinic |
+| IRRI rice disease diagnosis | https://www.knowledgebank.irri.org/images/docs/diagnostic-of-common-diseases-of-rice.pdf | Rice symptom checks | Clinic |
+| BRRI Leaf Colour Chart | https://www.knowledgebank-brri.org/lcc.php | Checking leaf nitrogen by colour | Clinic |
+
+The app holds 33 agronomy sources in total. All of them open from the **Evidence register** in the sidebar. The full list is in [13-source-register.md](13-source-register.md).
+
+### Maps
+
+| Source | Link | Helps with | Used on |
+|---|---|---|---|
+| geoBoundaries gbOpen (Bangladesh ADM3) | https://www.geoboundaries.org/ | District and upazila borders on the map (CC BY 3.0 IGO) | My field |
+| Leaflet 1.9.4 | https://leafletjs.com/ | The interactive map itself | My field |
+
 ## Screen by screen
 
 | Screen (route) | What the farmer does here | NASA data used | What the data shows on this screen |
