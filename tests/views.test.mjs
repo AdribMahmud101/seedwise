@@ -503,3 +503,106 @@ test("3D terrain view HTML elements and chips", async () => {
   // Switch back to 2D
   setViewMode("2d");
 });
+
+test("#field and #seasons render >= 3 truth badges each in EN and BN", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  for (const lang of ["en", "bn"]) {
+    state.lang = lang;
+    state.fieldId = "mithapukur";
+    
+    // Test #field view (home)
+    const fieldHtml = home();
+    const fieldTruthCount = (fieldHtml.match(/class="truth/g) || []).length;
+    assert.ok(fieldTruthCount >= 3, `#field view renders >= 3 truth badges in ${lang} (found ${fieldTruthCount})`);
+    
+    // Check for specific truth badges in #field
+    assert.ok(fieldHtml.includes("class=\"truth") || fieldHtml.includes("class='truth'"), `Truth label class in #field ${lang}`);
+    assert.ok(fieldHtml.includes("Estimated") || fieldHtml.includes("স্যাটেলাইট অনুমান") || fieldHtml.includes("Scenario") || fieldHtml.includes("কাল্পনিক পরিকল্পনা") || fieldHtml.includes("Measured") || fieldHtml.includes("জমি থেকে মাপা"), `Truth label text in #field ${lang}`);
+    
+    // Test #seasons view (seasonView)
+    state.historyYear = 2024;
+    state.month = 10;
+    const seasonsHtml = seasonView();
+    const seasonsTruthCount = (seasonsHtml.match(/class="truth/g) || []).length;
+    assert.ok(seasonsTruthCount >= 3, `#seasons view renders >= 3 truth badges in ${lang} (found ${seasonsTruthCount})`);
+    
+    // Check for specific truth badges in #seasons
+    assert.ok(seasonsHtml.includes("class=\"truth") || seasonsHtml.includes("class='truth'"), `Truth label class in #seasons ${lang}`);
+    assert.ok(seasonsHtml.includes("Estimated") || seasonsHtml.includes("স্যাটেলাইট অনুমান") || seasonsHtml.includes("Scenario") || seasonsHtml.includes("কাল্পনিক পরিকল্পনা") || seasonsHtml.includes("Measured") || seasonsHtml.includes("জমি থেকে মাপা") || seasonsHtml.includes("Unknown") || seasonsHtml.includes("অজানা"), `Truth label text in #seasons ${lang}`);
+  }
+});
+
+test("no '%' after wetness value in #field and #seasons", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  for (const lang of ["en", "bn"]) {
+    state.lang = lang;
+    state.fieldId = "mithapukur";
+    
+    // Test #field view
+    const fieldHtml = home();
+    
+    // Find wetness values and ensure no % follows them
+    // Look for the wetness stat section
+    const wetnessStat = fieldHtml.match(/Surface wetness[\s\S]*?<\/article>/);
+    if (wetnessStat) {
+      const wetnessText = wetnessStat[0];
+      // Check that wetness value is not followed by %
+      const wetnessValueMatch = wetnessText.match(/(\d+\.\d+|\d+)[\s\S]*?<\/div>/);
+      if (wetnessValueMatch) {
+        assert.ok(!wetnessText.includes("%"), `No % after wetness value in #field ${lang}`);
+      }
+    }
+    
+    // Test #seasons view
+    state.historyYear = 2024;
+    state.month = 10;
+    const seasonsHtml = seasonView();
+    
+    // Check that wetness values in charts are not followed by %
+    assert.ok(!seasonsHtml.includes("wetness index 0–1%") && !seasonsHtml.includes("আর্দ্রতা সূচক ০–১%"), `No % in wetness index label in #seasons ${lang}`);
+    
+    // Check for any wetness values followed by %
+    const wetnessIndexMatch = seasonsHtml.match(/wetness index 0–1[\s\S]*?<\/p>/);
+    if (wetnessIndexMatch) {
+      assert.ok(!wetnessIndexMatch[0].includes("%"), `No % after wetness index in #seasons ${lang}`);
+    }
+  }
+});
+
+test("truth badges in #field and #seasons have proper source, date, cell info", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  state.historyYear = 2024;
+  state.month = 10;
+  
+  // Test #field view - check for title attributes with source info
+  const fieldHtml = home();
+  assert.ok(fieldHtml.includes("source:") || fieldHtml.includes("source:"), `Truth badges in #field have source info`);
+  assert.ok(fieldHtml.includes("date:") || fieldHtml.includes("date:"), `Truth badges in #field have date info`);
+  assert.ok(fieldHtml.includes("cell:") || fieldHtml.includes("cell:"), `Truth badges in #field have cell info`);
+  
+  // Test #seasons view
+  const seasonsHtml = seasonView();
+  assert.ok(seasonsHtml.includes("source:") || seasonsHtml.includes("source:"), `Truth badges in #seasons have source info`);
+  assert.ok(seasonsHtml.includes("date:") || seasonsHtml.includes("date:"), `Truth badges in #seasons have date info`);
+  assert.ok(seasonsHtml.includes("cell:") || seasonsHtml.includes("cell:"), `Truth badges in #seasons have cell info`);
+});
