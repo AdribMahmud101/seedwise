@@ -60,6 +60,7 @@ This demonstration uses frozen 2024 daily data and 2021–2025 monthly data, wit
 - `public/data/history.json` has 60 monthly records per site for 2021–2025.
 - `public/data/agronomy.json` contains 33 references, five crop profiles, four rotation templates, BARC guidance, 25 symptoms, ten clinic pathways and conditional recovery options.
 - `data-raw/` contains original POWER responses and four-band Landsat GeoTIFF windows. The app serves only `public/` and the built `out/`.
+- Published trials: Hossain et al. 2022 DOI [10.1155/2022/6288494](https://doi.org/10.1155/2022/6288494); Sarker et al. 2026 (RARS Rangpur) DOI [10.1155/ioa/9089088](https://doi.org/10.1155/ioa/9089088).
 - Read `docs/method.md`, `docs/agronomy-notes.md`, `docs/credits.md` and `docs/judging-walkthrough.md` for methods, sources and a two-minute demo.
 
 ## Reproduce the data
