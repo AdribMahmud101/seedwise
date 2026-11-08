@@ -1,6 +1,6 @@
 # Agronomy evidence and model boundaries
 
-Reviewed 2 November 2026. `public/data/agronomy.json` is a compact reference asset for the Rangpur demonstration. It includes 17 source records, five crop records, four rotation candidates, ten symptom pathways, an AEZ context matrix, and research workflow requirements. No measured soil test, pest diagnosis, farmer yield, aquifer recharge, or groundwater level is supplied for a demo polygon.
+Reviewed 2 November 2026. `public/data/agronomy.json` is a compact reference asset for the Rangpur demonstration. It includes 33 source records, five crop records, four rotation candidates, 25 symptoms, ten condition pathways, an AEZ context matrix, and research workflow requirements. No measured soil test, pest diagnosis, farmer yield, aquifer recharge, or groundwater level is supplied for a demo polygon.
 
 ## Integration contract
 
