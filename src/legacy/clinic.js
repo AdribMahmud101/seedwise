@@ -15,6 +15,7 @@ import {
   header,
   panel,
   tag,
+  truth,
   chips,
   input,
   select,
@@ -57,7 +58,7 @@ function clinic() {
   );
 }
 function symptomView() {
-  return `<div class="grid-equal">${panel(
+  return `<div class="grid-equal">${truth('FARMER_REPORTED', { source: 'Symptom checklist' })}${panel(
     t('What do you see?', 'কী লক্ষণ দেখছেন?'),
     `<div class="step-indicator">01 / ${t('Choose crop', 'ফসল বাছুন')}</div>${select(
       t('Affected crop', 'আক্রান্ত ফসল'),
@@ -104,7 +105,7 @@ function fertilizer() {
     )}${input(t('Variety', 'জাত'), 'variety', '', 'required maxlength="100"', 'text')}${input(t('Lab or extension office', 'ল্যাব বা কৃষি অফিস'), 'lab', '', 'required maxlength="120"', 'text')}${input(t('Soil test date', 'মাটি পরীক্ষার দিন'), 'testDate', '', 'required', 'date')}${input(t('Area receiving fertilizer (ha)', 'সার প্রয়োগের জমি (হেক্টর)'), 'fertArea', area().toFixed(2), 'min="0.001" max="100000" step="any" required')}${input(t('Net N (kg/ha)', 'অবশিষ্ট N (কেজি/হেক্টর)'), 'n', '', 'min="0" max="1000" step="any" required')}${input(t('Net P (kg/ha)', 'অবশিষ্ট P (কেজি/হেক্টর)'), 'p', '', 'min="0" max="1000" step="any" required')}${input(t('Net K (kg/ha)', 'অবশিষ্ট K (কেজি/হেক্টর)'), 'k', '', 'min="0" max="1000" step="any" required')}</div>
  <label class="check-label"><input type="checkbox" required>${t('My recommendation uses elemental N, P and K, with previous inputs already credited.', 'আমার সুপারিশ মৌলিক N, P, K হিসেবে দেওয়া এবং আগের সার বাদ দেওয়া হয়েছে।')}</label><button class="button primary">${t('Calculate product amounts', 'সারের পরিমাণ হিসাব করুন')}</button></form>`
   )}
- <section class="panel"><div class="panel-header"><h2>${t('Product amounts', 'সারের পরিমাণ')}</h2>${tag('BARC 2024', 'green')}</div><div class="panel-body"><div id="fert-result" class="notice">${t('Enter the soil-test recommendation to calculate amounts for this field.', 'এই জমির সারের পরিমাণ দেখতে মাটি পরীক্ষার সুপারিশ লিখুন।')}</div><div class="spacer"></div><p class="note">${t('BARC product fractions: urea 46% N, TSP 20% elemental P, and MOP 50% elemental K. Oxide-based P₂O₅ and K₂O values require a separate conversion. Mixed products require joint accounting.', 'BARC অনুযায়ী ইউরিয়ায় ৪৬% N, TSP-তে ২০% মৌলিক P ও MOP-তে ৫০% মৌলিক K। P₂O₅ বা K₂O হলে আগে মৌলিক এককে রূপান্তর করতে হবে।')}</p>${sources(['barc-frg2024'])}</div></section></div>`;
+ <section class="panel"><div class="panel-header"><h2>${t('Product amounts', 'সারের পরিমাণ')}</h2>${tag('BARC 2024', 'green')} ${truth('MODELED', { source: 'BARC 2024 calculator' })}</div><div class="panel-body"><div id="fert-result" class="notice">${t('Enter the soil-test recommendation to calculate amounts for this field.', 'এই জমির সারের পরিমাণ দেখতে মাটি পরীক্ষার সুপারিশ লিখুন。')}</div><div class="spacer"></div><p class="note">${t('BARC product fractions: urea 46% N, TSP 20% elemental P, and MOP 50% elemental K. Oxide-based P₂O₅ and K₂O values require a separate conversion. Mixed products require joint accounting.', 'BARC অনুযায়ী ইউরিয়ায় ৪৬% N, TSP-তে ২০% মৌলিক P ও MOP-তে ৫০% মৌলিক K। P₂O₅ বা K₂O হলে আগে মৌলিক এককে রূপান্তর করতে হবে।')}</p>${sources(['barc-frg2024'])}</div></section></div>`;
 }
 function saveCase() {
   const r = {
@@ -212,12 +213,12 @@ function clinicSubmit(form) {
   const products = nutrientProducts(+d.n, +d.p, +d.k);
   document.querySelector('#fert-result').className = 'fertilizer-output';
   document.querySelector('#fert-result').innerHTML =
-    `<b>${esc(d.variety)} · ${num(+d.fertArea, 2)} ha</b><dl>${Object.entries(
+    `<b>${esc(d.variety)} · ${num(+d.fertArea, 2)} ha</b> ${truth('MODELED', { source: 'BARC 2024 calculator' })}<dl>${Object.entries(
       products
     )
       .map(
         ([key, value]) =>
-          `<dt>${{ urea: t('Urea', 'ইউরিয়া'), tsp: 'TSP', mop: 'MOP' }[key]}</dt><dd>${num(value * +d.fertArea, 2)} kg <small>(${num(value, 2)} kg/ha)</small></dd>`
+          `<dt>${{ urea: t('Urea', 'ইউরিয়া'), tsp: 'TSP', mop: 'MOP' }[key]}</dt><dd>${num(value * +d.fertArea, 2)} kg <small>(${num(value, 2)} kg/ha)</small> ${truth('SCENARIO', { source: 'BARC fractions' })}</dd>`
       )
       .join(
         ''
