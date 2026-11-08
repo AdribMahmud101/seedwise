@@ -33,6 +33,7 @@
   text-align: left;
   cursor: pointer;
   min-height: 133px;
+  min-width: 44px;
 }
 .rr-hazard .rr-sketch {
   width: 100px;
@@ -82,8 +83,8 @@
   top: 12px;
   border: 1px solid var(--line);
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
 }
@@ -289,7 +290,7 @@
   flex-wrap: wrap;
 }
 .rr-crop .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
 }
 .rr-crop h3 {
   font:
@@ -302,7 +303,7 @@
   margin: 4px 0 20px;
 }
 .rr-crop .tag {
-  font-size: 10px;
+  font-size: 12px;
 }
 .rr-months {
   display: grid;
@@ -332,7 +333,7 @@
   border-top: 1px solid #e7e9e1;
 }
 .rr-dates dt {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 4px;
 }
@@ -482,7 +483,7 @@
     height: 61px;
   }
   .rr-hazard small {
-    font-size: 11px;
+    font-size: 12px;
   }
   .rr-crop-grid {
     grid-template-columns: 1fr 1fr;
@@ -507,14 +508,14 @@
     height: 51px;
   }
   .rr-hazard small {
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .rr-radio {
-    width: 16px;
-    height: 16px;
-    right: 6px;
-    top: 6px;
+    width: 24px;
+    height: 24px;
+    right: 8px;
+    top: 8px;
   }
   .rr-assessment .form-grid,
   .rr-crop-grid,

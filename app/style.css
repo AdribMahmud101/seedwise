@@ -41,7 +41,7 @@ body {
   background: var(--paper);
   color: var(--ink);
   font:
-    15px/1.5 Plex,
+    16px/1.5 Plex,
     Bangla,
     sans-serif;
 }
@@ -128,7 +128,7 @@ small {
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .eyebrow.light {
@@ -185,12 +185,12 @@ small {
   letter-spacing: -0.5px;
 }
 .brand small {
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
 .nav-label {
-  font: 9px Mono;
+  font: 12px Mono;
   letter-spacing: 1.7px;
   margin: 5px 13px 12px;
   color: var(--muted);
@@ -202,11 +202,12 @@ small {
   border: 0;
   width: 100%;
   text-align: left;
-  padding: 12px 13px;
+  padding: 12px 14px;
+  min-height: 44px;
   border-radius: 5px;
   background: transparent;
   color: #60695d;
-  font-size: 13px;
+  font-size: 14px;
   margin-bottom: 3px;
 }
 .nav-item.active {
@@ -218,7 +219,7 @@ small {
 }
 .nav-item .number {
   margin-left: auto;
-  font: 9px Mono;
+  font: 12px Mono;
   opacity: 0.55;
 }
 .nav-divider {
@@ -244,7 +245,7 @@ small {
   border-radius: 50%;
 }
 .side-bottom p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
   color: var(--muted);
 }
@@ -257,7 +258,7 @@ small {
 .sidebar-foot span {
   border: 1px solid #c9cfbc;
   border-radius: 3px;
-  font: 9px Mono;
+  font: 12px Mono;
   padding: 4px 6px;
 }
 .workspace {
@@ -290,7 +291,7 @@ small {
   align-items: center;
 }
 .top-actions .snapshot {
-  font: 10px Mono;
+  font: 12px Mono;
   color: var(--muted);
 }
 .lang-toggle {
@@ -302,8 +303,13 @@ small {
 .lang-toggle button {
   border: 0;
   background: transparent;
-  padding: 3px 8px;
-  font-size: 11px;
+  padding: 6px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .lang-toggle button.on {
   background: var(--ink);
@@ -312,6 +318,9 @@ small {
 }
 .mobile-menu {
   display: none;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
 }
 .avatar {
   width: 30px;
@@ -319,7 +328,7 @@ small {
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
-  font: 10px Mono;
+  font: 12px Mono;
   border-radius: 50%;
 }
 .main {
@@ -350,10 +359,12 @@ small {
 }
 .button {
   border: 1px solid var(--line);
-  padding: 9px 13px;
+  padding: 10px 14px;
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 4px;
   background: var(--surface);
-  font-size: 12px;
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -375,8 +386,10 @@ small {
   filter: brightness(0.97);
 }
 .button.small {
-  padding: 6px 9px;
-  font-size: 11px;
+  padding: 8px 12px;
+  font-size: 14px;
+  min-height: 44px;
+  min-width: 44px;
 }
 .button.ghost {
   border: 0;
@@ -388,18 +401,20 @@ small {
 }
 .icon-button {
   border: 1px solid var(--line);
-  width: 33px;
-  height: 33px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--surface);
 }
 .tag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.3;
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -429,7 +444,7 @@ small {
   border-color: #48613e;
 }
 .note {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.6;
 }
@@ -501,9 +516,10 @@ small {
 }
 .field-chip {
   border: 1px solid var(--line);
-  padding: 8px 12px;
+  padding: 10px 14px;
+  min-height: 44px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
   background: var(--surface);
   display: flex;
   gap: 7px;
@@ -533,7 +549,7 @@ small {
   z-index: 450;
   background: #fffef5ec;
   padding: 7px 10px;
-  font: 10px Mono;
+  font: 12px Mono;
   border: 1px solid #ffffff88;
   border-radius: 3px;
   max-width: 75%;
@@ -547,7 +563,7 @@ small {
   background: #253b2bea;
   color: #e5eddc;
   padding: 7px 10px;
-  font: 10px Mono;
+  font: 12px Mono;
   border: 1px solid #789062;
   border-radius: 3px;
   pointer-events: none;
@@ -562,14 +578,14 @@ small {
   background: #f9f9f1;
 }
 .map-actions .note {
-  font-size: 10px;
+  font-size: 12px;
 }
 .map-controls {
   display: flex;
   gap: 5px;
 }
 .leaflet-control-attribution {
-  font: 9px Plex !important;
+  font: 12px Plex !important;
   background: rgba(255, 254, 249, 0.85) !important;
 }
 .leaflet-container {
@@ -581,7 +597,7 @@ small {
   border: 1px solid #b4c0a0 !important;
 }
 .leaflet-tooltip {
-  font: 10px Mono !important;
+  font: 12px Mono !important;
   border-radius: 2px !important;
   background: #eff4dedc !important;
   border-color: #aab98b !important;
@@ -593,7 +609,7 @@ small {
 }
 .search-inline input {
   width: 170px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 7px 9px;
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -618,7 +634,7 @@ small {
   border-bottom: 1px solid var(--line);
 }
 .field-meta dt {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 3px;
 }
@@ -645,7 +661,7 @@ small {
   padding: 12px 22px;
   border-top: 1px solid var(--line);
   background: #f0f2e6;
-  font-size: 10px;
+  font-size: 12px;
   color: #667258;
   display: flex;
   gap: 7px;
@@ -670,7 +686,7 @@ small {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .stat-top svg {
@@ -690,7 +706,7 @@ small {
   color: var(--muted);
 }
 .stat-foot {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .spark {
@@ -705,7 +721,7 @@ small {
   overflow: visible;
 }
 .chart text {
-  font: 10px Mono;
+  font: 12px Mono;
   fill: #78806e;
 }
 .chart .grid {
@@ -716,7 +732,7 @@ small {
   display: flex;
   gap: 18px;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 10px;
   flex-wrap: wrap;
@@ -737,7 +753,7 @@ small {
   height: 32px;
   flex: 1;
   text-align: center;
-  font: 9px Mono;
+  font: 12px Mono;
   padding-top: 9px;
   border-radius: 2px;
   color: #53614b;
@@ -766,7 +782,7 @@ small {
 .month-labels span {
   flex: 1;
   text-align: center;
-  font: 8px Mono;
+  font: 12px Mono;
   color: var(--muted);
 }
 .text-link {
@@ -793,7 +809,7 @@ small {
   grid-column: 1/-1;
 }
 .form-field label {
-  font-size: 11px;
+  font-size: 12px;
   color: #535d4e;
 }
 .form-field input,
@@ -816,7 +832,7 @@ small {
   background: #eeeee5;
 }
 .form-help {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 input[type='range'] {
@@ -862,11 +878,11 @@ input[type='checkbox'] {
   margin-bottom: 6px;
 }
 .priority-item .count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .priority-note {
-  font-size: 11px;
+  font-size: 12px;
   border-top: 1px solid var(--line);
   padding-top: 15px;
   color: var(--muted);
@@ -878,7 +894,7 @@ input[type='checkbox'] {
   margin-bottom: 18px;
 }
 .preset {
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid var(--line);
   background: #f4f5eb;
   border-radius: 3px;
@@ -912,7 +928,7 @@ input[type='checkbox'] {
 }
 .rank-num {
   color: #9aab85;
-  font: 11px Mono;
+  font: 12px Mono;
   margin-right: 8px;
 }
 .rotation-sequence {
@@ -941,7 +957,7 @@ input[type='checkbox'] {
   display: block;
 }
 .score small {
-  font-size: 9px;
+  font-size: 12px;
   white-space: nowrap;
   color: var(--muted);
 }
@@ -964,7 +980,7 @@ input[type='checkbox'] {
   margin-top: 17px;
 }
 .rotation-info p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 4px;
 }
@@ -978,7 +994,7 @@ input[type='checkbox'] {
   gap: 10px;
 }
 .rotation-warning {
-  font-size: 11px;
+  font-size: 12px;
   color: #876137;
   margin-top: 12px;
 }
@@ -989,7 +1005,7 @@ input[type='checkbox'] {
 }
 .mini-contributions div {
   flex: 1;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
 }
 .mini-contributions meter {
@@ -1006,11 +1022,15 @@ input[type='checkbox'] {
   border-radius: 4px;
 }
 .segmented button {
-  padding: 6px 10px;
+  padding: 8px 12px;
+  min-height: 44px;
   border: 0;
   background: none;
   border-radius: 2px;
-  font-size: 11px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .segmented .active {
   background: #e1e8d4;
@@ -1076,7 +1096,7 @@ input[type='checkbox'] {
 }
 .image-strip p {
   padding: 8px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .empty {
   padding: 26px;
@@ -1099,7 +1119,7 @@ input[type='checkbox'] {
   cursor: grab;
 }
 .planner-hint {
-  font: 10px Mono;
+  font: 12px Mono;
   color: var(--muted);
   text-align: center;
   padding: 8px;
@@ -1121,7 +1141,7 @@ input[type='checkbox'] {
   font: 24px Fraunces;
 }
 .plan-result small {
-  font-size: 10px;
+  font-size: 12px;
   color: #69725f;
   display: block;
 }
@@ -1129,7 +1149,7 @@ input[type='checkbox'] {
   margin-bottom: 13px;
 }
 .mini-field {
-  font-size: 11px;
+  font-size: 12px;
   padding: 9px 11px;
   border: 1px solid var(--line);
   margin-top: 12px;
@@ -1168,8 +1188,9 @@ input[type='checkbox'] {
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: 3px;
-  padding: 9px;
-  font-size: 11px;
+  padding: 11px;
+  min-height: 44px;
+  font-size: 14px;
   cursor: pointer;
 }
 .symptom-option:has(input:checked) {
@@ -1196,7 +1217,7 @@ input[type='checkbox'] {
   margin: 8px 0;
 }
 .condition-result .source {
-  font-size: 10px;
+  font-size: 12px;
 }
 .clinic-placeholder {
   padding: 34px 25px;
@@ -1216,7 +1237,7 @@ input[type='checkbox'] {
   color: var(--muted);
 }
 .step-indicator {
-  font: 10px Mono;
+  font: 12px Mono;
   color: var(--green);
   margin-bottom: 6px;
 }
@@ -1244,10 +1265,10 @@ input[type='checkbox'] {
 .data-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 11px;
+  font-size: 12px;
 }
 .data-table th {
-  font: 9px Mono;
+  font: 12px Mono;
   text-transform: uppercase;
   letter-spacing: 0.7px;
   color: var(--muted);
@@ -1274,7 +1295,9 @@ input[type='checkbox'] {
   margin-bottom: 20px;
 }
 .tabbar button {
-  padding: 10px 0 12px;
+  padding: 12px 10px;
+  min-height: 44px;
+  font-size: 14px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
@@ -1303,14 +1326,14 @@ input[type='checkbox'] {
   margin: 7px 0 3px;
 }
 .research-stat span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .record-count {
   background: #e3ead7;
   padding: 2px 7px;
   border-radius: 9px;
-  font: 10px Mono;
+  font: 12px Mono;
   margin-left: 5px;
 }
 .progress-line {
@@ -1350,7 +1373,7 @@ input[type='checkbox'] {
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 7px;
 }
 .water-bar strong {
@@ -1401,7 +1424,7 @@ input[type='checkbox'] {
   margin-top: 4px;
 }
 .source-no {
-  font: 11px Mono;
+  font: 12px Mono;
   color: #8b997d;
 }
 .workspace-foot {
@@ -1411,7 +1434,7 @@ input[type='checkbox'] {
   margin-top: 26px;
   padding-top: 15px;
   border-top: 1px solid var(--line);
-  font: 9px Mono;
+  font: 12px Mono;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1425,7 +1448,7 @@ input[type='checkbox'] {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin: 10px 0;
 }
@@ -1433,7 +1456,7 @@ input[type='checkbox'] {
   height: 17px;
 }
 .source-link {
-  font-size: 10px;
+  font-size: 12px;
   text-underline-offset: 3px;
 }
 .bullet-list {
@@ -1447,7 +1470,7 @@ input[type='checkbox'] {
 .status-strip {
   display: flex;
   gap: 15px;
-  font-size: 10px;
+  font-size: 12px;
   flex-wrap: wrap;
   border-top: 1px solid var(--line);
   padding: 11px 20px;
@@ -1504,8 +1527,12 @@ dialog .modal-body {
   border: 0;
   background: #e8efdc;
   color: #536849;
-  padding: 4px 7px;
-  font: 9px Mono;
+  padding: 6px 10px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 12px Mono;
   border-radius: 3px;
   cursor: pointer;
 }
@@ -1515,12 +1542,12 @@ dialog .modal-body {
   padding-top: 12px;
 }
 .disclosure summary {
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   color: var(--muted);
 }
 .disclosure p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 10px;
 }
@@ -1606,8 +1633,10 @@ dialog .modal-body {
     font-size: 24px;
   }
   .page-head-actions .button {
-    padding: 8px 10px;
-  }
+  font-size: 14px;
+  min-height: 44px;
+  padding: 8px 12px;
+}
   .rotation-info {
     gap: 12px;
   }
@@ -1693,13 +1722,13 @@ dialog .modal-body {
     padding: 14px 11px;
   }
   .stat-top {
-    font-size: 10px;
+    font-size: 12px;
   }
   .stat-value {
     font-size: 23px;
   }
   .stat-foot {
-    font-size: 9px;
+    font-size: 12px;
   }
   .planner-canvas {
     height: 370px;
@@ -1745,7 +1774,7 @@ dialog .modal-body {
     padding: 0 17px;
   }
   .crumb {
-    font-size: 10px;
+    font-size: 12px;
     gap: 8px;
   }
   .crumb .crumb-region {
@@ -1772,9 +1801,10 @@ dialog .modal-body {
     font-size: 12px;
   }
   .page-head-actions .button {
-    font-size: 10px;
-    padding: 7px;
-  }
+  font-size: 14px;
+  min-height: 44px;
+  padding: 8px 12px;
+}
   .page-head-actions .button svg {
     width: 14px;
     height: 14px;
@@ -1790,7 +1820,7 @@ dialog .modal-body {
     margin-bottom: 12px;
   }
   .field-chip {
-    font-size: 10px;
+    font-size: 12px;
     padding: 7px 9px;
   }
   .field-map {
@@ -1829,7 +1859,7 @@ dialog .modal-body {
     font-size: 26px;
   }
   .stat-foot {
-    font-size: 10px;
+    font-size: 12px;
   }
   .data-stat:last-child {
     border: 0;
@@ -1887,7 +1917,7 @@ dialog .modal-body {
     gap: 6px;
   }
   .symptom-option {
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px;
   }
   .search-inline input {
@@ -1910,10 +1940,10 @@ dialog .modal-body {
   .timeline-strip div {
     height: 26px;
     padding-top: 7px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .month-labels span {
-    font-size: 7px;
+    font-size: 12px;
   }
   .image-strip {
     gap: 7px;
@@ -1934,15 +1964,16 @@ dialog .modal-body {
     font-size: 24px;
   }
   .research-stat .eyebrow {
-    font-size: 8px;
+    font-size: 12px;
     letter-spacing: 0.3px;
   }
   .tabbar {
     gap: 18px;
   }
   .tabbar button {
-    font-size: 12px;
-  }
+  font-size: 14px;
+  min-height: 44px;
+}
   .source-row {
     grid-template-columns: 23px 1fr;
   }
@@ -1950,7 +1981,7 @@ dialog .modal-body {
     grid-column: 2;
   }
   .workspace-foot {
-    font-size: 8px;
+    font-size: 12px;
     line-height: 1.6;
   }
   .workspace-foot span:last-child {
@@ -1963,7 +1994,7 @@ dialog .modal-body {
     font-size: 25px;
   }
   .inline-options {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1976,7 +2007,7 @@ dialog .modal-body {
 @media print {
   body {
     background: white;
-    font-size: 11px;
+    font-size: 12px;
   }
   .sidebar,
   .topbar,
@@ -2019,7 +2050,7 @@ dialog .modal-body {
     color: #222;
   }
   .notice {
-    font-size: 10px;
+    font-size: 12px;
   }
   .leaflet-control {
     display: none;
@@ -2057,7 +2088,7 @@ dialog .modal-body {
 .work-action small,
 .result-option small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 4px;
 }
@@ -2132,7 +2163,7 @@ dialog .modal-body {
 .priority-context p {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 9px;
 }
 .priority-context button {
@@ -2142,7 +2173,7 @@ dialog .modal-body {
   font-size: 12px;
 }
 .score small {
-  font: 10px Mono;
+  font: 12px Mono;
   color: var(--muted);
 }
 .mini-contributions {
@@ -2151,13 +2182,13 @@ dialog .modal-body {
   flex-wrap: wrap;
 }
 .mini-contributions span {
-  font-size: 10px;
+  font-size: 12px;
 }
 .plan-result > span {
   display: block;
 }
 .file-native {
-  font-size: 10px;
+  font-size: 12px;
   max-width: 100%;
   margin: 7px auto;
 }
@@ -2170,7 +2201,7 @@ dialog .modal-body {
   display: block;
 }
 .photo-drop small {
-  font-size: 10px;
+  font-size: 12px;
 }
 .quality-list > div {
   display: flex;
@@ -2230,7 +2261,9 @@ dialog .modal-body {
   margin: 16px 0 0;
 }
 .map-controls .button {
-  white-space: normal;
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 14px;
 }
 .report-only {
   display: none;
@@ -2290,7 +2323,7 @@ dialog .modal-body {
     white-space: normal;
   }
   .quality-list > div {
-    font-size: 11px;
+    font-size: 12px;
   }
   .rotation-bottom .toolbar-inline {
     flex-wrap: wrap;
@@ -2302,13 +2335,13 @@ dialog .modal-body {
     white-space: nowrap;
   }
   .field-selector .mono {
-    font-size: 9px;
+    font-size: 12px;
   }
   .sidebar.open .side-bottom {
     margin-top: auto;
   }
   .observation-thumb div {
-    font-size: 11px;
+    font-size: 12px;
   }
   .section-label {
     gap: 10px;
@@ -2343,7 +2376,7 @@ dialog .modal-body {
   font-size: 12px;
 }
 .report-section .timeline-strip div {
-  font-size: 8px;
+  font-size: 12px;
 }
 .timeline-controls {
   margin-top: 12px;
@@ -2379,13 +2412,12 @@ dialog .modal-body {
   }
 }
 .unit-note {
-  font:
-    10px Plex,
+  font: 12px Plex,
     Bangla;
   color: var(--muted);
 }
 .field-meta dt {
-  font-size: 11px;
+  font-size: 12px;
 }
 .map-actions .map-controls .button svg {
   width: 14px;
@@ -2428,7 +2460,9 @@ dialog .modal-body {
   max-width: 80%;
 }
 .map-controls .button {
-  min-height: 30px;
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 14px;
 }
 .research-stat span {
   display: block;
@@ -2448,13 +2482,13 @@ dialog .modal-body {
     flex-wrap: wrap;
   }
   .field-meta dt {
-    font-size: 10px;
+    font-size: 12px;
   }
   .button {
-    min-height: 34px;
+    min-height: 44px;
   }
   .field-chip {
-    min-height: 35px;
+    min-height: 44px;
   }
   .map-overline {
     max-width: 70%;
