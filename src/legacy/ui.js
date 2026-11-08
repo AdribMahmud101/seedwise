@@ -396,6 +396,17 @@ function chart(
       lines += `<text x="${x(i)}" y="${height - 7}" text-anchor="middle">${n === 12 ? monthName(i, true) : num(i + 1)}</text>`;
   return `<div class="chart-legend">${series.map((s) => `<span><i class="legend-dot" style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}<span>${esc(unit)}</span></div><svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(description)}">${lines}</svg>`;
 }
+function stateEmpty(msg, actionLabel = "", action = null) {
+  const hasAction = actionLabel && action;
+  return `<div class="empty">${icon("note", 31)}${hasAction ? `<h3>${esc(msg)}</h3><p>${button(esc(actionLabel), action, "primary")}</p>` : `<h3>${esc(msg)}</h3><p>${esc(actionLabel)}</p>`}</div>`;
+}
+function stateError(msg, retryAction = null) {
+  const hasRetry = retryAction !== null;
+  return `<div class="error-state">${icon("bug", 31)}<h3>${esc(msg)}</h3>${hasRetry ? `<p>${button(t("Retry", "আবার চেষ্টা করুন"), retryAction)}</p>` : ""}</div>`;
+}
+function exampleBanner() {
+  return `<div class="example-banner">${t("Example — not your field", "উদাহরণ — আপনার জমি নয়")}</div>`;
+}
 
 export {
   recordId,
@@ -439,4 +450,7 @@ export {
   csv,
   timeline,
   chart,
+  stateEmpty,
+  stateError,
+  exampleBanner,
 };
