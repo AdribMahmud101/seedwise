@@ -27,7 +27,7 @@
 |---|---|---|---|
 | 1 | Doc fixes: POWER grid wording, `agronomy-notes.md` 17 → 33 sources + 25 symptoms, mark VIS reference-only, drop STI, record this spec as the M1 audit | D-C8, C10, C13, C14, C16 | M1 |
 | 2 | Canonical provenance enum + farmer labels + review status; wetness-index display fix; T-UNIT test | D-C5, C6 | M1 |
-| 3 | SMAP L4 SFMC/RZMC + percentiles via POWER, frozen into the data pack, shown as a data card | D-C11 | M2 |
+| 3 | SMAP L4 SFMC/RZMC + percentiles via POWER, frozen into the data pack, shown as a data card. **Access route:** POWER's public SMAP Zarr store (the daily point API returned -999 on 8 Nov 2026), see 17 §3 | D-C11 | M2 |
 | 4 | Tiered field-kit advisories (pH, LCC, VSA, AWD, history) + tests; no mm/lime amounts | D-C1, C16 | M2/M3 |
 | 5 | Nav grouping into 5 farmer areas; self-hosted three.js; 3D toggle in `#field` and `#water` on a Mithapukur demo field; calculators with documented formulas and farmer-entered costs | D-C4, C2, C7, C15 | M3/M5 |
 | 6 | Event replay limited to archive-verified 2023–2024 events | D-C17 | M5 |
