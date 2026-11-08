@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { state, loadData, truth } from "../src/legacy/ui.js";
+import { state, loadData, truth, stateEmpty, stateError, exampleBanner } from "../src/legacy/ui.js";
 import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N } from "../src/legacy/fields.js";
 import { rotations } from "../src/legacy/rotations.js";
 import { planner } from "../src/legacy/planner.js";
@@ -302,4 +302,129 @@ test("report source contains truth badges, index label, and Sources line", async
   const labelsSource = await readFile(new URL("../app/labels.css", import.meta.url), "utf8");
   assert.ok(labelsSource.includes("@media print"), "labels.css has print media query");
   assert.ok(labelsSource.includes(".truth") && labelsSource.includes("black"), "Print CSS makes truth badges visible in black and white");
+});
+
+test("stateEmpty renders empty state with message and action in EN and BN", () => {
+  state.lang = "en";
+  const html = stateEmpty("No records found", "Add record", "add-record");
+  assert.ok(html.includes("class=\"empty\""), "stateEmpty has empty class");
+  assert.ok(html.includes("No records found"), "stateEmpty shows message in EN");
+  assert.ok(html.includes("Add record"), "stateEmpty shows action label in EN");
+  assert.ok(html.includes("data-action=\"add-record\""), "stateEmpty has action");
+
+  state.lang = "bn";
+  const htmlBn = stateEmpty("রেকর্ড নেই", "রেকর্ড যোগ করুন", "add-record");
+  assert.ok(htmlBn.includes("class=\"empty\""), "stateEmpty has empty class in BN");
+  assert.ok(htmlBn.includes("রেকর্ড নেই"), "stateEmpty shows message in BN");
+  assert.ok(htmlBn.includes("রেকর্ড যোগ করুন"), "stateEmpty shows action label in BN");
+});
+
+test("stateEmpty renders without action when actionLabel is empty", () => {
+  state.lang = "en";
+  const html = stateEmpty("No data available");
+  assert.ok(html.includes("class=\"empty\""), "stateEmpty has empty class");
+  assert.ok(html.includes("No data available"), "stateEmpty shows message");
+  assert.ok(!html.includes("data-action"), "stateEmpty has no action button");
+});
+
+test("stateError renders error state with message and retry button in EN and BN", () => {
+  state.lang = "en";
+  const html = stateError("Failed to load data", "reload");
+  assert.ok(html.includes("class=\"error-state\""), "stateError has error-state class");
+  assert.ok(html.includes("Failed to load data"), "stateError shows message in EN");
+  assert.ok(html.includes("Retry"), "stateError shows Retry button in EN");
+  assert.ok(html.includes("data-action=\"reload\""), "stateError has retry action");
+
+  state.lang = "bn";
+  const htmlBn = stateError("তথ্য লোড হয়নি", "reload");
+  assert.ok(htmlBn.includes("class=\"error-state\""), "stateError has error-state class in BN");
+  assert.ok(htmlBn.includes("তথ্য লোড হয়নি"), "stateError shows message in BN");
+  assert.ok(htmlBn.includes("আবার চেষ্টা করুন"), "stateError shows Retry button in BN");
+});
+
+test("stateError renders without retry button when action is null", () => {
+  state.lang = "en";
+  const html = stateError("Error occurred");
+  assert.ok(html.includes("class=\"error-state\""), "stateError has error-state class");
+  assert.ok(html.includes("Error occurred"), "stateError shows message");
+  assert.ok(!html.includes("Retry"), "stateError has no retry button");
+});
+
+test("exampleBanner renders example banner in EN and BN", () => {
+  state.lang = "en";
+  const html = exampleBanner();
+  assert.ok(html.includes("class=\"example-banner\""), "exampleBanner has example-banner class");
+  assert.ok(html.includes("Example — not your field"), "exampleBanner shows EN text");
+
+  state.lang = "bn";
+  const htmlBn = exampleBanner();
+  assert.ok(htmlBn.includes("class=\"example-banner\""), "exampleBanner has example-banner class in BN");
+  assert.ok(htmlBn.includes("উদাহরণ — আপনার জমি নয়"), "exampleBanner shows BN text");
+});
+
+test("research log with empty records shows empty state and action", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  state.tabs.research = "log";
+  state.records = [];
+  
+  const { research } = await import("../src/legacy/research.js");
+  const html = research();
+  
+  assert.ok(html.includes("class=\"empty\""), "Research log shows empty state");
+  assert.ok(html.includes("Your field record starts here") || html.includes("আপনার মাঠের খাতা এখান থেকে শুরু"), "Research log shows empty message");
+});
+
+test("stateError function works correctly for data load errors", () => {
+  state.lang = "en";
+  const html = stateError("The field workspace could not open.", "reload");
+  assert.ok(html.includes("class=\"error-state\""), "stateError has error-state class");
+  assert.ok(html.includes("The field workspace could not open."), "stateError shows data load error message in EN");
+  assert.ok(html.includes("Retry"), "stateError shows Retry button in EN");
+  assert.ok(html.includes("data-action=\"reload\""), "stateError has reload action");
+
+  state.lang = "bn";
+  const htmlBn = stateError("ফিল্ড কর্মক্ষেত্র খোলা যায়নি।", "reload");
+  assert.ok(htmlBn.includes("class=\"error-state\""), "stateError has error-state class in BN");
+  assert.ok(htmlBn.includes("ফিল্ড কর্মক্ষেত্র খোলা যায়নি।"), "stateError shows data load error message in BN");
+  assert.ok(htmlBn.includes("আবার চেষ্টা করুন"), "stateError shows Retry button in BN");
+});
+
+test("recovery example shows example banner in EN and BN", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  const { recovery } = await import("../src/legacy/research.js");
+  
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  state.hazard = "flood";
+  state.recoveryDrafts["mithapukur:flood"] = {
+    phase: "ready",
+    date: "2024-10-15",
+    example: true,
+    ground: "unknown",
+    standing: "unknown",
+    water: "unknown",
+    exposure: "unknown",
+    delay: 0,
+    nextDate: "",
+    edge: "none"
+  };
+  
+  const { recovery: recoveryFn } = await import("../src/legacy/recovery.js");
+  const html = recoveryFn();
+  
+  assert.ok(html.includes("class=\"example-banner\"") || html.includes("Example — not your field") || html.includes("উদাহরণ — আপনার জমি নয়"), "Recovery example shows example banner");
 });
