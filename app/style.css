@@ -2672,3 +2672,6 @@ dialog .modal-body {
     background: #22332242;
   }
 }
+
+/* Hide the image chip while a tap card is open so they never overlap on phones. */
+.map-shell:has(.leaflet-popup) .map-overline { visibility: hidden; }

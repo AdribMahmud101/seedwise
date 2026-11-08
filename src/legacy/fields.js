@@ -644,24 +644,24 @@ async function mountMap() {
         <div class="inspect-coords">${num(lat, 5)}° N · ${num(lng, 5)}° E</div>
         <dl class="inspect-grid">
           <div class="inspect-item">
-            <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
-            <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : "—"}</dd>
+            <dt>${t("Surface wetness (index 0–1)", "মাটির আর্দ্রতা (সূচক ০–১)")}</dt>
+            <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : t("No data", "তথ্য নেই")}</dd>
           </div>
           <div class="inspect-item">
             <dt>${t("Rainfall", "বৃষ্টি")}</dt>
-            <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : "—"}</dd>
+            <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : t("No data", "তথ্য নেই")}</dd>
           </div>
           <div class="inspect-item">
             <dt>${t("Root wetness", "শিকড় আর্দ্রতা")}</dt>
-            <dd>${Number.isFinite(m.rootWetness) ? num(m.rootWetness, 2) : "—"}</dd>
+            <dd>${Number.isFinite(m.rootWetness) ? num(m.rootWetness, 2) : t("No data", "তথ্য নেই")}</dd>
           </div>
           <div class="inspect-item">
             <dt>${t("Temp", "তাপমাত্রা")}</dt>
-            <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : "—"}</dd>
+            <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : t("No data", "তথ্য নেই")}</dd>
           </div>
         </dl>
         <div class="inspect-footer">
-          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${esc(sensor)} · ${esc(dateStr)}
+          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${t("Wetness & temp: NASA POWER (~50 km cell)", "আর্দ্রতা ও তাপমাত্রা: NASA POWER (~৫০ কিমি)")} · ${t("Rain: GPM IMERG (~10 km)", "বৃষ্টি: GPM IMERG (~১০ কিমি)")} · ${esc(monthName())} 2024 ${t("monthly", "মাসিক")}
         </div>
       </div>
     `;
