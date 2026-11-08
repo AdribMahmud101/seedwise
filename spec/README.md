@@ -26,6 +26,7 @@ This folder reorganizes every spec, doc and prototype in the project into one st
 | 13 | [source-register](13-source-register.md) | External references S1–S25 and evidence used by the app |
 | 14 | [decision-recommendations](14-decision-recommendations.md) | **Final decisions** — override any conflicting source statement |
 | 15 | [ui-ux-spec](15-ui-ux-spec.md) | **UI/UX rules every agent follows** — base UI kept, done checklist |
+| 16 | [nasa-data-by-route](16-nasa-data-by-route.md) | Which NASA data each screen uses, in easy words |
 
 ## Source keys
 
