@@ -33,8 +33,10 @@ import {
   download,
   csv,
   chart,
+  truth,
 } from "./ui.js";
 import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
+import { isWebGLAvailable, reset3DView, dispose3DView } from "./terrain3d.js";
 
 let leafletMap = null,
   drawLayer = null,
@@ -43,6 +45,7 @@ let leafletMap = null,
   drawMode = false,
   regional = false,
   showLandsat = false,
+  viewMode = "2d", // '2d' | '3d'
   mapLayersData = null,
   ndviGridData = null,
   osmContextData = null,
@@ -210,6 +213,7 @@ function disposeMap() {
     leafletMap.remove();
     leafletMap = null;
   }
+  dispose3DView();
   drawLayer = null;
   drawMode = false;
   drawPoints = [];
@@ -409,7 +413,14 @@ function home() {
         button(t("Find a field", "জমি খুঁজুন"), "search", "primary", "search"),
     ) +
     chips() +
-    `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2>${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div>
+    `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
+ <div class="view-mode-bar">
+   <div class="map-segmented view-mode-switch" role="tablist" aria-label="${t("2D or 3D view", "দ্বিমাত্রিক বা ত্রিমাত্রিক দৃশ্য")}">
+     <button type="button" class="button ${viewMode === "2d" ? "active" : ""}" data-action="set-view-mode" data-value="2d" role="tab" aria-selected="${viewMode === "2d"}">${icon("field", 14)} ${t("2D map", "২ডি মানচিত্র")}</button>
+     <button type="button" class="button ${viewMode === "3d" ? "active" : ""}" data-action="set-view-mode" data-value="3d" role="tab" aria-selected="${viewMode === "3d"}">${icon("planner", 14)} ${t("3D view", "৩ডি দৃশ্য")}</button>
+   </div>
+   ${viewMode === "3d" ? `<div class="terrain-chips"><span class="chip-exaggeration tag">${t("Height exaggerated 2.5×", "উচ্চতা ২.৫ গুণ বাড়ানো")}</span><span class="chip-scenario-warning">${t("Real satellite + illustrative 3D — heights include trees and houses — check locally", "আসল স্যাটেলাইট ও নমুনা ৩ডি — উচ্চতায় গাছপালা ও বাড়ি অন্তর্ভুক্ত — স্থানীয়ভাবে যাচাই করুন")} ${truth("SCENARIO")}</span></div>` : ""}
+ </div>
  <div class="map-switcher">
    <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
      <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}">${icon("layers", 14)} ${t("Natural colour", "প্রাকৃতিক রং")}</button>
@@ -436,9 +447,28 @@ function home() {
    </div>
    <span class="map-timeline-status">${isDateReliable ? `<span class="tag green">✓ ${t("Clear observation", "পরিষ্কার ছবি")}</span>` : `<span class="tag amber">⊘ ${t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</span>`}</span>
  </div>
- <div class="map-shell"><div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div><div class="map-overline" id="map-label">${esc(chipLabel)}</div><div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div></div>
- ${legendHtml}
- <div class="map-actions"><span class="note">${esc(chipLabel)}</span><div class="map-controls">${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}</div></div><div id="drawing-help"></div></section>
+ <div class="map-shell">
+   <div id="field-map" class="field-map ${viewMode === "3d" ? "hidden-2d" : ""}" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div>
+   <div id="field-3d" class="field-3d-container ${viewMode === "3d" ? "" : "hidden-3d"}" role="region" aria-label="${t("3D terrain view", "ত্রিমাত্রিক ভূপ্রকৃতি দৃশ্য")}"></div>
+   <div class="map-overline" id="map-label">${esc(chipLabel)}</div>
+   <div class="map-bottom">${viewMode === "3d" ? `${t("Drag to rotate · Pinch/scroll to zoom", "ঘোরাতে টানুন · জুম করতে পিঞ্চ বা স্ক্রোল করুন")}` : `N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E`}</div>
+ </div>
+ ${viewMode === "3d" ? `
+   <div class="terrain-water-legend">
+     <span class="legend-swatch water-shade-swatch"></span>
+     <span class="legend-text">${t("Possible water collects here", "এখানে পানি জমতে পারে")}</span>
+     ${truth("MODELED")}
+   </div>
+ ` : legendHtml}
+ <div class="map-actions">
+   <span class="note">${viewMode === "3d" ? t("Illustrative 3D surface model", "নমুনা ত্রিমাত্রিক ভূপ্রকৃতি") : esc(chipLabel)}</span>
+   <div class="map-controls">
+     ${viewMode === "3d"
+       ? `${button(t("Reset view", "আগের দৃশ্য"), "reset-3d-view", "small reset-view-btn")}`
+       : `${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}`
+     }
+   </div>
+ </div><div id="drawing-help"></div></section>
  <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small></div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
@@ -585,6 +615,27 @@ function seasonView() {
   );
 }
 async function mountMap() {
+  if (viewMode === "3d") {
+    const container = document.querySelector("#field-3d");
+    if (!container) return;
+    try {
+      const { mount3DView } = await import("./terrain3d.js");
+      const f = field();
+      await mount3DView(container, {
+        siteId: f.id,
+        layerMode,
+        activeDate,
+        fieldPoly: polygon(),
+      });
+    } catch (err) {
+      console.error("Failed to mount 3D view:", err);
+      toast(t("3D terrain could not be loaded. Switched back to 2D.", "ত্রিমাত্রিক ভূপ্রকৃতি লোড করা যায়নি। ২ডি মানচিত্রে ফিরে যাওয়া হয়েছে।"));
+      viewMode = "2d";
+      repaint();
+    }
+    return;
+  }
+
   const el = document.querySelector("#field-map");
   if (!el || !window.L) return;
   await loadMapData();
@@ -1106,6 +1157,23 @@ function editProfile() {
   );
 }
 function fieldAction(action, value) {
+  if (action === "set-view-mode") {
+    if (value === "3d") {
+      if (!isWebGLAvailable()) {
+        toast(t("3D view requires WebGL, which is unavailable on this device or browser. Staying in 2D map.", "ত্রিমাত্রিক দৃশ্যের জন্য WebGL প্রয়োজন, যা এই ডিভাইসে অনুপলব্ধ। ২ডি মানচিত্রেই রাখা হলো।"));
+        viewMode = "2d";
+        return;
+      }
+      viewMode = "3d";
+      repaint();
+    } else {
+      viewMode = "2d";
+      repaint();
+    }
+  }
+  if (action === "reset-3d-view") {
+    reset3DView();
+  }
   if (action === "set-layer-mode") {
     layerMode = value;
     if (value === "photo") {
@@ -1238,6 +1306,10 @@ function fieldInput(el) {
   }
 }
 
+function setViewMode(mode) {
+  viewMode = mode;
+}
+
 export {
   home,
   seasonView,
@@ -1253,4 +1325,6 @@ export {
   filterOsmFeature,
   queryNdvi,
   projectWgs84ToUtm45N,
+  viewMode,
+  setViewMode,
 };

@@ -274,10 +274,15 @@ function monthControl(year = 2024) {
 }
 function toast(message) {
   const el = document.querySelector("#toast");
-  el.textContent = message;
-  el.classList.add("show");
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove("show"), 2700);
+  if (el) {
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => el.classList.remove("show"), 2700);
+  }
+  if (typeof globalThis.onToastMessage === "function") {
+    globalThis.onToastMessage(message);
+  }
 }
 function recordId() {
   return typeof crypto.randomUUID === "function"

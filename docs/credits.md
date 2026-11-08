@@ -11,6 +11,7 @@
 | Agronomy | Bangladesh Agricultural Research Council FRG 2024, Bangladesh rice and agricultural research sources, FAO-56 and published Rangpur trials. Individual source URLs and locators are included in agronomy.json. |
 | Administrative boundaries | geoBoundaries gbOpen BGD ADM3, release 9469f09, BBS / OCHA ROAP. CC BY 3.0 IGO. Rangpur geometry was supplied in the original Ropon Radar package. |
 | Map engine | Leaflet 1.9.4, BSD 2-Clause. Copyright Vladimir Agafonkin and contributors. |
+| 3D engine | Three.js r160 (MIT License, Copyright 2010-2024 Three.js Authors) and OrbitControls. Vendored into public/assets/three/, dynamically loaded on demand for optional 3D terrain rendering. |
 | Fonts | IBM Plex Sans and Mono, Fraunces and Noto Sans Bengali. SIL Open Font License 1.1. Self-hosted files supplied with the original project. |
 | Original Ropon Radar | Apache-2.0. Original color and type direction, fonts and district geometry were retained. The synthetic environmental demo generator is excluded. |
 
