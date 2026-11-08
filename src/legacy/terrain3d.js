@@ -64,8 +64,141 @@ export async function fetchTerrainData(siteId) {
   return data;
 }
 
+/**
+ * 5x5 moving-average spatial smoothing filter to reduce NASADEM elevation noise
+ * (e.g. tree canopies, buildings, SRTM speckle) on floodplains.
+ * Preserves boundary grid dimensions while computing local window averages.
+ */
+export function smoothElevationGrid(grid, kernelSize = 5) {
+  if (!grid || !grid.length) return grid;
+  const h = grid.length;
+  const w = grid[0].length;
+  const half = Math.floor(kernelSize / 2);
+  const smoothed = [];
+
+  for (let r = 0; r < h; r++) {
+    const row = new Array(w);
+    for (let c = 0; c < w; c++) {
+      let sum = 0;
+      let count = 0;
+      for (let dr = -half; dr <= half; dr++) {
+        for (let dc = -half; dc <= half; dc++) {
+          const nr = r + dr;
+          const nc = c + dc;
+          if (nr >= 0 && nr < h && nc >= 0 && nc < w) {
+            sum += grid[nr][nc];
+            count++;
+          }
+        }
+      }
+      row[c] = count > 0 ? sum / count : grid[r][c];
+    }
+    smoothed.push(row);
+  }
+  return smoothed;
+}
+
+/**
+ * Computes a boolean mask indicating cells in the lowest 10% of elevations.
+ * Guarantees that the shaded low area covers <= 10% of total cells.
+ */
+export function computeLowAreaMask(grid, thresholdPercent = 0.10) {
+  if (!grid || !grid.length) return [];
+  const h = grid.length;
+  const w = grid[0].length;
+  const flat = [].concat(...grid);
+  const sorted = [...flat].sort((a, b) => a - b);
+  const minVal = sorted[0];
+  const maxVal = sorted[sorted.length - 1];
+
+  if (minVal === maxVal) {
+    return Array.from({ length: h }, () => Array(w).fill(false));
+  }
+
+  const cutoffIndex = Math.floor(sorted.length * thresholdPercent);
+  const cutoffVal = sorted[cutoffIndex];
+
+  // Try <= threshold if count is <= cutoffIndex
+  const countLessEq = sorted.filter((v) => v <= cutoffVal).length;
+  if (countLessEq <= cutoffIndex) {
+    return grid.map((row) => row.map((v) => v <= cutoffVal));
+  }
+
+  // Try < threshold if non-empty and <= cutoffIndex
+  const countLess = sorted.filter((v) => v < cutoffVal).length;
+  if (countLess > 0 && countLess <= cutoffIndex) {
+    return grid.map((row) => row.map((v) => v < cutoffVal));
+  }
+
+  // Strict rank-based selection if ties exceed cutoffIndex
+  const ranked = [];
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      ranked.push({ r, c, val: grid[r][c] });
+    }
+  }
+  ranked.sort((a, b) => a.val - b.val);
+  const mask = Array.from({ length: h }, () => Array(w).fill(false));
+  for (let i = 0; i < cutoffIndex; i++) {
+    mask[ranked[i].r][ranked[i].c] = true;
+  }
+  return mask;
+}
+
+/**
+ * Crop terrain around the field polygon center (~1.5 km square box).
+ */
+export function cropTerrainAroundField(terrain, fieldPoly, targetBoxSizeMetres = 1500) {
+  const [minLon, minLat, maxLon, maxLat] = terrain.bounds;
+  const lonSpan = maxLon - minLon;
+  const latSpan = maxLat - minLat;
+
+  let centerLat = terrain.centre[0];
+  let centerLon = terrain.centre[1];
+
+  if (fieldPoly && fieldPoly.length >= 3) {
+    centerLat = fieldPoly.reduce((sum, p) => sum + p[0], 0) / fieldPoly.length;
+    centerLon = fieldPoly.reduce((sum, p) => sum + p[1], 0) / fieldPoly.length;
+  }
+
+  const centerCol = ((centerLon - minLon) / lonSpan) * (terrain.width - 1);
+  const centerRow = ((maxLat - centerLat) / latSpan) * (terrain.height - 1);
+
+  const cellRadius = Math.round(targetBoxSizeMetres / 2 / (terrain.cellSizeMetres || 46.88));
+  const minCol = Math.max(0, Math.round(centerCol) - cellRadius);
+  const maxCol = Math.min(terrain.width - 1, Math.round(centerCol) + cellRadius);
+  const minRow = Math.max(0, Math.round(centerRow) - cellRadius);
+  const maxRow = Math.min(terrain.height - 1, Math.round(centerRow) + cellRadius);
+
+  const croppedBounds = [
+    minLon + (minCol / (terrain.width - 1)) * lonSpan,
+    maxLat - (maxRow / (terrain.height - 1)) * latSpan,
+    minLon + (maxCol / (terrain.width - 1)) * lonSpan,
+    maxLat - (minRow / (terrain.height - 1)) * latSpan,
+  ];
+
+  const croppedGrid = [];
+  for (let r = minRow; r <= maxRow; r++) {
+    const row = [];
+    for (let c = minCol; c <= maxCol; c++) {
+      row.push(terrain.grid[r][c]);
+    }
+    croppedGrid.push(row);
+  }
+
+  return {
+    site: terrain.site,
+    centre: [centerLat, centerLon],
+    bounds: croppedBounds,
+    width: maxCol - minCol + 1,
+    height: maxRow - minRow + 1,
+    cellSizeMetres: terrain.cellSizeMetres,
+    grid: croppedGrid,
+  };
+}
+
 // Build canvas texture draping tiles or fallback imagery
-export async function createDrapedTexture(terrain, layerMode, activeDate, fieldPoly) {
+export async function createDrapedTexture(terrain, layerMode, activeDate, fieldPoly, lowAreaMask) {
   const canvas = document.createElement("canvas");
   const size = 1024;
   canvas.width = size;
@@ -86,7 +219,7 @@ export async function createDrapedTexture(terrain, layerMode, activeDate, fieldP
     try {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve) => {
         img.onload = resolve;
         img.onerror = () => resolve(); // Non-blocking fallback
         img.src = `/assets/satellite-${terrain.site}.jpg`;
@@ -139,36 +272,35 @@ export async function createDrapedTexture(terrain, layerMode, activeDate, fieldP
     }
   }
 
-  // Draw shaded low elevation areas ("Possible water collects here")
-  // 15th percentile threshold
-  const grid = terrain.grid;
-  const flat = [].concat(...grid).sort((a, b) => a - b);
-  const p15 = flat[Math.floor(flat.length * 0.15)];
-
-  const lowCanvas = document.createElement("canvas");
-  lowCanvas.width = terrain.width;
-  lowCanvas.height = terrain.height;
-  const lowCtx = lowCanvas.getContext("2d");
-  if (lowCtx) {
-    const imgData = lowCtx.createImageData(terrain.width, terrain.height);
-    for (let r = 0; r < terrain.height; r++) {
-      for (let c = 0; c < terrain.width; c++) {
-        const val = grid[r][c];
-        const idx = (r * terrain.width + c) * 4;
-        if (val <= p15) {
-          // Semi-transparent deep blue/cyan for water collection areas
-          imgData.data[idx] = 40;     // R
-          imgData.data[idx + 1] = 130; // G
-          imgData.data[idx + 2] = 200; // B
-          imgData.data[idx + 3] = 110; // Alpha
-        } else {
-          imgData.data[idx + 3] = 0;
+  // Draw shaded low elevation areas ("Lower ground — water may collect after heavy rain (check locally)")
+  // Shaded only for lowest 10% of cells inside the cropped area
+  if (lowAreaMask && lowAreaMask.length) {
+    const maskH = lowAreaMask.length;
+    const maskW = lowAreaMask[0].length;
+    const lowCanvas = document.createElement("canvas");
+    lowCanvas.width = maskW;
+    lowCanvas.height = maskH;
+    const lowCtx = lowCanvas.getContext("2d");
+    if (lowCtx) {
+      const imgData = lowCtx.createImageData(maskW, maskH);
+      for (let r = 0; r < maskH; r++) {
+        for (let c = 0; c < maskW; c++) {
+          const idx = (r * maskW + c) * 4;
+          if (lowAreaMask[r][c]) {
+            // Semi-transparent deep blue/cyan for water collection areas
+            imgData.data[idx] = 40;     // R
+            imgData.data[idx + 1] = 130; // G
+            imgData.data[idx + 2] = 200; // B
+            imgData.data[idx + 3] = 130; // Alpha
+          } else {
+            imgData.data[idx + 3] = 0;
+          }
         }
       }
+      lowCtx.putImageData(imgData, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(lowCanvas, 0, 0, size, size);
     }
-    lowCtx.putImageData(imgData, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(lowCanvas, 0, 0, size, size);
   }
 
   // Draw field outline on the texture
@@ -183,6 +315,10 @@ export async function createDrapedTexture(terrain, layerMode, activeDate, fieldP
     ctx.closePath();
 
     // High-visibility crisp border for the field boundary
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+    ctx.stroke();
+
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#ffffff";
     ctx.stroke();
@@ -191,7 +327,7 @@ export async function createDrapedTexture(terrain, layerMode, activeDate, fieldP
     ctx.strokeStyle = "#e8b839"; // Accent gold
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(232, 184, 57, 0.18)";
+    ctx.fillStyle = "rgba(232, 184, 57, 0.22)";
     ctx.fill();
   }
 
@@ -229,20 +365,13 @@ export function dispose3DView() {
 export function reset3DView() {
   if (!currentCamera || !currentControls) return;
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const targetCamPos = { x: 0, y: 55, z: 75 };
+  const targetCamPos = { x: 0, y: 18, z: 22.5 };
   const targetLookAt = { x: 0, y: 0, z: 0 };
 
-  if (prefersReduced) {
-    currentCamera.position.set(targetCamPos.x, targetCamPos.y, targetCamPos.z);
-    currentControls.target.set(targetLookAt.x, targetLookAt.y, targetLookAt.z);
-    currentControls.update();
-    requestRender3D();
-  } else {
-    currentCamera.position.set(targetCamPos.x, targetCamPos.y, targetCamPos.z);
-    currentControls.target.set(targetLookAt.x, targetLookAt.y, targetLookAt.z);
-    currentControls.update();
-    requestRender3D();
-  }
+  currentCamera.position.set(targetCamPos.x, targetCamPos.y, targetCamPos.z);
+  currentControls.target.set(targetLookAt.x, targetLookAt.y, targetLookAt.z);
+  currentControls.update();
+  requestRender3D();
 }
 
 // On-demand rendering (renders only on interaction / animation frame)
@@ -262,6 +391,29 @@ function requestRender3D() {
   }
 }
 
+// Update DOM chips and legends with polished descriptions
+function updateTerrainViewDOM(containerEl) {
+  if (!containerEl) return;
+  const doc = containerEl.ownerDocument || (typeof document !== "undefined" ? document : null);
+  if (!doc) return;
+
+  // Add "Smoothed surface model" line to exaggeration chip / terrain chips
+  const chipsContainer = doc.querySelector(".terrain-chips");
+  if (chipsContainer && !doc.querySelector(".chip-smoothed-model")) {
+    const smoothedChip = doc.createElement("span");
+    smoothedChip.className = "chip-smoothed-model tag";
+    smoothedChip.textContent = "Smoothed surface model";
+    chipsContainer.appendChild(smoothedChip);
+  }
+
+  // Update low elevation water text to:
+  // "Lower ground — water may collect after heavy rain (check locally)"
+  const legendText = doc.querySelector(".terrain-water-legend .legend-text");
+  if (legendText) {
+    legendText.textContent = "Lower ground — water may collect after heavy rain (check locally)";
+  }
+}
+
 // Mount and render the 3D scene in the target container element
 export async function mount3DView(containerEl, {
   siteId,
@@ -278,15 +430,32 @@ export async function mount3DView(containerEl, {
 
   // Load Three.js modules dynamically
   await loadThreeLibraries();
-  const terrain = await fetchTerrainData(siteId);
+  const rawTerrain = await fetchTerrainData(siteId);
+
+  // 1. Smooth before display with 5x5 mean filter
+  const smoothedGrid = smoothElevationGrid(rawTerrain.grid, 5);
+  const smoothedTerrain = {
+    ...rawTerrain,
+    grid: smoothedGrid,
+  };
+
+  // 2. Crop terrain mesh to ~1.5 km box around field polygon center
+  const croppedTerrain = cropTerrainAroundField(smoothedTerrain, fieldPoly, 1500);
+
+  // 3. Lowest 10% low area mask inside the cropped area
+  const lowAreaMask = computeLowAreaMask(croppedTerrain.grid, 0.10);
+
+  // Update DOM chip and legend text
+  updateTerrainViewDOM(containerEl);
 
   // Setup Three.js Scene, Camera, Renderer
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf2f4ec); // Theme background
   currentScene = scene;
 
+  // Camera positioned so the ~1.5 km mesh and ~170 m field fill ~1/3 of the view
   const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-  camera.position.set(0, 55, 75);
+  camera.position.set(0, 18, 22.5);
   currentCamera = camera;
 
   const renderer = new THREE.WebGLRenderer({
@@ -312,8 +481,8 @@ export async function mount3DView(containerEl, {
   controls.dampingFactor = 0.08;
   controls.autoRotate = false; // No auto-spin per spec §8
   controls.maxPolarAngle = Math.PI / 2.05; // Prevent camera going beneath terrain
-  controls.minDistance = 20;
-  controls.maxDistance = 180;
+  controls.minDistance = 10;
+  controls.maxDistance = 120;
   currentControls = controls;
 
   // Render on user interaction
@@ -321,25 +490,24 @@ export async function mount3DView(containerEl, {
     requestRender3D();
   });
 
-  // Build Terrain Mesh (≤ 128x128 vertices)
-  const gridW = terrain.width; // 128
-  const gridH = terrain.height; // 128
-  const meshSize = 80; // World unit dimension
+  // Build Cropped Terrain Mesh
+  const gridW = croppedTerrain.width;
+  const gridH = croppedTerrain.height;
+  const meshSize = 80; // World unit dimension for cropped area
   const geometry = new THREE.PlaneGeometry(meshSize, meshSize, gridW - 1, gridH - 1);
   geometry.rotateX(-Math.PI / 2); // Rotate to lay horizontal (XZ plane, Y is up)
 
-  // Compute elevation scaling with 2.5x vertical exaggeration
-  // Real world domain: ~6000 m across. Elevation range ~25 m.
-  // Ratio = 25m / 6000m = ~0.004. With 2.5x exaggeration = 0.01 of width.
-  // In world units (meshSize = 80), heightScale = 0.5 world units per meter.
-  const grid = terrain.grid;
+  // Vertical exaggeration: 2.5x
+  // Cropped area domain is ~1500 m. Elevation range ~5 m across cropped floodplain.
+  // In world units (meshSize = 80), heightScale gives 2.5x vertical exaggeration:
+  // (80 / 1500) * 2.5 ~= 0.133 world units per metre.
+  const grid = croppedTerrain.grid;
   const flat = [].concat(...grid);
   const avgHeight = flat.reduce((a, b) => a + b, 0) / flat.length;
-  const heightScale = 0.45; // 2.5x exaggeration relative to natural horizontal perspective
+  const heightScale = (meshSize / 1500) * 2.5;
 
   const posAttr = geometry.attributes.position;
   for (let i = 0; i < posAttr.count; i++) {
-    // PlaneGeometry vertices row-by-row (top to bottom, left to right in XZ)
     const row = Math.floor(i / gridW);
     const col = i % gridW;
     const h = (grid[row]?.[col] ?? avgHeight) - avgHeight;
@@ -347,8 +515,14 @@ export async function mount3DView(containerEl, {
   }
   geometry.computeVertexNormals();
 
-  // Create draped canvas texture
-  const textureCanvas = await createDrapedTexture(terrain, layerMode, activeDate, fieldPoly);
+  // Create draped canvas texture for the cropped terrain
+  const textureCanvas = await createDrapedTexture(
+    croppedTerrain,
+    layerMode,
+    activeDate,
+    fieldPoly,
+    lowAreaMask,
+  );
   const texture = new THREE.CanvasTexture(textureCanvas);
   texture.minFilter = THREE.LinearFilter;
   texture.wrapS = THREE.ClampToEdgeWrapping;
@@ -364,9 +538,9 @@ export async function mount3DView(containerEl, {
   const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
 
-  // Field boundary outline 3D ribbon / line lifted slightly above surface
+  // Field boundary outline thicker (>= 3 px look), lifted slightly above surface
   if (fieldPoly && fieldPoly.length >= 3) {
-    const [minLon, minLat, maxLon, maxLat] = terrain.bounds;
+    const [minLon, minLat, maxLon, maxLat] = croppedTerrain.bounds;
     const lonSpan = maxLon - minLon;
     const latSpan = maxLat - minLat;
 
@@ -377,37 +551,38 @@ export async function mount3DView(containerEl, {
       const x = (u - 0.5) * meshSize;
       const z = (v - 0.5) * meshSize;
 
-      // Sample height from grid
+      // Sample height from cropped grid
       const col = Math.min(Math.max(Math.floor(u * (gridW - 1)), 0), gridW - 1);
       const row = Math.min(Math.max(Math.floor(v * (gridH - 1)), 0), gridH - 1);
       const h = (grid[row]?.[col] ?? avgHeight) - avgHeight;
-      const y = h * heightScale + 0.35; // Lift slightly to prevent Z-fighting
+      const y = h * heightScale + 0.35; // Lift above surface to prevent Z-fighting
       linePoints.push(new THREE.Vector3(x, y, z));
     });
-    // Close the loop
-    linePoints.push(linePoints[0].clone());
 
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints(linePoints);
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      linewidth: 3,
-    });
-    const line = new THREE.Line(lineGeometry, lineMaterial);
-    scene.add(line);
-  }
-
-  // Low elevation water label / indicator
-  // Find coordinate of minimum height within the terrain
-  let minH = 9999;
-  let minRow = 0;
-  let minCol = 0;
-  for (let r = 0; r < gridH; r++) {
-    for (let c = 0; c < gridW; c++) {
-      if (grid[r][c] < minH) {
-        minH = grid[r][c];
-        minRow = r;
-        minCol = c;
+    // 3D Tube ribbon for thick (>= 3px look) outline in existing accent gold (#e8b839)
+    try {
+      const curvePath = new THREE.CurvePath();
+      for (let i = 0; i < linePoints.length; i++) {
+        const nextPt = linePoints[(i + 1) % linePoints.length];
+        curvePath.add(new THREE.LineCurve3(linePoints[i], nextPt));
       }
+      curvePath.closePath();
+      const tubeGeometry = new THREE.TubeGeometry(curvePath, 64, 0.22, 6, true);
+      const tubeMaterial = new THREE.MeshBasicMaterial({
+        color: 0xe8b839, // Existing outline colour (accent gold)
+      });
+      const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
+      scene.add(tubeMesh);
+    } catch {
+      // Fallback to line
+      const loopPoints = [...linePoints, linePoints[0].clone()];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(loopPoints);
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0xe8b839,
+        linewidth: 3,
+      });
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      scene.add(line);
     }
   }
 
