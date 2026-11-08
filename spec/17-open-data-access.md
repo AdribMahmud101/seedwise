@@ -14,7 +14,7 @@ Every call below was **run live on 8 Nov 2026** at Mithapukur (lat 25.54, lon 89
 | Sentinel-1 radar *(ESA)* | Planetary Computer STAC | No | ✅ works | Planned flood history (M5) |
 | NASADEM height | Planetary Computer data API (point read) | No | ✅ works (27 m at Mithapukur) | Planned 3D view (D-C4) |
 | NISAR radar | ASF search API | Search: no · download: Earthdata login | ✅ scenes found (4 + 6 Nov 2026) | Research pilot (P1) |
-| NASA FIRMS fires | REST API | Free MAP_KEY | 🔑 needs key | Fire context (P1) |
+| NASA FIRMS fires | REST API | Free MAP_KEY (we have one) | ✅ works with our key | Fire context (P1) |
 | ISRIC SoilGrids | REST API | No | ❌ 503 down today (retry) | Soil baseline (M3) |
 | FFWC flood (Bangladesh) | REST API | Registration | 🔑 docs only after sign-up | Flood alerts (P0) |
 | geoBoundaries | REST API | No | ✅ works | Map borders |
@@ -147,3 +147,4 @@ Every call below was **run live on 8 Nov 2026** at Mithapukur (lat 25.54, lon 89
 | Key | Where it lives | Valid until | How scripts use it |
 |---|---|---|---|
 | `EARTHDATA_TOKEN` (+ `EARTHDATA_USER`) | Phone: `/root/projects/ropon-radar/.env` (git-ignored, mode 600). Laptop: `~/.config/ropon-radar/earthdata.env` | **7 Jan 2027**, then renew at https://urs.earthdata.nasa.gov → Generate Token | Load `.env`, then send header `Authorization: Bearer $EARTHDATA_TOKEN`. Tested 9 Nov 2026: SMAP L4 file → 206 with token, 401 without |
+| `FIRMS_MAP_KEY` | Phone: same `.env`. Laptop: `~/.config/ropon-radar/firms.env` | No expiry stated; limit 5,000 requests / 10 min | Put in the URL: `/api/area/csv/$FIRMS_MAP_KEY/VIIRS_SNPP_NRT/<bbox>/<days>`. Tested 9 Nov 2026: HTTP 200 |
