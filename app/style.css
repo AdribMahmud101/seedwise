@@ -2675,3 +2675,6 @@ dialog .modal-body {
 
 /* Hide the image chip while a tap card is open so they never overlap on phones. */
 .map-shell:has(.leaflet-popup) .map-overline { visibility: hidden; }
+
+/* Phones: bar labels fit their own column instead of a fixed 130px that overlaps the neighbour. */
+@media (max-width: 700px) { .water-bar label { width: 100%; } .water-visual { margin-bottom: 64px; } }

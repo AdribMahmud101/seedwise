@@ -79,11 +79,11 @@ function smapCard() {
     <div class="water-visual">
       <div class="water-bar" style="height:${Math.max(2, ((sfmc || 0) / 0.5) * 128)}px">
         <strong>${formatValue(sfmc)}</strong>
-        <label>${t("Top 0–5 cm", "উপরের ০–৫ সেমি")} · ${sfmcStatus}</label>
+        <label>${t("Top 0–5 cm", "উপরের ০–৫ সেমি")}<br>${sfmcStatus}</label>
       </div>
       <div class="water-bar" style="height:${Math.max(2, ((rzmc || 0) / 0.5) * 128)}px">
         <strong>${formatValue(rzmc)}</strong>
-        <label>${t("Root zone 0–100 cm", "শিকড় অঞ্চল ০–১০০ সেমি")} · ${rzmcStatus}</label>
+        <label>${t("Root zone 0–100 cm", "শিকড় অঞ্চল ০–১০০ সেমি")}<br>${rzmcStatus}</label>
       </div>
     </div>
     <p>${sentence}</p>
