@@ -117,7 +117,8 @@ Every call below was **run live on 8 Nov 2026** at Mithapukur (lat 25.54, lon 89
 
 - **What it gives:** real-time and historical river water levels, warnings, 24/48 h forecasts.
 - **Page:** https://api.ffwc.gov.bd/
-- **Status:** the page says "Developer Documentation (link will be provided upon registration)". Write to **api.support@bwdb.gov.bd** (task D-Q2).
+- **Status:** the page says "Developer Documentation (link will be provided upon registration)".
+- **Contact (updated 9 Nov 2026):** `api.support@bwdb.gov.bd` from the API page **bounces** (550 User unknown). Use the official contacts in the FFWC site footer: **ffwcbwdb@gmail.com**, **ffwc@bwdb.gov.bd**, **ffwc05@yahoo.com**, phone **+880 2 2222 30070** (task D-Q2).
 - **Until then:** link to the official bulletin https://ffwc.gov.bd/ (already in the app).
 - **Checked 9 Nov 2026 — observed water level page** https://ffwc.gov.bd/app/observed-water-level:
   - The page is an Angular app that reads `https://api.ffwc.gov.bd/data_load/...` (e.g. `stations/`, `observed-waterlevel-by-station/`, `seven-days-observed-waterlevel-by-station/`, `forecast-waterlevel-by-station/`, `three-days-observed-rainfall/`).
