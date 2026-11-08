@@ -14,6 +14,7 @@ import {
   header,
   panel,
   tag,
+  truth,
   chips,
   input,
   select,
@@ -131,7 +132,7 @@ function qaView() {
     : Number.isFinite(im?.cloudMaskLoss)
       ? im.cloudMaskLoss
       : null;
-  return `<div class="research-stats">${indicator(t('Matched daily pairs', 'একই দিনের জোড়া'), num(q.pairedDays), '2024 · UTC')}${indicator(t('Mean difference', 'গড় পার্থক্য'), `${num(q.meanDifferenceMm, 2)} mm`, t('POWER minus IMERG per day', 'দৈনিক POWER থেকে IMERG বাদ'))}${indicator(t('Mean absolute gap', 'গড় পরম ব্যবধান'), `${num(q.maeMm, 2)} mm`, t('Paired days only', 'শুধু একই দিনের যুগল'))}</div>
+  return `<div class="research-stats">${indicator(t('Matched daily pairs', 'একই দিনের জোড়া'), num(q.pairedDays), '2024 · UTC')} ${truth('MODELED', { source: 'Paired daily QA' })}${indicator(t('Mean difference', 'গড় পার্থক্য'), `${num(q.meanDifferenceMm, 2)} mm ${truth('MODELED')}`, t('POWER minus IMERG per day', 'দৈনিক POWER থেকে IMERG বাদ'))}${indicator(t('Mean absolute gap', 'গড় পরম ব্যবধান'), `${num(q.maeMm, 2)} mm ${truth('MODELED')}`, t('Paired days only', 'শুধু একই দিনের যুগল'))}</div>
  <div class="grid-two">${panel(
    t('Rainfall comparison', 'বৃষ্টির তুলনা'),
    `<div class="segmented">${[
@@ -145,7 +146,7 @@ function qaView() {
      .join(
        ''
      )}</div>${chart(series, { band: qaMode === 'spread' ? monthPairs.map((q) => [q.q10, q.q90]) : null, unit: qaMode === 'spread' ? 'mm / day' : 'mm / month', description: 'Observed rainfall product comparison' })}
- <p class="note">${qaMode === 'totals' ? t('Both products estimate rainfall. Their difference measures disagreement. An independent gauge is needed to assess bias against a reference.', 'দুটি উৎসই বৃষ্টির অনুমান দেয়। পার্থক্য তাদের অমিল বোঝায়। পক্ষপাত যাচাইয়ে স্বতন্ত্র বৃষ্টিমাপ দরকার।') : t('Shading spans the 10th–90th percentiles of paired daily differences within each month. It describes observed spread.', 'ছায়া প্রতি মাসের দৈনিক পার্থক্যের ১০ম থেকে ৯০তম পার্সেন্টাইল দেখায়। এটি দেখা ওঠানামার বিস্তার।')}</p>${monthControl()}<p class="note">${t('Approximate 95% interval for the annual mean difference', 'বার্ষিক গড় পার্থক্যের আনুমানিক ৯৫% পরিসর')} ${q.meanDifference95CI.map((v) => num(v, 2)).join(' to ')} mm/d. ${t('Assumes independent days. Serial correlation can make it too narrow.', 'দৈনিক মান স্বতন্ত্র ধরে হিসাব। পরপর দিনের সম্পর্ক থাকলে পরিসরটি ছোট হতে পারে।')}</p>`
+ <p class="note">${qaMode === 'totals' ? t('Both products estimate rainfall. Their difference measures disagreement. An independent gauge is needed to assess bias against a reference.', 'দুটি উৎসই বৃষ্টির অনুমান দেয়। পার্থক্য তাদের অমিল বোঝায়। পক্ষপাত যাচাইয়ে স্বতন্ত্র বৃষ্টিমাপ দরকার।') : t('Shading spans the 10th–90th percentiles of paired daily differences within each month. It describes observed spread.', 'ছায়া প্রতি মাসের দৈনিক পার্থক্যের ১০ম থেকে ৯০তম পার্সেন্টাইল দেখায়। এটি দেখা ওঠানামার বিস্তার।')}</p>${monthControl()}<p class="note">${t('Approximate 95% interval for the annual mean difference', 'বার্ষিক গড় পার্থক্যের আনুমানিক ৯৫% পরিসর')} ${q.meanDifference95CI.map((v) => num(v, 2)).join(' to ')} mm/d ${truth('MODELED')} · ${t('Assumes independent days. Serial correlation can make it too narrow.', 'দৈনিক মান স্বতন্ত্র ধরে হিসাব। পরপর দিনের সম্পর্ক থাকলে পরিসরটি ছোট হতে পারে।')}</p>`
  )}
  ${panel(
    t('Optical quality check', 'স্যাটেলাইট ছবির মান'),
@@ -158,7 +159,7 @@ function qaView() {
            opticalIndex
          )
        : ''
-   }<dl class="quality-list"><div><dt>${t('Whole-scene cloud cover', 'পুরো দৃশ্যে মেঘ')}</dt><dd>${num(im?.sceneCloudPercent, 1)}%</dd></div><div><dt>${t('Cloud / shadow mask loss', 'মেঘ ও ছায়ায় বাদ পড়া অংশ')}</dt><dd>${cloud === null ? t('Unavailable', 'তথ্য নেই') : `${num(cloud * 100, 1)}%`}</dd></div><div><dt>${t('Usable optical pixels', 'ব্যবহারযোগ্য পিক্সেল')}</dt><dd>${Number.isFinite(im?.validFraction) ? num(im.validFraction * 100, 1) + '%' : '—'}</dd></div><div><dt>NDVI</dt><dd>${num(im?.ndvi, 3)}</dd></div></dl><p class="note">${esc(im?.qualityNote || q.cloudMaskNote)} ${im?.validFraction < 0.25 ? t('Low clear coverage. Treat the surviving samples cautiously.', 'পরিষ্কার অংশ কম। অবশিষ্ট নমুনা সতর্কভাবে দেখুন।') : ''}</p>${epoch ? `<a class="source-link" href="${esc(epoch.opticalQA.dataRequest)}" target="_blank" rel="noopener">${t('Original analysis window ↗', 'বিশ্লেষণের মূল ছবি ↗')}</a>` : ''}<div class="spacer"></div>${sources(['landsat'])}`
+   }<dl class="quality-list"><div><dt>${t('Whole-scene cloud cover', 'পুরো দৃশ্যে মেঘ')}</dt><dd>${num(im?.sceneCloudPercent, 1)}% ${truth('REMOTE_OBSERVED', { source: 'Landsat' })}</dd></div><div><dt>${t('Cloud / shadow mask loss', 'মেঘ ও ছায়ায় বাদ পড়া অংশ')}</dt><dd>${cloud === null ? t('Unavailable', 'তথ্য নেই') : `${num(cloud * 100, 1)}% ${truth('REMOTE_OBSERVED', { source: 'Landsat QA' })}`}</dd></div><div><dt>${t('Usable optical pixels', 'ব্যবহারযোগ্য পিক্সেল')}</dt><dd>${Number.isFinite(im?.validFraction) ? num(im.validFraction * 100, 1) + '%' : '—'} ${im?.validFraction ? truth('REMOTE_OBSERVED', { source: 'Landsat' }) : ''}</dd></div><div><dt>NDVI</dt><dd>${num(im?.ndvi, 3)} ${im?.ndvi ? truth('REMOTE_OBSERVED', { source: 'Landsat NDVI' }) : ''}</dd></div></dl><p class="note">${esc(im?.qualityNote || q.cloudMaskNote)} ${im?.validFraction < 0.25 ? t('Low clear coverage. Treat the surviving samples cautiously.', 'পরিষ্কার অংশ কম। অবশিষ্ট নমুনা সতর্কভাবে দেখুন।') : ''}</p>${epoch ? `<a class="source-link" href="${esc(epoch.opticalQA.dataRequest)}" target="_blank" rel="noopener">${t('Original analysis window ↗', 'বিশ্লেষণের মূল ছবি ↗')}</a>` : ''}<div class="spacer"></div>${sources(['landsat'])}`
  )}</div>
  <div class="grid-equal section-space">${panel(t('Independent rain gauge', 'স্বতন্ত্র বৃষ্টিমাপ'), ground.n ? `<p class="notice">${num(ground.n)} ${t('matched UTC dates', 'দিনের UTC মিল')}.</p><dl class="quality-list"><div><dt>POWER ${t('mean bias', 'গড় পক্ষপাত')}</dt><dd>${num(ground.powerBias, 2)} mm/d</dd></div><div><dt>IMERG ${t('mean bias', 'গড় পক্ষপাত')}</dt><dd>${num(ground.gpmBias, 2)} mm/d</dd></div></dl><p class="note">${t('Gauge observations are locally entered. Repeated readings on the same date are averaged before comparison.', 'বৃষ্টিমাপ স্থানীয়ভাবে দেওয়া। একই দিনের একাধিক মাপের গড় নিয়ে তুলনা করা হয়।')}</p>${button(t('Add a gauge reading', 'বৃষ্টিমাপ লিখুন'), 'new-rain', 'small', 'add')}` : `<p class="note">${t('No paired independent gauge reading yet. Add a 24-hour UTC total from a 2024 date to enable a measured reference comparison.', 'এখনও ২০২৪ সালের একই দিনের স্বতন্ত্র বৃষ্টিমাপ নেই। ২৪ ঘণ্টার UTC মোট দিলে তুলনা করা যাবে।')}</p><div class="spacer"></div>${button(t('Add a gauge reading', 'বৃষ্টিমাপ লিখুন'), 'new-rain', '', 'add')}`)}
  ${panel(t('Coverage and source grids', 'তথ্য ও উৎসের মাপ'), `<p class="note">POWER / MERRA-2 · 0.5° × 0.625°<br>IMERG · 0.1°<br>Landsat · 30 m</p><p class="note">${t('Missing paired days', 'অনুপস্থিত যুগল দিন')} ${num(period.length - q.pairedDays)} / ${num(period.length)}. ${t('Mithapukur and Pirganj share the same POWER grid anchor. Each IMERG request uses its prepared centre.', 'মিঠাপুকুর ও পীরগঞ্জ একই POWER গ্রিড ব্যবহার করে। IMERG প্রতিটি কেন্দ্রের স্থানাঙ্ক দিয়ে নেওয়া।')}</p><a class="source-link" href="${esc(f.provenance.meteorologyRequest)}" target="_blank" rel="noopener">POWER request ↗</a> · <a class="source-link" href="${esc(f.provenance.gpmRequest)}" target="_blank" rel="noopener">IMERG request ↗</a><div class="spacer"></div>${button(t('Download paired days', 'দৈনিক জোড়ার তথ্য নিন'), 'export-days', 'small', 'download')}`)}</div>`;
@@ -205,12 +206,12 @@ function logView() {
 }
 function summary(r) {
   if (r.kind === 'harvest')
-    return `${esc(r.variety || cropName(r.crop))} · ${num(r.yieldKg / r.harvestedAreaHa / 1000, 2)} t/ha`;
-  if (r.kind === 'soil') return `${esc(r.labName)} · pH ${num(r.soilPH, 2)}`;
-  if (r.kind === 'rain') return `${num(r.rainMm, 2)} mm`;
+    return `${esc(r.variety || cropName(r.crop))} · ${num(r.yieldKg / r.harvestedAreaHa / 1000, 2)} t/ha ${truth('FARMER_REPORTED', { source: r.observerRole })}`;
+  if (r.kind === 'soil') return `${esc(r.labName)} · pH ${num(r.soilPH, 2)} ${truth(r.reviewStatus === 'Laboratory confirmed' ? 'MEASURED' : 'FARMER_REPORTED', { source: r.reviewStatus })}`;
+  if (r.kind === 'rain') return `${num(r.rainMm, 2)} mm ${truth('FARMER_REPORTED', { source: r.instrument || r.observerRole })}`;
   if (r.kind === 'moisture')
-    return `${num(r.waterContent, 3)} m³/m³ · ${num(r.depthCm)} cm`;
-  return `${esc(cropName(r.crop))} · ${num(r.symptomIds?.length || 0)} ${t('signs', 'টি লক্ষণ')}`;
+    return `${num(r.waterContent, 3)} m³/m³ · ${num(r.depthCm)} cm ${truth('FARMER_REPORTED', { source: r.instrument || r.observerRole })}`;
+  return `${esc(cropName(r.crop))} · ${num(r.symptomIds?.length || 0)} ${t('signs', 'টি লক্ষণ')} ${truth('FARMER_REPORTED', { source: r.observerRole })}`;
 }
 function trialView() {
   return panel(
@@ -218,7 +219,7 @@ function trialView() {
     agronomy.rotations
       .map(
         (r, i) =>
-          `<article class="trial-row"><span class="source-no">T0${i + 1}</span><div><h3>${esc(t(r.label, r.bn))}</h3><p class="note">${esc(r.rationale)}</p><p class="note">${t('Irrigation observed in trials', 'গবেষণায় সেচ')} <b>${r.referenceIrrigationMm ? r.referenceIrrigationMm.join('–') + ' mm' : t('not reported', 'তথ্য নেই')}</b> · ${sources(r.sourceIds)}</p></div></article>`
+          `<article class="trial-row"><span class="source-no">T0${i + 1}</span><div><h3>${esc(t(r.label, r.bn))}</h3><p class="note">${esc(r.rationale)}</p><p class="note">${t('Irrigation observed in trials', 'গবেষণায় সেচ')} <b>${r.referenceIrrigationMm ? r.referenceIrrigationMm.join('–') + ' mm ' + truth('MODELED', { source: 'Trial observations' }) : t('not reported', 'তথ্য নেই')}</b> · ${sources(r.sourceIds)}</p></div></article>`
       )
       .join('') +
       `<div class="notice">${t('Published trial results retain their own sites, varieties and dates. They are reference evidence for planning.', 'প্রকাশিত ফলাফল গবেষণার নিজস্ব জমি, জাত ও সময়ের। পরিকল্পনায় এগুলো তুলনার তথ্য।')}</div>`

@@ -207,6 +207,44 @@ function panel(title, body, action = "") {
 function tag(label, color = "") {
   return `<span class="tag ${color}">${esc(label)}</span>`;
 }
+function truth(tag, opts = {}) {
+  const labels = {
+    MEASURED: ["Measured", "জমি থেকে মাপা"],
+    FARMER_REPORTED: ["Measured", "জমি থেকে মাপা"],
+    REMOTE_OBSERVED: ["Estimated", "স্যাটেলাইট অনুমান"],
+    MODELED: ["Estimated", "স্যাটেলাইট অনুমান"],
+    SCENARIO: ["Scenario", "কাল্পনিক পরিকল্পনা"],
+    UNKNOWN: ["Unknown — add data", "অজানা — তথ্য দিন"],
+  };
+  const icons = {
+    MEASURED: "✓",
+    FARMER_REPORTED: "✓",
+    REMOTE_OBSERVED: "◈",
+    MODELED: "◈",
+    SCENARIO: "⬡",
+    UNKNOWN: "⊘",
+  };
+  const classes = {
+    MEASURED: "measured",
+    FARMER_REPORTED: "measured",
+    REMOTE_OBSERVED: "estimated",
+    MODELED: "estimated",
+    SCENARIO: "scenario",
+    UNKNOWN: "unknown",
+  };
+  const [en, bn] = labels[tag] || ["Unknown — add data", "অজানা — তথ্য দিন"];
+  const icon = icons[tag] || "⊘";
+  const cls = classes[tag] || "unknown";
+  const labelText = tag === "FARMER_REPORTED" ? `${icon} ${t(en, bn)} · by farmer` : `${icon} ${t(en, bn)}`;
+  
+  const titleParts = [];
+  if (opts.source) titleParts.push(`source: ${opts.source}`);
+  if (opts.date) titleParts.push(`date: ${opts.date}`);
+  if (opts.cell) titleParts.push(`cell: ${opts.cell}`);
+  const title = titleParts.length ? titleParts.join(", ") : tag;
+  
+  return `<span class="truth ${cls}" title="${esc(title)}" aria-label="${esc(labelText)}">${esc(labelText)}</span>`;
+}
 function chips() {
   return `<div class="field-selector" aria-label="${t("Prepared fields", "প্রস্তুত জমি")}">${earth.fields.map((f, i) => `<button data-field="${f.id}" class="field-chip ${state.fieldId === f.id ? "selected" : ""}" aria-pressed="${state.fieldId === f.id}"><span class="tiny-dot"></span>${esc(fieldName(f))} <small class="mono">${String(i + 1).padStart(2, "0")}</small></button>`).join("")}</div>`;
 }
@@ -386,6 +424,7 @@ export {
   header,
   panel,
   tag,
+  truth,
   chips,
   input,
   select,

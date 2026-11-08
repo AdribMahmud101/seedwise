@@ -1,0 +1,107 @@
+/* Truth labels - DATA1: truth labels on every number (6 views) */
+/* Built on .tag with icon + word + colour (never colour alone) */
+/* Min font 12px; badge hit area >= 44px only if tappable */
+
+.truth {
+  font-size: 12px;
+  font-family: Plex, Bangla, sans-serif;
+  line-height: 1.3;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Measured: green text on --light */
+.truth.measured {
+  background-color: var(--light);
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+
+/* Estimated: ink text on --light */
+.truth.estimated {
+  background-color: var(--light);
+  color: var(--ink);
+  border: 1px solid var(--muted);
+}
+
+/* Scenario: ink text, dashed border */
+.truth.scenario {
+  background-color: transparent;
+  color: var(--ink);
+  border: 1px dashed var(--muted);
+}
+
+/* Unknown: danger text, links to entry form */
+.truth.unknown {
+  background-color: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* Ensure minimum hit area when used as interactive element */
+.truth:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Bengali text - same sizes or 1px larger; never smaller */
+.truth[lang|="bn"] {
+  font-size: 13px;
+}
+
+/* Badges must never widen the research stat grid on phones (was 200px sideways scroll at 360px). */
+.research-stats > * { min-width: 0; }
+.research-stat strong, .research-stat .eyebrow, .truth { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .research-stats { grid-template-columns: 1fr; } }
+
+/* Print styles: badges must print in black and white with their word visible */
+@media print {
+  .truth {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.measured {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.estimated {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.scenario {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.unknown {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  /* Ensure source links are visible in print */
+  .source-link {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+  
+  /* Ensure sources line is visible */
+  .sources-line {
+    color: black !important;
+    font-size: 11px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #ccc;
+  }
+}

@@ -17,6 +17,7 @@ import {
   header,
   panel,
   tag,
+  truth,
   chips,
   input,
   select,
@@ -78,16 +79,16 @@ function smapCard() {
     `<div class="eyebrow">${t("2024 monthly · regional cell", "২০২৪ সালের মাসিক · আঞ্চলিক কোষ")}</div>
     <div class="water-visual">
       <div class="water-bar" style="height:${Math.max(2, ((sfmc || 0) / 0.5) * 128)}px">
-        <strong>${formatValue(sfmc)}</strong>
+        <strong>${formatValue(sfmc)} ${sfmc !== null ? truth('REMOTE_OBSERVED', { source: 'NASA SMAP', cell: '~9 km' }) : truth('UNKNOWN')}</strong>
         <label>${t("Top 0–5 cm", "উপরের ০–৫ সেমি")}<br>${sfmcStatus}</label>
       </div>
       <div class="water-bar" style="height:${Math.max(2, ((rzmc || 0) / 0.5) * 128)}px">
-        <strong>${formatValue(rzmc)}</strong>
+        <strong>${formatValue(rzmc)} ${rzmc !== null ? truth('REMOTE_OBSERVED', { source: 'NASA SMAP', cell: '~9 km' }) : truth('UNKNOWN')}</strong>
         <label>${t("Root zone 0–100 cm", "শিকড় অঞ্চল ০–১০০ সেমি")}<br>${rzmcStatus}</label>
       </div>
     </div>
     <p>${sentence}</p>
-    <p class="note">${tag(t("Estimated", "স্যাটেলাইট অনুমান"), "")} · ${t("NASA SMAP L4 · ~9 km cell · model + satellite · 2024 monthly", "NASA SMAP L4 · ~৯ কিমি কোষ · মডেল + স্যাটেলাইট · ২০২৪ সালের মাসিক")}</p>
+    <p class="note">${truth('REMOTE_OBSERVED', { source: 'NASA SMAP L4', cell: '~9 km', date: '2024 monthly' })} · ${t("model + satellite", "মডেল + স্যাটেলাইট")}</p>
     <p class="note">${t("This is a regional cell, not your field. A soil probe or AWD pipe gives your field's real value.", "এটি একটি আঞ্চলিক কোষ, আপনার জমির নয়। মাটি পরীক্ষা বা AWD পাইপ আপনার জমির সঠিক মান দেয়।")} <a href="#research" class="source-link">${t("Research lab logger", "গবেষণা ল্যাব লগার")}</a></p>`,
     tag(t("Estimated", "স্যাটেলাইট অনুমান"), ""),
   );
@@ -153,9 +154,9 @@ function budgetResult() {
     m = field().monthly[state.month],
     w = state.water;
   const maximum = Math.max(pumped, recharge || 0, 1);
-  return `<div class="eyebrow">${t("2024 replay · annual scenario", "২০২৪ সালের তথ্য · বার্ষিক দৃশ্য")}</div><div class="water-visual"><div class="water-bar pump" style="height:${Math.max(2, (pumped / maximum) * 128)}px"><strong>${num(pumped)} m³</strong><label>${t("Pumped groundwater", "উত্তোলিত ভূগর্ভস্থ পানি")}</label></div>${recharge === null ? "" : `<div class="water-bar" style="height:${Math.max(2, (recharge / maximum) * 128)}px"><strong>${num(recharge)} m³</strong><label>${t("Allocated recharge", "বরাদ্দ পুনর্ভরণ")}</label></div>`}</div>
- <p class="notice ${balance !== null && balance < 0 ? "amber" : ""}">${balance === null ? t("Enter independently estimated recharge and an accounting area to unlock the balance.", "ভারসাম্য দেখতে স্বতন্ত্রভাবে পাওয়া পুনর্ভরণের হার ও সংশ্লিষ্ট এলাকা দিন।") : `${t("Allocated recharge less all entered withdrawals", "বরাদ্দ পুনর্ভরণ থেকে পানি তোলা বাদ")} <b>${num(balance)} m³/${t("year", "বছর")}</b>. ${num(w.years)} ${t("identical replay years", "একই ধরনের বছরের মোট")} <b>${num(balance * w.years)} m³</b>.`}</p>
- <dl class="field-meta"><div><dt>${t("Annual irrigation assumption", "বার্ষিক নিট সেচের অনুমান")}</dt><dd>${num(net, 1)} mm</dd></div><div><dt>${monthName()} · ${t("crop water use", "ফসলের পানির চাহিদা")}</dt><dd>${num(m.et0 * coeff[seq.months[state.month]], 1)} mm</dd></div><div><dt>${monthName()} · ETo</dt><dd>${num(m.et0, 1)} mm</dd></div><div><dt>${monthName()} · ${t("rain (IMERG)", "বৃষ্টি (IMERG)")}</dt><dd>${num(m.rainGpm, 1)} mm</dd></div></dl>
+  return `<div class="eyebrow">${t("2024 replay · annual scenario", "২০২৪ সালের তথ্য · বার্ষিক দৃশ্য")}</div><div class="water-visual"><div class="water-bar pump" style="height:${Math.max(2, (pumped / maximum) * 128)}px"><strong>${num(pumped)} m³ ${truth('SCENARIO', { source: 'Water budget model' })}</strong><label>${t("Pumped groundwater", "উত্তোলিত ভূগর্ভস্থ পানি")}</label></div>${recharge === null ? "" : `<div class="water-bar" style="height:${Math.max(2, (recharge / maximum) * 128)}px"><strong>${num(recharge)} m³ ${truth('SCENARIO', { source: 'User input' })}</strong><label>${t("Allocated recharge", "বরাদ্দ পুনর্ভরণ")}</label></div>`}</div>
+ <p class="notice ${balance !== null && balance < 0 ? "amber" : ""}">${balance === null ? t("Enter independently estimated recharge and an accounting area to unlock the balance.", "ভারসাম্য দেখতে স্বতন্ত্রভাবে পাওয়া পুনর্ভরণের হার ও সংশ্লিষ্ট এলাকা দিন।") : `${t("Allocated recharge less all entered withdrawals", "বরাদ্দ পুনর্ভরণ থেকে পানি তোলা বাদ")} <b>${num(balance)} m³/${t("year", "বছর")} ${truth('SCENARIO')}</b>. ${num(w.years)} ${t("identical replay years", "একই ধরনের বছরের মোট")} <b>${num(balance * w.years)} m³ ${truth('SCENARIO')}</b>.`}</p>
+ <dl class="field-meta"><div><dt>${t("Annual irrigation assumption", "বার্ষিক নিট সেচের অনুমান")}</dt><dd>${num(net, 1)} mm ${truth('SCENARIO')}</dd></div><div><dt>${monthName()} · ${t("crop water use", "ফসলের পানির চাহিদা")}</dt><dd>${num(m.et0 * coeff[seq.months[state.month]], 1)} mm ${truth('MODELED', { source: 'FAO-56 ETo' })}</dd></div><div><dt>${monthName()} · ETo</dt><dd>${num(m.et0, 1)} mm ${truth('REMOTE_OBSERVED', { source: 'NASA POWER' })}</dd></div><div><dt>${monthName()} · ${t("rain (IMERG)", "বৃষ্টি (IMERG)")}</dt><dd>${num(m.rainGpm, 1)} mm ${truth('REMOTE_OBSERVED', { source: 'NASA IMERG' })}</dd></div></dl>
  <p class="note">${t("The annual estimate adds positive monthly crop demand gaps and your extra losses. Groundwater volume depends on pumping share and irrigation efficiency. Repeated-year balances use the same weather and assumptions each year. Water-table depth is unavailable without aquifer measurements.", "বছরের প্রতিটি মাসে ফসলের চাহিদা থেকে কার্যকর বৃষ্টি বাদ দিয়ে ধনাত্মক ঘাটতি ও অতিরিক্ত ক্ষতি যোগ হয়। উত্তোলনে সেচের দক্ষতা ও উৎসের অংশ ধরা হয়। প্রতি বছর একই আবহাওয়া ধরে দীর্ঘমেয়াদি হিসাব। ভূগর্ভস্থ পানির গভীরতা জানতে সরাসরি মাপ দরকার।")}</p>`;
 }
 function budget() {

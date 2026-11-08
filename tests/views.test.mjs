@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { state, loadData } from "../src/legacy/ui.js";
+import { state, loadData, truth } from "../src/legacy/ui.js";
 import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N } from "../src/legacy/fields.js";
 import { rotations } from "../src/legacy/rotations.js";
 import { planner } from "../src/legacy/planner.js";
@@ -11,6 +11,7 @@ import { research } from "../src/legacy/research.js";
 import { recovery } from "../src/legacy/recovery.js";
 import { examples, references } from "../src/legacy/recovery-data.js";
 import { units } from "../src/legacy/boundary.js";
+import { fieldReport } from "../src/legacy/report.js";
 
 test("SMAP card renders correctly in EN and BN", async () => {
   globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
@@ -181,3 +182,124 @@ test("null NDVI renders 'No reliable observation' and valid NDVI renders formatt
   assert.equal(formatNdvi(outsideNdvi), "No reliable observation");
 });
 
+test("truth labels render in all 6 views in EN and BN", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  const sixViews = [
+    ['rotations', rotations],
+    ['planner', planner],
+    ['clinic', clinic],
+    ['water', water],
+    ['research', research],
+    ['recovery', recovery],
+  ];
+
+  for (const [name, viewFn] of sixViews) {
+    for (const lang of ["en", "bn"]) {
+      state.lang = lang;
+      state.fieldId = "mithapukur";
+      if (name === 'water') state.tabs.water = "budget";
+      if (name === 'research') state.tabs.research = "qa";
+      if (name === 'clinic') state.tabs.clinic = "symptoms";
+      if (name === 'recovery') {
+        state.hazard = "flood";
+        state.recoveryDrafts["mithapukur:flood"] = {
+          ...examples.flood,
+          example: true,
+        };
+      }
+      const html = viewFn();
+      assert.ok(html.includes("class=\"truth") || html.includes("class='truth"), `Truth label class in ${name} ${lang}`);
+      assert.ok(html.includes("Measured") || html.includes("Estimated") || html.includes("Scenario") || html.includes("Unknown") || html.includes("জমি থেকে মাপা") || html.includes("স্যাটেলাইট অনুমান") || html.includes("কাল্পনিক পরিকল্পনা") || html.includes("অজানা"), `Truth label text in ${name} ${lang}`);
+    }
+  }
+});
+
+test("truth function handles all tags and null values", () => {
+  state.lang = "en";
+  
+  const tags = ['MEASURED', 'FARMER_REPORTED', 'REMOTE_OBSERVED', 'MODELED', 'SCENARIO', 'UNKNOWN'];
+  for (const tag of tags) {
+    const html = truth(tag);
+    assert.ok(html.includes("class=\"truth"), `Truth label has class for ${tag}`);
+    assert.ok(html.includes("Measured") || html.includes("Estimated") || html.includes("Scenario") || html.includes("Unknown"), `Truth label has English text for ${tag}`);
+  }
+  
+  state.lang = "bn";
+  for (const tag of tags) {
+    const html = truth(tag);
+    assert.ok(html.includes("class=\"truth"), `Truth label has class for ${tag} BN`);
+    assert.ok(html.includes("জমি থেকে মাপা") || html.includes("স্যাটেলাইট অনুমান") || html.includes("কাল্পনিক পরিকল্পনা") || html.includes("অজানা"), `Truth label has Bengali text for ${tag}`);
+  }
+  
+  const unknownHtml = truth('UNKNOWN');
+  assert.ok(unknownHtml.includes("Unknown") || unknownHtml.includes("অজানা"), "UNKNOWN tag renders correctly");
+  assert.ok(unknownHtml.includes("⊘"), "UNKNOWN tag has icon");
+});
+
+test("truth badges include both icon and word", () => {
+  state.lang = "en";
+  const tags = ['MEASURED', 'FARMER_REPORTED', 'REMOTE_OBSERVED', 'MODELED', 'SCENARIO', 'UNKNOWN'];
+  const icons = ['✓', '✓', '◈', '◈', '⬡', '⊘'];
+  
+  for (let i = 0; i < tags.length; i++) {
+    const html = truth(tags[i]);
+    assert.ok(html.includes(icons[i]), `Tag ${tags[i]} has icon ${icons[i]}`);
+    assert.ok(html.includes("Measured") || html.includes("Estimated") || html.includes("Scenario") || html.includes("Unknown"), `Tag ${tags[i]} has English word`);
+  }
+  
+  state.lang = "bn";
+  for (let i = 0; i < tags.length; i++) {
+    const html = truth(tags[i]);
+    assert.ok(html.includes(icons[i]), `Tag ${tags[i]} has icon ${icons[i]} in BN`);
+    assert.ok(html.includes("জমি থেকে মাপা") || html.includes("স্যাটেলাইট অনুমান") || html.includes("কাল্পনিক পরিকল্পনা") || html.includes("অজানা"), `Tag ${tags[i]} has Bengali word`);
+  }
+});
+
+test("truth labels with opts include title and aria-label", () => {
+  state.lang = "en";
+  const html = truth('MODELED', { source: 'NASA SMAP', date: '2024', cell: '9km' });
+  assert.ok(html.includes('title="source: NASA SMAP, date: 2024, cell: 9km"'), "Title includes opts");
+  assert.ok(html.includes('aria-label='), "Has aria-label");
+});
+
+test("FARMER_REPORTED shows 'by farmer'", () => {
+  state.lang = "en";
+  const html = truth('FARMER_REPORTED');
+  assert.ok(html.includes("by farmer"), "FARMER_REPORTED shows 'by farmer' in EN");
+  
+  state.lang = "bn";
+  const htmlBn = truth('FARMER_REPORTED');
+  assert.ok(htmlBn.includes("by farmer"), "FARMER_REPORTED shows 'by farmer' in BN");
+});
+
+test("report source contains truth badges, index label, and Sources line", async () => {
+  // Read the report.js source to verify it contains the required patterns
+  const reportSource = await readFile(new URL("../src/legacy/report.js", import.meta.url), "utf8");
+  
+  // Check report.js imports truth function
+  assert.ok(reportSource.includes("truth"), "report.js imports truth function");
+  
+  // Check for truth badges in the HTML
+  assert.ok(reportSource.includes("truth('REMOTE_OBSERVED')"), "Uses REMOTE_OBSERVED for rain");
+  assert.ok(reportSource.includes("truth('MODELED')"), "Uses MODELED for estimated values");
+  assert.ok(reportSource.includes("truth('FARMER_REPORTED')"), "Uses FARMER_REPORTED for farmer data");
+  assert.ok(reportSource.includes("truth('SCENARIO')"), "Uses SCENARIO for trial-based values");
+  
+  // Check for index label (Bengali or English)
+  assert.ok(reportSource.includes("index 0–1") || reportSource.includes("সূচক ০–১"), "Contains index label");
+  
+  // Check for Sources line
+  assert.ok(reportSource.includes("sources-line"), "Contains sources-line class");
+  assert.ok(reportSource.includes("This plan supports"), "Contains disclaimer text");
+  
+  // Check print CSS in labels.css
+  const labelsSource = await readFile(new URL("../app/labels.css", import.meta.url), "utf8");
+  assert.ok(labelsSource.includes("@media print"), "labels.css has print media query");
+  assert.ok(labelsSource.includes(".truth") && labelsSource.includes("black"), "Print CSS makes truth badges visible in black and white");
+});
