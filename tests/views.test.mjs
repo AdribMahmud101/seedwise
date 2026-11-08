@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { state, loadData } from "../src/legacy/ui.js";
-import { home, seasonView } from "../src/legacy/fields.js";
+import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N } from "../src/legacy/fields.js";
 import { rotations } from "../src/legacy/rotations.js";
 import { planner } from "../src/legacy/planner.js";
 import { clinic } from "../src/legacy/clinic.js";
@@ -145,3 +145,39 @@ test("every workspace renders in English and Bengali using all three data packs"
     }
   }
 });
+
+test("null NDVI renders 'No reliable observation' and valid NDVI renders formatted number", async () => {
+  state.lang = "en";
+  assert.equal(formatNdvi(null), "No reliable observation");
+  assert.equal(formatNdvi(undefined), "No reliable observation");
+  assert.equal(formatNdvi(NaN), "No reliable observation");
+
+  state.lang = "bn";
+  assert.equal(formatNdvi(null), "নির্ভরযোগ্য পর্যবেক্ষণ নেই");
+  assert.equal(formatNdvi(undefined), "নির্ভরযোগ্য পর্যবেক্ষণ নেই");
+
+  state.lang = "en";
+  assert.equal(formatNdvi(0.839), "0.84");
+  assert.equal(formatNdvi(0.35), "0.35");
+
+  // Also verify queryNdvi against real ndvi-grid.json
+  const ndviGrid = JSON.parse(await readFile(new URL("../public/data/ndvi-grid.json", import.meta.url), "utf8"));
+  const mithaGrid = ndviGrid.grids.find((g) => g.siteId === "mithapukur");
+  assert.ok(mithaGrid, "found mithapukur grid");
+
+  // Center coordinate
+  const centerNdvi = queryNdvi(mithaGrid, 25.54, 89.27);
+  assert.equal(typeof centerNdvi, "number");
+  assert.ok(centerNdvi > 0.8, "center of mithapukur has high NDVI");
+
+  // Known masked null coordinate (row 10, col 34)
+  const nullNdvi = queryNdvi(mithaGrid, 25.565973, 89.246791);
+  assert.equal(nullNdvi, null, "masked cell evaluates to null");
+  assert.equal(formatNdvi(nullNdvi), "No reliable observation");
+
+  // Coordinate outside bounds returns null -> "No reliable observation"
+  const outsideNdvi = queryNdvi(mithaGrid, 26.5, 90.0);
+  assert.equal(outsideNdvi, null);
+  assert.equal(formatNdvi(outsideNdvi), "No reliable observation");
+});
+

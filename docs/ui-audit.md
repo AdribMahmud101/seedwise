@@ -107,3 +107,23 @@ Standard: `spec/15-ui-ux-spec.md` §12 checklist applied to `#field` Leaflet map
 - [x] ✅ **Offline build makes no network request:** Geolocation fallback works offline without external tiles or CDNs; imagery uses local pre-rendered assets.
 - [x] ✅ **No wetness %, no unsourced prototype number, no dose outside the tiered rule:** Surface and root-zone wetness displayed strictly as 0–1 decimal indices (never %).
 - [x] ✅ **`npm test` passes:** All 14 tests pass, including the new unit test validating shotok, bigha, katha, acre, and ha conversions.
+
+---
+
+## 6. MAP3 · Map Layers, Date Timeline, Context Lines & NDVI Probe Audit (§12 Checklist)
+
+Audit date: 8 Nov 2026  
+Standard: `spec/15-ui-ux-spec.md` §5, §8, §9, §12; `spec/14-decision-recommendations.md` D-C5, D-C6, D-C7, D-Q4.  
+Tested viewports: **360 px** (mobile), **768 px** (tablet), **1280 px** (desktop).
+
+- [x] ✅ **Offline tile layers (`public/tiles/...`):** Wired `public/data/map-layers.json` into Leaflet tile layers (`tiles/natural/2024-03-09/{z}/{x}/{y}.png` and `tiles/ndvi/2024-03-09/{z}/{x}/{y}.png`). No online or non-local HTTP tile hosts are referenced or queried.
+- [x] ✅ **Layer switcher (44 px segmented control):** Segmented control with 44×44 px minimum hit targets switching between **Natural colour**, **Greenness (NDVI)**, and **Original 2024 photo**.
+- [x] ✅ **Dedicated legends and truth chips:** Each layer mode provides a dedicated legend bar (`.map-legend-bar`) and an updated truth chip: source · date · 10 m / 30 m · `◈ Estimated` (D-C5).
+- [x] ✅ **Date timeline:** Dedicated date selection buttons over manifest dates (28 Jan 2024, 9 Mar 2024, 14 Jul 2024, 18 Oct 2024). Cloudy/missing dates explicitly display `⊘ No reliable observation` / `⊘ নির্ভরযোগ্য পর্যবেক্ষণ নেই` (never blank, guess, or 0; spec §1 5, §9).
+- [x] ✅ **Imagery opacity slider:** 44 px height range slider dynamically adjusts tile and image overlay opacity from 10% to 100%, keeping the field outline and bunds crisp and readable.
+- [x] ✅ **OSM context lines:** Integrated `public/data/context-osm.geojson` with muted roads (`#7d8471` / `#9ca392`), rivers/waterways (`#527f8d`), and village/town labels (`.osm-village-label`). Toggleable on/off with attribution `© OpenStreetMap contributors (ODbL)`.
+- [x] ✅ **Tap to inspect NDVI probe:** Tapping any location queries `public/data/ndvi-grid.json` via UTM Zone 45N projection (`projectWgs84ToUtm45N`), returning the sampled NDVI value, cell size (20 m), date, and label. Null or masked cells render `No reliable observation` / `নির্ভরযোগ্য পর্যবেক্ষণ নেই`.
+- [x] ✅ **Rangpur overview tiles:** Tile layers support zoom levels down to z9–z12 spanning Rangpur district extent, showing regional satellite context when zoomed out.
+- [x] ✅ **Responsive & Tap Target Verification:** At 360 px and 1280 px: no horizontal page scroll, map controls ≥ 44×44 px, legend items neatly wrap and are never obstructed by controls or popups.
+- [x] ✅ **Automated Tests & Build:** `npm test` and `npm run build` exit 0; unit test validates that null/masked NDVI renders "No reliable observation".
+
