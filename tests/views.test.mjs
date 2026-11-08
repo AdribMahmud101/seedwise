@@ -10,6 +10,27 @@ import { water } from "../src/legacy/water.js";
 import { research } from "../src/legacy/research.js";
 import { recovery } from "../src/legacy/recovery.js";
 import { examples, references } from "../src/legacy/recovery-data.js";
+import { units } from "../src/legacy/boundary.js";
+
+test("area-unit conversion outputs shotok, bigha, katha, acre, and ha in EN and BN", () => {
+  // 1 ha test
+  state.lang = "en";
+  const enUnits = units(1);
+  assert.ok(enUnits.includes("shotok"), "includes shotok in English");
+  assert.ok(enUnits.includes("bigha"), "includes bigha in English");
+  assert.ok(enUnits.includes("katha"), "includes katha in English");
+  assert.ok(enUnits.includes("acres"), "includes acres in English");
+  assert.ok(enUnits.includes("ha"), "includes ha in English");
+  assert.ok(enUnits.startsWith("247.1 shotok · 7.49 bigha · 149.8 katha · 2.47 acres · 1 ha"));
+
+  state.lang = "bn";
+  const bnUnits = units(1);
+  assert.ok(bnUnits.includes("শতক"), "includes শতক in Bengali");
+  assert.ok(bnUnits.includes("বিঘা"), "includes বিঘা in Bengali");
+  assert.ok(bnUnits.includes("কাঠা"), "includes কাঠা in Bengali");
+  assert.ok(bnUnits.includes("একর"), "includes একর in Bengali");
+  assert.ok(bnUnits.includes("ha"), "includes ha in Bengali");
+});
 
 test("every workspace renders in English and Bengali using all three data packs", async () => {
   globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };

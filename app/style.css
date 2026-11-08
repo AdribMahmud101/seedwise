@@ -547,26 +547,29 @@ small {
   left: 16px;
   top: 15px;
   z-index: 450;
-  background: #fffef5ec;
-  padding: 7px 10px;
+  background: rgba(255, 254, 249, 0.92);
+  color: var(--ink);
+  padding: 6px 10px;
   font: 12px Mono;
-  border: 1px solid #ffffff88;
-  border-radius: 3px;
-  max-width: 75%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  max-width: 60%;
   pointer-events: none;
+  box-shadow: 0 1px 4px rgba(36, 57, 44, 0.12);
 }
 .map-bottom {
   position: absolute;
   bottom: 22px;
   left: 16px;
   z-index: 450;
-  background: #253b2bea;
-  color: #e5eddc;
-  padding: 7px 10px;
+  background: rgba(36, 57, 44, 0.92);
+  color: var(--light);
+  padding: 6px 10px;
   font: 12px Mono;
   border: 1px solid #789062;
-  border-radius: 3px;
+  border-radius: 4px;
   pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 .map-actions {
   display: flex;
@@ -595,17 +598,136 @@ small {
 .leaflet-bar {
   box-shadow: none !important;
   border: 1px solid #b4c0a0 !important;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
 }
 .leaflet-bar a,
 .leaflet-bar a.leaflet-control-zoom-in,
-.leaflet-bar a.leaflet-control-zoom-out {
+.leaflet-bar a.leaflet-control-zoom-out,
+.leaflet-bar a.map-control-btn {
   width: 44px !important;
   height: 44px !important;
   line-height: 44px !important;
-  font-size: 22px !important;
+  font-size: 20px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  border-bottom: 1px solid var(--line) !important;
+}
+.leaflet-bar a:last-child {
+  border-bottom: none !important;
+}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus-visible {
+  background: var(--light) !important;
+  color: var(--green) !important;
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+.leaflet-bar a svg {
+  display: block;
+}
+.corner-marker-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  cursor: grab;
+}
+.corner-marker-handle:active {
+  cursor: grabbing;
+}
+.corner-marker-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e3f9a2;
+  border: 2px solid #24392c;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.45);
+  transition: transform 150ms ease, background 150ms ease;
+}
+.corner-marker-handle:hover .corner-marker-dot,
+.corner-marker-handle:focus .corner-marker-dot {
+  background: #ffffff;
+  transform: scale(1.25);
+}
+.field-inspect-popup .leaflet-popup-content-wrapper {
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(36, 57, 44, 0.2);
+  border: 1px solid var(--line);
+  padding: 0;
+}
+.field-inspect-popup .leaflet-popup-content {
+  margin: 12px 14px;
+  font-family: Plex, sans-serif;
+  line-height: 1.4;
+}
+.field-inspect-popup .leaflet-popup-tip {
+  background: var(--surface);
+}
+.inspect-card {
+  min-width: 190px;
+  max-width: 250px;
+}
+.inspect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.inspect-coords {
+  font: 12px Mono;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.inspect-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.inspect-item dt {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.inspect-item dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.inspect-footer {
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 4px;
+  border-top: 1px dashed var(--line);
+}
+.field-map-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+}
+.field-map-fullscreen .field-map {
+  height: calc(100vh - 54px) !important;
+  min-height: calc(100vh - 54px) !important;
 }
 .leaflet-tooltip {
   font: 12px Mono !important;
@@ -2550,3 +2672,6 @@ dialog .modal-body {
     background: #22332242;
   }
 }
+
+/* Hide the image chip while a tap card is open so they never overlap on phones. */
+.map-shell:has(.leaflet-popup) .map-overline { visibility: hidden; }

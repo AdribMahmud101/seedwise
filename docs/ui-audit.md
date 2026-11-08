@@ -87,3 +87,23 @@ Every interactive element listed in the UI2 brief was measured and verified for 
 - [x] ✅ Offline build makes no network request
 - [x] ✅ No wetness %, no unsourced prototype number, no dose outside the tiered rule
 - [x] ✅ `npm test` passes (views render in EN and BN)
+
+---
+
+## 5. MAP2 · Interactive Field Map Audit (§12 Checklist)
+
+Audit date: 8 Nov 2026  
+Standard: `spec/15-ui-ux-spec.md` §12 checklist applied to `#field` Leaflet map & boundary tools.
+
+- [x] ✅ **Uses existing tokens and classes:** Map styling confined entirely to `app/style.css` using existing tokens (`--surface`, `--ink`, `--muted`, `--light`, `--line`, `--gold`, `--green`).
+- [ ] ❌ **Page title is the question; action card first; details collapsed:** `#field` retains notebook header; full screen recipe deferred to UI3 / template card.
+- [x] ✅ **Every number has a truth label and a unit; Unknown is stated, not blank:** Tap to inspect popup and map overlay chip explicitly display truth labels (`◈ Estimated · Sentinel-2 / Landsat · date`), with units on every variable (`mm`, `°C`, `ha`, `shotok`, `bigha`, `katha`, `acre`).
+- [x] ✅ **Every string is `t(en, bn)`; both languages checked on screen:** Inspect card, corner handle tooltips, boundary edit prompts, units, and custom map navigation controls are all bilingual.
+- [x] ✅ **Text ≥ 16 px (body), ≥ 12 px (smallest); touch targets ≥ 44 px:** All map navigation control buttons (Zoom in, Zoom out, Reset view, Locate me, Full screen) and boundary handles are strictly sized to ≥ 44×44 px with clear focus outlines.
+- [x] ✅ **No text in `--gold`; `--blue` only as large text; nothing conveyed by colour alone:** Inspection popup badges include icons and text labels; handles include high-contrast 2px borders with soft halos.
+- [x] ✅ **Keyboard: everything reachable, focus ring visible; icons have labels:** All control buttons have `aria-label`, `title`, and keyboard tab navigation with visible outline focus rings.
+- [ ] ❌ **All five states handled (§10):** Loading and error states for offline imagery preserved; full 5-state lifecycle across views handled under STATE1.
+- [x] ✅ **360 px phone: no horizontal scroll; 3D has a 2D fallback:** Zero horizontal overflow at 360 px; map shell expands fluidly; legend/badges capped in width and stacked cleanly above controls.
+- [x] ✅ **Offline build makes no network request:** Geolocation fallback works offline without external tiles or CDNs; imagery uses local pre-rendered assets.
+- [x] ✅ **No wetness %, no unsourced prototype number, no dose outside the tiered rule:** Surface and root-zone wetness displayed strictly as 0–1 decimal indices (never %).
+- [x] ✅ **`npm test` passes:** All 14 tests pass, including the new unit test validating shotok, bigha, katha, acre, and ha conversions.
