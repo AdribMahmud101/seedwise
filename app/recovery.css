@@ -198,6 +198,11 @@
 .rr-official a {
   color: var(--ink);
   text-underline-offset: 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 4px;
+  box-sizing: border-box;
 }
 .rr-emergency {
   background: #8c4830;

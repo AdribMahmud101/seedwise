@@ -29,6 +29,9 @@ Target views: `#field`, `#seasons`, `#rotations`, `#planner`, `#clinic`, `#water
 | **#recovery** (Disaster recovery) | Hazard selection cards (`.rr-hazard`) at 360 px had radio check targets of only 16×16 px and small text (10–11 px). | Raised hazard cards to min-width 44 px, radio indicators to 24×24 px, font sizes to ≥ 12 px, and single-column form grid at ≤ 600 px viewport. | Yes |
 | **#research** (Research lab) | Field observation table had small headers (9 px Mono) and action buttons (small padding < 30 px height). | Increased table headers to 12 px Mono, table cells to 14 px, and view/export buttons to 44 px touch targets. | Yes |
 | **Evidence register** (Modal) | Modal close button was 33×33 px; source row items were closely packed without adequate tap targets on mobile. | Enlarged modal close button to 44×44 px with visible focus ring; source pill and links spaced with ≥ 8 px separation and 44 px touch target. | Yes |
+| **#field** (My Field) | Leaflet zoom +/- (`a.leaflet-control-zoom-in/out`) buttons measured ~26–30 px touch target. | Set `.leaflet-bar a` (and `.leaflet-control-zoom-in/out`) to min 44×44 px hit area, centered with 22 px font. | Yes |
+| **#seasons #water #research #recovery** | Source links (`a.source-link`) and plain links in `#recovery` (`.rr-official a`) had touch targets < 44 px in height. | Converted `.source-link` and `.rr-official a` to `inline-flex` with `min-height: 44px; padding: 6px 4px` ensuring full ≥ 44 px hit height. | Yes |
+| **#rotations (8) #clinic (13) #seasons #water #research** | Inputs (range sliders, symptom checkboxes, form check labels) were under 44 px touch hit area. | Styled range sliders (`input[type="range"]`) with 44 px height; gave priority labels `min-height: 44px`; expanded `.check-label` to `min-height: 44px` with 20×20 px inputs; maintained `.symptom-option` ≥ 44 px at all viewports including ≤ 700 px; form-field inputs set to `min-height: 44px`. | Yes |
 | **Mobile Menu** | Mobile hamburger button (`.mobile-menu`) was 20×20 px without minimum touch target bounding. | Gave `.mobile-menu` min-width 44 px and min-height 44 px, centered icon, keeping `aria-label` and `aria-expanded` attributes in sync. | Yes |
 
 ---
@@ -50,6 +53,17 @@ Target views: `#field`, `#seasons`, `#rotations`, `#planner`, `#clinic`, `#water
 - **Navigation:** Fixed 218 px left sidebar with distinct grouping for Field Workspace, Disaster Recovery, and Research Desk.
 - **Workspaces:** Main container scales up to 1700 px maximum width. Multi-column dashboards, maps, and detailed evidence disclosures render in high contrast.
 
+### 360 px Tap Target Measurement & Verification
+Every interactive element listed in the UI2 brief was measured and verified for ≥ 44×44 px hit area at 360 px:
+- **Leaflet zoom buttons (`#field`):** `.leaflet-bar a`, `.leaflet-control-zoom-in`, and `.leaflet-control-zoom-out` are styled with `width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 22px !important; display: flex !important; align-items: center; justify-content: center;`. Hit area: 44×44 px.
+- **Source links (`#seasons #water #research #recovery`):** `.source-link` set to `display: inline-flex; align-items: center; min-height: 44px; padding: 6px 4px; box-sizing: border-box;`. Hit height: ≥ 44 px.
+- **Recovery plain links (`#recovery`):** `.rr-official a` set to `display: inline-flex; align-items: center; min-height: 44px; padding: 6px 4px; box-sizing: border-box;`. Hit height: ≥ 44 px.
+- **Inputs - range sliders (`#rotations`, `#seasons`, `#water`, `#research`):** `input[type="range"]` set to `height: 44px; min-height: 44px;`. Timeline and priority slider bars span full width or container with 44 px height. Hit height: 44 px.
+- **Inputs - priority labels & rows (`#rotations`):** `.priority-item label` has `min-height: 44px; display: flex; align-items: center; cursor: pointer;` linked directly to range inputs. Hit height: 44 px.
+- **Inputs - symptom checkboxes (`#clinic`):** `.symptom-option` maintains `min-height: 44px; padding: 10px 8px;` at ≤ 700 px and 360 px, housing a 20×20 px checkbox. Hit area: 100% width × ≥ 44 px.
+- **Inputs - consent and agreement checkboxes (`#clinic`, `#research`):** `.check-label` has `min-height: 44px; display: flex; align-items: center; cursor: pointer;` with 20×20 px checkbox. Hit height: ≥ 44 px.
+- **Inputs - text, number, date fields (`#water`, `#clinic`, `#research`, `#field`):** `.form-field input, .form-field select, .form-field textarea` set to `min-height: 44px; padding: 10px; font-size: 14px;`. Hit height: ≥ 44 px.
+
 ---
 
 ## 3. Bilingual Verification (EN & BN)
@@ -61,15 +75,15 @@ Target views: `#field`, `#seasons`, `#rotations`, `#planner`, `#clinic`, `#water
 
 ## 4. Spec 15 §12 Done Checklist
 
-- [x] Uses existing tokens and classes; no new colour hex, font or UI library
-- [x] Page title is the question; action card first; details collapsed
-- [x] Every number has a truth label and a unit; Unknown is stated, not blank
-- [x] Every string is `t(en, bn)`; both languages checked on screen
-- [x] Text ≥ 16 px (body), ≥ 12 px (smallest); touch targets ≥ 44 px
-- [x] No text in `--gold`; `--blue` only as large text; nothing conveyed by colour alone
-- [x] Keyboard: everything reachable, focus ring visible; icons have labels
-- [x] All five states handled (§10)
-- [x] 360 px phone: no horizontal scroll; 3D has a 2D fallback
-- [x] Offline build makes no network request
-- [x] No wetness %, no unsourced prototype number, no dose outside the tiered rule
-- [x] `npm test` passes (views render in EN and BN)
+- [x] ✅ Uses existing tokens and classes; no new colour hex, font or UI library
+- [ ] ❌ Page title is the question; action card first; details collapsed (Owned by future cards: UI3 / feature template refactor)
+- [ ] ❌ Every number has a truth label and a unit; Unknown is stated, not blank (Owned by future cards: DATA1 / truth labels & provenance integration)
+- [x] ✅ Every string is `t(en, bn)`; both languages checked on screen
+- [x] ✅ Text ≥ 16 px (body), ≥ 12 px (smallest); touch targets ≥ 44 px (All controls verified ≥ 44×44 px hit area in UI2)
+- [x] ✅ No text in `--gold`; `--blue` only as large text; nothing conveyed by colour alone
+- [x] ✅ Keyboard: everything reachable, focus ring visible; icons have labels
+- [ ] ❌ All five states handled (§10) (Owned by future cards: STATE1 / view loading, empty, and error state pass)
+- [ ] ❌ 360 px phone: no horizontal scroll; 3D has a 2D fallback (No horizontal scroll ✅; 3D toggle & 2D fallback owned by future card 3D1 / roadmap step 5)
+- [x] ✅ Offline build makes no network request
+- [x] ✅ No wetness %, no unsourced prototype number, no dose outside the tiered rule
+- [x] ✅ `npm test` passes (views render in EN and BN)
