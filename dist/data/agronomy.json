@@ -1,0 +1,1435 @@
+{
+  "schemaVersion": "1.1.0",
+  "reviewedAt": "2026-11-03",
+  "scope": "Rangpur research-backed demonstration; no parcel-level ground truth is preloaded.",
+  "sources": [
+    {
+      "id": "barc-frg2024",
+      "title": "Fertilizer Recommendation Guide 2024",
+      "url": "https://apps.barc.gov.bd/fertilizer_recommendation/FRG%20English%2030.10.2024.pdf",
+      "publisher": "Bangladesh Agricultural Research Council",
+      "published": "2024",
+      "accessed": "2026-11-02",
+      "locator": "AEZ-3: printed p21 / PDF p36; products: Appendix 2, printed p212 / PDF p227; conversions: Appendix 10, printed p220 / PDF p235"
+    },
+    {
+      "id": "hossain2022",
+      "title": "Cropping System Intensification: An Approach to Increase Yield, Water Productivity, and Profitability in North-West Bangladesh",
+      "url": "https://doi.org/10.1155/2022/6288494",
+      "publisher": "BRRI/BARC/DAE researchers; International Journal of Agronomy",
+      "published": "2022-07-14",
+      "accessed": "2026-11-02",
+      "locator": "Sections 2.1–2.4; Tables 2–4. Trials 2018–2020, Mithapukur and Pirganj."
+    },
+    {
+      "id": "islam2014",
+      "title": "Improvement of potato based cropping patterns by inclusion of short duration mungbean and T. Aman rice in Monga prone areas of Rangpur",
+      "url": "https://www.banglajol.info/index.php/IJARIT/article/view/22645",
+      "publisher": "International Journal of Agricultural Research, Innovation and Technology",
+      "published": "2014",
+      "accessed": "2026-11-02",
+      "locator": "Paikan, Gangachara; 2011–2012 experiment. PDF /article/download/22645/15576."
+    },
+    {
+      "id": "fao56",
+      "title": "Crop evapotranspiration — FAO Irrigation and Drainage Paper 56, Chapter 6",
+      "url": "https://www.fao.org/4/X0490E/x0490e0b.htm",
+      "publisher": "Food and Agriculture Organization",
+      "published": "1998",
+      "accessed": "2026-11-02",
+      "locator": "Equation 58; Table 12. Standard-condition crop coefficients, not local measurements."
+    },
+    {
+      "id": "irri-disease",
+      "title": "Diagnosis of Common Diseases of Rice",
+      "url": "https://www.knowledgebank.irri.org/images/docs/diagnostic-of-common-diseases-of-rice.pdf",
+      "publisher": "International Rice Research Institute",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Brown spot: section 3.1.3; bacterial blight: section 3.2.1."
+    },
+    {
+      "id": "rrdi-blast",
+      "title": "Rice Blast",
+      "url": "https://doa.gov.lk/rrdi_ricediseases_riceblast/",
+      "publisher": "Rice Research and Development Institute, Department of Agriculture, Sri Lanka",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": null
+    },
+    {
+      "id": "icar-rice",
+      "title": "Rice decision support: symptoms and pest management",
+      "url": "https://ccari.res.in/dss/rice.html",
+      "publisher": "ICAR–Central Coastal Agricultural Research Institute",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Nitrogen deficiency and rice stem borer sections. Symptom evidence only; local prescription not transferred."
+    },
+    {
+      "id": "brri-disease",
+      "title": "Rice disease guides",
+      "url": "https://riceprofile.brri.gov.bd/cultivation/disease",
+      "publisher": "Bangladesh Rice Research Institute",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Bangla diagnostic leaflets for blast, brown spot, and bacterial leaf blight."
+    },
+    {
+      "id": "brri-lcc",
+      "title": "Leaf Colour Chart",
+      "url": "https://www.knowledgebank-brri.org/lcc.php",
+      "publisher": "Bangladesh Rice Knowledge Bank / BRRI",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": null
+    },
+    {
+      "id": "bamis-mustard",
+      "title": "Pests information — mustard",
+      "url": "https://www.bamis.gov.bd/en/pests/1/all/44/",
+      "publisher": "Department of Agricultural Extension, BAMIS",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Aphids; vegetative to pod initiation. Do not reuse archived chemical prescriptions."
+    },
+    {
+      "id": "bamis-potato",
+      "title": "Diseases information — potato",
+      "url": "https://www.bamis.gov.bd/en/diseases/1/all/52/",
+      "publisher": "Department of Agricultural Extension, BAMIS",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Late blight weather context."
+    },
+    {
+      "id": "bamis-bulletin",
+      "title": "Archived agro-meteorological advisory",
+      "url": "https://www.bamis.gov.bd/en/bulletin/view/20294/",
+      "publisher": "Department of Agricultural Extension, BAMIS",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Potato cutworm field inspection. Historical advisory, not a current warning."
+    },
+    {
+      "id": "ais-potato",
+      "title": "আলুর মড়ক রোগ ও তার প্রতিকার",
+      "url": "https://ais.gov.bd/pages/static-pages/6922dfea933eb65569e24a16",
+      "publisher": "Agricultural Information Service, Bangladesh",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Late blight symptoms and preventive field inspection; chemical schedules excluded."
+    },
+    {
+      "id": "ais-mung",
+      "title": "মুগ ডাল চাষ",
+      "url": "https://ais.gov.bd/pages/ekrishi/মুগ-ডাল-চাষ-fsmvc2-6a1d4c0f2de6aeac14f8a9ef",
+      "publisher": "Agricultural Information Service, Bangladesh",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "BARI Mung-6: 55–58 days, about 1.5 t/ha, seed 20–25 kg/ha; drainage and yellow mosaic context."
+    },
+    {
+      "id": "janala-mung",
+      "title": "Mungbean problems",
+      "url": "https://www.krishokerjanala.gov.bd/crop/13/list",
+      "publisher": "Krishoker Janala, Bangladesh government",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "Mosaic: yellow and dark green mottling."
+    },
+    {
+      "id": "bari-seed",
+      "title": "Mustard–Boro–Jute–T. Aman production technology",
+      "url": "https://baritechnology.org/m/crops/tech_detail/353",
+      "publisher": "Bangladesh Agricultural Research Institute",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": "BARI Shorisha-14 seed 7 kg/ha in this specified system. Search index retrieved; direct page may require browser verification."
+    },
+    {
+      "id": "barc-khamari",
+      "title": "Khamari: location-specific crop and nutrient planning",
+      "url": "https://portal.cropzoning.gov.bd/aboutKhamari",
+      "publisher": "Bangladesh Agricultural Research Council",
+      "published": null,
+      "accessed": "2026-11-02",
+      "locator": null
+    },
+    {
+      "id": "doe-haor2026",
+      "title": "Swamp Forest Restoration in the Surma–Kushiyara/Haor Region, SD-8",
+      "url": "https://bppa.gov.bd/advertisement-services/details-10689.html",
+      "publisher": "Bangladesh Department of Environment, via BPPA",
+      "published": "2026-10-01",
+      "accessed": "2026-11-03",
+      "locator": "Proposed restoration design, sections 4.1–4.3. Sunamganj site zoning, Hijol and Koroch, retained channels and habitat gaps. No survival outcomes reported."
+    },
+    {
+      "id": "sohel-haor-nurseries",
+      "title": "Ecological and economic significance of swamp vegetation nursery for successful reforestation program: an insight from Bangladesh",
+      "url": "https://www.tandfonline.com/doi/pdf/10.1080/24749508.2023.2256546",
+      "publisher": "Sohel et al., Geology, Ecology, and Landscapes",
+      "published": "2023-09-12",
+      "accessed": "2026-11-03",
+      "locator": "Table 2 footnote and section 3.2.2. Seasonal access and seedling condition in northeastern haors. Published online 2023, journal issue 2025."
+    },
+    {
+      "id": "bari-teesta-chars2026",
+      "title": "Agroforestry enhances economic returns, land efficiency and soil health in the char lands of Bangladesh",
+      "url": "https://link.springer.com/article/10.1007/s10457-026-01457-z",
+      "publisher": "Bari et al., Agroforestry Systems",
+      "published": "2026-02-24",
+      "accessed": "2026-11-03",
+      "locator": "2019–2023 research across four unions in Rangpur and Nilphamari. Includes mango intercropping. No fire recovery or flood-survival trial."
+    },
+    {
+      "id": "bamis-mango",
+      "title": "Mango farming at a glance",
+      "url": "https://www.bamis.gov.bd/en/crops/view/65/",
+      "publisher": "Bangladesh DAE, Bangladesh Agro-Meteorological Information Service",
+      "published": null,
+      "accessed": "2026-11-03",
+      "locator": "Sowing time and weather/disaster sections. May–June or August–September windows and drainage of excess rainfall."
+    },
+    {
+      "id": "fao-fire-recovery",
+      "title": "Fire management: voluntary guidelines, section 4.14",
+      "url": "https://www.fao.org/4/j9255e/J9255E07.htm",
+      "publisher": "Food and Agriculture Organization of the United Nations",
+      "published": null,
+      "accessed": "2026-11-03",
+      "locator": "Burned-area restoration and rehabilitation. Natural regeneration, soil erosion and locally native plants where regeneration is inadequate."
+    },
+    {
+      "id": "fao-regeneration",
+      "title": "Assisted natural regeneration",
+      "url": "https://www.fao.org/forestry/our-focus/forest-management/assisted-natural-regeneration/",
+      "publisher": "Food and Agriculture Organization of the United Nations",
+      "published": null,
+      "accessed": "2026-11-03",
+      "locator": "Site suitability, local tenure, protection and monitoring of natural seedlings."
+    },
+    {
+      "id": "rr-dry",
+      "name": "BAMIS · drought adaptation",
+      "publisher": "BAMIS · drought adaptation",
+      "url": "https://www.bamis.gov.bd/page/risk-map-recommendation/",
+      "method": "Moisture conservation, water storage and crop diversification."
+    },
+    {
+      "id": "rr-mustard",
+      "name": "DAE · Rangpur, 7 October 2020",
+      "publisher": "DAE · Rangpur, 7 October 2020",
+      "url": "https://www.bamis.gov.bd/res/bulletins/2020/10/08/22190.pdf#page=5",
+      "method": "Archived mustard sowing guidance: middle October to middle November."
+    },
+    {
+      "id": "rr-late",
+      "name": "DAE · 19 August 2020",
+      "publisher": "DAE · 19 August 2020",
+      "url": "https://www.bamis.gov.bd/res/public/bulletins/2020/08/21/20402.pdf#page=4",
+      "method": "Archived post-flood Aman windows. Requires variety-specific seedlings; not a current bulletin."
+    },
+    {
+      "id": "rr-aman",
+      "name": "BRRI · BRRI dhan71",
+      "publisher": "BRRI · BRRI dhan71",
+      "url": "https://riceprofile.brri.gov.bd/varieties/80",
+      "method": "25 July–9 August transplanting, 20–25-day seedlings, 115-day total life."
+    },
+    {
+      "id": "rr-green",
+      "name": "BAMIS · green gram",
+      "publisher": "BAMIS · green gram",
+      "url": "https://www.bamis.gov.bd/en/crops/view/57/",
+      "method": "Temperature, drainage and water requirements."
+    },
+    {
+      "id": "rr-fire",
+      "name": "Bangladesh Fire Service",
+      "publisher": "Bangladesh Fire Service",
+      "url": "https://fireservice.gov.bd/",
+      "method": "Official emergency information and hotline 102."
+    },
+    {
+      "id": "rr-flood",
+      "name": "IFRC · flood safety",
+      "publisher": "IFRC · flood safety",
+      "url": "https://ifrcstaysafe.org/disasters-tips/floods",
+      "method": "Safe access, electrical and contamination hazards."
+    },
+    {
+      "id": "rr-soil",
+      "name": "UC ANR · post-fire soil",
+      "publisher": "UC ANR · post-fire soil",
+      "url": "https://www.ucanr.edu/program/uc-anr-fire-network/home-garden-soil-safety",
+      "method": "Assess contamination sources and test with qualified support before food growing. California guidance; local review needed."
+    },
+    {
+      "id": "rr-regrow",
+      "name": "USDA NRCS · after-fire seeding",
+      "publisher": "USDA NRCS · after-fire seeding",
+      "url": "https://www.nrcs.usda.gov/resources/guides-and-instructions/after-the-fire-seeding",
+      "method": "Natural regrowth assessment before seeding; US guidance transferred only as a general principle."
+    },
+    {
+      "id": "rr-ash",
+      "name": "CDPH · wildfire ash",
+      "publisher": "CDPH · wildfire ash",
+      "url": "https://www.cdph.ca.gov/Programs/EPO/Pages/Wildfire%20Pages/ash-homegardens.aspx",
+      "method": "Mixed fire ash may contain contaminants. Do not use as garden fertilizer."
+    }
+  ],
+  "crops": [
+    {
+      "id": "aman",
+      "label": "Aman rice",
+      "bn": "আমন ধান",
+      "family": "Poaceae",
+      "referenceVariety": "BRRI dhan49",
+      "durationDays": [
+        135,
+        135
+      ],
+      "durationBasis": "Seed-to-maturity reference; transplanted seedlings were 30 days old.",
+      "spacingCm": [
+        20,
+        20
+      ],
+      "spacingUnit": "rice hills, not individual plants",
+      "referenceYieldTHa": [
+        4.9,
+        5.7
+      ],
+      "yieldBasis": "Min/max of reported site-year-treatment means in the 2018–2020 Rangpur trial; paddy, not milled rice.",
+      "sourceIds": [
+        "hossain2022"
+      ],
+      "kc": {
+        "initial": 1.05,
+        "mid": 1.2,
+        "end": [
+          0.6,
+          0.9
+        ],
+        "sourceId": "fao56"
+      }
+    },
+    {
+      "id": "boro",
+      "label": "Boro rice",
+      "bn": "বোরো ধান",
+      "family": "Poaceae",
+      "referenceVariety": "BRRI dhan29 / BRRI dhan58",
+      "durationDays": [
+        150,
+        160
+      ],
+      "durationBasis": "Seed-to-maturity reference; transplanted seedlings were 40 days old.",
+      "spacingCm": [
+        20,
+        20
+      ],
+      "spacingUnit": "rice hills, not individual plants",
+      "referenceYieldTHa": [
+        5.7,
+        8.07
+      ],
+      "yieldBasis": "Min/max of reported site-year-treatment means in the 2018–2020 Rangpur trial; paddy, not milled rice.",
+      "sourceIds": [
+        "hossain2022"
+      ],
+      "kc": {
+        "initial": 1.05,
+        "mid": 1.2,
+        "end": [
+          0.6,
+          0.9
+        ],
+        "sourceId": "fao56"
+      }
+    },
+    {
+      "id": "mustard",
+      "label": "Mustard",
+      "bn": "সরিষা",
+      "family": "Brassicaceae",
+      "referenceVariety": "BARI Shorisha-14",
+      "durationDays": [
+        75,
+        80
+      ],
+      "seedRateKgHa": [
+        7,
+        7
+      ],
+      "seedRateBasis": "BARI Shorisha-14 system-specific reference; editable planning input, not all mustard varieties.",
+      "seedSourceId": "bari-seed",
+      "referenceYieldTHa": [
+        1.2,
+        1.5
+      ],
+      "yieldBasis": "Observed site-year-treatment means in the 2018–2020 Rangpur trial; grain at 10% moisture.",
+      "sourceIds": [
+        "hossain2022",
+        "bari-seed"
+      ],
+      "kc": {
+        "initial": 0.35,
+        "mid": [
+          1,
+          1.15
+        ],
+        "end": 0.35,
+        "sourceId": "fao56",
+        "basis": "FAO rapeseed/canola proxy; not calibrated for BARI Shorisha-14."
+      }
+    },
+    {
+      "id": "potato",
+      "label": "Potato",
+      "bn": "আলু",
+      "family": "Solanaceae",
+      "referenceVariety": "BARI Alu-25",
+      "durationDays": [
+        90,
+        95
+      ],
+      "spacingCm": [
+        60,
+        25
+      ],
+      "spacingUnit": "planting positions",
+      "referenceYieldTHa": [
+        16.7,
+        33.6
+      ],
+      "yieldBasis": "Observed site-year-treatment means in the 2018–2020 Rangpur trial; fresh tubers.",
+      "sourceIds": [
+        "hossain2022"
+      ],
+      "kc": {
+        "initial": 0.5,
+        "mid": 1.15,
+        "end": 0.75,
+        "sourceId": "fao56"
+      }
+    },
+    {
+      "id": "mungbean",
+      "label": "Mungbean",
+      "bn": "মুগ ডাল",
+      "family": "Fabaceae",
+      "referenceVariety": "BARI Mung-6",
+      "durationDays": [
+        55,
+        58
+      ],
+      "seedRateKgHa": [
+        20,
+        25
+      ],
+      "seedSourceId": "ais-mung",
+      "seedRateBasis": "AIS variety-specific reference; broadcasting requires more seed.",
+      "referenceYieldTHa": [
+        1.47,
+        1.5
+      ],
+      "yieldBasis": "Two different references: 1.47 t/ha from the Gangachara trial and about 1.5 t/ha from AIS variety guidance. Not a statistical yield interval.",
+      "sourceIds": [
+        "islam2014",
+        "ais-mung"
+      ],
+      "kc": {
+        "initial": 0.4,
+        "mid": 1.05,
+        "end": [
+          0.35,
+          0.6
+        ],
+        "sourceId": "fao56",
+        "basis": "FAO green gram group; requires local stage dates and calibration."
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "id": "rice-leaf-blast",
+      "cropIds": [
+        "aman",
+        "boro"
+      ],
+      "label": "Leaf blast",
+      "bn": "ব্লাস্ট",
+      "symptomIds": [
+        "leaf-spots",
+        "spindle-spots",
+        "grey-centres"
+      ],
+      "possibleCause": "Pointed, elongated spots with pale centres and brown edges can fit leaf blast.",
+      "checks": [
+        "Compare spot shape on several leaves. Photograph the collar and panicle neck too."
+      ],
+      "actions": [
+        "Log variety, crop age and how quickly damage spreads. Seek an extension check before treatment."
+      ],
+      "sourceIds": [
+        "rrdi-blast",
+        "brri-disease"
+      ],
+      "urgency": "Prompt review if panicle necks are affected",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "দাগের দুই মাথা সরু, মাঝখান ফ্যাকাশে আর কিনারা বাদামি হলে ব্লাস্টের সম্ভাবনা আছে।",
+      "checksBn": [
+        "কয়েকটি পাতার দাগ মিলিয়ে দেখুন। পাতার গোড়া আর শীষের গোড়ার ছবিও তুলুন।"
+      ],
+      "actionsBn": [
+        "জাত, গাছের বয়স আর দাগ কত দ্রুত ছড়াচ্ছে লিখুন। ব্যবস্থা নেওয়ার আগে কৃষি কর্মকর্তাকে দেখান।"
+      ],
+      "urgencyBn": "শীষের গোড়ায় দাগ থাকলে দ্রুত দেখান"
+    },
+    {
+      "id": "rice-bacterial-blight",
+      "cropIds": [
+        "aman",
+        "boro"
+      ],
+      "label": "Bacterial leaf blight",
+      "bn": "পাতাপোড়া",
+      "symptomIds": [
+        "yellowing",
+        "leaf-edge-drying",
+        "water-soaked-edges"
+      ],
+      "possibleCause": "Wet-looking damage spreading from a leaf tip or edge toward the base can fit bacterial blight.",
+      "checks": [
+        "Check whether damage follows the margin rather than forming isolated spots."
+      ],
+      "actions": [
+        "Record storm damage, spread and recent fertilizer use. Ask an officer to distinguish blight from other stresses."
+      ],
+      "sourceIds": [
+        "irri-disease",
+        "brri-disease"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "পাতার আগা বা কিনারা থেকে ভেজা দাগ নিচের দিকে বাড়লে পাতাপোড়া রোগ হতে পারে।",
+      "checksBn": [
+        "দেখুন, দাগ কি পাতার কিনারা ধরে বাড়ছে, নাকি আলাদা আলাদা ছোপ হচ্ছে।"
+      ],
+      "actionsBn": [
+        "সম্প্রতি ঝড় হয়েছে কি না, সার কবে দিয়েছেন আর দাগ কতটা ছড়িয়েছে লিখুন। কৃষি কর্মকর্তাকে দেখান।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    },
+    {
+      "id": "rice-brown-spot",
+      "cropIds": [
+        "aman",
+        "boro"
+      ],
+      "label": "Brown spot",
+      "bn": "বাদামি দাগ",
+      "symptomIds": [
+        "leaf-spots",
+        "oval-brown-spots",
+        "grey-centres"
+      ],
+      "possibleCause": "Round or oval brown spots, sometimes with pale centres, can fit brown spot.",
+      "checks": [
+        "Compare round spots with the pointed lesions associated with blast. Check grains as well as leaves."
+      ],
+      "actions": [
+        "Keep representative photos and request a soil and crop check. Use healthy seed for the next crop."
+      ],
+      "sourceIds": [
+        "irri-disease",
+        "icar-rice",
+        "brri-disease"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "ছোট গোল বা ডিমের মতো বাদামি দাগের মাঝটা ফ্যাকাশে হলে বাদামি দাগ রোগ হতে পারে।",
+      "checksBn": [
+        "দাগ গোল নাকি দুই মাথা সরু দেখুন। পাতার সঙ্গে ধানের খোসাতেও দাগ আছে কি না দেখুন।"
+      ],
+      "actionsBn": [
+        "দাগের ছবি রাখুন। মাটি আর গাছ পরীক্ষা করাতে কৃষি কর্মকর্তার সাহায্য নিন। পরের মৌসুমে সুস্থ বীজ নিন।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    },
+    {
+      "id": "rice-stem-borer",
+      "cropIds": [
+        "aman",
+        "boro"
+      ],
+      "label": "Stem borer",
+      "bn": "মাজরা পোকা",
+      "symptomIds": [
+        "dead-central-shoot",
+        "white-empty-panicles",
+        "stem-damage"
+      ],
+      "possibleCause": "A dying central shoot in young rice, or a white panicle in older rice, can fit stem-borer injury.",
+      "checks": [
+        "Have an officer inspect a damaged stem for internal feeding. Empty panicles also have other causes."
+      ],
+      "actions": [
+        "Count affected and examined hills separately and retain close photos for review."
+      ],
+      "sourceIds": [
+        "icar-rice"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "কচি ধানের মাঝের কুশি শুকিয়ে গেলে বা বড় ধানের শীষ সাদা হলে মাজরা পোকার ক্ষতি হতে পারে।",
+      "checksBn": [
+        "ক্ষতিগ্রস্ত কাণ্ডের ভেতরে পোকার খাওয়ার চিহ্ন আছে কি না কৃষি কর্মকর্তাকে দেখান। শীষ সাদা হওয়ার অন্য কারণও আছে।"
+      ],
+      "actionsBn": [
+        "কতটি গোছা দেখেছেন আর কতটিতে ক্ষতি আছে, আলাদা করে গুনুন। কাছ থেকে ছবি তুলুন।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    },
+    {
+      "id": "rice-nitrogen-deficiency",
+      "cropIds": [
+        "aman",
+        "boro"
+      ],
+      "label": "Possible nitrogen shortage",
+      "bn": "নাইট্রোজেনের ঘাটতি",
+      "symptomIds": [
+        "yellowing",
+        "older-leaves-yellow",
+        "slow-growth"
+      ],
+      "possibleCause": "Older leaves yellowing first with pale growth can fit nitrogen shortage; root and water problems can look similar.",
+      "checks": [
+        "Compare older and newer leaves; record waterlogging, fertilizer dates and soil-test results."
+      ],
+      "actions": [
+        "Use the BRRI leaf colour chart with local guidance. Do not calculate a fertilizer dose from a photograph."
+      ],
+      "sourceIds": [
+        "icar-rice",
+        "brri-lcc"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "পুরোনো পাতা আগে হলুদ হলে নাইট্রোজেনের ঘাটতি হতে পারে। শিকড়ের ক্ষতি বা জমে থাকা পানিতেও এমন হয়।",
+      "checksBn": [
+        "পুরোনো আর নতুন পাতার রং মিলিয়ে দেখুন। পানি জমেছিল কি না, শেষ সার দেওয়ার তারিখ ও মাটি পরীক্ষার ফল লিখুন।"
+      ],
+      "actionsBn": [
+        "কৃষি কর্মকর্তার সঙ্গে পাতার রঙের চার্ট মিলিয়ে দেখুন। সারের মাত্রা ঠিক করতে মাটি পরীক্ষার পরামর্শ নিন।"
+      ],
+      "urgencyBn": "সার দেওয়ার আগে যাচাই করুন"
+    },
+    {
+      "id": "mustard-aphids",
+      "cropIds": [
+        "mustard"
+      ],
+      "label": "Aphids on mustard",
+      "bn": "জাব পোকা",
+      "symptomIds": [
+        "small-insects",
+        "flower-insects",
+        "sticky-leaves"
+      ],
+      "possibleCause": "Visible sucking insects on tender shoots or flowers warrant an aphid check.",
+      "checks": [
+        "Photograph insects closely; inspect shoots, flowers and pods. Count affected plants."
+      ],
+      "actions": [
+        "Record helpful insects as well as pests. Ask the extension officer whether action is warranted at this stage."
+      ],
+      "sourceIds": [
+        "bamis-mustard",
+        "bamis-bulletin"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "সরিষার কচি ডগা বা ফুলে ছোট পোকা থাকলে জাব পোকা কি না দেখুন।",
+      "checksBn": [
+        "ডগা, ফুল আর শুঁটি দেখুন। পোকার কাছে থেকে ছবি তুলে আক্রান্ত গাছ গুনুন।"
+      ],
+      "actionsBn": [
+        "উপকারী পোকাও দেখা যাচ্ছে কি না লিখুন। এখন ব্যবস্থা নেওয়া দরকার কি না কৃষি কর্মকর্তার সঙ্গে ঠিক করুন।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    },
+    {
+      "id": "potato-late-blight",
+      "cropIds": [
+        "potato"
+      ],
+      "label": "Possible late blight",
+      "bn": "নাবি ধ্বসা",
+      "symptomIds": [
+        "leaf-spots",
+        "wet-dark-patches",
+        "white-underleaf-growth"
+      ],
+      "possibleCause": "Rapidly darkening wet-looking leaf patches, sometimes with pale growth underneath, can fit late blight.",
+      "checks": [
+        "Inspect both leaf surfaces, especially in cool, humid or foggy weather."
+      ],
+      "actions": [
+        "Record spread and contact extension promptly. Next-season prevention includes healthy seed and regular scouting."
+      ],
+      "sourceIds": [
+        "ais-potato",
+        "bamis-potato"
+      ],
+      "urgency": "Prompt extension review for rapidly spreading patches",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "আলুর পাতায় ভেজা দাগ দ্রুত কালচে হয়ে উঠলে নাবি ধসা বা মড়ক হতে পারে। পাতার নিচে সাদা আস্তরণও থাকতে পারে।",
+      "checksBn": [
+        "ঠান্ডা, ভেজা বা কুয়াশার দিনে পাতার ওপর আর নিচ দুদিকই দেখুন।"
+      ],
+      "actionsBn": [
+        "দাগ কত দ্রুত ছড়াচ্ছে লিখুন। দ্রুত কৃষি কর্মকর্তাকে দেখান। পরের মৌসুমে সুস্থ বীজ আলু নিন।"
+      ],
+      "urgencyBn": "দাগ দ্রুত বাড়লে দ্রুত কৃষি কর্মকর্তাকে দেখান"
+    },
+    {
+      "id": "potato-cutworm",
+      "cropIds": [
+        "potato"
+      ],
+      "label": "Cutworm injury",
+      "bn": "কাটুই পোকা",
+      "symptomIds": [
+        "cut-stems",
+        "fallen-seedlings",
+        "soil-caterpillars"
+      ],
+      "possibleCause": "Young plants cut near the soil surface can fit cutworm injury.",
+      "checks": [
+        "Inspect soil near cut plants for larvae."
+      ],
+      "actions": [
+        "Collect visible larvae if safe, photograph them and record affected plant counts."
+      ],
+      "sourceIds": [
+        "bamis-bulletin"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "মাটির কাছে আলুর কচি গাছ কাটা থাকলে কাটুই পোকার ক্ষতি হতে পারে।",
+      "checksBn": [
+        "কাটা গাছের পাশের মাটি আলতো করে সরিয়ে শুঁয়োপোকা আছে কি না দেখুন।"
+      ],
+      "actionsBn": [
+        "পাওয়া পোকা নিরাপদে সংগ্রহ করতে পারলে করুন। ছবি তুলুন, আর কতটি গাছ কাটা তা লিখুন।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    },
+    {
+      "id": "mungbean-yellow-mosaic",
+      "cropIds": [
+        "mungbean"
+      ],
+      "label": "Yellow mosaic possibility",
+      "bn": "হলুদ মোজাইক",
+      "symptomIds": [
+        "yellow-mosaic",
+        "mottled-leaves",
+        "whiteflies"
+      ],
+      "possibleCause": "Patchy yellow and green leaves can fit mosaic disease; whiteflies are a relevant vector to inspect.",
+      "checks": [
+        "Check the pattern on young leaves and photograph small insects on leaf undersides."
+      ],
+      "actions": [
+        "Mark affected plants and seek confirmation. Discuss removal of confirmed infected plants and resistant varieties locally."
+      ],
+      "sourceIds": [
+        "janala-mung",
+        "ais-mung"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "মুগের পাতায় হলুদ ও সবুজ ছোপ হলে মোজাইক রোগ হতে পারে। সাদা মাছি এই রোগ ছড়াতে পারে।",
+      "checksBn": [
+        "কচি পাতার ছোপ দেখুন। পাতার নিচে ছোট সাদা পোকা থাকলে ছবি তুলুন।"
+      ],
+      "actionsBn": [
+        "আক্রান্ত গাছ চিহ্নিত করে কৃষি কর্মকর্তাকে দেখান। রোগ নিশ্চিত হলে কী করবেন আর পরের বার কোন জাত নেবেন জেনে নিন।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    },
+    {
+      "id": "mungbean-waterlogging",
+      "cropIds": [
+        "mungbean"
+      ],
+      "label": "Waterlogging stress",
+      "bn": "জলাবদ্ধতা",
+      "symptomIds": [
+        "standing-water",
+        "yellowing",
+        "wilting"
+      ],
+      "possibleCause": "Mungbean is vulnerable to waterlogging; standing water may help explain yellowing or decline.",
+      "checks": [
+        "Record how long water has remained, drainage outlets and the distribution of affected plants."
+      ],
+      "actions": [
+        "Restore a safe drainage route where feasible. Reassess once water recedes before adding fertilizer."
+      ],
+      "sourceIds": [
+        "ais-mung"
+      ],
+      "urgency": "Inspect and record",
+      "diagnosisStatus": "Possibility to investigate; not a confirmed diagnosis",
+      "possibleCauseBn": "মুগগাছের গোড়ায় পানি জমে থাকলে গাছ হলুদ বা দুর্বল হতে পারে।",
+      "checksBn": [
+        "কতক্ষণ পানি ছিল, কোন পথে বের হয় আর কোন জায়গায় বেশি ক্ষতি তা লিখুন।"
+      ],
+      "actionsBn": [
+        "সম্ভব হলে নিরাপদে বাড়তি পানি বের করুন। পানি নামলে গাছ আবার দেখে তারপর সারের সিদ্ধান্ত নিন।"
+      ],
+      "urgencyBn": "মাঠে দেখে লিখে রাখুন"
+    }
+  ],
+  "aez": {
+    "id": 3,
+    "label": "Tista Meander Floodplain",
+    "bn": "তিস্তা মিয়ান্ডার প্লাবনভূমি",
+    "sourceIds": [
+      "barc-frg2024"
+    ],
+    "sourcePage": 36,
+    "scale": "Regional reference; never a measured parcel result",
+    "parcelAssignment": "Not established by this prototype. Rangpur includes more than one AEZ.",
+    "soilMatrix": [
+      {
+        "landType": "Highland",
+        "shareOfAezPct": 35,
+        "pH": [
+          3.6,
+          6.6
+        ],
+        "organicMatterClass": "Low–medium",
+        "nutrientClasses": {
+          "N": "Very low–low",
+          "P": "Low–medium",
+          "K": "Low–medium",
+          "S": "Very low–low",
+          "Ca": "Low–medium",
+          "Mg": "Low–medium",
+          "Zn": "Very low–low",
+          "B": "Very low–low"
+        }
+      },
+      {
+        "landType": "Medium highland",
+        "shareOfAezPct": 51,
+        "pH": [
+          4.1,
+          6.8
+        ],
+        "organicMatterClass": "Low–medium",
+        "nutrientClasses": {
+          "N": "Very low–low",
+          "P": "Low–medium",
+          "K": "Low–medium",
+          "S": "Very low–low",
+          "Ca": "Low–medium",
+          "Mg": "Low–medium",
+          "Zn": "Very low–low",
+          "B": "Very low–low"
+        }
+      }
+    ],
+    "textureContext": "Ridge soils are loamy; basin soils include heavy silt loam and silty clay loam. Do not convert these classes into parcel water-holding capacity.",
+    "localStudyContext": {
+      "locations": [
+        "Mithapukur",
+        "Pirganj"
+      ],
+      "years": [
+        2018,
+        2020
+      ],
+      "texture": "silt loam",
+      "pH": [
+        4.6,
+        6.5
+      ],
+      "organicCarbonPct": 0.94,
+      "sourceId": "hossain2022",
+      "status": "Context reported in the study, not a soil test for any demo polygon."
+    }
+  },
+  "fertilizer": {
+    "title": "Convert an approved nutrient plan",
+    "bn": "সারের হিসাব",
+    "mode": "Arithmetic conversion only",
+    "nutrientBasis": "elemental N, P, K",
+    "sourceIds": [
+      "barc-frg2024"
+    ],
+    "requiredInputs": [
+      "field area and units",
+      "crop and variety",
+      "soil-test date and laboratory",
+      "soil-test extraction method and units",
+      "an agronomist- or laboratory-specified nutrient target in kg/ha",
+      "previous applications and manure credits"
+    ],
+    "noTargetState": "Add a soil-test-based target to calculate product quantity.",
+    "products": [
+      {
+        "id": "urea",
+        "label": "Urea",
+        "nutrient": "N",
+        "fraction": 0.46,
+        "formula": "net_N_kg_ha * area_ha / 0.46"
+      },
+      {
+        "id": "tsp",
+        "label": "TSP",
+        "nutrient": "P",
+        "fraction": 0.2,
+        "formula": "net_P_kg_ha * area_ha / 0.20"
+      },
+      {
+        "id": "mop",
+        "label": "MOP",
+        "nutrient": "K",
+        "fraction": 0.5,
+        "formula": "net_K_kg_ha * area_ha / 0.50"
+      }
+    ],
+    "validation": [
+      "All values finite and nonnegative; area must be positive.",
+      "The input nutrient basis must match the product basis.",
+      "No automatic recommendation from pH, satellite imagery or symptoms alone.",
+      "No negative product quantities: flag a target already met by previous inputs.",
+      "Mixed fertilizers supply more than one nutrient and require joint accounting.",
+      "Application timing, liming and micronutrient decisions require local review."
+    ],
+    "oxideWarning": "BARC uses elemental P and K. Do not enter a P2O5 or K2O target directly. Use a separately labelled conversion if oxide-based targets are added."
+  },
+  "rotations": [
+    {
+      "id": "aman-fallow-boro",
+      "label": "Aman → fallow → Boro",
+      "bn": "আমন → পতিত → বোরো",
+      "isBaseline": true,
+      "cropIds": [
+        "aman",
+        "boro"
+      ],
+      "studyTreatment": "CP3",
+      "referenceIrrigationMm": [
+        1272,
+        1537
+      ],
+      "sourceIds": [
+        "hossain2022"
+      ],
+      "rationale": "Local baseline in the published trial.",
+      "constraints": [
+        "Requires a reliable irrigation source for Boro.",
+        "Winter fallow creates a gap in crop cover."
+      ]
+    },
+    {
+      "id": "aman-mustard-boro",
+      "label": "Aman → mustard → Boro",
+      "bn": "আমন → সরিষা → বোরো",
+      "isBaseline": false,
+      "cropIds": [
+        "aman",
+        "mustard",
+        "boro"
+      ],
+      "studyTreatment": "CP1",
+      "referenceIrrigationMm": [
+        826,
+        1164
+      ],
+      "sourceIds": [
+        "hossain2022"
+      ],
+      "rationale": "Adds an oilseed crop in the winter gap; the Rangpur trial used later Boro planting.",
+      "constraints": [
+        "Aman must leave enough time for a short mustard variety.",
+        "Delayed Boro changes weather exposure; trial water savings are not guaranteed."
+      ]
+    },
+    {
+      "id": "aman-potato-boro",
+      "label": "Aman → potato → Boro",
+      "bn": "আমন → আলু → বোরো",
+      "isBaseline": false,
+      "cropIds": [
+        "aman",
+        "potato",
+        "boro"
+      ],
+      "studyTreatment": "CP2",
+      "referenceIrrigationMm": [
+        804,
+        1032
+      ],
+      "sourceIds": [
+        "hossain2022"
+      ],
+      "rationale": "Adds a tuber crop; site-year trial irrigation totals were lower than the baseline.",
+      "constraints": [
+        "Check seed capital, storage, buyer access and late-blight risk.",
+        "An extra crop needs labour and a tightly managed calendar."
+      ]
+    },
+    {
+      "id": "short-aman-potato-mungbean",
+      "label": "Short Aman → potato → mungbean",
+      "bn": "স্বল্পমেয়াদি আমন → আলু → মুগ",
+      "isBaseline": false,
+      "cropIds": [
+        "aman",
+        "potato",
+        "mungbean"
+      ],
+      "studyTreatment": "T1",
+      "referenceIrrigationMm": null,
+      "sourceIds": [
+        "islam2014"
+      ],
+      "rationale": "A Gangachara trial fitted a short pulse after potato; this is a rotation candidate, not a proven water-saving percentage.",
+      "referenceCalendar": [
+        {
+          "crop": "aman",
+          "variety": "BINA dhan7",
+          "fromMonthDay": "07-21",
+          "toMonthDay": "10-21"
+        },
+        {
+          "crop": "potato",
+          "fromMonthDay": "11-05",
+          "toMonthDay": "02-06"
+        },
+        {
+          "crop": "mungbean",
+          "variety": "BARI Mung-6",
+          "fromMonthDay": "02-21",
+          "toMonthDay": "04-21"
+        }
+      ],
+      "constraints": [
+        "Needs short-duration Aman and well-drained land.",
+        "Mungbean establishment must fit local weather and the next crop."
+      ]
+    }
+  ],
+  "water": {
+    "method": "Scenario calculator, not a calibrated aquifer model",
+    "etcFormula": "ETc_mm = Kc * ETo_mm",
+    "etcCaveat": "ETc is crop evapotranspiration under standard conditions, not gross irrigation demand. Effective rain, soil storage, paddy seepage/percolation and field losses must be considered separately.",
+    "requiredInputs": [
+      "irrigated area (ha)",
+      "net irrigation assumption (mm)",
+      "application efficiency (0–1)",
+      "groundwater fraction (0–1)",
+      "aquifer accounting area (ha)",
+      "independently estimated recharge (mm/year)",
+      "farm allocation share (0–1)",
+      "other withdrawals in that same accounting area (m3/year)"
+    ],
+    "formulas": {
+      "grossWithdrawalM3": "net_irrigation_mm * field_area_ha * 10 / efficiency * groundwater_fraction",
+      "allocatedRechargeM3": "recharge_mm * aquifer_accounting_area_ha * 10 * allocation_share",
+      "scenarioBalanceM3": "allocated_recharge_m3 - gross_withdrawal_m3 - allocated_other_withdrawals_m3"
+    },
+    "headChangeGate": "Keep water-table change unavailable unless aquifer extent, specific yield/storage coefficient and a validated boundary-flow model are supplied.",
+    "defaults": {
+      "rechargeMm": null,
+      "specificYield": null,
+      "waterTableDepthM": null
+    },
+    "limits": [
+      "Rainfall is not aquifer recharge.",
+      "No inferred aquifer storage from AEZ soil classes.",
+      "A negative scenario balance is an assumption-dependent pressure indicator, not a forecast of well failure.",
+      "Do not sum allocations across farms beyond the same aquifer recharge budget."
+    ],
+    "sourceIds": [
+      "fao56"
+    ],
+    "validation": [
+      "Application efficiency must be greater than 0 and at most 1.",
+      "Fractions and allocation share must be between 0 and 1.",
+      "Areas must be positive; depths and withdrawals must be finite and nonnegative.",
+      "All terms must use the same year and accounting boundary."
+    ]
+  },
+  "groundTruth": {
+    "storage": "Local demo records until an authenticated research service is connected",
+    "recordFields": [
+      "recordId",
+      "fieldId",
+      "observerRole",
+      "observedAt",
+      "crop",
+      "variety",
+      "plantingDate",
+      "harvestDate",
+      "harvestedAreaHa",
+      "yieldKg",
+      "yieldMoisturePct",
+      "soilSampleDate",
+      "soilSampleDepthCm",
+      "labName",
+      "soilPH",
+      "pHMethod",
+      "organicCarbonPct",
+      "soilNutrients",
+      "nutrientUnits",
+      "extractionMethod",
+      "irrigationMm",
+      "waterSource",
+      "symptomIds",
+      "affectedPlants",
+      "examinedPlants",
+      "notes",
+      "photoReferences",
+      "consentForResearch",
+      "reviewStatus"
+    ],
+    "reviewStates": [
+      "Farmer observation",
+      "Officer reviewed",
+      "Laboratory confirmed"
+    ],
+    "trainingRule": "Do not treat an unreviewed symptom label or synthetic demo record as a confirmed disease training label.",
+    "qa": [
+      "Retain raw observations and provenance.",
+      "Require harvested area to compute t/ha.",
+      "Separate paddy, milled grain and fresh-tuber mass.",
+      "Record moisture basis when comparing yields.",
+      "Photo review confidence is not a diagnostic probability."
+    ]
+  },
+  "qa": {
+    "purpose": "Compare products and expose missing evidence",
+    "metrics": [
+      {
+        "id": "mean-difference",
+        "label": "Mean difference",
+        "formula": "mean(POWER_mm - IMERG_mm) over matched valid periods",
+        "interpretation": "Product disagreement; not bias against truth without an independent gauge."
+      },
+      {
+        "id": "rmse",
+        "label": "RMSE against a gauge",
+        "requires": "Matched independent gauge measurements; otherwise unavailable."
+      },
+      {
+        "id": "optical-cloud-loss",
+        "label": "Cloud-mask loss",
+        "formula": "1 - valid_optical_pixel_count / eligible_optical_pixel_count",
+        "interpretation": "Requires actual scene QA masks. Not a metric for POWER or IMERG rainfall."
+      },
+      {
+        "id": "soil-moisture",
+        "label": "Soil moisture QA",
+        "requires": "Product retrieval flags, depth, native footprint and observation time."
+      }
+    ],
+    "missingState": "Not available for this field/time. No value inferred.",
+    "uncertaintyRule": "Draw uncertainty bands only from a documented uncertainty variable or stated calculation; an ensemble spread is not a confidence interval."
+  },
+  "modellingRules": [
+    "Preference scores are transparent heuristic scores, not predicted probabilities.",
+    "Reference yield extrema are not statistical prediction intervals.",
+    "Multiply area by a reference yield only when labelled a planning scenario.",
+    "A crop rotation suitability score does not establish calendar feasibility or market profitability."
+  ],
+  "symptoms": [
+    {
+      "id": "leaf-spots",
+      "label": "Spots on leaves",
+      "bn": "পাতায় দাগ"
+    },
+    {
+      "id": "spindle-spots",
+      "label": "Long spots with pointed ends",
+      "bn": "দুই মাথা সরু লম্বা দাগ"
+    },
+    {
+      "id": "grey-centres",
+      "label": "Grey centre inside spots",
+      "bn": "দাগের মাঝখান ধূসর"
+    },
+    {
+      "id": "yellowing",
+      "label": "Leaves turning yellow",
+      "bn": "পাতা হলুদ হচ্ছে"
+    },
+    {
+      "id": "leaf-edge-drying",
+      "label": "Drying along leaf edges",
+      "bn": "পাতার কিনারা শুকাচ্ছে"
+    },
+    {
+      "id": "water-soaked-edges",
+      "label": "Wet-looking leaf edges",
+      "bn": "পাতার কিনারা ভেজা ভেজা"
+    },
+    {
+      "id": "oval-brown-spots",
+      "label": "Round or oval brown spots",
+      "bn": "গোল বা ডিমের মতো বাদামি দাগ"
+    },
+    {
+      "id": "dead-central-shoot",
+      "label": "Middle shoot drying out",
+      "bn": "মাঝের কুশি শুকিয়ে যাচ্ছে"
+    },
+    {
+      "id": "white-empty-panicles",
+      "label": "White heads with empty grains",
+      "bn": "শীষ সাদা, দানা নেই"
+    },
+    {
+      "id": "stem-damage",
+      "label": "Damaged stems",
+      "bn": "কাণ্ডে ক্ষত"
+    },
+    {
+      "id": "older-leaves-yellow",
+      "label": "Older leaves yellow first",
+      "bn": "পুরোনো পাতা আগে হলুদ হচ্ছে"
+    },
+    {
+      "id": "slow-growth",
+      "label": "Plants growing slowly",
+      "bn": "গাছের বৃদ্ধি ধীর"
+    },
+    {
+      "id": "small-insects",
+      "label": "Small insects on the plant",
+      "bn": "গাছে ছোট পোকা"
+    },
+    {
+      "id": "flower-insects",
+      "label": "Insects on flowers",
+      "bn": "ফুলে পোকা"
+    },
+    {
+      "id": "sticky-leaves",
+      "label": "Leaves feel sticky",
+      "bn": "পাতা চটচটে"
+    },
+    {
+      "id": "wet-dark-patches",
+      "label": "Dark, wet-looking patches",
+      "bn": "ভেজা ভেজা কালচে দাগ"
+    },
+    {
+      "id": "white-underleaf-growth",
+      "label": "White coating under leaves",
+      "bn": "পাতার নিচে সাদা আস্তরণ"
+    },
+    {
+      "id": "cut-stems",
+      "label": "Stems cut near the ground",
+      "bn": "মাটির কাছে কাণ্ড কাটা"
+    },
+    {
+      "id": "fallen-seedlings",
+      "label": "Seedlings lying on the ground",
+      "bn": "চারা মাটিতে পড়ে আছে"
+    },
+    {
+      "id": "soil-caterpillars",
+      "label": "Caterpillars in nearby soil",
+      "bn": "গাছের পাশের মাটিতে শুঁয়োপোকা"
+    },
+    {
+      "id": "yellow-mosaic",
+      "label": "Patchy yellow and green colour",
+      "bn": "পাতায় হলুদ ও সবুজ ছোপ"
+    },
+    {
+      "id": "mottled-leaves",
+      "label": "Uneven colour on leaves",
+      "bn": "পাতায় ছোপ ছোপ রং"
+    },
+    {
+      "id": "whiteflies",
+      "label": "Tiny white flying insects",
+      "bn": "ছোট সাদা মাছি"
+    },
+    {
+      "id": "standing-water",
+      "label": "Water remains around plants",
+      "bn": "গাছের গোড়ায় পানি জমে আছে"
+    },
+    {
+      "id": "wilting",
+      "label": "Plants drooping",
+      "bn": "গাছ নেতিয়ে পড়ছে"
+    }
+  ],
+  "resilience": {
+    "title": "Choose a recovery path",
+    "titleBn": "ক্ষতির পর কী করবেন",
+    "context": "Match the site and its past land use with an extension or forestry officer. The examples distinguish wetland restoration from fruit farming on higher ground.",
+    "contextBn": "জমিতে আগে কী ছিল আর পানি কীভাবে নামে, তা কৃষি বা বন কর্মকর্তার সঙ্গে মিলিয়ে নিন। জলাভূমি আর উঁচু ফলের জমির জন্য আলাদা উদাহরণ রয়েছে।",
+    "candidates": [
+      {
+        "id": "hijol",
+        "label": "Hijol",
+        "bn": "হিজল",
+        "scientificName": "Barringtonia acutangula",
+        "siteFit": "Possible wetland restoration tree for a stable, seasonally flooded freshwater margin. Keep channels and fish passages open.",
+        "siteFitBn": "মৌসুমি বন্যা হয় এমন স্থির মিঠাপানির জলাভূমির ধারে বিবেচনা করা যায়। পানি চলাচল আর মাছের পথ খোলা রাখুন।",
+        "window": "Review once floodwater recedes and a planting spot is accessible. Confirm the next flood, nursery stock and aftercare locally.",
+        "windowBn": "বন্যার পানি নেমে জমিতে যাওয়া গেলে জায়গা দেখে নিন। পরের বন্যার সময়, সুস্থ চারা ও পরিচর্যার ব্যবস্থা মিলিয়ে সময় ঠিক করুন।",
+        "evidenceArea": "Sunamganj haor restoration design and northeastern Bangladesh nurseries. A Rangpur site needs local ecological review.",
+        "evidenceAreaBn": "সুনামগঞ্জের হাওর ও উত্তর-পূর্বাঞ্চলের নার্সারির তথ্য। রংপুরের জায়গাটি উপযুক্ত কি না স্থানীয়ভাবে দেখতে হবে।",
+        "sourceIds": [
+          "doe-haor2026",
+          "sohel-haor-nurseries"
+        ]
+      },
+      {
+        "id": "koroch",
+        "label": "Koroch",
+        "bn": "করচ",
+        "scientificName": "Millettia pinnata (syn. Pongamia pinnata)",
+        "siteFit": "Possible native tree for a stable low-to-middle flood zone beside a suitable canal or beel. Retain open wetland habitat.",
+        "siteFitBn": "স্থির খাল বা বিলের ধারে, মৌসুমে পানি ওঠে এমন উপযুক্ত জায়গায় বিবেচনা করা যায়। খোলা জলাভূমি অক্ষত রাখুন।",
+        "window": "Inspect exposed ground after water levels fall. Elevated haor sites can have a different planting window from submerged sites.",
+        "windowBn": "পানি নামলে জেগে ওঠা মাটি দেখুন। উঁচু জমি আর ডুবে থাকা জমিতে চারা লাগানোর সময় আলাদা হতে পারে।",
+        "evidenceArea": "Sunamganj haor restoration design. Compare flood depth and duration before transfer to Rangpur.",
+        "evidenceAreaBn": "সুনামগঞ্জের হাওর পুনরুদ্ধার পরিকল্পনার উদাহরণ। রংপুরে পানির গভীরতা ও স্থায়িত্ব আগে মিলিয়ে নিন।",
+        "sourceIds": [
+          "doe-haor2026",
+          "sohel-haor-nurseries"
+        ]
+      },
+      {
+        "id": "mango",
+        "label": "Mango",
+        "bn": "আম",
+        "scientificName": "Mangifera indica",
+        "siteFit": "Fruit-tree option for a stable, drained homestead or char farm where the owner wants tree–crop intercropping. Allow space for shade and drainage.",
+        "siteFitBn": "বাড়ির উঁচু জমি বা স্থিতিশীল চরে পানি নামার ব্যবস্থা থাকলে ফসলের সঙ্গে আমের কথা ভাবা যায়। ছায়া ও পানি বের হওয়ার পথের জন্য জায়গা রাখুন।",
+        "window": "BAMIS lists May–June or August–September. Use a suitable window only after water drains and the plot is stable.",
+        "windowBn": "বামিসে মে–জুন অথবা আগস্ট–সেপ্টেম্বর বলা আছে। পানি নেমে জমি স্থির হলে উপযুক্ত সময় বেছে নিন।",
+        "evidenceArea": "Fruit–vegetable systems were studied on Teesta chars in Rangpur and Nilphamari during 2019–2023. Species survival after a flood or fire was outside that experiment.",
+        "evidenceAreaBn": "২০১৯–২০২৩ সালে রংপুর ও নীলফামারীর তিস্তার চরে ফল ও সবজি একসঙ্গে চাষের গবেষণা হয়। বন্যা বা আগুনের পর আমগাছ টিকে থাকা সেখানে মাপা হয়নি।",
+        "sourceIds": [
+          "bari-teesta-chars2026",
+          "bamis-mango"
+        ]
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "flood",
+        "label": "Flood recovery",
+        "bn": "বন্যার পর",
+        "steps": [
+          {
+            "phase": "While water remains",
+            "phaseBn": "পানি থাকলে",
+            "text": "Record flood depth, duration and erosion from a safe position. Wait until access is safe and the ground is stable.",
+            "textBn": "নিরাপদ জায়গা থেকে পানির গভীরতা, কতদিন ছিল ও কোথায় ভাঙন হয়েছে লিখুন। যাতায়াত নিরাপদ হওয়া ও মাটি স্থির হওয়া পর্যন্ত অপেক্ষা করুন।"
+          },
+          {
+            "phase": "When water recedes",
+            "phaseBn": "পানি নামলে",
+            "text": "Distinguish a wetland margin from a drained farm edge. Mark flood channels, fish routes and existing regrowth with the land users.",
+            "textBn": "জলাভূমির ধার আর পানি নেমে যায় এমন ক্ষেতের আইল আলাদা করুন। জমি ব্যবহারকারীদের নিয়ে পানির পথ, মাছ চলাচলের পথ ও নতুন গজানো গাছ চিহ্নিত করুন।"
+          },
+          {
+            "phase": "Before planting",
+            "phaseBn": "চারা লাগানোর আগে",
+            "text": "Review the candidate and planting window locally. Record the planting date and check survival after the next flood.",
+            "textBn": "স্থানীয় কর্মকর্তার সঙ্গে গাছ ও সময় ঠিক করুন। লাগানোর তারিখ লিখুন, পরের বন্যার পর কতটি চারা টিকেছে দেখুন।"
+          }
+        ],
+        "candidateIds": [
+          "hijol",
+          "koroch",
+          "mango"
+        ],
+        "sourceIds": [
+          "doe-haor2026",
+          "sohel-haor-nurseries",
+          "bari-teesta-chars2026",
+          "bamis-mango"
+        ]
+      },
+      {
+        "id": "fire",
+        "label": "Fire recovery",
+        "bn": "আগুনের পর",
+        "steps": [
+          {
+            "phase": "After access is safe",
+            "phaseBn": "ফেরা নিরাপদ হলে",
+            "text": "Ask the local authority when re-entry is safe. Mark exposed soil, erosion routes, surviving plants and the previous land use.",
+            "textBn": "কখন ফেরা নিরাপদ, স্থানীয় কর্তৃপক্ষের কাছে জেনে নিন। খোলা মাটি, ক্ষয়ের পথ, বেঁচে থাকা গাছ আর আগের জমির ব্যবহার লিখুন।"
+          },
+          {
+            "phase": "Watch for regrowth",
+            "phaseBn": "নতুন গাছ দেখুন",
+            "text": "Protect surviving shoots and seedlings. Review exposed soil and repeat-fire risk with forestry or extension staff.",
+            "textBn": "বেঁচে থাকা কুঁড়ি ও চারা রক্ষা করুন। মাটি ক্ষয় আর আবার আগুন লাগার ঝুঁকি বন বা কৃষি কর্মকর্তার সঙ্গে দেখুন।"
+          },
+          {
+            "phase": "Choose after review",
+            "phaseBn": "দেখে সিদ্ধান্ত নিন",
+            "text": "Where regrowth is insufficient, review locally native material for the former habitat. Agree a moisture and aftercare window with the land manager.",
+            "textBn": "নিজে থেকে যথেষ্ট গাছ না উঠলে আগের পরিবেশের উপযোগী দেশি প্রজাতি নিয়ে আলোচনা করুন। মাটিতে আর্দ্রতা ও পরিচর্যার সুযোগ দেখে জমির দায়িত্বে থাকা ব্যক্তির সঙ্গে সময় ঠিক করুন।"
+          }
+        ],
+        "candidateIds": [],
+        "sourceIds": [
+          "fao-fire-recovery",
+          "fao-regeneration"
+        ]
+      }
+    ],
+    "fieldChecks": [
+      {
+        "id": "land-use",
+        "label": "Previous land use and access rights",
+        "bn": "জমির আগের ব্যবহার ও কার ব্যবহারের অধিকার আছে"
+      },
+      {
+        "id": "water-history",
+        "label": "Typical flood depth and duration",
+        "bn": "সাধারণত পানি কত গভীর ও কতদিন থাকে"
+      },
+      {
+        "id": "site-stability",
+        "label": "Bank stability and drainage routes",
+        "bn": "পাড় স্থির কি না ও পানি বের হওয়ার পথ"
+      },
+      {
+        "id": "regrowth",
+        "label": "Surviving stems and new seedlings",
+        "bn": "বেঁচে থাকা গাছ ও নতুন চারা"
+      },
+      {
+        "id": "aftercare",
+        "label": "Local nursery, water and aftercare",
+        "bn": "স্থানীয় নার্সারি, পানি ও পরিচর্যার ব্যবস্থা"
+      }
+    ]
+  }
+}
