@@ -11,6 +11,7 @@ import { research } from "../src/legacy/research.js";
 import { recovery } from "../src/legacy/recovery.js";
 import { examples, references } from "../src/legacy/recovery-data.js";
 import { units } from "../src/legacy/boundary.js";
+import { fieldReport } from "../src/legacy/report.js";
 
 test("SMAP card renders correctly in EN and BN", async () => {
   globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
@@ -240,4 +241,30 @@ test("FARMER_REPORTED shows 'by farmer'", () => {
   state.lang = "bn";
   const htmlBn = truth('FARMER_REPORTED');
   assert.ok(htmlBn.includes("by farmer"), "FARMER_REPORTED shows 'by farmer' in BN");
+});
+
+test("report source contains truth badges, index label, and Sources line", async () => {
+  // Read the report.js source to verify it contains the required patterns
+  const reportSource = await readFile(new URL("../src/legacy/report.js", import.meta.url), "utf8");
+  
+  // Check report.js imports truth function
+  assert.ok(reportSource.includes("truth"), "report.js imports truth function");
+  
+  // Check for truth badges in the HTML
+  assert.ok(reportSource.includes("truth('REMOTE_OBSERVED')"), "Uses REMOTE_OBSERVED for rain");
+  assert.ok(reportSource.includes("truth('MODELED')"), "Uses MODELED for estimated values");
+  assert.ok(reportSource.includes("truth('FARMER_REPORTED')"), "Uses FARMER_REPORTED for farmer data");
+  assert.ok(reportSource.includes("truth('SCENARIO')"), "Uses SCENARIO for trial-based values");
+  
+  // Check for index label (Bengali or English)
+  assert.ok(reportSource.includes("index 0–1") || reportSource.includes("সূচক ০–১"), "Contains index label");
+  
+  // Check for Sources line
+  assert.ok(reportSource.includes("sources-line"), "Contains sources-line class");
+  assert.ok(reportSource.includes("This plan supports"), "Contains disclaimer text");
+  
+  // Check print CSS in labels.css
+  const labelsSource = await readFile(new URL("../app/labels.css", import.meta.url), "utf8");
+  assert.ok(labelsSource.includes("@media print"), "labels.css has print media query");
+  assert.ok(labelsSource.includes(".truth") && labelsSource.includes("black"), "Print CSS makes truth badges visible in black and white");
 });

@@ -57,3 +57,51 @@
 .research-stats > * { min-width: 0; }
 .research-stat strong, .research-stat .eyebrow, .truth { overflow-wrap: anywhere; }
 @media (max-width: 700px) { .research-stats { grid-template-columns: 1fr; } }
+
+/* Print styles: badges must print in black and white with their word visible */
+@media print {
+  .truth {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.measured {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.estimated {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.scenario {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .truth.unknown {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  /* Ensure source links are visible in print */
+  .source-link {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+  
+  /* Ensure sources line is visible */
+  .sources-line {
+    color: black !important;
+    font-size: 11px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #ccc;
+  }
+}
