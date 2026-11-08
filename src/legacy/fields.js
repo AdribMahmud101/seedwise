@@ -119,6 +119,66 @@ function formatNdvi(val) {
   return num(val, 2);
 }
 
+function formatDateLabel(iso) {
+  if (!iso || typeof iso !== "string") return "";
+  const parts = iso.split("-").map(Number);
+  if (parts.length !== 3) return iso;
+  const [y, m, d] = parts;
+  const monthsEn = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return `${d} ${monthsEn[m - 1]} ${y}`;
+}
+
+function isValidCoord(pt) {
+  return (
+    Array.isArray(pt) &&
+    pt.length >= 2 &&
+    Number.isFinite(pt[0]) &&
+    Number.isFinite(pt[1])
+  );
+}
+
+function filterOsmFeature(feature) {
+  if (!feature || typeof feature !== "object") return false;
+  const geom = feature.geometry;
+  if (!geom || typeof geom !== "object") return false;
+  const { type, coordinates } = geom;
+  if (!coordinates || !Array.isArray(coordinates)) return false;
+
+  if (type === "Point") {
+    return isValidCoord(coordinates);
+  }
+  if (type === "LineString") {
+    const valid = coordinates.filter(isValidCoord);
+    return valid.length >= 2;
+  }
+  if (type === "MultiLineString") {
+    const validLines = coordinates
+      .map((line) => (Array.isArray(line) ? line.filter(isValidCoord) : []))
+      .filter((line) => line.length >= 2);
+    return validLines.length > 0;
+  }
+  if (type === "Polygon") {
+    const validRings = coordinates
+      .map((ring) => (Array.isArray(ring) ? ring.filter(isValidCoord) : []))
+      .filter((ring) => ring.length >= 3);
+    return validRings.length > 0;
+  }
+  if (type === "MultiPolygon") {
+    const validPolys = coordinates
+      .map((poly) =>
+        (Array.isArray(poly) ? poly : [])
+          .map((ring) => (Array.isArray(ring) ? ring.filter(isValidCoord) : []))
+          .filter((ring) => ring.length >= 3),
+      )
+      .filter((poly) => poly.length > 0);
+    return validPolys.length > 0;
+  }
+  return false;
+}
+
 async function loadMapData() {
   if (!mapLayersData || !ndviGridData || !osmContextData) {
     try {
@@ -243,23 +303,47 @@ function home() {
     ranks = rotationEvidence(f.monthly, state.weights, p);
   const first = ranks.find((r) => r.feasible);
 
-  // Determine active chip info based on layerMode
+  // Dates for timeline: manifest Sentinel-2 dates (for natural & ndvi) or original photo
+  let timelineDates = [];
+  if (layerMode === "photo") {
+    timelineDates = [
+      { date: "2024-01-28", label: formatDateLabel("2024-01-28"), available: true },
+    ];
+  } else {
+    // For Natural colour and Greenness, use dates from mapLayersData manifest
+    const manifestDates = mapLayersData?.layers?.find((l) => l.id === layerMode)?.dates?.map((d) => d.date) || [
+      "2024-03-09",
+      "2024-11-09",
+    ];
+    timelineDates = manifestDates.map((d) => ({
+      date: d,
+      label: formatDateLabel(d),
+      available: true,
+    }));
+  }
+
+  // Ensure activeDate is valid for current mode
+  if (!timelineDates.some((td) => td.date === activeDate)) {
+    activeDate = timelineDates[0]?.date || "2024-03-09";
+  }
+
+  // Determine active chip info based on layerMode and activeDate
   let chipSensor, chipDate, chipRes, chipSource, chipIsEstimate;
   if (layerMode === "natural") {
     chipSensor = "Copernicus Sentinel-2";
-    chipDate = "9 Mar 2024";
+    chipDate = formatDateLabel(activeDate);
     chipRes = "10 m";
     chipSource = "ESA / Planetary Computer";
     chipIsEstimate = true;
   } else if (layerMode === "ndvi") {
     chipSensor = "Sentinel-2 NDVI";
-    chipDate = "9 Mar 2024";
+    chipDate = formatDateLabel(activeDate);
     chipRes = "10 m";
     chipSource = "ESA / Planetary Computer";
     chipIsEstimate = true;
   } else {
     chipSensor = "Landsat 8";
-    chipDate = "28 Jan 2024";
+    chipDate = formatDateLabel(activeDate);
     chipRes = "30 m";
     chipSource = "NASA / USGS";
     chipIsEstimate = true;
@@ -267,14 +351,6 @@ function home() {
 
   const chipLabel = `${chipSource} · ${chipDate} · ${chipRes} · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`;
   const hasCustomBoundary = !!state.boundaries[f.id];
-
-  // Dates for timeline: manifest Sentinel-2 date and original 2024 photo date
-  const timelineDates = [
-    { date: "2024-01-28", label: "28 Jan 2024", available: layerMode === "photo" },
-    { date: "2024-03-09", label: "9 Mar 2024", available: true },
-    { date: "2024-07-14", label: "14 Jul 2024", available: false },
-    { date: "2024-10-18", label: "18 Oct 2024", available: false },
-  ];
   const currentDateObj = timelineDates.find((d) => d.date === activeDate);
   const isDateReliable = currentDateObj ? currentDateObj.available : false;
 
@@ -633,43 +709,77 @@ async function mountMap() {
   L.control.scale({ position: "bottomright", imperial: false }).addTo(current);
   current.attributionControl.setPrefix(false);
 
+  // Soft halo polygon underlay (prepare objects first before adding to map)
+  const haloPoly = L.polygon(polygon(), {
+    color: "#24392c",
+    weight: 7,
+    opacity: 0.35,
+    fill: false,
+    interactive: false,
+    lineCap: "round",
+    lineJoin: "round",
+  });
+
+  const poly = L.polygon(polygon(), {
+    color: "#e3f9a2",
+    weight: 2.5,
+    fillColor: "#c8e383",
+    fillOpacity: 0.22,
+  });
+
+  // Set initial map view before adding layers to guarantee valid renderer bounds
+  if (regional) {
+    current.setView([25.65, 89.25], 10);
+  } else if (poly && poly.getBounds().isValid()) {
+    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: 16 });
+  } else {
+    current.setView([f.lat, f.lon], 15);
+  }
+
   // 1. Add Imagery: Tiles (natural/ndvi) or original 2024 photo
-  const s2Attribution = mapLayersData?.attribution || "Contains modified Copernicus Sentinel data (2024). ESA / Microsoft Planetary Computer.";
-  if (layerMode === "natural" && activeDate === "2024-03-09") {
-    activeTileLayer = L.tileLayer("tiles/natural/2024-03-09/{z}/{x}/{y}.png", {
-      minZoom: 9,
+  const s2Attribution =
+    mapLayersData?.attribution ||
+    "Contains modified Copernicus Sentinel data (2024). ESA / Microsoft Planetary Computer.";
+
+  if (layerMode === "natural" || layerMode === "ndvi") {
+    const layerManifest = mapLayersData?.layers?.find((l) => l.id === layerMode);
+    const dateEntry = layerManifest?.dates?.find((d) => d.date === activeDate);
+    const tileUrl = dateEntry?.pathTemplate || `/tiles/${layerMode}/${activeDate}/{z}/{x}/{y}.png`;
+    const minZoom = dateEntry?.minZoom ?? 9;
+    const maxZoom = dateEntry?.maxZoom ?? 16;
+    let tileBounds = undefined;
+    if (dateEntry?.bounds && dateEntry.bounds.length === 4) {
+      const [w, s, e, n] = dateEntry.bounds;
+      tileBounds = [
+        [s, w],
+        [n, e],
+      ];
+    }
+    activeTileLayer = L.tileLayer(tileUrl, {
+      minZoom,
       maxZoom: 17,
+      maxNativeZoom: maxZoom,
+      bounds: tileBounds,
       opacity: layerOpacity,
       attribution: s2Attribution,
     }).addTo(current);
-  } else if (layerMode === "ndvi" && activeDate === "2024-03-09") {
-    activeTileLayer = L.tileLayer("tiles/ndvi/2024-03-09/{z}/{x}/{y}.png", {
-      minZoom: 9,
-      maxZoom: 17,
-      opacity: layerOpacity,
-      attribution: s2Attribution,
-    }).addTo(current);
-  } else if (layerMode === "photo" && activeDate === "2024-01-28") {
+  } else if (layerMode === "photo") {
     const photo = f.imagery[0];
-    if (photo) {
+    if (photo && photo.bounds && photo.bounds.length === 4) {
       const [w, s, e, n] = photo.bounds;
-      activePhotoOverlay = L.imageOverlay(
-        photo.url,
-        [[s, w], [n, e]],
-        {
-          opacity: layerOpacity,
-          attribution: photo.source || "Landsat · NASA / USGS",
-        },
-      ).addTo(current);
+      activePhotoOverlay = L.imageOverlay(photo.url, [[s, w], [n, e]], {
+        opacity: layerOpacity,
+        attribution: photo.source || "Landsat · NASA / USGS",
+      }).addTo(current);
     }
   }
 
-  // 2. Context lines from public/data/context-osm.geojson
+  // 2. Context lines from public/data/context-osm.geojson (filtered for validity)
   if (showOsmContext && osmContextData) {
     activeOsmLayer = L.geoJSON(osmContextData, {
       attribution: "© OpenStreetMap contributors (ODbL)",
       filter: (feature) => {
-        if (!feature.geometry) return false;
+        if (!filterOsmFeature(feature)) return false;
         // Filter features belonging to the current site (or show nearby)
         const p = feature.properties || {};
         return !p.siteId || p.siteId === f.id;
@@ -677,12 +787,16 @@ async function mountMap() {
       style: (feature) => {
         const p = feature.properties || {};
         if (p.highway) {
-          const isMajor = p.highway === "trunk" || p.highway === "secondary" || p.highway === "tertiary";
+          const isMajor =
+            p.highway === "trunk" ||
+            p.highway === "secondary" ||
+            p.highway === "tertiary";
           return {
             color: isMajor ? "#7d8471" : "#9ca392",
             weight: isMajor ? 2.5 : 1.5,
             opacity: 0.75,
-            dashArray: p.highway === "track" || p.highway === "path" ? "4 4" : null,
+            dashArray:
+              p.highway === "track" || p.highway === "path" ? "4 4" : null,
           };
         }
         if (p.waterway || p.natural === "water" || p.water) {
@@ -698,7 +812,10 @@ async function mountMap() {
       },
       pointToLayer: (feature, latlng) => {
         const p = feature.properties || {};
-        const name = (state.lang === "bn" && p["name:bn"]) ? p["name:bn"] : (p["name:en"] || p.name || "");
+        const name =
+          state.lang === "bn" && p["name:bn"]
+            ? p["name:bn"]
+            : p["name:en"] || p.name || "";
         return L.marker(latlng, {
           icon: L.divIcon({
             className: "osm-place-icon",
@@ -711,23 +828,8 @@ async function mountMap() {
     }).addTo(current);
   }
 
-  // Soft halo polygon underlay
-  const haloPoly = L.polygon(polygon(), {
-    color: "#24392c",
-    weight: 7,
-    opacity: 0.35,
-    fill: false,
-    interactive: false,
-    lineCap: "round",
-    lineJoin: "round",
-  }).addTo(current);
-
-  const poly = L.polygon(polygon(), {
-    color: "#e3f9a2",
-    weight: 2.5,
-    fillColor: "#c8e383",
-    fillOpacity: 0.22,
-  }).addTo(current);
+  haloPoly.addTo(current);
+  poly.addTo(current);
 
   function syncPolyGeom(pts) {
     poly.setLatLngs(pts);
@@ -785,7 +887,9 @@ async function mountMap() {
     try {
       const gj = await (await fetch("data/rangpur_upazilas.geojson")).json();
       if (current !== leafletMap) return;
-      const region = L.geoJSON(gj, {
+      const validFeatures = gj.features?.filter(filterOsmFeature) || [];
+      const validGj = { ...gj, features: validFeatures };
+      const region = L.geoJSON(validGj, {
         style: {
           color: "#9ca889",
           weight: 1,
@@ -795,7 +899,9 @@ async function mountMap() {
         interactive: false,
       }).addTo(current);
       region.bringToBack();
-      current.fitBounds(region.getBounds(), { padding: [12, 12] });
+      if (region.getBounds().isValid()) {
+        current.fitBounds(region.getBounds(), { padding: [12, 12] });
+      }
       earth.fields.forEach((other) =>
         L.circleMarker([other.lat, other.lon], {
           radius: 6,
@@ -818,7 +924,6 @@ async function mountMap() {
       current.setView([25.65, 89.25], 10);
     }
   } else {
-    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: 16 });
     poly.bindTooltip(t("Demo plot", "নমুনা জমি"), {
       direction: "center",
       permanent: false,
@@ -868,10 +973,12 @@ async function mountMap() {
     const isInside = pointInPoly([lat, lng], pts);
     const m = f.monthly?.[state.month] || {};
 
-    const targetGrid = ndviGridData?.grids?.find((g) => g.siteId === f.id);
+    const targetGrid = ndviGridData?.grids?.find(
+      (g) => g.siteId === f.id && g.date === activeDate,
+    ) || ndviGridData?.grids?.find((g) => g.siteId === f.id);
     let probeNdvi = null;
     let cellSizeMetres = targetGrid?.cellSizeMetres || 20;
-    if (activeDate === "2024-03-09" && targetGrid) {
+    if (targetGrid) {
       probeNdvi = queryNdvi(targetGrid, lat, lng);
     } else if (activeDate === "2024-01-28") {
       probeNdvi = f.imagery[0]?.ndvi ?? null;
@@ -1141,6 +1248,8 @@ export {
   fieldSubmit,
   searchResults,
   formatNdvi,
+  formatDateLabel,
+  filterOsmFeature,
   queryNdvi,
   projectWgs84ToUtm45N,
 };
