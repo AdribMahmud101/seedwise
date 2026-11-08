@@ -823,6 +823,7 @@ async function mountMap() {
             iconAnchor: [20, 10],
           }),
           interactive: false,
+          keyboard: false, // village names are labels, not controls
         });
       },
     }).addTo(current);
