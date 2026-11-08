@@ -1,0 +1,1 @@
+{"requestUrl":"https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/725020,2823640,731160,2829740/307x305.tif?collection=sentinel-2-l2a&item=S2A_MSIL2A_20240309T043701_R033_T45RYJ_20240309T091652&assets=B04&assets=B08&assets=SCL&coord_crs=EPSG%3A32645&dst_crs=EPSG%3A32645&unscale=false&resampling=nearest&return_mask=true","fetchedAt":"2026-11-08T19:02:00.833282+00:00"}
