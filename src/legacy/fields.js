@@ -34,11 +34,12 @@ import {
   csv,
   chart,
 } from "./ui.js";
-import { rotationEvidence, polygonValid, mean } from "./engine.js";
+import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
 
 let leafletMap = null,
   drawLayer = null,
   drawPoints = [],
+  cornerMarkers = [],
   drawMode = false,
   regional = false,
   showLandsat = false;
@@ -53,6 +54,7 @@ function setField(id) {
   regional = false;
   drawMode = false;
   drawPoints = [];
+  cornerMarkers = [];
   persist();
   repaint();
 }
@@ -65,6 +67,7 @@ function disposeMap() {
   drawLayer = null;
   drawMode = false;
   drawPoints = [];
+  cornerMarkers = [];
 }
 function spark(values, color) {
   const finiteValues = values.filter(Number.isFinite);
@@ -135,12 +138,38 @@ function stats(months = field().monthly) {
 function mapImage(f) {
   return showLandsat ? f.imagery[0] : f.contextImage || f.imagery[0];
 }
+function pointInPoly(pt, poly) {
+  const [y, x] = pt;
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [yi, xi] = poly[i],
+      [yj, xj] = poly[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
 function home() {
   const f = field(),
     p = profile(),
     image = mapImage(f),
     ranks = rotationEvidence(f.monthly, state.weights, p);
   const first = ranks.find((r) => r.feasible);
+  const isS2 = !!image?.sourceLabel;
+  const chipRes = isS2 ? "10 m" : "30 m";
+  const chipSensor = isS2 ? "Sentinel-2" : "Landsat 8";
+  const chipDate = image?.date ? new Intl.DateTimeFormat(state.lang === "bn" ? "bn-BD" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(image.date + "T00:00:00Z")) : "";
+  const chipLabel = image
+    ? `${chipSensor} · ${chipDate} · ${chipRes} · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`
+    : t("No image available", "ছবি নেই");
+  const hasCustomBoundary = !!state.boundaries[f.id];
+
   return (
     header(
       t("Field atlas  /  01", "জমির মানচিত্র  /  ০১"),
@@ -159,8 +188,8 @@ function home() {
     ) +
     chips() +
     `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2>${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div>
- <div class="map-shell"><div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div><div class="map-overline" id="map-label">${image?.sourceLabel ? "SENTINEL-2" : "LANDSAT 8"}  /  ${t("NATURAL COLOR", "প্রাকৃতিক রং")}</div><div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div></div>
- <div class="map-actions"><span class="note">${image ? `${image.date} · ${image.sourceLabel || "NASA / USGS"}` : t("No image available", "ছবি নেই")}</span><div class="map-controls">${f.contextImage ? button(showLandsat ? "Sentinel-2" : "Landsat 8", "swap-image", "small", "layers") : ""}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(t("Draw boundary", "সীমানা আঁকুন"), "draw", "small", "draw")}</div></div><div id="drawing-help"></div></section>
+ <div class="map-shell"><div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div><div class="map-overline" id="map-label">${esc(chipLabel)}</div><div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div></div>
+ <div class="map-actions"><span class="note">${esc(chipLabel)}</span><div class="map-controls">${f.contextImage ? button(showLandsat ? "Sentinel-2" : "Landsat 8", "swap-image", "small", "layers") : ""}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}</div></div><div id="drawing-help"></div></section>
  <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small></div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
@@ -311,17 +340,123 @@ async function mountMap() {
   if (!el || !window.L) return;
   const f = field(),
     img = mapImage(f);
+  const maxZ = img?.sourceLabel ? 16 : 15;
   leafletMap = L.map(el, {
     zoomControl: false,
     scrollWheelZoom: false,
     zoomSnap: 0.5,
     minZoom: 8,
-    maxZoom: 19,
+    maxZoom: maxZ,
     attributionControl: true,
     keyboard: true,
   });
   const current = leafletMap;
-  L.control.zoom({ position: "topright" }).addTo(current);
+
+  // Custom 44px Controls: Zoom (+/-), Reset view, Locate me, Full screen
+  const FieldNavControl = L.Control.extend({
+    options: { position: "topright" },
+    onAdd: function () {
+      const container = L.DomUtil.create("div", "leaflet-bar");
+      
+      const zoomIn = L.DomUtil.create("a", "leaflet-control-zoom-in", container);
+      zoomIn.href = "#";
+      zoomIn.title = t("Zoom in", "বড় করুন");
+      zoomIn.setAttribute("aria-label", t("Zoom in", "বড় করুন"));
+      zoomIn.setAttribute("role", "button");
+      zoomIn.innerHTML = "+";
+
+      const zoomOut = L.DomUtil.create("a", "leaflet-control-zoom-out", container);
+      zoomOut.href = "#";
+      zoomOut.title = t("Zoom out", "ছোট করুন");
+      zoomOut.setAttribute("aria-label", t("Zoom out", "ছোট করুন"));
+      zoomOut.setAttribute("role", "button");
+      zoomOut.innerHTML = "−";
+
+      const resetBtn = L.DomUtil.create("a", "map-control-btn", container);
+      resetBtn.href = "#";
+      resetBtn.title = t("Reset view", "আগের দৃশ্য");
+      resetBtn.setAttribute("aria-label", t("Reset view", "আগের দৃশ্য"));
+      resetBtn.setAttribute("role", "button");
+      resetBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
+
+      const locateBtn = L.DomUtil.create("a", "map-control-btn", container);
+      locateBtn.href = "#";
+      locateBtn.title = t("Locate me", "আমার অবস্থান");
+      locateBtn.setAttribute("aria-label", t("Locate me", "আমার অবস্থান"));
+      locateBtn.setAttribute("role", "button");
+      locateBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3 M12 19v3 M2 12h3 M19 12h3"/></svg>`;
+
+      const fsBtn = L.DomUtil.create("a", "map-control-btn", container);
+      fsBtn.href = "#";
+      fsBtn.title = t("Full screen", "সম্পূর্ণ পর্দা");
+      fsBtn.setAttribute("aria-label", t("Full screen", "সম্পূর্ণ পর্দা"));
+      fsBtn.setAttribute("role", "button");
+      fsBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`;
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+
+      L.DomEvent.on(zoomIn, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        current.zoomIn();
+      });
+      L.DomEvent.on(zoomOut, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        current.zoomOut();
+      });
+      L.DomEvent.on(resetBtn, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        if (poly && poly.getBounds().isValid()) {
+          current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: maxZ });
+        } else {
+          current.setView([f.lat, f.lon], maxZ);
+        }
+      });
+      L.DomEvent.on(locateBtn, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        if (!navigator.geolocation) {
+          toast(t("Location is not supported on this browser.", "এই ব্রাউজারে লোকেশন পাওয়া যাচ্ছে না।"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            current.setView([latitude, longitude], Math.min(15, maxZ));
+            L.circleMarker([latitude, longitude], {
+              radius: 8,
+              color: "#315c3d",
+              fillColor: "#e5eadb",
+              fillOpacity: 1,
+              weight: 3,
+            })
+              .addTo(current)
+              .bindPopup(t("Your current position", "আপনার বর্তমান অবস্থান"))
+              .openPopup();
+          },
+          (err) => {
+            if (err.code === 1) {
+              toast(t("Location access was denied. You can still use the map freely.", "লোকেশন অনুমতি দেওয়া হয়নি। আপনি মানচিত্রটি স্বাভাবিকভাবে ব্যবহার করতে পারবেন।"));
+            } else {
+              toast(t("Could not get current location.", "বর্তমান অবস্থান পাওয়া যায়নি।"));
+            }
+          },
+          { timeout: 8000, enableHighAccuracy: false },
+        );
+      });
+      L.DomEvent.on(fsBtn, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        const panel = el.closest(".panel");
+        if (panel) {
+          panel.classList.toggle("field-map-fullscreen");
+          setTimeout(() => current.invalidateSize(), 200);
+        }
+      });
+
+      return container;
+    },
+  });
+  new FieldNavControl().addTo(current);
+
   L.control.scale({ position: "bottomright", imperial: false }).addTo(current);
   current.attributionControl.setPrefix(false);
   if (img) {
@@ -335,12 +470,77 @@ async function mountMap() {
       { attribution: img.sourceLabel || "Landsat · NASA / USGS" },
     ).addTo(current);
   }
+
+  // Soft halo polygon underlay
+  const haloPoly = L.polygon(polygon(), {
+    color: "#24392c",
+    weight: 7,
+    opacity: 0.35,
+    fill: false,
+    interactive: false,
+    lineCap: "round",
+    lineJoin: "round",
+  }).addTo(current);
+
   const poly = L.polygon(polygon(), {
     color: "#e3f9a2",
     weight: 2.5,
     fillColor: "#c8e383",
-    fillOpacity: 0.21,
+    fillOpacity: 0.22,
   }).addTo(current);
+
+  function syncPolyGeom(pts) {
+    poly.setLatLngs(pts);
+    haloPoly.setLatLngs(pts);
+  }
+
+  function clearCornerHandles() {
+    cornerMarkers.forEach((m) => m.remove());
+    cornerMarkers = [];
+  }
+
+  function renderCornerHandles() {
+    clearCornerHandles();
+    if (!drawMode) return;
+    drawPoints.forEach((pt, idx) => {
+      const icon = L.divIcon({
+        className: "corner-marker-handle",
+        html: `<div class="corner-marker-dot" title="${t("Drag corner or tap to remove", "কোণ টানুন বা মুছতে চাপুন")}"></div>`,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+      });
+      const marker = L.marker(pt, {
+        icon,
+        draggable: true,
+        keyboard: true,
+        alt: `${t("Corner", "কোণ")} ${idx + 1}`,
+      }).addTo(current);
+
+      marker.on("drag", (e) => {
+        const { lat, lng } = e.target.getLatLng();
+        drawPoints[idx] = [lat, lng];
+        if (drawLayer) drawLayer.setLatLngs(drawPoints);
+        syncPolyGeom(drawPoints);
+        updateDraw();
+      });
+
+      marker.on("click", (e) => {
+        L.DomEvent.stopPropagation(e);
+        if (drawPoints.length <= 3) {
+          toast(t("A boundary needs at least three corners.", "জমির সীমানার জন্য অন্তত তিনটি কোণ থাকা প্রয়োজন।"));
+          return;
+        }
+        drawPoints.splice(idx, 1);
+        if (drawLayer) drawLayer.setLatLngs(drawPoints);
+        syncPolyGeom(drawPoints);
+        renderCornerHandles();
+        updateDraw();
+      });
+
+      cornerMarkers.push(marker);
+    });
+  }
+
   if (regional) {
     try {
       const gj = await (await fetch("data/rangpur_upazilas.geojson")).json();
@@ -378,40 +578,107 @@ async function mountMap() {
       current.setView([25.65, 89.25], 10);
     }
   } else {
-    current.setView(poly.getBounds().getCenter(), 16);
+    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: maxZ });
     poly.bindTooltip(t("Demo plot", "নমুনা জমি"), {
       direction: "center",
       permanent: false,
     });
   }
-  current.on("click", (event) => {
-    if (!drawMode) return;
-    const { lat, lng } = event.latlng;
-    const [w, s, e, n] = img?.bounds || [];
-    if (!(lng >= w && lng <= e && lat >= s && lat <= n)) {
-      toast(
-        t(
-          "Draw inside this prepared image.",
-          "প্রস্তুত ছবির ভেতরে সীমানা আঁকুন।",
-        ),
-      );
-      return;
-    }
-    drawPoints.push([lat, lng]);
+
+  if (drawMode) {
+    drawPoints = polygon().map((p) => [...p]);
     if (drawLayer) drawLayer.remove();
     drawLayer = L.polygon(drawPoints, {
       color: "#f6d879",
       weight: 2,
       dashArray: "4 4",
     }).addTo(current);
+    renderCornerHandles();
     updateDraw();
+  }
+
+  current.on("click", (event) => {
+    const { lat, lng } = event.latlng;
+    if (drawMode) {
+      const [w, s, e, n] = img?.bounds || [];
+      if (!(lng >= w && lng <= e && lat >= s && lat <= n)) {
+        toast(
+          t(
+            "Draw inside this prepared image.",
+            "প্রস্তুত ছবির ভেতরে সীমানা আঁকুন।",
+          ),
+        );
+        return;
+      }
+      drawPoints.push([lat, lng]);
+      if (drawLayer) drawLayer.remove();
+      drawLayer = L.polygon(drawPoints, {
+        color: "#f6d879",
+        weight: 2,
+        dashArray: "4 4",
+      }).addTo(current);
+      syncPolyGeom(drawPoints);
+      renderCornerHandles();
+      updateDraw();
+      return;
+    }
+
+    // Tap to inspect
+    const pts = polygon();
+    const isInside = pointInPoly([lat, lng], pts);
+    const m = f.monthly?.[state.month] || {};
+    const imgObj = mapImage(f);
+    const sensor = imgObj?.sourceLabel ? "Sentinel-2" : "Landsat 8";
+    const src = imgObj?.source || "Copernicus Sentinel-2 / Landsat";
+    const dateStr = imgObj?.date || monthName();
+    const statusWord = isInside
+      ? t("Inside field boundary", "জমির সীমানার ভেতরে")
+      : t("Outside field boundary", "জমির সীমানার বাইরে");
+
+    const popupHtml = `
+      <div class="inspect-card">
+        <div class="inspect-header">
+          <strong>${isInside ? "✓ " + esc(fieldName(f)) : esc(statusWord)}</strong>
+          <span class="tag ${isInside ? "green" : "amber"}">${isInside ? t("Field plot", "জমি") : t("Surroundings", "আশেপাশে")}</span>
+        </div>
+        <div class="inspect-coords">${num(lat, 5)}° N · ${num(lng, 5)}° E</div>
+        <dl class="inspect-grid">
+          <div class="inspect-item">
+            <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
+            <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : "—"}</dd>
+          </div>
+          <div class="inspect-item">
+            <dt>${t("Rainfall", "বৃষ্টি")}</dt>
+            <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : "—"}</dd>
+          </div>
+          <div class="inspect-item">
+            <dt>${t("Root wetness", "শিকড় আর্দ্রতা")}</dt>
+            <dd>${Number.isFinite(m.rootWetness) ? num(m.rootWetness, 2) : "—"}</dd>
+          </div>
+          <div class="inspect-item">
+            <dt>${t("Temp", "তাপমাত্রা")}</dt>
+            <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : "—"}</dd>
+          </div>
+        </dl>
+        <div class="inspect-footer">
+          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${esc(sensor)} · ${esc(dateStr)}
+        </div>
+      </div>
+    `;
+
+    L.popup({ className: "field-inspect-popup", maxWidth: 280, closeButton: true })
+      .setLatLng(event.latlng)
+      .setContent(popupHtml)
+      .openOn(current);
   });
 }
 function updateDraw() {
   const help = document.querySelector("#drawing-help");
   if (!help) return;
+  const currentAreaHa = polygonValid(drawPoints) ? areaHa(drawPoints) : 0;
+  const areaLiveStr = currentAreaHa > 0 ? `<div style="margin: 6px 0; font-size: 13px;"><b>${t("Live area:", "বর্তমান আয়তন:")}</b> ${units(currentAreaHa)}</div>` : "";
   help.innerHTML = drawMode
-    ? `<div class="notice">${t("Tap each corner of your plot, then finish.", "জমির কোণগুলোতে চাপুন, তারপর শেষ করুন।")} <b>${num(drawPoints.length)}</b> ${t("corners", "টি কোণ")} <div class="toolbar-inline">${button(t("Finish outline", "আঁকা শেষ"), "finish-draw", "small")}${button(t("Enter corners", "কোণ লিখুন"), "coordinates", "small")}${button(t("Cancel", "বাতিল"), "cancel-draw", "small")}${drawPoints.length ? button(t("Undo corner", "শেষ কোণ বাদ"), "undo-corner", "small") : ""}</div></div>`
+    ? `<div class="notice">${t("Drag corners or tap map to add. Tap a corner to remove.", "কোণ টেনে সরান বা মানচিত্রে চেপে যোগ করুন। মুছতে কোণে চাপুন।")} <b>${num(drawPoints.length)}</b> ${t("corners", "টি কোণ")} ${areaLiveStr}<div class="toolbar-inline">${button(t("Save boundary", "সীমানা সংরক্ষণ"), "finish-draw", "small primary")}${button(t("Enter corners", "কোণ লিখুন"), "coordinates", "small")}${button(t("Cancel", "বাতিল"), "cancel-draw", "small")}${drawPoints.length ? button(t("Undo corner", "শেষ কোণ বাদ"), "undo-corner", "small") : ""}${button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small")}</div></div>`
     : "";
 }
 function searchModal() {
@@ -493,23 +760,41 @@ function fieldAction(action, value) {
   if (action === "draw") {
     if (regional) {
       regional = false;
-      repaint();
     }
-    drawMode = true;
-    drawPoints = [];
-    if (drawLayer) drawLayer.remove();
-    updateDraw();
+    drawMode = !drawMode;
+    if (!drawMode) {
+      drawPoints = [];
+      if (drawLayer) drawLayer.remove();
+      cornerMarkers.forEach((m) => m.remove());
+      cornerMarkers = [];
+    }
+    repaint();
   }
   if (action === "cancel-draw") {
     drawMode = false;
     drawPoints = [];
     if (drawLayer) drawLayer.remove();
-    updateDraw();
+    cornerMarkers.forEach((m) => m.remove());
+    cornerMarkers = [];
+    repaint();
   }
   if (action === "undo-corner") {
     drawPoints.pop();
-    if (drawLayer) drawLayer.setLatLngs(drawPoints);
-    updateDraw();
+    if (drawPoints.length === 0) {
+      drawPoints = polygon().map((p) => [...p]);
+    }
+    repaint();
+  }
+  if (action === "reset-demo") {
+    delete state.boundaries[state.fieldId];
+    drawMode = false;
+    drawPoints = [];
+    if (drawLayer) drawLayer.remove();
+    cornerMarkers.forEach((m) => m.remove());
+    cornerMarkers = [];
+    persist();
+    repaint();
+    toast(t("Boundary reset to demo outline", "নমুনা সীমানায় ফিরে যাওয়া হয়েছে"));
   }
   if (action === "finish-draw") {
     if (!polygonValid(drawPoints)) {

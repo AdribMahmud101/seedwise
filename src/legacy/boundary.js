@@ -16,7 +16,11 @@ import {
 import { polygonValid, areaHa } from './engine.js';
 
 function units(ha) {
-  return `${num(ha, 2)} ha · ${num(ha * 2.47105381, 2)} ${t('acres', 'একর')} · ${num(ha * 247.105381, 1)} ${t('decimals', 'শতক')}`;
+  const shotok = ha * 247.105381;
+  const bigha = shotok / 33;
+  const katha = shotok / 1.65;
+  const acre = ha * 2.47105381;
+  return `${num(shotok, 1)} ${t('shotok', 'শতক')} · ${num(bigha, 2)} ${t('bigha', 'বিঘা')} · ${num(katha, 1)} ${t('katha', 'কাঠা')} · ${num(acre, 2)} ${t('acres', 'একর')} · ${num(ha, 2)} ha`;
 }
 function editBoundary(initial = null) {
   const points = initial || polygon();
@@ -74,6 +78,12 @@ function boundaryAction(action, value) {
     close();
     repaint();
     toast(t('Measured boundary saved', 'মাপা সীমানা সংরক্ষিত'));
+  }
+  if (action === 'reset-demo') {
+    delete state.boundaries[state.fieldId];
+    persist();
+    repaint();
+    toast(t('Boundary reset to demo outline', 'নমুনা সীমানায় ফিরে যাওয়া হয়েছে'));
   }
   if (action === 'export-geometry' && measured) {
     const ring = measured.map(([lat, lon]) => [lon, lat]);
