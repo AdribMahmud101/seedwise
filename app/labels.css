@@ -52,3 +52,8 @@
 .truth[lang|="bn"] {
   font-size: 13px;
 }
+
+/* Badges must never widen the research stat grid on phones (was 200px sideways scroll at 360px). */
+.research-stats > * { min-width: 0; }
+.research-stat strong, .research-stat .eyebrow, .truth { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .research-stats { grid-template-columns: 1fr; } }
