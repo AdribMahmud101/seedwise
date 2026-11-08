@@ -16,6 +16,7 @@ import io
 import json
 import math
 from pathlib import Path
+import shutil
 import struct
 import time
 import urllib.error
@@ -33,6 +34,8 @@ SOURCE = 'Copernicus Sentinel-2 L2A (ESA), via Microsoft Planetary Computer'
 PROVENANCE = 'REMOTE_OBSERVED'
 LIMIT = 30_000_000
 BASE_ZOOM = 14  # 8.6 m/pixel here; higher zooms cannot add to the native 10 m detail.
+# Prefer the season furthest from the retained March date when the disk cap binds.
+SEASONS = [('aman', (10, 11)), ('dry-rabi', (1, 2)), ('pre-monsoon', (4, 5))]
 SCL_VALID = [4, 5, 6]
 RAMP = [
     [[0, 85], [0, 0, 0, 0]],
@@ -104,6 +107,21 @@ def tile_range(bounds, zoom):
 def tiles(bounds, zoom):
     x0, y0, x1, y1 = tile_range(bounds, zoom)
     return {(zoom, x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)}
+
+
+def lowest_cloud(candidates, months):
+    clear = [f for f in candidates if f['properties']['datetime'].startswith('2024-')
+             and int(f['properties']['datetime'][5:7]) in months
+             and 0 <= f['properties']['eo:cloud_cover'] <= 15]
+    return min(clear, key=lambda f: (f['properties']['eo:cloud_cover'], f['id']), default=None)
+
+
+def tile_usage():
+    root = PUBLIC / 'tiles'
+    files = list(root.rglob('*.png'))
+    logical = sum(p.stat().st_size for p in files)
+    allocated = sum(p.stat().st_blocks * 512 for p in root.rglob('*')) + root.stat().st_blocks * 512
+    return files, logical, allocated
 
 
 def ndvi_expression(offset):
@@ -320,11 +338,29 @@ def validate(manifest, grids, context):
     expected = set()
     assert {site['id'] for site in manifest['sites']} == {'mithapukur', 'pirganj', 'gangachara'}
     assert {layer['id'] for layer in manifest['layers']} == {'natural', 'ndvi'}
+    dates = {f['date'] for f in manifest['layers'][0]['dates']}
+    assert '2024-03-09' in dates
+    assert manifest['selection']['selectedDatesPerSite'] == len(dates) <= 4
+    seasons = manifest['selection']['seasons']
+    assert {s['id'] for s in seasons} == {s[0] for s in SEASONS}
+    assert dates == {'2024-03-09'} | {s['date'] for s in seasons if 'skipped' not in s}
+    for season in seasons:
+        if 'skipped' in season:
+            assert season['skipped'] in ('no scene ≤15 % cloud', '30 MB tile budget')
+        if 'date' in season:
+            assert season['date'].startswith('2024-')
+            assert int(season['date'][5:7]) in dict(SEASONS)[season['id']]
+            assert 0 <= season['cloudPercent'] <= 15
+    assert not list((PUBLIC / 'tiles').glob('*/*/17'))
     for layer in manifest['layers']:
+        assert {f['date'] for f in layer['dates']} == dates
         for frame in layer['dates']:
             assert frame['provenance'] == PROVENANCE and frame['resolutionMetres'] == 10
+            assert frame['minZoom'] == 9 and frame['maxZoom'] == 16
+            assert 0 <= frame['cloudPercent'] <= 15
+            assert {c['id'] for c in frame['coverage']} == {'rangpur'} | {s['id'] for s in manifest['sites']}
             for coverage in frame['coverage']:
-                assert coverage['minZoom'] <= coverage['maxZoom']
+                assert (coverage['minZoom'], coverage['maxZoom']) == ((9, 12) if coverage['id'] == 'rangpur' else (12, 16))
                 for zoom in range(coverage['minZoom'], coverage['maxZoom'] + 1):
                     for z, x, y in tiles(coverage['bounds'], zoom):
                         expected.add(PUBLIC / frame['pathTemplate'].lstrip('/').format(z=z, x=x, y=y))
@@ -332,9 +368,8 @@ def validate(manifest, grids, context):
         with path.open('rb') as stream:
             header = stream.read(24)
         assert header[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', header[16:24]) == (256, 256), path
-    files = list((PUBLIC / 'tiles').rglob('*.png'))
-    logical = sum(p.stat().st_size for p in files)
-    allocated = sum(p.stat().st_blocks * 512 for p in (PUBLIC / 'tiles').rglob('*')) + (PUBLIC / 'tiles').stat().st_blocks * 512
+    files, logical, allocated = tile_usage()
+    assert set(files) == expected
     assert logical <= LIMIT and allocated <= LIMIT, f'Tile budget exceeded: {logical} bytes; {allocated} allocated'
     assert len(files) == manifest['tileCount'] and logical == manifest['tileBytes']
     for grid in grids['grids']:
@@ -346,6 +381,10 @@ def validate(manifest, grids, context):
     expected_grids = {(site['id'], date['date']) for site in manifest['sites']
                       for date in manifest['layers'][0]['dates']}
     assert {(g['siteId'], g['date']) for g in grids['grids']} == expected_grids
+    assert len(grids['grids']) == len(expected_grids)
+    for grid in grids['grids']:
+        frame = next(f for f in manifest['layers'][0]['dates'] if f['date'] == grid['date'])
+        assert (grid['sceneId'], grid['cloudPercent']) == (frame['sceneId'], frame['cloudPercent'])
     assert context['type'] == 'FeatureCollection' and context['features']
     for site in manifest['sites']:
         assert any(f['properties']['siteId'] == site['id'] and f['properties'].get('highway') for f in context['features'])
@@ -362,6 +401,14 @@ def self_check():
     # Known reflectances: red .1, NIR .3 must give .5 after the DN offset, not .3333.
     red, nir, offset = 2000, 4000, -1000
     assert (nir - red) / (nir + red + 2 * offset) == .5
+    def scene(id, date, cloud):
+        return {'id': id, 'properties': {'datetime': date, 'eo:cloud_cover': cloud}}
+    candidates = [scene('b', '2024-01-01', 15), scene('a', '2024-02-01', 15),
+                  scene('cloudy', '2024-01-02', 15.01), scene('old', '2023-01-01', 0),
+                  scene('other-season', '2024-04-01', 0)]
+    assert lowest_cloud(candidates, (1, 2))['id'] == 'a'
+    assert lowest_cloud(candidates, (10, 11)) is None
+    assert lowest_cloud([scene('lower', '2024-01-03', 1)] + candidates, (1, 2))['id'] == 'lower'
 
 
 def check_cloud_mask():
@@ -384,8 +431,10 @@ def main():
         try:
             validate(*(json.loads(path.read_text()) for path in paths))
             return
-        except (AssertionError, FileNotFoundError):
+        except (AssertionError, FileNotFoundError, KeyError):
             print('Incomplete pack; rebuilding from cached public responses.', flush=True)
+    for path in (PUBLIC / 'tiles').glob('*/*/17'):
+        shutil.rmtree(path)
     fields = json.loads((PUBLIC / 'data/earth-data.json').read_text())['fields']
     check_cloud_mask()
     sites = [{'id': f['id'], 'lat': f['lat'], 'lon': f['lon'], 'bounds': site_bounds(f)} for f in fields]
@@ -396,10 +445,11 @@ def main():
                 max(g.bounds[2] for g in geometries), max(g.bounds[3] for g in geometries)]
     search_args = {'collections': COLLECTION, 'bbox': ','.join(str(v) for v in overview),
                    'datetime': '2024-01-01T00:00:00Z/2024-12-31T23:59:59Z', 'limit': 1000,
-                   'query': json.dumps({'eo:cloud_cover': {'lt': 15}}),
+                   'query': json.dumps({'eo:cloud_cover': {'lte': 15}}),
                    'fields': 'id,bbox,geometry,properties.datetime,properties.eo:cloud_cover,properties.s2:processing_baseline'}
     url = STAC + '/search?' + urllib.parse.urlencode(search_args)
-    search = json.loads(cached('search-2024.json.gz', url, compressed=True))
+    search_name = 'search-2024-le15.json.gz'
+    search = json.loads(cached(search_name, url, compressed=True))
     if any(link['rel'] == 'next' for link in search['links']):
         raise ValueError('Scene search truncated; refine the search before selecting dates')
     candidates = [f for f in search['features'] if all(
@@ -409,65 +459,106 @@ def main():
             [s['bounds'][0], s['bounds'][1]]]]})) for s in sites)]
     if not candidates:
         raise ValueError('No clear 2024 Sentinel-2 scene covers the prepared sites')
-    chosen = min(candidates, key=lambda f: (f['properties']['eo:cloud_cover'], f['id']))
-    item_url = STAC + '/collections/' + COLLECTION + '/items/' + chosen['id']
-    item = json.loads(cached(chosen['id'] + '.json', item_url))
-    radiometry = source_metadata(item)
-    date = item['properties']['datetime'][:10]
-    coverage = [{'id': s['id'], 'bounds': s['bounds'], 'minZoom': 12, 'maxZoom': 17} for s in sites]
+    retained = [f for f in candidates if f['properties']['datetime'][:10] == '2024-03-09']
+    chosen = lowest_cloud(retained, (3,))
+    if chosen is None:
+        raise ValueError('The retained 2024-03-09 scene is missing from the clear-scene search')
+    coverage = [{'id': s['id'], 'bounds': s['bounds'], 'minZoom': 12, 'maxZoom': 16} for s in sites]
     coverage.append({'id': 'rangpur', 'bounds': overview, 'minZoom': 9, 'maxZoom': 12})
     coordinates = set().union(*(tiles(c['bounds'], z) for c in coverage
                                 for z in range(c['minZoom'], c['maxZoom'] + 1)))
-    minimum_two_dates = 2 * 2 * len(coordinates) * 4096
-    # shortcut: one date fits the disk cap; add seasonal tile dates when the 30 MB cap increases.
-    assert minimum_two_dates > LIMIT, 'Revisit the single-date budget calculation'
-    selection = {'maximumDatesPerSite': 4, 'selectedDatesPerSite': 1,
-                 'method': 'Lowest eo:cloud_cover among 2024 scenes covering all three site boxes.',
-                 'cloudThresholdPercent': 15, 'searchRequest': url, **receipt('search-2024.json.gz'),
-                 'seasonalCoverage': 'One date only: two complete dates exceed the disk budget even with 4 KiB files.',
-                 'twoDateMinimumAllocatedBytes': minimum_two_dates}
-    layers = []
-    print(f'Selected {date}: {item["id"]}; {len(coordinates)} tiles per layer', flush=True)
-    for layer in ('natural', 'ndvi'):
-        pattern = tile_pattern(layer, item['id'], radiometry['boaAddOffset'])
-        build_tiles(layer, date, coordinates, pattern)
-        frame = {'date': date, 'pathTemplate': f'/tiles/{layer}/{date}/{{z}}/{{x}}/{{y}}.png',
-                 'minZoom': 9, 'maxZoom': 17, 'bounds': overview, 'coverage': coverage,
-                 'sceneId': item['id'], 'cloudPercent': item['properties']['eo:cloud_cover'],
-                 'resolutionMetres': 10, 'source': SOURCE, 'provenance': PROVENANCE,
-                 'processingBaseline': item['properties']['s2:processing_baseline'],
-                 'itemUrl': item_url, 'requestUrlPattern': pattern, 'radiometry': radiometry,
-                 'rawTileReceipts': f'data-raw/map-tiles/{layer}/{date}/{{z}}/{{x}}/{{y}}.png.receipt.json',
-                 'fetchedAt': receipt(chosen['id'] + '.json')['fetchedAt'],
-                 'rendering': '256-colour PNG (natural); 7 fixed NDVI colours plus transparent unknown. '
-                              'XYZ WebMercatorQuad, 256 px; z9–14 from data API, z15–17 cropped from z14 '
-                              'and enlarged with nearest-neighbour. No additional detail beyond native 10 m.'}
-        if layer == 'ndvi':
-            frame.update(formula='(B08-B04)/(B08+B04) on offset-corrected BOA reflectance',
-                         rescale=[-1, 1], apiRescale=[-2, 1], unknownSentinel=-2, colormap=RAMP,
-                         maskValidSclClasses=SCL_VALID, maskResolutionMetres=20)
-        layers.append({'id': layer, 'dates': [frame]})
+    seasons = []
+    choices = [(chosen, None)]
+    for id, months in SEASONS:
+        candidate = lowest_cloud(candidates, months)
+        season = {'id': id, 'months': list(months)}
+        seasons.append(season)
+        if candidate is None:
+            season['skipped'] = 'no scene ≤15 % cloud'
+            continue
+        season.update(date=candidate['properties']['datetime'][:10], sceneId=candidate['id'],
+                      cloudPercent=candidate['properties']['eo:cloud_cover'])
+        choices.append((candidate, season))
+    selection = {'maximumDatesPerSite': 4, 'selectedDatesPerSite': 0,
+                 'method': 'Keep 2024-03-09; lowest eo:cloud_cover per season among scenes covering all three site boxes. '
+                           'Aman has budget priority, then dry/Rabi and pre-monsoon; scene ID breaks ties.',
+                 'cloudThresholdPercent': 15, 'searchRequest': url, **receipt(search_name),
+                 'seasonalCoverage': 'Seasonal additions within the 30 MB disk budget; see seasons for skipped candidates.',
+                 'seasons': seasons}
+    layers = [{'id': layer, 'dates': []} for layer in ('natural', 'ndvi')]
+    grid_frames = []
+    minimum_date_bytes = 2 * len(coordinates) * 4096
+    for chosen, season in choices:
+        date = chosen['properties']['datetime'][:10]
+        if season is not None and not (PUBLIC / f'tiles/natural/{date}').exists() and tile_usage()[2] + minimum_date_bytes > LIMIT:
+            season['skipped'] = '30 MB tile budget'
+            print(f'Skipped {date}: even one 4 KiB block per tile exceeds the remaining disk budget', flush=True)
+            continue
+        item_url = STAC + '/collections/' + COLLECTION + '/items/' + chosen['id']
+        item = json.loads(cached(chosen['id'] + '.json', item_url))
+        radiometry = source_metadata(item)
+        print(f'Selected {date}: {item["id"]}; cloud {item["properties"]["eo:cloud_cover"]}%; '
+              f'{len(coordinates)} tiles per layer', flush=True)
+        frames = []
+        for layer in layers:
+            id = layer['id']
+            pattern = tile_pattern(id, item['id'], radiometry['boaAddOffset'])
+            build_tiles(id, date, coordinates, pattern)
+            frame = {'date': date, 'pathTemplate': f'/tiles/{id}/{date}/{{z}}/{{x}}/{{y}}.png',
+                     'minZoom': 9, 'maxZoom': 16, 'bounds': overview, 'coverage': coverage,
+                     'sceneId': item['id'], 'cloudPercent': item['properties']['eo:cloud_cover'],
+                     'resolutionMetres': 10, 'source': SOURCE, 'provenance': PROVENANCE,
+                     'processingBaseline': item['properties']['s2:processing_baseline'],
+                     'itemUrl': item_url, 'requestUrlPattern': pattern, 'radiometry': radiometry,
+                     'rawTileReceipts': f'data-raw/map-tiles/{id}/{date}/{{z}}/{{x}}/{{y}}.png.receipt.json',
+                     'fetchedAt': receipt(chosen['id'] + '.json')['fetchedAt'],
+                     'rendering': '256-colour PNG (natural); 7 fixed NDVI colours plus transparent unknown. '
+                                  'XYZ WebMercatorQuad, 256 px; z9–14 from data API, z15–16 cropped from z14 '
+                                  'and enlarged with nearest-neighbour. No additional detail beyond native 10 m.'}
+            if id == 'ndvi':
+                frame.update(formula='(B08-B04)/(B08+B04) on offset-corrected BOA reflectance',
+                             rescale=[-1, 1], apiRescale=[-2, 1], unknownSentinel=-2, colormap=RAMP,
+                             maskValidSclClasses=SCL_VALID, maskResolutionMetres=20)
+            frames.append(frame)
+        _, logical, allocated = tile_usage()
+        if logical > LIMIT or allocated > LIMIT:
+            if season is None:
+                raise ValueError('Retained March tiles exceed the tile budget')
+            for layer in layers:
+                shutil.rmtree(PUBLIC / f'tiles/{layer["id"]}/{date}')
+            season['skipped'] = '30 MB tile budget'
+            print(f'Skipped {date}: complete pack would use {allocated:,} allocated bytes', flush=True)
+            continue
+        for layer, frame in zip(layers, frames):
+            layer['dates'].append(frame)
+        grid_frames.extend(build_grid(field, item, radiometry) for field in fields)
+        selection['selectedDatesPerSite'] += 1
+        date_files = [p for layer in layers for p in (PUBLIC / f'tiles/{layer["id"]}/{date}').rglob('*.png')]
+        print(f'{date}: {sum(p.stat().st_size for p in date_files):,} bytes; '
+              f'{sum(p.stat().st_blocks * 512 for p in date_files):,} allocated tile bytes', flush=True)
+    for layer in layers:
+        layer['dates'].sort(key=lambda f: f['date'])
     grids = {'schemaVersion': 1, 'missingValue': None, 'formula': '(NIR-red)/(NIR+red), BOA offset corrected',
              'sampling': 'Nearest 20 m cell, row-major. Transform maps pixel corners in EPSG:32645. '
                          'Lookup: project longitude/latitude; column=floor((x-transform[2])/20), '
                          'row=floor((transform[5]-y)/20). Outside site bounds or grid returns null.',
              'mask': 'Only SCL 4/5/6; no data, saturated, dark, cloud shadow, unclassified, cloud, '
                      'cirrus and snow are null. Negative reflectance and nonpositive denominators are null.',
-             'grids': [build_grid(field, item, radiometry) for field in fields]}
-    context = build_context(fields)
-    files = list((PUBLIC / 'tiles').rglob('*.png'))
+             'grids': sorted(grid_frames, key=lambda g: (g['date'], g['siteId']))}
+    context = json.loads(paths[2].read_text())
+    files, logical, _ = tile_usage()
     manifest = {'schemaVersion': 1, 'tileScheme': 'xyz', 'tileSize': 256, 'offline': True,
                 'attribution': 'Contains modified Copernicus Sentinel data (2024). ESA / Microsoft Planetary Computer.',
                 'sites': sites, 'selection': selection, 'layers': layers,
-                'tileCount': len(files), 'tileBytes': sum(p.stat().st_size for p in files), 'tileBudgetBytes': LIMIT,
+                'tileCount': len(files), 'tileBytes': logical, 'tileBudgetBytes': LIMIT,
                 'ndviGrid': '/data/ndvi-grid.json', 'context': '/data/context-osm.geojson',
-                'limitations': ['One clear date per site under the 30 MB disk budget; no seasonal comparison.',
+                'limitations': ['Seasonal dates are limited by the 30 MB disk budget; skipped candidates are recorded in selection.seasons.',
                                'Scene cloud percentage is not local pixel cloud loss. NDVI uses the 20 m SCL mask.',
                                'Tiles intersecting coverage bounds are included in full. Outside coverage has no tiles.',
                                'Rangpur overview uses the same scene; any pixels outside its footprint are transparent.',
                                'NDVI is satellite-observed greenness, not crop diagnosis or ground measurement.']}
     validate(manifest, grids, context)
-    for path, value in zip(paths, [manifest, grids, context]):
+    for path, value in zip(paths[:2], [manifest, grids]):
         write_json(path, value)
 
 
