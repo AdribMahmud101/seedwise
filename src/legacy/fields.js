@@ -42,13 +42,159 @@ let leafletMap = null,
   cornerMarkers = [],
   drawMode = false,
   regional = false,
-  showLandsat = false;
+  showLandsat = false,
+  mapLayersData = null,
+  ndviGridData = null,
+  osmContextData = null,
+  activeTileLayer = null,
+  activeOsmLayer = null,
+  activePhotoOverlay = null,
+  layerMode = "natural", // 'natural' | 'ndvi' | 'photo'
+  activeDate = "2024-03-09",
+  layerOpacity = 0.85,
+  showOsmContext = true;
+
 const colors = {
   wetness: "#658261",
   rainGpm: "#518899",
   tmean: "#bd8d49",
   et0: "#9e9275",
 };
+
+// EPSG:32645 (WGS 84 / UTM zone 45N) projection for Bangladesh / Rangpur
+function projectWgs84ToUtm45N(lon, lat) {
+  const a = 6378137.0;
+  const f = 1 / 298.257223563;
+  const e2 = 2 * f - f * f;
+  const ePrime2 = e2 / (1 - e2);
+  const k0 = 0.9996;
+  const lon0 = 87.0 * (Math.PI / 180.0);
+  const latR = lat * (Math.PI / 180.0);
+  const lonR = lon * (Math.PI / 180.0);
+  const N = a / Math.sqrt(1 - e2 * Math.sin(latR) ** 2);
+  const T = Math.tan(latR) ** 2;
+  const C = ePrime2 * Math.cos(latR) ** 2;
+  const A = (lonR - lon0) * Math.cos(latR);
+  const M =
+    a *
+    ((1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256) * latR -
+      ((3 * e2) / 8 + (3 * e2 ** 2) / 32 + (45 * e2 ** 3) / 1024) *
+        Math.sin(2 * latR) +
+      ((15 * e2 ** 2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * latR) -
+      ((35 * e2 ** 3) / 3072) * Math.sin(6 * latR));
+  const x =
+    k0 *
+      N *
+      (A +
+        ((1 - T + C) * A ** 3) / 6 +
+        ((5 - 18 * T + T ** 2 + 72 * C - 58 * ePrime2) * A ** 5) / 120) +
+    500000.0;
+  const y =
+    k0 *
+    (M +
+      N *
+        Math.tan(latR) *
+        (A ** 2 / 2 +
+          ((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24 +
+          ((61 - 58 * T + T ** 2 + 600 * C - 330 * ePrime2) * A ** 6) / 720));
+  return [x, y];
+}
+
+function queryNdvi(grid, lat, lon) {
+  if (!grid) return null;
+  const [w, s, e, n] = grid.bounds;
+  if (lon < w || lon > e || lat < s || lat > n) return null;
+  const [x, y] = projectWgs84ToUtm45N(lon, lat);
+  const col = Math.floor((x - grid.transform[2]) / grid.transform[0]);
+  const row = Math.floor((grid.transform[5] - y) / -grid.transform[4]);
+  if (row < 0 || row >= grid.height || col < 0 || col >= grid.width) return null;
+  const val = grid.values[row]?.[col];
+  return val !== undefined && val !== null ? val : null;
+}
+
+function formatNdvi(val) {
+  if (val === null || val === undefined || !Number.isFinite(val)) {
+    return t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই");
+  }
+  return num(val, 2);
+}
+
+function formatDateLabel(iso) {
+  if (!iso || typeof iso !== "string") return "";
+  const parts = iso.split("-").map(Number);
+  if (parts.length !== 3) return iso;
+  const [y, m, d] = parts;
+  const monthsEn = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return `${d} ${monthsEn[m - 1]} ${y}`;
+}
+
+function isValidCoord(pt) {
+  return (
+    Array.isArray(pt) &&
+    pt.length >= 2 &&
+    Number.isFinite(pt[0]) &&
+    Number.isFinite(pt[1])
+  );
+}
+
+function filterOsmFeature(feature) {
+  if (!feature || typeof feature !== "object") return false;
+  const geom = feature.geometry;
+  if (!geom || typeof geom !== "object") return false;
+  const { type, coordinates } = geom;
+  if (!coordinates || !Array.isArray(coordinates)) return false;
+
+  if (type === "Point") {
+    return isValidCoord(coordinates);
+  }
+  if (type === "LineString") {
+    const valid = coordinates.filter(isValidCoord);
+    return valid.length >= 2;
+  }
+  if (type === "MultiLineString") {
+    const validLines = coordinates
+      .map((line) => (Array.isArray(line) ? line.filter(isValidCoord) : []))
+      .filter((line) => line.length >= 2);
+    return validLines.length > 0;
+  }
+  if (type === "Polygon") {
+    const validRings = coordinates
+      .map((ring) => (Array.isArray(ring) ? ring.filter(isValidCoord) : []))
+      .filter((ring) => ring.length >= 3);
+    return validRings.length > 0;
+  }
+  if (type === "MultiPolygon") {
+    const validPolys = coordinates
+      .map((poly) =>
+        (Array.isArray(poly) ? poly : [])
+          .map((ring) => (Array.isArray(ring) ? ring.filter(isValidCoord) : []))
+          .filter((ring) => ring.length >= 3),
+      )
+      .filter((poly) => poly.length > 0);
+    return validPolys.length > 0;
+  }
+  return false;
+}
+
+async function loadMapData() {
+  if (!mapLayersData || !ndviGridData || !osmContextData) {
+    try {
+      const [layersRes, gridRes, osmRes] = await Promise.all([
+        fetch("data/map-layers.json"),
+        fetch("data/ndvi-grid.json"),
+        fetch("data/context-osm.geojson"),
+      ]);
+      if (layersRes.ok) mapLayersData = await layersRes.json();
+      if (gridRes.ok) ndviGridData = await gridRes.json();
+      if (osmRes.ok) osmContextData = await osmRes.json();
+    } catch {
+      // offline fallback or test runner without local server
+    }
+  }
+}
 function setField(id) {
   state.fieldId = id;
   regional = false;
@@ -153,22 +299,98 @@ function pointInPoly(pt, poly) {
 function home() {
   const f = field(),
     p = profile(),
-    image = mapImage(f),
+    photoImage = f.imagery[0],
     ranks = rotationEvidence(f.monthly, state.weights, p);
   const first = ranks.find((r) => r.feasible);
-  const isS2 = !!image?.sourceLabel;
-  const chipRes = isS2 ? "10 m" : "30 m";
-  const chipSensor = isS2 ? "Sentinel-2" : "Landsat 8";
-  const chipDate = image?.date ? new Intl.DateTimeFormat(state.lang === "bn" ? "bn-BD" : "en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(image.date + "T00:00:00Z")) : "";
-  const chipLabel = image
-    ? `${chipSensor} · ${chipDate} · ${chipRes} · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`
-    : t("No image available", "ছবি নেই");
+
+  // Dates for timeline: manifest Sentinel-2 dates (for natural & ndvi) or original photo
+  let timelineDates = [];
+  if (layerMode === "photo") {
+    timelineDates = [
+      { date: "2024-01-28", label: formatDateLabel("2024-01-28"), available: true },
+    ];
+  } else {
+    // For Natural colour and Greenness, use dates from mapLayersData manifest
+    const manifestDates = mapLayersData?.layers?.find((l) => l.id === layerMode)?.dates?.map((d) => d.date) || [
+      "2024-03-09",
+      "2024-11-09",
+    ];
+    timelineDates = manifestDates.map((d) => ({
+      date: d,
+      label: formatDateLabel(d),
+      available: true,
+    }));
+  }
+
+  // Ensure activeDate is valid for current mode
+  if (!timelineDates.some((td) => td.date === activeDate)) {
+    activeDate = timelineDates[0]?.date || "2024-03-09";
+  }
+
+  // Determine active chip info based on layerMode and activeDate
+  let chipSensor, chipDate, chipRes, chipSource, chipIsEstimate;
+  if (layerMode === "natural") {
+    chipSensor = "Copernicus Sentinel-2";
+    chipDate = formatDateLabel(activeDate);
+    chipRes = "10 m";
+    chipSource = "ESA / Planetary Computer";
+    chipIsEstimate = true;
+  } else if (layerMode === "ndvi") {
+    chipSensor = "Sentinel-2 NDVI";
+    chipDate = formatDateLabel(activeDate);
+    chipRes = "10 m";
+    chipSource = "ESA / Planetary Computer";
+    chipIsEstimate = true;
+  } else {
+    chipSensor = "Landsat 8";
+    chipDate = formatDateLabel(activeDate);
+    chipRes = "30 m";
+    chipSource = "NASA / USGS";
+    chipIsEstimate = true;
+  }
+
+  const chipLabel = `${chipSource} · ${chipDate} · ${chipRes} · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`;
   const hasCustomBoundary = !!state.boundaries[f.id];
+  const currentDateObj = timelineDates.find((d) => d.date === activeDate);
+  const isDateReliable = currentDateObj ? currentDateObj.available : false;
+
+  // Legend HTML per active layer
+  let legendHtml = "";
+  if (layerMode === "natural") {
+    legendHtml = `
+      <div class="map-legend-bar">
+        <strong>${t("Natural colour", "প্রাকৃতিক রং")}</strong>
+        <div class="map-legend-items">
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#4b5a37"></span> ${t("Vegetation / fields", "ফসল ও গাছপালা")}</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#858374"></span> ${t("Bare soil / paths", "অনাবাদী জমি ও রাস্তা")}</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#3b4f59"></span> ${t("Water / ponds", "পুকুর ও জলাশয়")}</span>
+        </div>
+      </div>
+    `;
+  } else if (layerMode === "ndvi") {
+    legendHtml = `
+      <div class="map-legend-bar">
+        <strong>NDVI ${t("Greenness", "সবুজভাব")}</strong>
+        <div class="map-legend-items">
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#313695"></span> &lt; −0.5 (${t("Water", "পানি")})</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#a50026"></span> −0.5–0.0 (${t("Bare / Cloud", "অনাবাদী")})</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#fee08b"></span> 0.0–0.2 (${t("Low", "কম")})</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#d9ef8b"></span> 0.2–0.4 (${t("Moderate", "মাঝারি")})</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#66bd63"></span> 0.4–0.6 (${t("Vigorous", "ভালো বৃদ্ধি")})</span>
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#006837"></span> &gt; 0.6 (${t("Dense canopy", "ঘন সবুজ")})</span>
+        </div>
+      </div>
+    `;
+  } else {
+    legendHtml = `
+      <div class="map-legend-bar">
+        <strong>${t("Original 2024 photo", "আসল ২০২৪ ছবি")}</strong>
+        <div class="map-legend-items">
+          <span class="map-legend-item"><span class="legend-swatch" style="background:#525b42"></span> Landsat 8 True Colour · 30 m (${t("28 Jan 2024 dry season base", "২৮ জানু ২০২৪ শুষ্ক মৌসুম")})</span>
+        </div>
+      </div>
+    `;
+  }
 
   return (
     header(
@@ -188,8 +410,35 @@ function home() {
     ) +
     chips() +
     `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2>${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div>
+ <div class="map-switcher">
+   <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
+     <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}">${icon("layers", 14)} ${t("Natural colour", "প্রাকৃতিক রং")}</button>
+     <button type="button" class="button ${layerMode === "ndvi" ? "active" : ""}" data-action="set-layer-mode" data-value="ndvi" role="tab" aria-selected="${layerMode === "ndvi"}">${icon("tree", 14)} ${t("Greenness (NDVI)", "সবুজভাব (NDVI)")}</button>
+     <button type="button" class="button ${layerMode === "photo" ? "active" : ""}" data-action="set-layer-mode" data-value="photo" role="tab" aria-selected="${layerMode === "photo"}">${icon("camera", 14)} ${t("Original 2024 photo", "আসল ২০২৪ ছবি")}</button>
+   </div>
+   <div class="map-subcontrols">
+     <div class="map-opacity-control">
+       <label for="layer-opacity-slider">${t("Opacity", "স্বচ্ছতা")}:</label>
+       <input type="range" id="layer-opacity-slider" name="layerOpacity" min="0.1" max="1.0" step="0.05" value="${layerOpacity}" title="${t("Adjust imagery opacity to view field outline", "জমির সীমানা স্পষ্ট দেখতে ছবির স্বচ্ছতা কমান-বাড়ান")}">
+     </div>
+     <button type="button" class="button small ${showOsmContext ? "primary" : ""}" data-action="toggle-osm-context">${icon("field", 14)} ${t("Context lines", "রাস্তা ও নদী")}</button>
+   </div>
+ </div>
+ <div class="map-timeline">
+   <span class="map-timeline-label">${icon("seasons", 14)} ${t("Observation date", "পর্যবেক্ষণের তারিখ")}:</span>
+   <div class="map-timeline-dates">
+     ${timelineDates
+       .map(
+         (td) =>
+           `<button type="button" class="button ${activeDate === td.date ? "active" : ""}" data-action="set-active-date" data-value="${td.date}">${esc(td.label)}</button>`,
+       )
+       .join("")}
+   </div>
+   <span class="map-timeline-status">${isDateReliable ? `<span class="tag green">✓ ${t("Clear observation", "পরিষ্কার ছবি")}</span>` : `<span class="tag amber">⊘ ${t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</span>`}</span>
+ </div>
  <div class="map-shell"><div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div><div class="map-overline" id="map-label">${esc(chipLabel)}</div><div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div></div>
- <div class="map-actions"><span class="note">${esc(chipLabel)}</span><div class="map-controls">${f.contextImage ? button(showLandsat ? "Sentinel-2" : "Landsat 8", "swap-image", "small", "layers") : ""}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}</div></div><div id="drawing-help"></div></section>
+ ${legendHtml}
+ <div class="map-actions"><span class="note">${esc(chipLabel)}</span><div class="map-controls">${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}</div></div><div id="drawing-help"></div></section>
  <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small></div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
@@ -338,9 +587,9 @@ function seasonView() {
 async function mountMap() {
   const el = document.querySelector("#field-map");
   if (!el || !window.L) return;
-  const f = field(),
-    img = mapImage(f);
-  const maxZ = img?.sourceLabel ? 16 : 15;
+  await loadMapData();
+  const f = field();
+  const maxZ = 17;
   leafletMap = L.map(el, {
     zoomControl: false,
     scrollWheelZoom: false,
@@ -407,9 +656,9 @@ async function mountMap() {
       L.DomEvent.on(resetBtn, "click", (e) => {
         L.DomEvent.preventDefault(e);
         if (poly && poly.getBounds().isValid()) {
-          current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: maxZ });
+          current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: 16 });
         } else {
-          current.setView([f.lat, f.lon], maxZ);
+          current.setView([f.lat, f.lon], 15);
         }
       });
       L.DomEvent.on(locateBtn, "click", (e) => {
@@ -459,19 +708,8 @@ async function mountMap() {
 
   L.control.scale({ position: "bottomright", imperial: false }).addTo(current);
   current.attributionControl.setPrefix(false);
-  if (img) {
-    const [w, s, e, n] = img.bounds;
-    L.imageOverlay(
-      img.url,
-      [
-        [s, w],
-        [n, e],
-      ],
-      { attribution: img.sourceLabel || "Landsat · NASA / USGS" },
-    ).addTo(current);
-  }
 
-  // Soft halo polygon underlay
+  // Soft halo polygon underlay (prepare objects first before adding to map)
   const haloPoly = L.polygon(polygon(), {
     color: "#24392c",
     weight: 7,
@@ -480,14 +718,119 @@ async function mountMap() {
     interactive: false,
     lineCap: "round",
     lineJoin: "round",
-  }).addTo(current);
+  });
 
   const poly = L.polygon(polygon(), {
     color: "#e3f9a2",
     weight: 2.5,
     fillColor: "#c8e383",
     fillOpacity: 0.22,
-  }).addTo(current);
+  });
+
+  // Set initial map view before adding layers to guarantee valid renderer bounds
+  if (regional) {
+    current.setView([25.65, 89.25], 10);
+  } else if (poly && poly.getBounds().isValid()) {
+    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: 16 });
+  } else {
+    current.setView([f.lat, f.lon], 15);
+  }
+
+  // 1. Add Imagery: Tiles (natural/ndvi) or original 2024 photo
+  const s2Attribution =
+    mapLayersData?.attribution ||
+    "Contains modified Copernicus Sentinel data (2024). ESA / Microsoft Planetary Computer.";
+
+  if (layerMode === "natural" || layerMode === "ndvi") {
+    const layerManifest = mapLayersData?.layers?.find((l) => l.id === layerMode);
+    const dateEntry = layerManifest?.dates?.find((d) => d.date === activeDate);
+    const tileUrl = dateEntry?.pathTemplate || `/tiles/${layerMode}/${activeDate}/{z}/{x}/{y}.png`;
+    const minZoom = dateEntry?.minZoom ?? 9;
+    const maxZoom = dateEntry?.maxZoom ?? 16;
+    let tileBounds = undefined;
+    if (dateEntry?.bounds && dateEntry.bounds.length === 4) {
+      const [w, s, e, n] = dateEntry.bounds;
+      tileBounds = [
+        [s, w],
+        [n, e],
+      ];
+    }
+    activeTileLayer = L.tileLayer(tileUrl, {
+      minZoom,
+      maxZoom: 17,
+      maxNativeZoom: maxZoom,
+      bounds: tileBounds,
+      opacity: layerOpacity,
+      attribution: s2Attribution,
+    }).addTo(current);
+  } else if (layerMode === "photo") {
+    const photo = f.imagery[0];
+    if (photo && photo.bounds && photo.bounds.length === 4) {
+      const [w, s, e, n] = photo.bounds;
+      activePhotoOverlay = L.imageOverlay(photo.url, [[s, w], [n, e]], {
+        opacity: layerOpacity,
+        attribution: photo.source || "Landsat · NASA / USGS",
+      }).addTo(current);
+    }
+  }
+
+  // 2. Context lines from public/data/context-osm.geojson (filtered for validity)
+  if (showOsmContext && osmContextData) {
+    activeOsmLayer = L.geoJSON(osmContextData, {
+      attribution: "© OpenStreetMap contributors (ODbL)",
+      filter: (feature) => {
+        if (!filterOsmFeature(feature)) return false;
+        // Filter features belonging to the current site (or show nearby)
+        const p = feature.properties || {};
+        return !p.siteId || p.siteId === f.id;
+      },
+      style: (feature) => {
+        const p = feature.properties || {};
+        if (p.highway) {
+          const isMajor =
+            p.highway === "trunk" ||
+            p.highway === "secondary" ||
+            p.highway === "tertiary";
+          return {
+            color: isMajor ? "#7d8471" : "#9ca392",
+            weight: isMajor ? 2.5 : 1.5,
+            opacity: 0.75,
+            dashArray:
+              p.highway === "track" || p.highway === "path" ? "4 4" : null,
+          };
+        }
+        if (p.waterway || p.natural === "water" || p.water) {
+          return {
+            color: "#527f8d",
+            weight: 2,
+            opacity: 0.8,
+            fillColor: "#759ca8",
+            fillOpacity: 0.35,
+          };
+        }
+        return { color: "#8a9184", weight: 1, opacity: 0.6 };
+      },
+      pointToLayer: (feature, latlng) => {
+        const p = feature.properties || {};
+        const name =
+          state.lang === "bn" && p["name:bn"]
+            ? p["name:bn"]
+            : p["name:en"] || p.name || "";
+        return L.marker(latlng, {
+          icon: L.divIcon({
+            className: "osm-place-icon",
+            html: `<span class="osm-village-label">${esc(name)}</span>`,
+            iconAnchor: [20, 10],
+          }),
+          interactive: false,
+          keyboard: false, // village names are labels, not controls
+        });
+      },
+    }).addTo(current);
+  }
+
+  haloPoly.addTo(current);
+  poly.addTo(current);
 
   function syncPolyGeom(pts) {
     poly.setLatLngs(pts);
@@ -545,7 +888,9 @@ async function mountMap() {
     try {
       const gj = await (await fetch("data/rangpur_upazilas.geojson")).json();
       if (current !== leafletMap) return;
-      const region = L.geoJSON(gj, {
+      const validFeatures = gj.features?.filter(filterOsmFeature) || [];
+      const validGj = { ...gj, features: validFeatures };
+      const region = L.geoJSON(validGj, {
         style: {
           color: "#9ca889",
           weight: 1,
@@ -555,7 +900,9 @@ async function mountMap() {
         interactive: false,
       }).addTo(current);
       region.bringToBack();
-      current.fitBounds(region.getBounds(), { padding: [12, 12] });
+      if (region.getBounds().isValid()) {
+        current.fitBounds(region.getBounds(), { padding: [12, 12] });
+      }
       earth.fields.forEach((other) =>
         L.circleMarker([other.lat, other.lon], {
           radius: 6,
@@ -578,7 +925,6 @@ async function mountMap() {
       current.setView([25.65, 89.25], 10);
     }
   } else {
-    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: maxZ });
     poly.bindTooltip(t("Demo plot", "নমুনা জমি"), {
       direction: "center",
       permanent: false,
@@ -600,7 +946,7 @@ async function mountMap() {
   current.on("click", (event) => {
     const { lat, lng } = event.latlng;
     if (drawMode) {
-      const [w, s, e, n] = img?.bounds || [];
+      const [w, s, e, n] = f.imagery[0]?.bounds || [];
       if (!(lng >= w && lng <= e && lat >= s && lat <= n)) {
         toast(
           t(
@@ -623,14 +969,24 @@ async function mountMap() {
       return;
     }
 
-    // Tap to inspect
+    // Tap to inspect: fetch ndvi from ndvi-grid.json
     const pts = polygon();
     const isInside = pointInPoly([lat, lng], pts);
     const m = f.monthly?.[state.month] || {};
-    const imgObj = mapImage(f);
-    const sensor = imgObj?.sourceLabel ? "Sentinel-2" : "Landsat 8";
-    const src = imgObj?.source || "Copernicus Sentinel-2 / Landsat";
-    const dateStr = imgObj?.date || monthName();
+
+    const targetGrid = ndviGridData?.grids?.find(
+      (g) => g.siteId === f.id && g.date === activeDate,
+    ) || ndviGridData?.grids?.find((g) => g.siteId === f.id);
+    let probeNdvi = null;
+    let cellSizeMetres = targetGrid?.cellSizeMetres || 20;
+    if (targetGrid) {
+      probeNdvi = queryNdvi(targetGrid, lat, lng);
+    } else if (activeDate === "2024-01-28") {
+      probeNdvi = f.imagery[0]?.ndvi ?? null;
+      cellSizeMetres = 30;
+    }
+    const ndviDisplayStr = formatNdvi(probeNdvi);
+
     const statusWord = isInside
       ? t("Inside field boundary", "জমির সীমানার ভেতরে")
       : t("Outside field boundary", "জমির সীমানার বাইরে");
@@ -644,7 +1000,19 @@ async function mountMap() {
         <div class="inspect-coords">${num(lat, 5)}° N · ${num(lng, 5)}° E</div>
         <dl class="inspect-grid">
           <div class="inspect-item">
-            <dt>${t("Surface wetness (index 0–1)", "মাটির আর্দ্রতা (সূচক ০–১)")}</dt>
+            <dt>${t("NDVI (Greenness)", "NDVI (সবুজভাব)")}</dt>
+            <dd><strong>${esc(ndviDisplayStr)}</strong></dd>
+          </div>
+          <div class="inspect-item">
+            <dt>${t("Cell size", "সেল সাইজ")}</dt>
+            <dd>${num(cellSizeMetres)} m</dd>
+          </div>
+          <div class="inspect-item">
+            <dt>${t("Observation date", "পর্যবেক্ষণের তারিখ")}</dt>
+            <dd>${esc(activeDate)}</dd>
+          </div>
+          <div class="inspect-item">
+            <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
             <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : t("No data", "তথ্য নেই")}</dd>
           </div>
           <div class="inspect-item">
@@ -652,16 +1020,12 @@ async function mountMap() {
             <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : t("No data", "তথ্য নেই")}</dd>
           </div>
           <div class="inspect-item">
-            <dt>${t("Root wetness", "শিকড় আর্দ্রতা")}</dt>
-            <dd>${Number.isFinite(m.rootWetness) ? num(m.rootWetness, 2) : t("No data", "তথ্য নেই")}</dd>
-          </div>
-          <div class="inspect-item">
             <dt>${t("Temp", "তাপমাত্রা")}</dt>
             <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : t("No data", "তথ্য নেই")}</dd>
           </div>
         </dl>
         <div class="inspect-footer">
-          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${t("Wetness & temp: NASA POWER (~50 km cell)", "আর্দ্রতা ও তাপমাত্রা: NASA POWER (~৫০ কিমি)")} · ${t("Rain: GPM IMERG (~10 km)", "বৃষ্টি: GPM IMERG (~১০ কিমি)")} · ${esc(monthName())} 2024 ${t("monthly", "মাসিক")}
+          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${layerMode === "photo" ? "Landsat 8 · 30 m" : "Sentinel-2 L2A · 10/20 m"} · ${esc(activeDate)}
         </div>
       </div>
     `;
@@ -742,6 +1106,23 @@ function editProfile() {
   );
 }
 function fieldAction(action, value) {
+  if (action === "set-layer-mode") {
+    layerMode = value;
+    if (value === "photo") {
+      activeDate = "2024-01-28";
+    } else {
+      activeDate = "2024-03-09";
+    }
+    repaint();
+  }
+  if (action === "set-active-date") {
+    activeDate = value;
+    repaint();
+  }
+  if (action === "toggle-osm-context") {
+    showOsmContext = !showOsmContext;
+    repaint();
+  }
   if (action === "search") searchModal();
   if (action === "swap-image") {
     showLandsat = !showLandsat;
@@ -849,6 +1230,14 @@ function fieldSubmit(form) {
   return false;
 }
 
+function fieldInput(el) {
+  if (el.name === "layerOpacity") {
+    layerOpacity = parseFloat(el.value);
+    if (activeTileLayer) activeTileLayer.setOpacity(layerOpacity);
+    if (activePhotoOverlay) activePhotoOverlay.setOpacity(layerOpacity);
+  }
+}
+
 export {
   home,
   seasonView,
@@ -856,6 +1245,12 @@ export {
   disposeMap,
   setField,
   fieldAction,
+  fieldInput,
   fieldSubmit,
   searchResults,
+  formatNdvi,
+  formatDateLabel,
+  filterOsmFeature,
+  queryNdvi,
+  projectWgs84ToUtm45N,
 };
