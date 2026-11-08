@@ -13,6 +13,7 @@ import {
   icon,
   modal,
   close,
+  stateError,
 } from "./ui.js";
 import {
   home,
@@ -239,9 +240,11 @@ async function start() {
     render();
   } catch (error) {
     console.error(error);
-    document.querySelector("#app").innerHTML =
-      `<div class="boot"><h1>Ropon Radar</h1><p>The field workspace could not open. Reload to try again.</p><button class="button" id="retry">Reload</button></div>`;
-    document.querySelector("#retry").onclick = () => location.reload();
+    document.querySelector("#app").innerHTML = stateError(
+      t("The field workspace could not open.", "ফিল্ড কর্মক্ষেত্র খোলা যায়নি।"),
+      "reload"
+    );
+    document.querySelector("[data-action='reload']").onclick = () => location.reload();
   }
 }
 start();

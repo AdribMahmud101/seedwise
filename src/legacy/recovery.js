@@ -24,6 +24,7 @@ import {
   repaint,
   modal,
   download,
+  exampleBanner,
 } from "./ui.js";
 import { mean } from "./engine.js";
 import { setPlantCrop } from "./planner.js";
@@ -361,7 +362,7 @@ function report(s) {
   const g = guides[s.hazard];
   modal(
     t("Recovery plan", "পুনরুদ্ধারের পরিকল্পনা"),
-    `<article id="report-content"><div class="eyebrow">ROPON RADAR · ${s.assessment.example ? t("WORKED EXAMPLE", "নমুনা পরিস্থিতি") : t("FARMER-ENTERED PLAN", "কৃষকের দেওয়া পরিকল্পনা")}</div><h2>${esc(s.fieldName)} · ${word(g.name)}</h2><p>${date(s.assessment.date)} · ${word(phases.find((p) => p[0] === s.assessment.phase).slice(1))}</p><p>${word(g.actions[phases.findIndex((p) => p[0] === s.assessment.phase)])}</p>
+    `<article id="report-content">${s.assessment.example ? exampleBanner() : ""}<div class="eyebrow">ROPON RADAR · ${s.assessment.example ? t("WORKED EXAMPLE", "নমুনা পরিস্থিতি") : t("FARMER-ENTERED PLAN", "কৃষকের দেওয়া পরিকল্পনা")}</div><h2>${esc(s.fieldName)} · ${word(g.name)}</h2><p>${date(s.assessment.date)} · ${word(phases.find((p) => p[0] === s.assessment.phase).slice(1))}</p><p>${word(g.actions[phases.findIndex((p) => p[0] === s.assessment.phase)])}</p>
  <p class="note">${t("Saved", "সংরক্ষিত")} ${esc(s.savedAt.slice(0, 10))} · ${t("Preparation delay", "প্রস্তুতির দেরি")} ${num(+s.assessment.delay)} d · ${t("Next crop deadline", "পরের ফসলের তারিখ")} ${s.assessment.nextDate ? date(s.assessment.nextDate) : "—"}</p>
  ${s.reasons.length ? `<ul>${s.reasons.map((id) => `<li>${word(reasons[id])}</li>`).join("")}</ul>` : s.options.map((c) => `<div class="report-section"><h3>${word(c.name)} · ${word(statuses[c.status])}</h3><p>${esc(c.variety)} · ${word(c.verb)} ${date(c.start)} – ${date(c.end)}</p>${c.available ? `<p>${t("Fits entered conditions", "আপনার দেওয়া শর্তে সময়")} ${date(c.first)} – ${date(c.last)}</p>` : ""}<p>${word(c.check)}</p>${c.harvest ? `<p>${t("Approximate harvest from earliest planting", "প্রথম দিনে লাগালে আনুমানিক ফসল তোলা")} ${date(c.harvest[0])} – ${date(c.harvest[1])}</p>` : ""}</div>`).join("")}
  ${(s.restoration || []).map((c) => `<div class="report-section"><h3>${t(c.label, c.bn)}</h3><p>${t(c.siteFit, c.siteFitBn)}</p><p>${t(c.window, c.windowBn)}</p><p class="note">${t(c.evidenceArea, c.evidenceAreaBn)}</p>${sources(c.sourceIds)}</div>`).join("")}
@@ -383,7 +384,7 @@ function recovery() {
     ) +
     chips() +
     `<div class="rr-intro"><span>${icon("recovery", 23)}</span><p>${t("Choose the situation you want to plan for. Conditions below come from you. This page does not monitor active emergencies.", "কোন পরিস্থিতির পরিকল্পনা চান বাছুন। নিচের পরিস্থিতি আপনার দেওয়া তথ্য। এখানে চলমান দুর্যোগ পর্যবেক্ষণ করা হয় না।")}</p></div>${hazardCards()}
- ${a.example ? `<div class="notice amber rr-example-label">${t("Worked example · fictional field conditions, real guidance. Change the inputs to explore the rules, or start your own assessment.", "নমুনা পরিস্থিতি · জমির অবস্থা কাল্পনিক, নির্দেশনার সূত্র বাস্তব। নিয়ম দেখতে তথ্য বদলান বা নিজের জমি যাচাই শুরু করুন।")}</div>` : ""}
+ ${a.example ? exampleBanner() : ""}
  <div class="rr-assessment">${assessment(a)}${actions(a)}</div>${planting(a, r)}
  <div class="rr-bottom">${trees(a, r)}${panel(t("4. Keep a recovery plan", "৪. পরিকল্পনা রাখুন"), `<p class="note">${t("Save this assessment on this device, or take a printed plan to your extension officer. Revisit it when conditions change.", "এই ডিভাইসে যাচাই সংরক্ষণ করুন বা ছাপিয়ে কৃষি কর্মকর্তার কাছে নিন। অবস্থা বদলালে আবার দেখুন।")}</p><div class="rr-save-actions">${button(t("Save assessment", "যাচাই সংরক্ষণ"), "rr-save", "primary", "save")}${button(t("Preview / print", "দেখুন / ছাপুন"), "rr-print", "", "print")}${button(t("Export JSON", "JSON নিন"), "rr-export", "ghost small", "download")}</div>${saved ? `<p class="note rr-saved">${t("Last saved", "শেষ সংরক্ষণ")} ${date(saved.assessment.date)} · ${saved.assessment.example ? t("Example", "নমুনা") : t("Your assessment", "আপনার যাচাই")} ${button(t("View saved copy", "সংরক্ষিত কপি"), "rr-saved", "ghost small")}</p>` : ""}<div class="rr-linked">${goButton(t("Check water demand", "পানির চাহিদা দেখুন"), "water", "small")}${goButton(t("Log crop or soil evidence", "ফসল বা মাটির তথ্য লিখুন"), "research", "small")}${hazard() === "flood" && !r.reasons.length ? button(t("Use delay in rotation comparison", "ফসলচক্রে দেরি প্রয়োগ"), "rr-rotation", "small") : ""}</div>`)}</div>${evidence(a)}`
   );

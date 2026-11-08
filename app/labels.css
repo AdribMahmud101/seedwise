@@ -14,6 +14,61 @@
   gap: 3px;
 }
 
+/* State components: Loading, Empty, Unknown, Error, Example */
+/* Reuse existing .empty, .notice classes */
+
+/* Empty state: what's missing + one action */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+}
+
+.empty h3 {
+  margin: 12px 0 16px;
+  color: var(--ink);
+}
+
+.empty svg {
+  opacity: 0.6;
+}
+
+/* Error state: plain sentence + retry button */
+.error-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--danger);
+}
+
+.error-state h3 {
+  margin: 12px 0 20px;
+  color: var(--danger);
+}
+
+.error-state svg {
+  opacity: 0.7;
+}
+
+.error-state .button {
+  margin-top: 8px;
+}
+
+/* Example banner */
+.example-banner {
+  background: linear-gradient(90deg, var(--light) 0%, var(--light-blue) 100%);
+  color: var(--ink);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  text-align: center;
+  margin-bottom: 12px;
+  border: 1px solid var(--muted);
+}
+
+/* Unknown state: uses truth('UNKNOWN') badge */
+/* Already styled via .truth.unknown class */
+
 /* Measured: green text on --light */
 .truth.measured {
   background-color: var(--light);
@@ -103,5 +158,26 @@
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid #ccc;
+  }
+  
+  /* State components in print */
+  .empty,
+  .error-state,
+  .example-banner {
+    page-break-inside: avoid;
+  }
+  
+  .example-banner {
+    background: #f0f0f0 !important;
+    color: black !important;
+    border: 1px solid #999 !important;
+  }
+  
+  .error-state {
+    color: black !important;
+  }
+  
+  .error-state h3 {
+    color: black !important;
   }
 }

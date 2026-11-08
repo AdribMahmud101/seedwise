@@ -24,6 +24,7 @@ import {
   toast,
   repaint,
   modal,
+  stateEmpty,
 } from './ui.js';
 import { nutrientProducts } from './engine.js';
 
@@ -92,7 +93,7 @@ function result() {
   if (!checked)
     return `<div class="clinic-placeholder"><div class="eyebrow">${t('Field checklist', 'জমিতে দেখার তালিকা')}</div>${icon('clinic', 44)}<h2>${t('Start with the leaf.', 'পাতা থেকে শুরু করুন।')}</h2><p>${t('Look at several plants, including healthy neighbours. Record whether the damage is on old leaves, new shoots, stems, or insects.', 'সুস্থ গাছসহ কয়েকটি গাছ দেখুন। পুরনো পাতা, কচি ডগা বা কাণ্ডে ক্ষতি আছে কি না, পোকা দেখা যাচ্ছে কি না লিখুন।')}</p></div>`;
   const list = matchConditions().slice(0, 3);
-  return `<div class="panel-header"><h2>${t('Possibilities to check', 'যা যাচাই করবেন')}</h2>${tag(t('Field review', 'মাঠে যাচাই'), 'amber')}</div>${list.length ? list.map((c) => `<article class="condition-result"><h3>${esc(t(c.label, c.bn))}</h3><p>${esc(t(c.possibleCause, c.possibleCauseBn))}</p><ul>${[...t(c.checks, c.checksBn), ...t(c.actions, c.actionsBn)].map((v) => `<li>${esc(v)}</li>`).join('')}</ul><div>${sources(c.sourceIds)}</div></article>`).join('') : `<div class="empty">${t('No matching pathway. Save the observations for an officer to review.', 'মিল পাওয়া যায়নি। কৃষি কর্মকর্তার জন্য লক্ষণগুলো সংরক্ষণ করুন।')}</div>`}<div class="panel-body"><div class="notice amber">${t('Similar signs can have different causes. An officer or lab can confirm the cause before treatment.', 'একই লক্ষণের নানা কারণ হতে পারে। ব্যবস্থা নেওয়ার আগে কর্মকর্তা বা পরীক্ষাগারে নিশ্চিত করুন।')}</div><div class="spacer"></div>${button(t('Save observation to field log', 'জমির খাতায় লিখুন'), 'save-case', 'primary', 'save')}</div>`;
+  return `<div class="panel-header"><h2>${t('Possibilities to check', 'যা যাচাই করবেন')}</h2>${tag(t('Field review', 'মাঠে যাচাই'), 'amber')}</div>${list.length ? list.map((c) => `<article class="condition-result"><h3>${esc(t(c.label, c.bn))}</h3><p>${esc(t(c.possibleCause, c.possibleCauseBn))}</p><ul>${[...t(c.checks, c.checksBn), ...t(c.actions, c.actionsBn)].map((v) => `<li>${esc(v)}</li>`).join('')}</ul><div>${sources(c.sourceIds)}</div></article>`).join('') : stateEmpty(t('No matching pathway. Save the observations for an officer to review.', 'মিল পাওয়া যায়নি। কৃষি কর্মকর্তার জন্য লক্ষণগুলো সংরক্ষণ করুন।'))}<div class="panel-body"><div class="notice amber">${t('Similar signs can have different causes. An officer or lab can confirm the cause before treatment.', 'একই লক্ষণের নানা কারণ হতে পারে। ব্যবস্থা নেওয়ার আগে কর্মকর্তা বা পরীক্ষাগারে নিশ্চিত করুন।')}</div><div class="spacer"></div>${button(t('Save observation to field log', 'জমির খাতায় লিখুন'), 'save-case', 'primary', 'save')}</div>`;
 }
 function fertilizer() {
   return `<div class="grid-equal">${panel(

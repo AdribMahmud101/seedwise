@@ -28,6 +28,7 @@ import {
   download,
   csv,
   chart,
+  stateEmpty,
 } from './ui.js';
 import { mean, pairedQA } from './engine.js';
 
@@ -202,7 +203,7 @@ function logView() {
     t('Reviewed by', 'উৎসের অবস্থা'),
     t('Open', 'খুলুন'),
   ];
-  return `<div class="notice">${t('These entries are stored in this browser. Export a copy to share with a research team. Unreviewed labels stay separate from verified results.', 'তথ্য এই ব্রাউজারে থাকে। গবেষণা দলের জন্য কপি রপ্তানি করুন। যাচাই হয়নি এমন রেকর্ড আলাদাভাবে চিহ্নিত থাকে।')}</div><section class="panel section-space"><div class="panel-header"><h2>${t('Field observations', 'মাঠের পর্যবেক্ষণ')} <span class="record-count">${num(records.length)}</span></h2><div class="toolbar-inline">${button('CSV', 'export-log', 'small', 'download', 'csv')}${button('JSON', 'export-log', 'small', 'download', 'json')}</div></div>${records.length ? `<div class="table-wrap"><table class="data-table"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${records.map((r) => `<tr><td>${esc(r.date)}</td><td>${esc(kindLabel(r.kind))}</td><td>${summary(r)}</td><td>${esc(r.reviewStatus)}</td><td>${button(t('View', 'দেখুন'), 'view-record', 'small', 'note', r.id)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">${icon('note', 31)}<h3>${t('Your field record starts here', 'আপনার মাঠের খাতা এখান থেকে শুরু')}</h3><p>${t('Add a variety and yield, soil test, moisture reading, or rain gauge total.', 'জাত ও ফলন, মাটি পরীক্ষা, আর্দ্রতা বা বৃষ্টিমাপ যোগ করুন।')}</p>${button(t('Add first observation', 'প্রথম পর্যবেক্ষণ লিখুন'), 'new-record', 'primary', 'add')}</div>`}</section>`;
+  return `<div class="notice">${t('These entries are stored in this browser. Export a copy to share with a research team. Unreviewed labels stay separate from verified results.', 'তথ্য এই ব্রাউজারে থাকে। গবেষণা দলের জন্য কপি রপ্তানি করুন। যাচাই হয়নি এমন রেকর্ড আলাদাভাবে চিহ্নিত থাকে।')}</div><section class="panel section-space"><div class="panel-header"><h2>${t('Field observations', 'মাঠের পর্যবেক্ষণ')} <span class="record-count">${num(records.length)}</span></h2><div class="toolbar-inline">${button('CSV', 'export-log', 'small', 'download', 'csv')}${button('JSON', 'export-log', 'small', 'download', 'json')}</div></div>${records.length ? `<div class="table-wrap"><table class="data-table"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${records.map((r) => `<tr><td>${esc(r.date)}</td><td>${esc(kindLabel(r.kind))}</td><td>${summary(r)}</td><td>${esc(r.reviewStatus)}</td><td>${button(t('View', 'দেখুন'), 'view-record', 'small', 'note', r.id)}</td></tr>`).join('')}</tbody></table></div>` : stateEmpty(t('Your field record starts here', 'আপনার মাঠের খাতা এখান থেকে শুরু'), t('Add first observation', 'প্রথম পর্যবেক্ষণ লিখুন'), 'new-record')}</section>`;
 }
 function summary(r) {
   if (r.kind === 'harvest')
