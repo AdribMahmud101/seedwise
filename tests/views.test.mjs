@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { state, loadData, truth, stateEmpty, stateError, exampleBanner } from "../src/legacy/ui.js";
-import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N } from "../src/legacy/fields.js";
+import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N, fieldAction, viewMode, setViewMode } from "../src/legacy/fields.js";
+import { isWebGLAvailable, fetchTerrainData } from "../src/legacy/terrain3d.js";
 import { rotations } from "../src/legacy/rotations.js";
 import { planner } from "../src/legacy/planner.js";
 import { clinic } from "../src/legacy/clinic.js";
@@ -427,4 +428,78 @@ test("recovery example shows example banner in EN and BN", async () => {
   const html = recoveryFn();
   
   assert.ok(html.includes("class=\"example-banner\"") || html.includes("Example — not your field") || html.includes("উদাহরণ — আপনার জমি নয়"), "Recovery example shows example banner");
+});
+
+test("3D terrain toggle and WebGL fallback behavior", async () => {
+  globalThis.document = {
+    baseURI: new URL("../public/", import.meta.url).href,
+    createElement: () => ({ getContext: () => null }),
+    querySelector: () => null,
+  };
+  globalThis.window = {
+    WebGLRenderingContext: undefined,
+    matchMedia: () => ({ matches: false }),
+  };
+
+  let toastMessage = "";
+  globalThis.onToastMessage = (msg) => { toastMessage = msg; };
+
+  // isWebGLAvailable returns false when WebGL is missing
+  assert.equal(isWebGLAvailable(), false, "isWebGLAvailable returns false when WebGLRenderingContext missing");
+
+  // Attempting to switch to 3D without WebGL stays in 2D with explanatory message
+  fieldAction("set-view-mode", "3d");
+  assert.equal(viewMode, "2d", "View mode stays 2D when WebGL is unavailable");
+  assert.ok(
+    toastMessage.includes("WebGL") || toastMessage.includes("3D view requires WebGL"),
+    "Displays explanatory toast message about missing WebGL",
+  );
+
+  delete globalThis.onToastMessage;
+});
+
+test("3D terrain view HTML elements and chips", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => {
+    const target = url instanceof URL || (typeof url === "string" && url.startsWith("file:")) ? new URL(url) : url;
+    return {
+      ok: true,
+      json: async () => JSON.parse(await readFile(target, "utf8")),
+    };
+  };
+  await loadData();
+
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  const html2D = home();
+
+  // Check 2D / 3D segmented toggle buttons
+  assert.ok(html2D.includes("2D map"), "Includes '2D map' button");
+  assert.ok(html2D.includes("3D view"), "Includes '3D view' button");
+  assert.ok(html2D.includes('data-action="set-view-mode"'), "Has set-view-mode data-action");
+
+  // Check terrain data loading from public/terrain/<site>.json
+  const terrain = await fetchTerrainData("mithapukur");
+  assert.equal(terrain.site, "mithapukur", "Terrain data site matches");
+  assert.equal(terrain.width, 128, "Terrain grid width <= 128");
+  assert.equal(terrain.height, 128, "Terrain grid height <= 128");
+  assert.equal(terrain.grid.length, 128, "Terrain grid rows == 128");
+
+  // Test 3D mode rendering
+  setViewMode("3d");
+  const html3D = home();
+
+  assert.ok(html3D.includes("field-3d"), "Includes field-3d container");
+  assert.ok(html3D.includes("Reset view"), "Includes Reset view button");
+  assert.ok(html3D.includes("Height exaggerated 2.5×"), "Includes 'Height exaggerated 2.5×' label");
+  assert.ok(
+    html3D.includes("Real satellite + illustrative 3D — heights include trees and houses — check locally"),
+    "Includes required scenario warning chip",
+  );
+  assert.ok(html3D.includes("Possible water collects here"), "Includes 'Possible water collects here' label");
+  assert.ok(html3D.includes("Scenario"), "Includes Scenario truth tag");
+  assert.ok(html3D.includes("Estimated"), "Includes Estimated truth tag");
+
+  // Switch back to 2D
+  setViewMode("2d");
 });
