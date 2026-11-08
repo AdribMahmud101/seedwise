@@ -27,6 +27,8 @@ All recommendations below were validated by the project owner on 8 Nov 2026 and 
 | C15 | F18 data with no plan (canal level, culverts, pump tariff, labour, shade tolerance, seed availability) | Integrate datasets | Ignore | **Farmer-entered optional inputs** for pump tariff, shared-pump schedule, labour and seed availability. **Scenario-only** for canal level and culverts (survey-dependent, labelled). Tree shade from the existing recovery tree guidance. | No public dataset exists in our sources; F18 itself says these need local survey. | ✅ |
 | C17 | 3D disaster replay events (2020/2023/2024) | Keep | Drop | **Verify the 2023–2024 events against the core 2021–2025 archive** (POWER/IMERG) and keep only those the archive shows, with the archive as source. **Drop 26 Sep 2020** (outside the archive) unless an official BMD/FFWC source is added. | Real NASA data already on hand; no fabricated events (CORE/DR). | ✅ |
 
+> **C2 verification (9 Nov 2026):** both PDFs are in `nsac/files/` (kept out of git until licence checked). Sarker et al. 2026 DOI `10.1155/ioa/9089088` verified: RARS Rangpur, AEZ-3, 2021–23, soil pH 5.61 / OM 1.83 % (Table 1), patterns CP4/CP5/CP11/CP12 among others. It may now be added to `agronomy.json` as a reference-trial record. **But** the paper never says "Burirhat", and its printed coordinates (25.33° N, 87.1° E) are outside Bangladesh (likely a typo). Cite it as "RARS Rangpur" without coordinates; the prototypes' Burirhat location and economics stay unverified (D-C7). Hossain et al. 2022 DOI `10.1155/2022/6288494` verified; Table 2 CP3 Pirganj row (Boro 127 vs total 1272) confirms the CORE/AG caution.
+
 ## C. Documentation drift (🟡) — do directly, no debate needed
 
 | ID | Issue | **Recommendation** | Status |
