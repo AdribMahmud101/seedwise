@@ -596,6 +596,17 @@ small {
   box-shadow: none !important;
   border: 1px solid #b4c0a0 !important;
 }
+.leaflet-bar a,
+.leaflet-bar a.leaflet-control-zoom-in,
+.leaflet-bar a.leaflet-control-zoom-out {
+  width: 44px !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  font-size: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
 .leaflet-tooltip {
   font: 12px Mono !important;
   border-radius: 2px !important;
@@ -820,9 +831,11 @@ small {
   border: 1px solid #cdd4c0;
   background: #fffef9;
   border-radius: 3px;
-  padding: 9px 10px;
-  font-size: 12px;
+  padding: 10px;
+  min-height: 44px;
+  font-size: 14px;
   color: var(--ink);
+  box-sizing: border-box;
 }
 .form-field textarea {
   resize: vertical;
@@ -840,7 +853,8 @@ input[type='range'] {
   width: 100%;
   cursor: pointer;
   padding: 0;
-  height: 22px;
+  height: 44px;
+  min-height: 44px;
 }
 input[type='checkbox'] {
   accent-color: var(--green);
@@ -874,8 +888,11 @@ input[type='checkbox'] {
 .priority-item label {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
   font-size: 13px;
   margin-bottom: 6px;
+  cursor: pointer;
 }
 .priority-item .count {
   font-size: 12px;
@@ -1184,7 +1201,7 @@ input[type='checkbox'] {
 }
 .symptom-option {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -1192,6 +1209,13 @@ input[type='checkbox'] {
   min-height: 44px;
   font-size: 14px;
   cursor: pointer;
+  box-sizing: border-box;
+}
+.symptom-option input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 0;
 }
 .symptom-option:has(input:checked) {
   background: #e8efdd;
@@ -1447,17 +1471,30 @@ input[type='checkbox'] {
 .check-label {
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
+  min-height: 44px;
   font-size: 12px;
   color: var(--muted);
   margin: 10px 0;
+  cursor: pointer;
+}
+.check-label input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 0;
 }
 .spacer {
   height: 17px;
 }
 .source-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 4px;
   font-size: 12px;
   text-underline-offset: 3px;
+  box-sizing: border-box;
 }
 .bullet-list {
   padding-left: 18px;
@@ -1544,6 +1581,7 @@ dialog .modal-body {
 .disclosure summary {
   font-size: 12px;
   cursor: pointer;
+  padding-block: 13px;
   color: var(--muted);
 }
 .disclosure p {
@@ -1918,7 +1956,9 @@ dialog .modal-body {
   }
   .symptom-option {
     font-size: 12px;
-    padding: 8px;
+    padding: 10px 8px;
+    min-height: 44px;
+    align-items: center;
   }
   .search-inline input {
     width: 130px;
