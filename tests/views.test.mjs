@@ -496,7 +496,7 @@ test("3D terrain view HTML elements and chips", async () => {
     html3D.includes("Real satellite + illustrative 3D — heights include trees and houses — check locally"),
     "Includes required scenario warning chip",
   );
-  assert.ok(html3D.includes("Possible water collects here"), "Includes 'Possible water collects here' label");
+  assert.ok(html3D.includes("Lower ground — water may collect after heavy rain"), "Includes 'Lower ground — water may collect after heavy rain' label");
   assert.ok(html3D.includes("Scenario"), "Includes Scenario truth tag");
   assert.ok(html3D.includes("Estimated"), "Includes Estimated truth tag");
 
@@ -605,4 +605,78 @@ test("truth badges in #field and #seasons have proper source, date, cell info", 
   assert.ok(seasonsHtml.includes("source:") || seasonsHtml.includes("source:"), `Truth badges in #seasons have source info`);
   assert.ok(seasonsHtml.includes("date:") || seasonsHtml.includes("date:"), `Truth badges in #seasons have date info`);
   assert.ok(seasonsHtml.includes("cell:") || seasonsHtml.includes("cell:"), `Truth badges in #seasons have cell info`);
+});
+
+test("MAP4C: 3D terrain elevation smoothing and low-area mask", async () => {
+  const { smoothElevationGrid, computeLowAreaMask, cropTerrainAroundField, fetchTerrainData } = await import(
+    "../src/legacy/terrain3d.js"
+  );
+
+  // 1. Smoothing reduces the max-min range of a noisy grid
+  const noisyGrid = [
+    [10, 35, 12, 38, 15],
+    [32, 11, 40, 14, 36],
+    [14, 39, 10, 37, 12],
+    [36, 15, 35, 11, 39],
+    [11, 38, 13, 36, 14],
+  ];
+  const flatNoisy = [].concat(...noisyGrid);
+  const noisyRange = Math.max(...flatNoisy) - Math.min(...flatNoisy);
+
+  const smoothed = smoothElevationGrid(noisyGrid, 5);
+  const flatSmoothed = [].concat(...smoothed);
+  const smoothedRange = Math.max(...flatSmoothed) - Math.min(...flatSmoothed);
+
+  assert.ok(
+    smoothedRange < noisyRange,
+    `Smoothing reduces max-min range (smoothed range: ${smoothedRange} < noisy range: ${noisyRange})`,
+  );
+
+  // Verify on real terrain grid data
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => {
+    const target = url instanceof URL || (typeof url === "string" && url.startsWith("file:")) ? new URL(url) : url;
+    return {
+      ok: true,
+      json: async () => JSON.parse(await readFile(target, "utf8")),
+    };
+  };
+  const terrain = await fetchTerrainData("mithapukur");
+  const realSmoothed = smoothElevationGrid(terrain.grid, 5);
+  const realRawRange = terrain.maxHeightMetres - terrain.minHeightMetres;
+  const flatRealSmoothed = [].concat(...realSmoothed);
+  const realSmoothedRange = Math.max(...flatRealSmoothed) - Math.min(...flatRealSmoothed);
+  assert.ok(
+    realSmoothedRange < realRawRange,
+    `Real terrain smoothing reduces range (${realSmoothedRange} < ${realRawRange})`,
+  );
+
+  // 2. Low-area mask covers <= 10% of cells
+  const testGrid = [
+    [10, 11, 12, 13, 14],
+    [15, 16, 17, 18, 19],
+    [20, 21, 22, 23, 24],
+    [25, 26, 27, 28, 29],
+  ];
+  const mask = computeLowAreaMask(testGrid, 0.10);
+  const totalCells = testGrid.length * testGrid[0].length;
+  const markedCells = [].concat(...mask).filter(Boolean).length;
+  assert.ok(
+    markedCells / totalCells <= 0.10,
+    `Low-area mask covers <= 10% of cells (${markedCells} / ${totalCells} = ${markedCells / totalCells})`,
+  );
+
+  // Test mask on cropped smoothed real terrain
+  const cropped = cropTerrainAroundField(
+    { ...terrain, grid: realSmoothed },
+    [[25.54, 89.27], [25.541, 89.271], [25.539, 89.269]],
+    1500,
+  );
+  const croppedMask = computeLowAreaMask(cropped.grid, 0.10);
+  const croppedTotal = cropped.width * cropped.height;
+  const croppedMarked = [].concat(...croppedMask).filter(Boolean).length;
+  assert.ok(
+    croppedMarked / croppedTotal <= 0.10,
+    `Cropped low-area mask covers <= 10% of cells (${croppedMarked} / ${croppedTotal} = ${croppedMarked / croppedTotal})`,
+  );
 });

@@ -427,7 +427,7 @@ function home() {
      <button type="button" class="button ${viewMode === "2d" ? "active" : ""}" data-action="set-view-mode" data-value="2d" role="tab" aria-selected="${viewMode === "2d"}">${icon("field", 14)} ${t("2D map", "২ডি মানচিত্র")}</button>
      <button type="button" class="button ${viewMode === "3d" ? "active" : ""}" data-action="set-view-mode" data-value="3d" role="tab" aria-selected="${viewMode === "3d"}">${icon("planner", 14)} ${t("3D view", "৩ডি দৃশ্য")}</button>
    </div>
-   ${viewMode === "3d" ? `<div class="terrain-chips"><span class="chip-exaggeration tag">${t("Height exaggerated 2.5×", "উচ্চতা ২.৫ গুণ বাড়ানো")}</span><span class="chip-scenario-warning">${t("Real satellite + illustrative 3D — heights include trees and houses — check locally", "আসল স্যাটেলাইট ও নমুনা ৩ডি — উচ্চতায় গাছপালা ও বাড়ি অন্তর্ভুক্ত — স্থানীয়ভাবে যাচাই করুন")} ${truth("SCENARIO")}</span></div>` : ""}
+   ${viewMode === "3d" ? `<div class="terrain-chips"><span class="chip-exaggeration tag">${t("Height exaggerated 2.5×", "উচ্চতা ২.৫ গুণ বাড়ানো")}</span><span class="chip-smoothed-model tag">${t("Smoothed surface model", "মসৃণ করা পৃষ্ঠ মডেল")}</span><span class="chip-scenario-warning">${t("Real satellite + illustrative 3D — heights include trees and houses — check locally", "আসল স্যাটেলাইট ও নমুনা ৩ডি — উচ্চতায় গাছপালা ও বাড়ি অন্তর্ভুক্ত — স্থানীয়ভাবে যাচাই করুন")} ${truth("SCENARIO")}</span></div>` : ""}
  </div>
  <div class="map-switcher">
    <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
@@ -464,7 +464,7 @@ function home() {
  ${viewMode === "3d" ? `
    <div class="terrain-water-legend">
      <span class="legend-swatch water-shade-swatch"></span>
-     <span class="legend-text">${t("Possible water collects here", "এখানে পানি জমতে পারে")}</span>
+     <span class="legend-text">${t("Lower ground — water may collect after heavy rain (check locally)", "নিচু জমি — ভারী বৃষ্টির পর পানি জমতে পারে (মাঠে যাচাই করুন)")}</span>
      ${truth("MODELED")}
    </div>
  ` : legendHtml}
