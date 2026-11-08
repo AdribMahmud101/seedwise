@@ -15,6 +15,7 @@ import {
   header,
   panel,
   tag,
+  truth,
   chips,
   input,
   select,
@@ -216,9 +217,9 @@ function calendar(c) {
 function cropCard(c) {
   return `<article class="rr-crop ${c.available ? "available" : ""}"><div class="rr-crop-head"><div><div class="eyebrow">${esc(c.variety)}</div><h3>${word(c.name)}</h3></div>${tag(word(statuses[c.status]), c.available ? "green" : "amber")}</div>
   <p class="note">${word(c.why)}</p>${calendar(c)}
-  <dl class="rr-dates"><div><dt>${word(c.verb)} · ${t("reference window", "তথ্যসূত্রের সময়")}</dt><dd>${date(c.start)} – ${date(c.end)}</dd></div>
-  ${c.available ? `<div><dt>${t("Fits your entered conditions", "আপনার দেওয়া শর্ত মিললে")}</dt><dd>${date(c.first)} – ${date(c.last)}</dd></div>` : ""}
-  <div><dt>${t("Harvest if planted on", "এই দিনে লাগালে সম্ভাব্য ফসল তোলা")} ${date(c.first)}</dt><dd>${c.harvest ? `${date(c.harvest[0])} – ${date(c.harvest[1])}` : t("Confirm locally before scheduling the next crop", "পরের ফসলের আগে স্থানীয়ভাবে নিশ্চিত করুন")}</dd></div></dl>
+  <dl class="rr-dates"><div><dt>${word(c.verb)} · ${t("reference window", "তথ্যসূত্রের সময়")}</dt><dd>${date(c.start)} – ${date(c.end)} ${truth('MODELED', { source: 'Archived advisories' })}</dd></div>
+  ${c.available ? `<div><dt>${t("Fits your entered conditions", "আপনার দেওয়া শর্ত মিললে")}</dt><dd>${date(c.first)} – ${date(c.last)} ${truth('SCENARIO', { source: 'Recovery model' })}</dd></div>` : ""}
+  <div><dt>${t("Harvest if planted on", "এই দিনে লাগালে সম্ভাব্য ফসল তোলা")} ${date(c.first)}</dt><dd>${c.harvest ? `${date(c.harvest[0])} – ${date(c.harvest[1])} ${truth('SCENARIO', { source: 'Arithmetic estimate' })}` : t("Confirm locally before scheduling the next crop", "পরের ফসলের আগে স্থানীয়ভাবে নিশ্চিত করুন")}</dd></div></dl>
   <p class="rr-crop-check">${word(c.check)}</p>
   ${
     !c.available
@@ -258,7 +259,7 @@ function planting(a, r) {
   ${
     r.reasons.length
       ? `<div class="rr-hold">${icon("recovery", 30)}<div><h3>${t("Resolve these checks first", "আগে এই বিষয়গুলো নিশ্চিত করুন")}</h3><ul>${r.reasons.map((id) => `<li>${word(reasons[id])}</li>`).join("")}</ul><p class="note">${t("The crop calendar will open here when the checks are complete.", "যাচাই সম্পূর্ণ হলে এখানে ফসলের সময় দেখা যাবে।")}</p></div></div>`
-      : `<p class="note">${t("Earliest assumed field readiness", "জমি প্রস্তুত হওয়ার প্রথম অনুমিত দিন")} <b>${date(r.ready)}</b>. ${t("Compare alternatives for this plot with your extension officer. Recheck field conditions at the chosen window. Harvest dates are arithmetic estimates, not forecasts.", "এই জমির বিকল্প ফসলগুলো কৃষি কর্মকর্তার সঙ্গে তুলনা করুন। বাছা সময়ে জমি আবার যাচাই করুন। কাটার তারিখ গাণিতিক হিসাব, পূর্বাভাস নয়।")}</p>
+      : `<p class="note">${t("Earliest assumed field readiness", "জমি প্রস্তুত হওয়ার প্রথম অনুমিত দিন")} <b>${date(r.ready)} ${truth('SCENARIO', { source: 'Recovery model' })}</b>. ${t("Compare alternatives for this plot with your extension officer. Recheck field conditions at the chosen window. Harvest dates are arithmetic estimates, not forecasts.", "এই জমির বিকল্প ফসলগুলো কৃষি কর্মকর্তার সঙ্গে তুলনা করুন। বাছা সময়ে জমি আবার যাচাই করুন। কাটার তারিখ গাণিতিক হিসাব, পূর্বাভাস নয়।")}</p>
   ${fits.length ? `<div class="rr-crop-grid">${fits.map(cropCard).join("")}</div>` : `<div class="notice amber">${t("No option clears every check in the next six months. Keep suitable soil cover and review the timing or constraints with your extension officer.", "আগামী ছয় মাসে সব শর্ত মিলে এমন সুযোগ নেই। উপযুক্ত মাটির আচ্ছাদন রাখুন এবং সময় ও শর্ত কৃষি কর্মকর্তার সঙ্গে দেখুন।")}</div>`}
   ${others.length ? `<details class="rr-details rr-other"><summary>${t("Other seasons and options needing review", "অন্য মৌসুম ও যাচাই দরকার এমন সুযোগ")} (${num(others.length)})</summary><div class="rr-crop-grid section-space">${others.map(cropCard).join("")}</div></details>` : ""}
   <p class="note rr-method">${t("Archived crop advisories are used as reference calendars. Approximate dates repeat annually. The tool checks your entered readiness and next-crop deadline; it does not predict the next flood, fire, rainfall or yield.", "পুরনো ফসলের নির্দেশনা সময়ের তথ্যসূত্র। আনুমানিক সময় প্রতিবছর ধরা হয়। আপনার দেওয়া প্রস্তুতি ও পরের ফসলের তারিখ মেলানো হয়। পরের বন্যা, আগুন, বৃষ্টি বা ফলনের পূর্বাভাস দেওয়া হয় না।")}</p>`

@@ -11,6 +11,7 @@ import {
   header,
   panel,
   tag,
+  truth,
   chips,
   input,
   select,
@@ -47,8 +48,8 @@ function plannerResult() {
     q = estimate(),
     record = agronomy.crops.find((x) => x.id === cropIds[p.crop]);
   const isSeed = p.crop === 'mustard';
-  return `<div class="plan-result"><div class="eyebrow">${t('Layout estimate', 'বপনের আনুমানিক হিসাব')}</div><strong>${num(isSeed ? q.seedKg : q.positions, isSeed ? 1 : 0)}</strong><span>${isSeed ? t('kg of seed', 'কেজি বীজ') : p.crop === 'rice' ? t('rice hills', 'ধানের গোছা') : t('planting positions', 'গাছ লাগানোর স্থান')}</span></div><dl class="field-meta"><div><dt>${t('Usable area', 'চাষযোগ্য জমি')}</dt><dd>${num(q.net, 2)} ha</dd></div><div><dt>${isSeed ? t('Reference seed rate', 'বীজের হার') : t('Spacing', 'দূরত্ব')}</dt><dd>${isSeed ? `${num(c.seedRate)} kg/ha` : `${num(p.row, 1)} × ${num(p.spacing, 1)} cm`}</dd></div></dl>
- <p class="note"><b>${t('Trial-based harvest illustration', 'গবেষণার ফলন ধরে উদাহরণ')}</b><br>${num(q.low, 1)}–${num(q.high, 1)} t ${t('on this usable area if the published trial yield were achieved.', 'এই চাষযোগ্য জমিতে, যদি গবেষণার ফলনের সমান ফল পাওয়া যায়।')} (${record.referenceYieldTHa.join('–')} t/ha). ${sources(record.sourceIds)}</p>`;
+  return `<div class="plan-result"><div class="eyebrow">${t('Layout estimate', 'বপনের আনুমানিক হিসাব')}</div><strong>${num(isSeed ? q.seedKg : q.positions, isSeed ? 1 : 0)}</strong><span>${isSeed ? t('kg of seed', 'কেজি বীজ') : p.crop === 'rice' ? t('rice hills', 'ধানের গোছা') : t('planting positions', 'গাছ লাগানোর স্থান')}</span> ${truth('SCENARIO', { source: 'Planner model' })}</div><dl class="field-meta"><div><dt>${t('Usable area', 'চাষযোগ্য জমি')}</dt><dd>${num(q.net, 2)} ha ${truth('SCENARIO')}</dd></div><div><dt>${isSeed ? t('Reference seed rate', 'বীজের হার') : t('Spacing', 'দূরত্ব')}</dt><dd>${isSeed ? `${num(c.seedRate)} kg/ha ${truth('MODELED', { source: 'Trial reference' })}` : `${num(p.row, 1)} × ${num(p.spacing, 1)} cm ${truth('FARMER_REPORTED')}`}</dd></div></dl>
+ <p class="note"><b>${t('Trial-based harvest illustration', 'গবেষণার ফলন ধরে উদাহরণ')}</b><br>${num(q.low, 1)}–${num(q.high, 1)} t ${t('on this usable area if the published trial yield were achieved.', 'এই চাষযোগ্য জমিতে, যদি গবেষণার ফলনের সমান ফল পাওয়া যায়।')} (${record.referenceYieldTHa.join('–')} t/ha ${truth('MODELED', { source: 'Trial evidence' })}). ${sources(record.sourceIds)}</p>`;
 }
 function planner() {
   const p = state.planner;
