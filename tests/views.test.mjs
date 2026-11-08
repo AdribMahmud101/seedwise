@@ -496,7 +496,7 @@ test("3D terrain view HTML elements and chips", async () => {
     html3D.includes("Real satellite + illustrative 3D — heights include trees and houses — check locally"),
     "Includes required scenario warning chip",
   );
-  assert.ok(html3D.includes("Possible water collects here"), "Includes 'Possible water collects here' label");
+  assert.ok(html3D.includes("Lower ground — water may collect after heavy rain"), "Includes 'Lower ground — water may collect after heavy rain' label");
   assert.ok(html3D.includes("Scenario"), "Includes Scenario truth tag");
   assert.ok(html3D.includes("Estimated"), "Includes Estimated truth tag");
 
