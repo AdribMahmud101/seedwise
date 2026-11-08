@@ -119,6 +119,12 @@ Every call below was **run live on 8 Nov 2026** at Mithapukur (lat 25.54, lon 89
 - **Page:** https://api.ffwc.gov.bd/
 - **Status:** the page says "Developer Documentation (link will be provided upon registration)". Write to **api.support@bwdb.gov.bd** (task D-Q2).
 - **Until then:** link to the official bulletin https://ffwc.gov.bd/ (already in the app).
+- **Checked 9 Nov 2026 — observed water level page** https://ffwc.gov.bd/app/observed-water-level:
+  - The page is an Angular app that reads `https://api.ffwc.gov.bd/data_load/...` (e.g. `stations/`, `observed-waterlevel-by-station/`, `seven-days-observed-waterlevel-by-station/`, `forecast-waterlevel-by-station/`, `three-days-observed-rainfall/`).
+  - Direct calls return **403 "Access Denied: Invalid Security Header"**. The site adds an internal key header and, for logged-in users, a Bearer token from `/api/token/`.
+  - **Not usable as open data.** We do **not** copy the site's internal key (that would bypass their access control). Use it only after registration gives us our own credentials.
+  - **Allowed now:** deep-link farmers to the official page (`/app/observed-water-level`) from the Recovery and Water screens, labelled "Official FFWC — live".
+  - **Stations to request first** (Rangpur area, to confirm with FFWC): Teesta (Dalia, Kaunia), Ghaghot (Gaibandha), Karatoya.
 
 ## 9. geoBoundaries — district and upazila borders
 
