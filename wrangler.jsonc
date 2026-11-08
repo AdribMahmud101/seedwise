@@ -1,0 +1,7 @@
+{
+  // Static offline build (out/) served by Cloudflare Workers static assets.
+  "name": "ropon-radar",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./out", "not_found_handling": "404-page" },
+  "routes": [{ "pattern": "roponradar.onefusionlab.systems", "custom_domain": true }]
+}
