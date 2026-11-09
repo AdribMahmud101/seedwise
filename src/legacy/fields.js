@@ -75,6 +75,33 @@ function setLayerMode(mode) {
   layerMode = mode;
 }
 
+// Esri imagery depth varies by place (Rangpur stops at z18; cities reach z19-20). Ask Esri's tilemap which
+// zoom has real photos at a point, so we never show its grey "Map data not yet available" tiles.
+const ESRI_TILEMAP = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tilemap";
+const esriDepthCache = new Map();
+export async function esriMaxZoom(lat, lon, fetchFn = fetch) {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  if (esriDepthCache.has(key)) return esriDepthCache.get(key);
+  const zooms = [20, 19, 18, 17];
+  const has = await Promise.all(
+    zooms.map(async (z) => {
+      const n = 2 ** z;
+      const x = Math.floor(((lon + 180) / 360) * n);
+      const y = Math.floor(((1 - Math.asinh(Math.tan((lat * Math.PI) / 180)) / Math.PI) / 2) * n);
+      try {
+        const j = await (await fetchFn(`${ESRI_TILEMAP}/${z}/${y}/${x}/1/1`)).json();
+        return j?.data?.[0] === 1;
+      } catch {
+        return false;
+      }
+    }),
+  );
+  const i = has.indexOf(true);
+  const depth = i === -1 ? 18 : zooms[i]; // probe failed: 18 is safe for all three pilot sites
+  esriDepthCache.set(key, depth);
+  return depth;
+}
+
 function switchToOfflineNatural(reason = "offline") {
   layerMode = "natural";
   activeDate = "2024-03-09";
@@ -634,7 +661,7 @@ async function mountMap() {
 
   tileErrorCount = 0;
   const isHighDetailActive = layerMode === "high-detail" || (layerMode === "ndvi" && online);
-  const maxMapZoom = isHighDetailActive ? 19 : 16;
+  const maxMapZoom = isHighDetailActive ? 18 : 16; // raised per place by esriMaxZoom()
   const fitMaxZoom = online ? 18 : 16;
 
   leafletMap = L.map(el, {
@@ -700,6 +727,21 @@ async function mountMap() {
         L.DomEvent.preventDefault(e);
         current.zoomOut();
       });
+      // Grey out +/− at the limits (max zoom differs by place for the High detail photo).
+      const syncZoomButtons = () => {
+        for (const [btn, off] of [
+          [zoomIn, current.getZoom() >= current.getMaxZoom()],
+          [zoomOut, current.getZoom() <= current.getMinZoom()],
+        ]) {
+          btn.classList.toggle("leaflet-disabled", off);
+          btn.setAttribute("aria-disabled", String(off));
+        }
+        zoomIn.title = current.getZoom() >= current.getMaxZoom()
+          ? t("Closest photo available here", "এখানে এর চেয়ে কাছের ছবি নেই")
+          : t("Zoom in", "বড় করুন");
+      };
+      current.on("zoomend zoomlevelschange", syncZoomButtons);
+      setTimeout(syncZoomButtons, 0);
       L.DomEvent.on(resetBtn, "click", (e) => {
         L.DomEvent.preventDefault(e);
         if (poly && poly.getBounds().isValid()) {
@@ -787,10 +829,23 @@ async function mountMap() {
   function createHighDetailLayer() {
     const esriUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
     const layer = L.tileLayer(esriUrl, {
-      maxNativeZoom: 18, // Esri has no Rangpur imagery at z19 ("Map data not yet available"); upscale z18
-      maxZoom: 19,
+      maxNativeZoom: 18,
+      maxZoom: 20,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
     });
+    // Limit zoom to the deepest level Esri really has at the map centre; re-check after each move.
+    const fitDepth = async () => {
+      const c = current.getCenter();
+      const depth = await esriMaxZoom(c.lat, c.lng);
+      if (!current.hasLayer(layer)) return;
+      layer.options.maxNativeZoom = depth;
+      if (current.getMaxZoom() !== depth) current.setMaxZoom(depth); // also zooms out if beyond
+    };
+    layer.on("add", () => {
+      fitDepth();
+      current.on("moveend", fitDepth);
+    });
+    layer.on("remove", () => current.off("moveend", fitDepth));
     layer.on("tileerror", () => {
       tileErrorCount++;
       if (tileErrorCount >= 3) {
@@ -848,7 +903,7 @@ async function mountMap() {
     }
     activeTileLayer = L.tileLayer(tileUrl, {
       minZoom,
-      maxZoom: online ? 19 : 16, // overlay must survive the zoom-18 photo view,
+      maxZoom: online ? 20 : 16, // overlay must survive the deep photo zooms,
       maxNativeZoom: maxZoom,
       bounds: tileBounds,
       opacity: layerOpacity,

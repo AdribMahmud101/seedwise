@@ -2862,3 +2862,6 @@ dialog .modal-body {
 }
 
 
+
+/* Zoom limit reached (High detail depth varies by place) */
+.map-shell a.leaflet-disabled { opacity: 0.38; cursor: not-allowed; }
