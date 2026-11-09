@@ -1625,10 +1625,11 @@ function fitPerspective(data, close = false) {
   });
 
   // Block fills ~70 % of the frame on 3D view; close-up pushes in closer.
+  // Shift target down to center the block in the frame below the UI
   const distance = close ? fit.distance * 0.72 : fit.distance * 0.92;
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
-  const target = [fit.target[0], -depth * 0.25, fit.target[2]];
+  const target = [fit.target[0], -depth * 0.45, fit.target[2]];
   cameraPersp.position.set(
     target[0] + Math.cos(el) * Math.sin(yaw) * distance,
     target[1] + Math.sin(el) * distance,
@@ -1939,10 +1940,6 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <h2>${t("Your field. Brought to life.", "আপনার জমি। জীবন্ত রূপে।")}</h2>
             <p>${t("Drag to rotate · scroll to zoom · tap to inspect", "ঘোরাতে টানুন · জুম করতে স্ক্রল · পরীক্ষা করতে ট্যাপ")}</p>
           </div>
-          <label class="studio-surround-bar">
-            <input type="checkbox" id="studio-surroundings-chk" ${showSurroundings ? "checked" : ""}>
-            <span>${t("Surroundings", "আশেপাশের জমি")}</span>
-          </label>
         </div>
 
         <div class="studio-stage-controls">
@@ -1961,6 +1958,10 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           </div>
           <input type="range" id="studio-height-slider-stage" min="1" max="4" step="0.5" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
           <small>${t("True scale · NASADEM ~30 m", "প্রকৃত স্কেল · নাসাডেম ~৩০ মি")}</small>
+          <label class="studio-terrain-surround">
+            <input type="checkbox" id="studio-surroundings-chk" ${showSurroundings ? "checked" : ""}>
+            <span>${t("Surroundings", "আশেপাশের জমি")}</span>
+          </label>
         </div>
 
         <div class="studio-model-caption" aria-hidden="true">
