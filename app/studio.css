@@ -401,11 +401,15 @@
 
 .studio-stage-canvas-host {
   flex: none;
-  height: clamp(480px, 64vh, 680px);
+  height: clamp(520px, 68vh, 720px);
   min-height: 0;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, #e9f0ec 0%, #f4f6ef 55%, #d7dccd 100%);
+  /* Soft studio ground — a quiet light-sage haze that matches the sky texture
+     drawn inside the WebGL scene, so the DOM layer never shows a seam. */
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 100%, rgba(195,208,180,0.55) 0%, rgba(195,208,180,0) 60%),
+    linear-gradient(180deg, #eef2e5 0%, #e6ecdc 55%, #dae2cc 100%);
   outline: none;
 }
 
@@ -535,81 +539,197 @@
 
 .studio-overlay-tl {
   position: absolute;
-  top: 12px;
-  left: 64px;
+  top: 16px;
+  left: 68px;
+  right: 68px;
   z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   align-items: flex-start;
+  pointer-events: none;
+}
+
+.studio-overlay-tl > * {
+  pointer-events: auto;
 }
 
 .studio-view-toggle {
   display: flex;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 3px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
+  background: #fffff6f2;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(20, 55, 20, 0.08);
 }
 
 .studio-view-btn {
-  padding: 6px 12px;
+  padding: 8px 14px;
   min-height: 44px;
   min-width: 44px;
   border: none;
   background: transparent;
-  border-radius: 3px;
+  border-radius: 7px;
   font-size: 12px;
   font-weight: 600;
+  color: #596b50;
   cursor: pointer;
 }
 
 .studio-view-btn.active {
-  background: var(--green);
-  color: #ffffff;
+  background: #28523e;
+  color: #f6f9ed;
 }
 
-/* Cutaway slider bar overlay */
-.studio-cutaway-bar {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  z-index: 5;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
+/* Soil cutaway slider — "Slice field ↔ Full field" — reference layout. */
+.studio-slice-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  flex-wrap: wrap;
-  max-width: calc(100% - 24px);
+  gap: 10px;
+  background: #fffff6f2;
+  padding: 4px 12px;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(20, 55, 20, 0.08);
+  min-height: 44px;
 }
 
-.studio-cutaway-bar input[type="range"] {
-  width: 120px;
-  min-width: 90px;
+.studio-slice-end {
+  font-size: 11px;
+  color: #5a6b4d;
+  white-space: nowrap;
+}
+
+.studio-slice-end-left {
+  font-weight: 600;
+  color: #28523e;
+}
+
+.studio-slice-card input[type="range"] {
+  width: 180px;
+  min-width: 120px;
   height: 24px;
+  accent-color: #28523e;
   cursor: pointer;
 }
 
-.studio-cutaway-note {
-  font: 11px Mono, monospace;
-  color: var(--text-dim);
+.studio-crop-chip {
+  display: inline-block;
+  background: #faffefeb;
+  color: #52693f;
+  font-size: 11px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 2px 8px rgba(20, 55, 20, 0.06);
+}
+
+.studio-caption-copy {
+  padding: 4px 0 0;
+  max-width: 420px;
+}
+
+.studio-caption-copy h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  color: #22402e;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.studio-caption-copy p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #68806a;
+}
+
+/* Bottom-left Terrain height card from the reference. */
+.studio-terrain-card {
+  position: absolute;
+  left: 16px;
+  bottom: 18px;
+  z-index: 5;
+  width: 220px;
+  padding: 12px 14px;
+  background: #ffffff f2;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(20, 55, 20, 0.12);
+}
+
+.studio-terrain-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2b4332;
+}
+
+.studio-terrain-card output {
+  font: 11px/1 'DM Sans', Mono, monospace;
+  background: #ecf2e1;
+  color: #35563f;
+  padding: 3px 8px;
+  border-radius: 5px;
+}
+
+.studio-terrain-card input[type="range"] {
+  width: 100%;
+  height: 24px;
+  accent-color: #28523e;
+  margin: 10px 0 6px;
+}
+
+.studio-terrain-card small {
+  display: block;
+  font-size: 10px;
+  color: #7c8972;
+}
+
+/* Centred small caption under the block. */
+.studio-model-caption {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  text-align: center;
+  color: #5e7555;
+  line-height: 1.55;
+}
+
+.studio-model-caption b {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 2.2px;
+  color: #475f3f;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.studio-model-caption span {
+  display: block;
+  font-size: 10.5px;
 }
 
 /* Surroundings toggle */
 .studio-surround-bar {
   background: rgba(255, 255, 255, 0.92);
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 3px 10px rgba(20, 55, 20, 0.06);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
+  color: #495a40;
   min-height: 44px;
   cursor: pointer;
 }
@@ -617,6 +737,7 @@
 .studio-surround-bar input[type="checkbox"] {
   width: 18px;
   height: 18px;
+  accent-color: #28523e;
   cursor: pointer;
 }
 
@@ -768,27 +889,41 @@
      stretching across the field and hiding crops. */
   .studio-overlay-tl {
     left: 64px;
-    right: auto;
-    max-width: calc(100% - 128px);
+    right: 12px;
+    max-width: calc(100% - 76px);
     flex-direction: column;
     gap: 6px;
   }
   .studio-view-toggle {
     flex-wrap: wrap;
   }
-  /* The cutaway is a full-width bar anchored to the bottom so it never covers the
-     field or collides with the view toggle. */
-  .studio-cutaway-bar {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    justify-content: center;
-    padding: 8px 12px;
-    min-height: 44px;
+  .studio-slice-card {
+    padding: 2px 8px;
+    gap: 6px;
+    max-width: 100%;
   }
-  .studio-cutaway-bar input[type="range"] {
-    flex: 1;
-    width: auto;
+  .studio-slice-card input[type="range"] {
+    width: 90px;
+    min-width: 60px;
+  }
+  .studio-caption-copy {
+    display: none;
+  }
+  .studio-crop-chip {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  .studio-model-caption {
+    display: none;
+  }
+  .studio-terrain-card {
+    left: 12px;
+    bottom: 12px;
+    width: 150px;
+    padding: 8px 10px;
+  }
+  .studio-terrain-card input[type="range"] {
+    margin: 6px 0 4px;
   }
   .studio-stage-controls {
     top: 64px;

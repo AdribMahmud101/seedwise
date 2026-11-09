@@ -9,6 +9,7 @@ import {
   distToPolygonEdge,
   fitCameraToBlock,
   canopyVisualHeight,
+  idleFloatOffset,
 } from "../src/legacy/studio3d-helpers.js";
 import { studio3dHtml } from "../src/legacy/studio3d.js";
 import { state } from "../src/legacy/ui.js";
@@ -193,3 +194,57 @@ test("fitCameraToBlock positions a perspective camera above and off-axis, fittin
   assert.ok(dy > 0.4 * fit.distance && dy < 0.7 * fit.distance,
     `camera elevation ${dy}/${fit.distance} is outside expected range`);
 });
+
+test("idleFloatOffset produces subtle vertical and yaw drift, disabled when dragging or reduced-motion", () => {
+  const active = idleFloatOffset(1.5, 30, false, false);
+  assert.ok(Number.isFinite(active.dy));
+  assert.ok(Number.isFinite(active.yaw));
+  assert.notEqual(active.dy, 0);
+  assert.notEqual(active.yaw, 0);
+
+  // When user is dragging, offsets freeze back to zero
+  const dragging = idleFloatOffset(1.5, 30, true, false);
+  assert.deepEqual(dragging, { dy: 0, yaw: 0 });
+
+  // When prefersReducedMotion is true, offsets freeze back to zero
+  const reducedMotion = idleFloatOffset(1.5, 30, false, true);
+  assert.deepEqual(reducedMotion, { dy: 0, yaw: 0 });
+
+  // Degenerate inputs stay safe
+  assert.deepEqual(idleFloatOffset(NaN, 30, false, false), { dy: 0, yaw: 0 });
+});
+
+test("studio3dHtml includes reference overlays and bilingual strings", () => {
+  state.lang = "en";
+  const htmlEn = studio3dHtml(fixture, 0);
+  assert.match(htmlEn, /3D field/);
+  assert.match(htmlEn, /Top view/);
+  assert.match(htmlEn, /Slice field/);
+  assert.match(htmlEn, /Full field/);
+  assert.match(htmlEn, /Illustrative crop preview · not observed plants/);
+  assert.match(htmlEn, /Your field\. Brought to life\./);
+  assert.match(htmlEn, /Drag to rotate · scroll to zoom · tap to inspect/);
+  assert.match(htmlEn, /Terrain height/);
+  assert.match(htmlEn, /True scale · NASADEM ~30 m/);
+  assert.match(htmlEn, /FIELD MODEL/);
+  assert.match(htmlEn, /Selected boundary \+ terrain/);
+  assert.match(htmlEn, /Illustrative plants &amp; enlarged soil section/);
+  assert.doesNotMatch(htmlEn, /checked.*studio-surroundings-chk/); // Surroundings off by default
+
+  state.lang = "bn";
+  const htmlBn = studio3dHtml(fixture, 0);
+  assert.match(htmlBn, /৩ডি মাঠ/);
+  assert.match(htmlBn, /উপরের দৃশ্য/);
+  assert.match(htmlBn, /মাঠ কাটুন/);
+  assert.match(htmlBn, /পুরো মাঠ/);
+  assert.match(htmlBn, /কাল্পনিক ফসল পূর্বদর্শন · পর্যবেক্ষিত উদ্ভিদ নয়/);
+  assert.match(htmlBn, /আপনার জমি। জীবন্ত রূপে।/);
+  assert.match(htmlBn, /ঘোরাতে টানুন · জুম করতে স্ক্রল · পরীক্ষা করতে ট্যাপ/);
+  assert.match(htmlBn, /ভূমির উচ্চতা/);
+  assert.match(htmlBn, /প্রকৃত স্কেল · নাসাডেম ~৩০ মি/);
+  assert.match(htmlBn, /মাঠ মডেল/);
+  assert.match(htmlBn, /নির্বাচিত সীমানা \+ ভূমি/);
+  assert.match(htmlBn, /কাল্পনিক উদ্ভিদ ও বড় করে দেখানো মাটির অংশ/);
+  state.lang = "en";
+});
+

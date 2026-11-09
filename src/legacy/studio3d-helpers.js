@@ -161,3 +161,19 @@ export function fitTopView({ outlineM, aspect = 1.5, margin = 0.12, altitude = 6
   const halfWidth = halfHeight * aspect;
   return { halfWidth, halfHeight, y: altitude, target: [b.cx, 0, -b.cy] };
 }
+
+// Idle hovering / slow drift for floating field block.
+// Zero when dragging or prefersReducedMotion is on.
+export function idleFloatOffset(timeS, fieldSpanM = 30, isDragging = false, prefersReducedMotion = false) {
+  if (isDragging || prefersReducedMotion || !Number.isFinite(timeS)) {
+    return { dy: 0, yaw: 0 };
+  }
+  const span = Number.isFinite(fieldSpanM) && fieldSpanM > 0 ? fieldSpanM : 30;
+  // Subtle vertical bobbing (approx ±0.15 m - scaled to plot span)
+  const dyAmplitude = Math.max(0.06, Math.min(0.28, span * 0.005));
+  const dy = Math.sin(timeS * 0.9) * dyAmplitude;
+  // Slow gentle drift yaw (approx ±0.012 radians ~ 0.7 degrees)
+  const yaw = Math.sin(timeS * 0.45) * 0.012;
+  return { dy, yaw };
+}
+
