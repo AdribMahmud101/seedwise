@@ -799,6 +799,19 @@ small {
 .field-meta dd.large {
   font: 24px Fraunces;
 }
+.admin-boundary-note {
+  padding: 10px 0 2px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.net-area-edit {
+  padding: 2px 8px;
+  min-height: 0;
+  font-size: 11px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
 .field-recommend {
   padding: 18px 0;
 }
