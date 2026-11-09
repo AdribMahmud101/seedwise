@@ -260,6 +260,30 @@ async function start() {
   }
 }
 start();
+// In-app browsers resume tabs for days without reloading, so a resumed tab can run an old build.
+// When the tab comes back, compare the deployed build with the one this page loaded and refresh.
+let loadedBuild = null;
+const deployedBuild = () =>
+  fetch("/version.json", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((v) => v?.build || null)
+    .catch(() => null);
+async function checkForNewBuild() {
+  if (document.visibilityState !== "visible" || !loadedBuild) return;
+  const build = await deployedBuild();
+  if (!build || build === loadedBuild) return;
+  if (!document.querySelector("dialog[open], .draw-bar")) return location.reload();
+  if (document.querySelector(".update-banner")) return; // mid-edit: let the farmer choose when
+  const bar = document.createElement("button");
+  bar.type = "button";
+  bar.className = "update-banner";
+  bar.textContent = t("New version available — tap to reload", "নতুন সংস্করণ এসেছে — চাপুন");
+  bar.onclick = () => location.reload();
+  document.body.append(bar);
+}
+deployedBuild().then((b) => (loadedBuild = b));
+document.addEventListener("visibilitychange", checkForNewBuild);
+window.addEventListener("pageshow", (e) => e.persisted && checkForNewBuild());
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});

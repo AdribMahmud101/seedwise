@@ -11,7 +11,7 @@ import json
 root = Path(__file__).resolve().parents[1] / 'out'
 if not root.exists():
     raise SystemExit('out/ not found. Run `next build` first.')
-skip = {'sw.js', '404.html'}
+skip = {'sw.js', '404.html', 'version.json'}  # version.json must always come from the network
 # Precache shell assets and data json, excluding tiles directory
 files = sorted(p for p in root.rglob('*')
                if p.is_file() and p.name not in skip and '_next' not in p.parts and 'tiles' not in p.parts and p.suffix != '.txt')
@@ -26,7 +26,8 @@ worker = """const NAME = __NAME__;
 const FILES = __FILES__;
 const PILOT_TILES = __PILOT_TILES__;
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(NAME).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting()));
+  // Cache files one by one: with addAll a single failed request aborted the install, so phones never left the old version.
+  event.waitUntil(caches.open(NAME).then(cache => Promise.allSettled(FILES.map(f => cache.add(f)))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
   event.waitUntil(
@@ -83,4 +84,5 @@ self.addEventListener('fetch', event => {
           .replace('__FILES__', json.dumps(assets, indent=2))
           .replace('__PILOT_TILES__', json.dumps(pilot_tiles))
 )
+(root / 'version.json').write_text(json.dumps({'build': version}))
 print(version, len(assets), 'static assets precached,', len(pilot_tiles), 'pilot tiles to warm')
