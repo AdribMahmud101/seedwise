@@ -1604,92 +1604,16 @@ function hostAspect() {
   return Math.max(0.35, w / Math.max(1, h));
 }
 
-/**
- * Check if the canvas is wide enough to need special framing (>= 1024px).
- * On wide canvases, we frame the block to avoid UI overlays.
- */
-function isWideCanvas() {
-  if (!canvasHostEl) return false;
-  return (canvasHostEl.clientWidth || 0) >= 1024;
-}
-
-/**
- * Measure overlay rectangles and compute the free region center for framing the 3D block.
- * Returns an object with free region center in 0-1 range (fraction of canvas).
- * Uses getBoundingClientRect to measure overlay positions as specified.
- */
-function getFreeCanvasCenter() {
-  if (!canvasHostEl || typeof document === "undefined") {
-    // Fallback to specified defaults if we can't measure
-    return { x: 0.625, y: 0.65 };
-  }
-  
-  const hostRect = canvasHostEl.getBoundingClientRect();
-  const hostW = hostRect.width;
-  const hostH = hostRect.height;
-  
-  // On phones, keep default framing
-  if (isPhone() || hostW <= 600) {
-    return { x: 0.5, y: 0.5 };
-  }
-  
-  // Measure top-left overlay (contains caption and view toggle)
-  const tlOverlay = document.querySelector(".studio-overlay-tl");
-  const terrainCard = document.querySelector(".studio-terrain-card");
-  
-  let leftBound = 0;
-  let rightBound = 1;
-  let topBound = 0;
-  let bottomBound = 1;
-  
-  if (tlOverlay) {
-    const tlRect = tlOverlay.getBoundingClientRect();
-    // Free region starts below the top-left overlay
-    topBound = Math.max(topBound, (tlRect.bottom - hostRect.top) / hostH);
-  }
-  
-  if (terrainCard) {
-    const tcRect = terrainCard.getBoundingClientRect();
-    // Free region ends above the terrain card
-    bottomBound = Math.min(bottomBound, (tcRect.top - hostRect.top) / hostH);
-    // Free region starts to the right of the terrain card
-    leftBound = Math.max(leftBound, (tcRect.right - hostRect.left) / hostW);
-  }
-  
-  // If we couldn't measure overlays properly, fall back to specified defaults
-  if (leftBound >= rightBound || topBound >= bottomBound) {
-    return { x: 0.625, y: 0.65 };
-  }
-  
-  // Compute center of free region
-  const centerX = (leftBound + rightBound) / 2;
-  const centerY = (topBound + bottomBound) / 2;
-  
-  // Clamp to reasonable bounds as per requirements (≈ x 30-95%, y 45-85%)
-  return {
-    x: Math.max(0.30, Math.min(0.95, centerX)),
-    y: Math.max(0.45, Math.min(0.85, centerY)),
-  };
-}
-
 function fitPerspective(data, close = false) {
   if (!cameraPersp || !data) return;
   const b = outlineBounds(data.field.outlineM);
   const depth = currentBlock.depth || blockDepthM(b);
-  
-  // Check if we're on a wide canvas that needs special framing
-  const isWide = isWideCanvas();
-  
   // Reference look: a low, nearly side-on shot of the block with a touch of
   // yaw so the far wall peeks and the floating shadow sits visible below.
   // Close-up still swings in tighter and higher.
   const elevationDeg = close ? 22 : 14;
   const yawDeg = close ? 26 : 10;
-  
-  // For wide canvases, increase margin to make block smaller in frame
-  // For phones, keep existing margin
-  const margin = isPhone() ? 0.22 : isWide ? 0.38 : 0.18;
-  
+  const margin = isPhone() ? 0.22 : 0.18;
   const fit = fitCameraToBlock({
     outlineM: data.field.outlineM,
     depthM: depth,
@@ -1700,77 +1624,12 @@ function fitPerspective(data, close = false) {
     margin: close ? 0.14 : margin,
   });
 
-  // Adjust distance and target based on canvas width
-  let distance, target;
-  
-  if (isWide && !close) {
-    // On wide canvases, we need to:
-    // 1. Make the block appear smaller (increase distance)
-    // 2. Shift the block to the right and up to center it in the free region
-    
-    // Target block width ≈ 55% of canvas width
-    // Use fitCameraToBlock's distance as base, then scale it up
-    distance = fit.distance * 1.65;
-    
-    // Get the free region center (x: 62.5%, y: 65% of canvas)
-    const freeCenter = getFreeCanvasCenter();
-    
-    // Compute view dimensions at the camera distance
-    const vFov = (cameraPersp.fov * Math.PI) / 180;
-    const aspect = hostAspect();
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const viewWidthAtDistance = distance * Math.tan(hFov / 2) * 2;
-    const viewHeightAtDistance = distance * Math.tan(vFov / 2) * 2;
-    
-    // Block dimensions in world units
-    const blockWidthWorld = Math.max(b.width, b.height, 10);
-    const blockDepthWorld = depth;
-    
-    // Desired block width as fraction of view
-    const desiredWidthFraction = 0.55;
-    
-    // Adjust distance so block width is ~55% of view width
-    // blockWidthWorld / viewWidthAtDistance ≈ desiredWidthFraction
-    // viewWidthAtDistance = blockWidthWorld / desiredWidthFraction
-    // distance * tan(hFov/2) * 2 = blockWidthWorld / desiredWidthFraction
-    const idealDistance = (blockWidthWorld / desiredWidthFraction) / (Math.tan(hFov / 2) * 2);
-    
-    // Blend the ideal distance with the scaled distance for smoothness
-    distance = idealDistance;
-    
-    // Now compute where to place the target so the block is centered in the free region
-    // Free region center in NDC coordinates (-1 to +1):
-    // x_ndc = (freeCenter.x * 2) - 1 = 0.625 * 2 - 1 = 0.25
-    // y_ndc = 1 - (freeCenter.y * 2) = 1 - 0.65 * 2 = -0.30
-    
-    const freeCenterX_ndc = freeCenter.x * 2 - 1;  // 0.25
-    const freeCenterY_ndc = 1 - freeCenter.y * 2;  // -0.30
-    
-    // At the camera distance, each world unit corresponds to:
-    // ndc_per_world_x = (2 * tan(hFov/2)) / canvasW
-    // ndc_per_world_z = (2 * tan(vFov/2)) / canvasH
-    // But we can use the view dimensions directly
-    
-    // To shift the block center to freeCenter in NDC:
-    // We need to offset the target by the difference between default center (0,0) and freeCenter
-    // In world units at distance d:
-    // offset_x_world = (freeCenterX_ndc * viewWidthAtDistance / 2) 
-    // offset_z_world = (freeCenterY_ndc * viewHeightAtDistance / 2)
-    
-    const offsetX = freeCenterX_ndc * (viewWidthAtDistance / 2);
-    const offsetZ = freeCenterY_ndc * (viewHeightAtDistance / 2);
-    
-    // Apply offsets to the default target (block center at origin)
-    target = [b.cx + offsetX, -depth * 0.45, -b.cy + offsetZ];
-  } else {
-    // Default behavior for phone or narrow canvas
-    distance = close ? fit.distance * 0.72 : fit.distance * 0.92;
-    target = [fit.target[0], -depth * 0.45, fit.target[2]];
-  }
-
+  // Block fills ~70 % of the frame on 3D view; close-up pushes in closer.
+  // Shift target down to center the block in the frame below the UI
+  const distance = close ? fit.distance * 0.72 : fit.distance * 0.92;
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
-  
+  const target = [fit.target[0], -depth * 0.45, fit.target[2]];
   cameraPersp.position.set(
     target[0] + Math.cos(el) * Math.sin(yaw) * distance,
     target[1] + Math.sin(el) * distance,
@@ -1781,8 +1640,8 @@ function fitPerspective(data, close = false) {
   cameraPersp.updateProjectionMatrix();
 
   controls.target.set(target[0], target[1], target[2]);
-  controls.minDistance = close ? Math.max(2, fit.distance * 0.18) : Math.max(3, fit.distance * (isWide ? 0.40 : 0.62));
-  controls.maxDistance = fit.distance * (isWide ? 2.0 : 2.8);
+  controls.minDistance = close ? Math.max(2, fit.distance * 0.18) : Math.max(3, fit.distance * 0.62);
+  controls.maxDistance = fit.distance * 2.8;
   controls.maxPolarAngle = Math.PI / 2 - 0.04;
   controls.update();
 }
