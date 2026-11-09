@@ -177,3 +177,184 @@ export function idleFloatOffset(timeS, fieldSpanM = 30, isDragging = false, pref
   return { dy, yaw };
 }
 
+// ------------------------------------------------------------- STUDIO5A helpers
+
+/**
+ * Compute water ponding depth (in cm) at a relative elevation point.
+ * Options:
+ *  - elev: current elevation in metres
+ *  - elevMin: minimum plot elevation in metres
+ *  - elevMax: maximum plot elevation in metres
+ *  - rainMm: scenario rainfall in mm (0..240)
+ *  - proposedDrain: boolean
+ *  - outletBlocked: boolean
+ *  - s1WaterMask: boolean | number (optional Sentinel-1 detected water flag at cell)
+ */
+export function computePonding({
+  elev,
+  elevMin = 0,
+  elevMax = 1,
+  rainMm = 0,
+  proposedDrain = false,
+  outletBlocked = false,
+  s1WaterMask = null,
+} = {}) {
+  // If Sentinel-1 water mask is explicitly present (STUDIO5D data)
+  if (s1WaterMask !== null && s1WaterMask !== undefined) {
+    if (s1WaterMask === 1 || s1WaterMask === true) {
+      // Confirmed water from radar
+      const baseCm = 15;
+      const extra = Math.max(0, Math.round((rainMm / 20) * (proposedDrain && !outletBlocked ? 0.5 : 1.0)));
+      return { pondCm: baseCm + extra, isPonded: true, truth: "REMOTE_OBSERVED", source: "Sentinel-1 Water Mask" };
+    }
+  }
+
+  // Fallback: Low ground + rainfall scenario (SCENARIO / Estimated)
+  const span = Math.max(0.2, (elevMax || 0) - (elevMin || 0));
+  const normE = Math.max(0, Math.min(1, ((elev ?? elevMin) - (elevMin || 0)) / span));
+  const drainFactor = proposedDrain && !outletBlocked ? 0.45 : outletBlocked ? 1.3 : 1.0;
+  const pond = Math.max(0, Math.round((1 - normE) * (Math.max(0, rainMm) / 12) * drainFactor));
+  return {
+    pondCm: pond,
+    isPonded: pond > 0,
+    truth: "SCENARIO",
+    source: "Estimated · Terrain & Rain Scenario",
+  };
+}
+
+/**
+ * Sample cross-field elevation profile across N steps along transect A (u0, v0) -> A' (u1, v1).
+ * Returns { pts: [{ t, u, v, elev, pondCm }], minE, maxE, reliefM, svgPath }
+ */
+export function sampleTransectProfile({
+  u0 = 0.12,
+  v0 = 0.26,
+  u1 = 0.92,
+  v1 = 0.74,
+  steps = 36,
+  sampleElevationFn,
+  elevMean = 30,
+  rainMm = 0,
+  proposedDrain = false,
+  outletBlocked = false,
+  width = 290,
+  height = 64,
+  padX = 12,
+  padY = 10,
+} = {}) {
+  const pts = [];
+  let minE = Infinity;
+  let maxE = -Infinity;
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const u = u0 + (u1 - u0) * t;
+    const v = v0 + (v1 - v0) * t;
+    const elev = typeof sampleElevationFn === "function" ? sampleElevationFn(u, v) : elevMean;
+    if (elev < minE) minE = elev;
+    if (elev > maxE) maxE = elev;
+    pts.push({ t, u, v, elev });
+  }
+
+  if (!Number.isFinite(minE)) {
+    minE = elevMean;
+    maxE = elevMean + 1;
+  }
+  const span = Math.max(0.5, maxE - minE);
+
+  const X = (t) => padX + t * (width - padX * 2);
+  const Y = (e) => height - padY - ((e - minE) / span) * (height - padY * 2);
+
+  const lineD = pts.map((p) => `${X(p.t).toFixed(1)},${Y(p.elev).toFixed(1)}`).join(" L ");
+  const areaD = `M ${X(0).toFixed(1)},${(height - 4).toFixed(1)} L ${lineD} L ${X(1).toFixed(1)},${(height - 4).toFixed(1)} Z`;
+
+  // Compute ponding per point
+  for (const p of pts) {
+    p.pond = computePonding({
+      elev: p.elev,
+      elevMin: minE,
+      elevMax: maxE,
+      rainMm,
+      proposedDrain,
+      outletBlocked,
+    });
+  }
+
+  return {
+    pts,
+    minE,
+    maxE,
+    reliefM: maxE - minE,
+    lineD: `M ${lineD}`,
+    areaD,
+    X,
+    Y,
+  };
+}
+
+/**
+ * Sample real values (lat/lon, elevation, NDVI, NDMI, low-ground, ponding) at normalized (u, v)
+ * for the clicked/tapped probe card.
+ */
+export function lookupProbePoint({
+  u,
+  v,
+  field = {},
+  sampleElevationFn = null,
+  ndviObservation = null,
+  moistureObservation = null,
+  groundClass = null,
+  rainMm = 0,
+  proposedDrain = false,
+  outletBlocked = false,
+  s1WaterMask = null,
+} = {}) {
+  const normU = Math.max(0, Math.min(1, u ?? 0.5));
+  const normV = Math.max(0, Math.min(1, v ?? 0.5));
+
+  const [cLat, cLon] = field.centroid || [25.83, 89.24];
+  const bbox = field.bboxLatLon; // [w, s, e, n]
+  let lat = cLat;
+  let lon = cLon;
+  if (Array.isArray(bbox) && bbox.length === 4) {
+    const [w, s, e, n] = bbox;
+    lon = w + normU * (e - w);
+    lat = n - normV * (n - s);
+  } else {
+    lat = cLat + (0.5 - normV) * 0.0012;
+    lon = cLon + (normU - 0.5) * 0.0012;
+  }
+
+  const elev = typeof sampleElevationFn === "function" ? sampleElevationFn(normU, normV) : 30.0;
+  const elevMin = field.elevMin ?? (elev - 1.2);
+  const elevMax = field.elevMax ?? (elev + 1.2);
+
+  const pondResult = computePonding({
+    elev,
+    elevMin,
+    elevMax,
+    rainMm,
+    proposedDrain,
+    outletBlocked,
+    s1WaterMask,
+  });
+
+  const ndviVal = ndviObservation?.ndvi ?? null;
+  const ndmiVal = moistureObservation?.ndmi ?? null;
+
+  return {
+    u: normU,
+    v: normV,
+    lat,
+    lon,
+    elevationM: elev,
+    pondingCm: pondResult.pondCm,
+    pondTruth: pondResult.truth,
+    pondSource: pondResult.source,
+    ndvi: ndviVal,
+    ndmi: ndmiVal,
+    groundClass: groundClass?.class ?? (elev - elevMin < (elevMax - elevMin) * 0.35 ? "low" : "level"),
+  };
+}
+
+
