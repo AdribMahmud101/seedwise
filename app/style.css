@@ -3195,3 +3195,41 @@ dialog .modal-body {
   }
 }
 
+
+/* MOB1 review: phone fixes */
+@media (max-width: 600px) {
+  /* Tap info as a bottom sheet: an in-flow card landed ~500 px below the screen */
+  .inspect-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1200;
+    margin: 0;
+    max-height: 58svh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 8px env(safe-area-inset-bottom, 0);
+  }
+  .inspect-sheet-card {
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -6px 24px rgba(36, 57, 44, 0.22);
+  }
+  /* Toggles share one row; opacity gets its own full-width row (one row clipped "Low ground" at 360 px) */
+  .map-subcontrols {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .map-subcontrols .button {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+  .map-opacity-control {
+    order: 2;
+    flex: 1 1 100%;
+  }
+  /* Imagery chip must stop before the zoom buttons */
+  .map-overline {
+    max-width: calc(100% - 84px);
+  }
+}
