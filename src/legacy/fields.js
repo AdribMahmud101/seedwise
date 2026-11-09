@@ -119,7 +119,7 @@ let leafletMap = null,
   activeBaseTileLayer = null,
   activeOsmLayer = null,
   layerMode = isOnline() ? "high-detail" : "natural", // 'high-detail' | 'natural' | 'ndvi'
-  activeDate = "2024-03-09",
+  activeDate = "2024-11-09",
   layerOpacity = 0.6,
   showOsmContext = true,
   tileErrorCount = 0;
@@ -169,7 +169,7 @@ export async function esriMaxZoom(lat, lon, fetchFn = fetch) {
 
 function switchToOfflineNatural(reason = "offline") {
   layerMode = "natural";
-  activeDate = "2024-03-09";
+  activeDate = "2024-11-09";
   toast(
     t(
       "No internet — showing offline 10 m satellite map",
@@ -637,7 +637,7 @@ function home() {
 
   // Ensure activeDate is valid for current mode
   if (!timelineDates.some((td) => td.date === activeDate)) {
-    activeDate = timelineDates[0]?.date || "2024-03-09";
+    activeDate = timelineDates.at(-1)?.date || "2024-11-09";
   }
 
   // Determine active chip info based on layerMode and activeDate
@@ -1633,7 +1633,7 @@ function fieldAction(action, value) {
     }
     layerMode = value;
     if (value === "natural" || value === "ndvi") {
-      activeDate = "2024-03-09";
+      activeDate = "2024-11-09";
     }
     repaint();
   }
