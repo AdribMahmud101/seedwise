@@ -37,7 +37,8 @@ Both are self-hosted so the app works offline. The earlier three.js field-scale 
 | Greenness (NDVI) | Same Sentinel-2 scenes | 10 m | 9 Mar 2024, 9 Nov 2024 | Offline tiles (`public/tiles/ndvi/`); drawn over the photo when online | Estimated |
 | Low ground | [NASADEM](https://planetarycomputer.microsoft.com/dataset/nasadem) relative elevation (cell minus 1 km median) | 30 m, smoothed | NASADEM (2000 radar) | Offline PNG overlays (`public/overlays/`, 80 KB) | Estimated |
 | Context lines | [OpenStreetMap](https://www.openstreetmap.org/) roads, rivers, villages | Vector | Fetched Nov 2026 | Offline (`context-osm.geojson`) | — |
-| Tap-to-inspect values | [NASA POWER](https://power.larc.nasa.gov/) wetness and temperature, [GPM IMERG](https://gpm.nasa.gov/data/imerg) rain, NDVI grid | ~50 km / ~10 km / 10 m | 2024 monthly | Offline JSON | Estimated |
+| Tap-to-inspect, at this spot | Sentinel-2 NDVI and NDMI (moisture) grids, NASADEM low ground | 20 m / 30 m | 9 Mar and 9 Nov 2024 | Offline JSON (`ndvi-grid.json`, gzip `moisture-grid.json` 0.85 MB) | Estimated |
+| Tap-to-inspect, area weather | [GPM IMERG](https://gpm.nasa.gov/data/imerg) rain, [NASA POWER](https://power.larc.nasa.gov/) wetness and temperature, labelled with scale | ~10 km / ~50 km | 2024 monthly | Offline JSON | Estimated |
 | 3D terrain | NASADEM, Terrarium-encoded tiles | 30 m, zoom 8–12, height ×10 | NASADEM | Offline (`public/landscape/`, 2.4 MB) | Estimated |
 | 3D colours | Built from NASADEM: height colours + hillshade, edges faded into haze | 30 m | — | Offline | Estimated |
 | 3D photo mode | Same Esri Wayback release | 0.31 m | 28 Nov 2022 | Online only | Estimated |
@@ -57,7 +58,7 @@ Why Wayback release 64776: the live Esri layer shows a hazy 14 Dec 2023 capture 
 | Zoom limit per place | `esriMaxZoom()` asks Esri's tilemap which zoom (17–20) has real photos at the map centre and caps zoom there; cached per ~1 km; falls back to 18 |
 | Zoom caps | Sentinel-2 layers stop at zoom 16 so 10 m pixels don't turn into blocks; +/− buttons grey out at the limit |
 | Field boundary | Draw and edit the outline; area shown live in shotok, bigha, katha, acre and hectare; saved in the browser |
-| Tap-to-inspect | Tap a point: NDVI, wetness index, temperature, rain for the month, and low / level / high ground, each with its source |
+| Tap-to-inspect | Tap a point: "At this spot" (NDVI with Mar → Nov change, NDMI moisture word, low ground) and "Area weather" (rain, wetness, temperature with their ~10–50 km scale) |
 | Low ground toggle | One button, off by default; the legend appears only when it is on |
 | Locate, reset, full screen | Map controls on the right, all 44 px tap targets |
 | 3D landscape | Lazy-loaded; frames all 3 upazilas (side view on wide screens, north-up on phones); Height colours / Photo switch and reset; one 2 s fly-in, no auto-rotate; shows a message without WebGL |
@@ -81,7 +82,7 @@ All offline map data is built once by Python scripts and committed as static fil
 
 Checks before every release:
 
-- **Unit tests:** `npm test` (Node test runner), 68 tests, including the `map-layers`, `low-ground`, `landscape`, `esri-zoom`, `custom-fields` (POWER parity with the Python fixture) and `netarea` suites.
+- **Unit tests:** `npm test` (Node test runner), 72 tests, including the `map-layers`, `low-ground`, `landscape`, `esri-zoom`, `custom-fields` (POWER parity with the Python fixture) and `netarea` suites.
 - **Build:** `npm run build` must compile on the main branch.
 - **Browser checks:** headless Chrome (Playwright) at 1280 px and 360 px, English and Bengali: no sideways scroll, no text under 12 px, no tap target under 44 px, no console errors, no 404s, only expected outside hosts.
 - **Size budgets:** low-ground overlays ≤ 300 KB; 3D landscape files ≤ 4 MB; MapLibre not loaded on first page load.
