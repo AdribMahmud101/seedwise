@@ -117,7 +117,7 @@ Standard: `spec/15-ui-ux-spec.md` §5, §8, §9, §12; `spec/14-decision-recomme
 Tested viewports: **360 px** (mobile), **768 px** (tablet), **1280 px** (desktop).
 
 - [x] ✅ **Offline tile layers (`public/tiles/...`):** Wired `public/data/map-layers.json` into Leaflet tile layers with `maxNativeZoom: 16`, local URL templates, bounds, and dynamic layer/date switching. Defaults to **Natural colour (Sentinel-2 tiles)**. No online or non-local HTTP tile hosts are referenced or queried.
-- [x] ✅ **Layer switcher (44 px segmented control):** Segmented control with 44×44 px minimum hit targets switching between **Natural colour**, **Greenness (NDVI)**, and **Original 2024 photo**.
+- [x] ✅ **Layer switcher (44 px segmented control):** Segmented control with 44×44 px minimum hit targets switching between **High detail (online)**, **Natural colour 10 m (offline)**, and **Greenness NDVI (offline)**.
 - [x] ✅ **Dedicated legends and truth chips:** Each layer mode provides a dedicated legend bar (`.map-legend-bar`) and an updated truth chip: source · date · 10 m / 30 m · `◈ Estimated` (D-C5).
 - [x] ✅ **Date timeline:** Dedicated date selection buttons over manifest dates (**9 Mar 2024** and **9 Nov 2024** for Natural colour & Greenness; 28 Jan 2024 for photo). Clear observation status displayed; Landsat dates restricted to original photo mode.
 - [x] ✅ **Imagery opacity slider:** 44 px height range slider dynamically adjusts tile and image overlay opacity from 10% to 100%, keeping the field outline and bunds crisp and readable.
@@ -127,21 +127,5 @@ Tested viewports: **360 px** (mobile), **768 px** (tablet), **1280 px** (desktop
 - [x] ✅ **Responsive & Tap Target Verification:** At 360 px and 1280 px: no horizontal page scroll, map controls ≥ 44×44 px, legend items neatly wrap and are never obstructed by controls or popups.
 - [x] ✅ **Automated Tests & Build:** `npm test` (30 tests) and `npm run build` exit 0; `tests/map-layers.test.mjs` verifies every manifest date has tiles at z12 and z16 on disk for each site, and unit tests the OSM feature validator.
 
----
-
-## 7. MAP4B · 2D / 3D Switch with Terrain in My Field Audit (§12 Checklist)
-
-Audit date: 8 Nov 2026  
-Standard: `spec/15-ui-ux-spec.md` §8 (binding) & `spec/14` D-C4.  
-Tested viewports: **360 px** (mobile), **768 px** (tablet), **1280 px** (desktop).
-
-- [x] ✅ **Self-hosted & Dynamic Load:** Three.js r160 + OrbitControls vendored into `public/assets/three/` with MIT licence file and version metadata. Not loaded on initial page load; loaded via dynamic import strictly when user taps **3D view**. First page load bundle is unaffected.
-- [x] ✅ **2D / 3D Segmented Control:** 44×44 px minimum hit target segmented control (`2D map │ 3D view`). 2D is the default view.
-- [x] ✅ **WebGL Detection & Graceful Fallback:** If WebGL is unavailable or fails, displays an explanatory bilingual toast message and keeps the view in 2D.
-- [x] ✅ **NASADEM Terrain Mesh:** Elevation grid loaded from `public/terrain/<site>.json` (MAP4A, 128×128 grid). Draped with selected MAP3 layer and date tiles (or photo overlay). Fixed 2.5× vertical exaggeration with visible badge `"Height exaggerated 2.5×"`.
-- [x] ✅ **Truth Label & Scenario Chip:** Always-visible chip: `"Real satellite + illustrative 3D — heights include trees and houses — check locally"` tagged with `SCENARIO` badge (`⬡ Scenario`).
-- [x] ✅ **Field Outline & Shaded Low Areas:** Field boundary outline drawn on the terrain surface. Low elevation areas (lowest 15th percentile) shaded with legend label `"Possible water collects here"` and tagged with `◈ Estimated`.
-- [x] ✅ **Controls & Performance:** OrbitControls with drag to rotate, pinch/wheel to zoom, 44 px **Reset view** button (`reset-3d-view`), damping enabled, no auto-spin. Respects `prefers-reduced-motion`. Render-on-demand only during user interactions; pauses rendering via IntersectionObserver when off-screen. Mesh capped at 128×128 vertices.
-- [x] ✅ **Responsive Design at 360 px:** No horizontal page scroll. All segmented buttons and control buttons meet ≥ 44 px touch targets.
 
 

@@ -2,8 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { state, loadData, truth, stateEmpty, stateError, exampleBanner } from "../src/legacy/ui.js";
-import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N, fieldAction, viewMode, setViewMode } from "../src/legacy/fields.js";
-import { isWebGLAvailable, fetchTerrainData } from "../src/legacy/terrain3d.js";
+import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N, fieldAction, getLayerMode, setLayerMode } from "../src/legacy/fields.js";
 import { rotations } from "../src/legacy/rotations.js";
 import { planner } from "../src/legacy/planner.js";
 import { clinic } from "../src/legacy/clinic.js";
@@ -430,35 +429,7 @@ test("recovery example shows example banner in EN and BN", async () => {
   assert.ok(html.includes("class=\"example-banner\"") || html.includes("Example — not your field") || html.includes("উদাহরণ — আপনার জমি নয়"), "Recovery example shows example banner");
 });
 
-test("3D terrain toggle and WebGL fallback behavior", async () => {
-  globalThis.document = {
-    baseURI: new URL("../public/", import.meta.url).href,
-    createElement: () => ({ getContext: () => null }),
-    querySelector: () => null,
-  };
-  globalThis.window = {
-    WebGLRenderingContext: undefined,
-    matchMedia: () => ({ matches: false }),
-  };
-
-  let toastMessage = "";
-  globalThis.onToastMessage = (msg) => { toastMessage = msg; };
-
-  // isWebGLAvailable returns false when WebGL is missing
-  assert.equal(isWebGLAvailable(), false, "isWebGLAvailable returns false when WebGLRenderingContext missing");
-
-  // Attempting to switch to 3D without WebGL stays in 2D with explanatory message
-  fieldAction("set-view-mode", "3d");
-  assert.equal(viewMode, "2d", "View mode stays 2D when WebGL is unavailable");
-  assert.ok(
-    toastMessage.includes("WebGL") || toastMessage.includes("3D view requires WebGL"),
-    "Displays explanatory toast message about missing WebGL",
-  );
-
-  delete globalThis.onToastMessage;
-});
-
-test("3D terrain view HTML elements and chips", async () => {
+test("MAP5: layer switcher buttons, online/offline state, and SW excludes Esri tiles", async () => {
   globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
   globalThis.fetch = async (url) => {
     const target = url instanceof URL || (typeof url === "string" && url.startsWith("file:")) ? new URL(url) : url;
@@ -469,39 +440,50 @@ test("3D terrain view HTML elements and chips", async () => {
   };
   await loadData();
 
+  // 1. Assert layer list in map-layers.json is [high-detail, natural, ndvi]
+  const manifest = JSON.parse(
+    await readFile(new URL("../public/data/map-layers.json", import.meta.url), "utf8"),
+  );
+  const layerIds = manifest.layers.map((l) => l.id);
+  assert.deepEqual(layerIds, ["high-detail", "natural", "ndvi"], "Layers must be [high-detail, natural, ndvi]");
+
+  // 2. Assert sw.js (from prepare-offline.py) excludes Esri / arcgisonline tiles from caching
+  const prepareOfflinePy = await readFile(new URL("../scripts/prepare-offline.py", import.meta.url), "utf8");
+  assert.ok(
+    prepareOfflinePy.includes("arcgisonline.com"),
+    "prepare-offline.py service worker must explicitly exclude arcgisonline.com from caching",
+  );
+
+  // 3. Test HTML rendering of 3 layer buttons
   state.lang = "en";
   state.fieldId = "mithapukur";
-  const html2D = home();
+  Object.defineProperty(globalThis.navigator, "onLine", { value: true, configurable: true, writable: true });
+  setLayerMode("high-detail");
+  const htmlOnline = home();
 
-  // Check 2D / 3D segmented toggle buttons
-  assert.ok(html2D.includes("2D map"), "Includes '2D map' button");
-  assert.ok(html2D.includes("3D view"), "Includes '3D view' button");
-  assert.ok(html2D.includes('data-action="set-view-mode"'), "Has set-view-mode data-action");
+  assert.ok(htmlOnline.includes("High detail"), "Includes High detail button");
+  assert.ok(htmlOnline.includes("Natural colour"), "Includes Natural colour button");
+  assert.ok(htmlOnline.includes("Greenness NDVI") || htmlOnline.includes("Greenness (NDVI)"), "Includes Greenness NDVI button");
+  assert.ok(!htmlOnline.includes('data-value="photo"'), "No legacy photo layer mode");
+  assert.ok(!htmlOnline.includes("hidden-3d"), "No 3D container");
+  assert.ok(!htmlOnline.includes("2D map"), "No 2D map switch");
 
-  // Check terrain data loading from public/terrain/<site>.json
-  const terrain = await fetchTerrainData("mithapukur");
-  assert.equal(terrain.site, "mithapukur", "Terrain data site matches");
-  assert.equal(terrain.width, 128, "Terrain grid width <= 128");
-  assert.equal(terrain.height, 128, "Terrain grid height <= 128");
-  assert.equal(terrain.grid.length, 128, "Terrain grid rows == 128");
+  // Attribution & chip text for high detail
+  assert.ok(htmlOnline.includes("Imagery © Esri, Maxar, Earthstar Geographics"), "Includes Esri attribution");
+  assert.ok(htmlOnline.includes("High-detail photo · Esri · date varies · online"), "Includes high detail chip");
 
-  // Test 3D mode rendering
-  setViewMode("3d");
-  const html3D = home();
+  // Timeline shows only for Sentinel-2 layers, NOT high-detail
+  assert.ok(!htmlOnline.includes("Observation date"), "Observation date timeline hidden for high detail");
 
-  assert.ok(html3D.includes("field-3d"), "Includes field-3d container");
-  assert.ok(html3D.includes("Reset view"), "Includes Reset view button");
-  assert.ok(html3D.includes("Height exaggerated 2.5×"), "Includes 'Height exaggerated 2.5×' label");
-  assert.ok(
-    html3D.includes("Real satellite + illustrative 3D — heights include trees and houses — check locally"),
-    "Includes required scenario warning chip",
-  );
-  assert.ok(html3D.includes("Lower ground — water may collect after heavy rain"), "Includes 'Lower ground — water may collect after heavy rain' label");
-  assert.ok(html3D.includes("Scenario"), "Includes Scenario truth tag");
-  assert.ok(html3D.includes("Estimated"), "Includes Estimated truth tag");
+  // Switch to natural colour -> timeline is visible
+  setLayerMode("natural");
+  const htmlNatural = home();
+  assert.ok(htmlNatural.includes("Observation date"), "Observation date timeline visible for natural colour");
 
-  // Switch back to 2D
-  setViewMode("2d");
+  // Switch to ndvi -> timeline is visible
+  setLayerMode("ndvi");
+  const htmlNdvi = home();
+  assert.ok(htmlNdvi.includes("Observation date"), "Observation date timeline visible for ndvi");
 });
 
 test("#field and #seasons render >= 3 truth badges each in EN and BN", async () => {
@@ -607,76 +589,4 @@ test("truth badges in #field and #seasons have proper source, date, cell info", 
   assert.ok(seasonsHtml.includes("cell:") || seasonsHtml.includes("cell:"), `Truth badges in #seasons have cell info`);
 });
 
-test("MAP4C: 3D terrain elevation smoothing and low-area mask", async () => {
-  const { smoothElevationGrid, computeLowAreaMask, cropTerrainAroundField, fetchTerrainData } = await import(
-    "../src/legacy/terrain3d.js"
-  );
 
-  // 1. Smoothing reduces the max-min range of a noisy grid
-  const noisyGrid = [
-    [10, 35, 12, 38, 15],
-    [32, 11, 40, 14, 36],
-    [14, 39, 10, 37, 12],
-    [36, 15, 35, 11, 39],
-    [11, 38, 13, 36, 14],
-  ];
-  const flatNoisy = [].concat(...noisyGrid);
-  const noisyRange = Math.max(...flatNoisy) - Math.min(...flatNoisy);
-
-  const smoothed = smoothElevationGrid(noisyGrid, 5);
-  const flatSmoothed = [].concat(...smoothed);
-  const smoothedRange = Math.max(...flatSmoothed) - Math.min(...flatSmoothed);
-
-  assert.ok(
-    smoothedRange < noisyRange,
-    `Smoothing reduces max-min range (smoothed range: ${smoothedRange} < noisy range: ${noisyRange})`,
-  );
-
-  // Verify on real terrain grid data
-  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
-  globalThis.fetch = async (url) => {
-    const target = url instanceof URL || (typeof url === "string" && url.startsWith("file:")) ? new URL(url) : url;
-    return {
-      ok: true,
-      json: async () => JSON.parse(await readFile(target, "utf8")),
-    };
-  };
-  const terrain = await fetchTerrainData("mithapukur");
-  const realSmoothed = smoothElevationGrid(terrain.grid, 5);
-  const realRawRange = terrain.maxHeightMetres - terrain.minHeightMetres;
-  const flatRealSmoothed = [].concat(...realSmoothed);
-  const realSmoothedRange = Math.max(...flatRealSmoothed) - Math.min(...flatRealSmoothed);
-  assert.ok(
-    realSmoothedRange < realRawRange,
-    `Real terrain smoothing reduces range (${realSmoothedRange} < ${realRawRange})`,
-  );
-
-  // 2. Low-area mask covers <= 10% of cells
-  const testGrid = [
-    [10, 11, 12, 13, 14],
-    [15, 16, 17, 18, 19],
-    [20, 21, 22, 23, 24],
-    [25, 26, 27, 28, 29],
-  ];
-  const mask = computeLowAreaMask(testGrid, 0.10);
-  const totalCells = testGrid.length * testGrid[0].length;
-  const markedCells = [].concat(...mask).filter(Boolean).length;
-  assert.ok(
-    markedCells / totalCells <= 0.10,
-    `Low-area mask covers <= 10% of cells (${markedCells} / ${totalCells} = ${markedCells / totalCells})`,
-  );
-
-  // Test mask on cropped smoothed real terrain
-  const cropped = cropTerrainAroundField(
-    { ...terrain, grid: realSmoothed },
-    [[25.54, 89.27], [25.541, 89.271], [25.539, 89.269]],
-    1500,
-  );
-  const croppedMask = computeLowAreaMask(cropped.grid, 0.10);
-  const croppedTotal = cropped.width * cropped.height;
-  const croppedMarked = [].concat(...croppedMask).filter(Boolean).length;
-  assert.ok(
-    croppedMarked / croppedTotal <= 0.10,
-    `Cropped low-area mask covers <= 10% of cells (${croppedMarked} / ${croppedTotal} = ${croppedMarked / croppedTotal})`,
-  );
-});

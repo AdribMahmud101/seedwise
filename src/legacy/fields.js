@@ -36,7 +36,10 @@ import {
   truth,
 } from "./ui.js";
 import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
-import { isWebGLAvailable, reset3DView, dispose3DView } from "./terrain3d.js";
+
+function isOnline() {
+  return typeof navigator !== "undefined" && "onLine" in navigator ? !!navigator.onLine : true;
+}
 
 let leafletMap = null,
   drawLayer = null,
@@ -45,17 +48,17 @@ let leafletMap = null,
   drawMode = false,
   regional = false,
   showLandsat = false,
-  viewMode = "2d", // '2d' | '3d'
   mapLayersData = null,
   ndviGridData = null,
   osmContextData = null,
   activeTileLayer = null,
+  activeBaseTileLayer = null,
   activeOsmLayer = null,
-  activePhotoOverlay = null,
-  layerMode = "natural", // 'natural' | 'ndvi' | 'photo'
+  layerMode = isOnline() ? "high-detail" : "natural", // 'high-detail' | 'natural' | 'ndvi'
   activeDate = "2024-03-09",
-  layerOpacity = 0.85,
-  showOsmContext = true;
+  layerOpacity = 0.6,
+  showOsmContext = true,
+  tileErrorCount = 0;
 
 const colors = {
   wetness: "#658261",
@@ -64,7 +67,25 @@ const colors = {
   et0: "#9e9275",
 };
 
-// EPSG:32645 (WGS 84 / UTM zone 45N) projection for Bangladesh / Rangpur
+function getLayerMode() {
+  return layerMode;
+}
+
+function setLayerMode(mode) {
+  layerMode = mode;
+}
+
+function switchToOfflineNatural(reason = "offline") {
+  layerMode = "natural";
+  activeDate = "2024-03-09";
+  toast(
+    t(
+      "No internet — showing offline 10 m satellite map",
+      "ইন্টারনেট সংযোগ নেই — অফলাইন ১০ মিটার স্যাটেলাইট মানচিত্র দেখানো হচ্ছে",
+    ),
+  );
+  repaint();
+}
 function projectWgs84ToUtm45N(lon, lat) {
   const a = 6378137.0;
   const f = 1 / 298.257223563;
@@ -213,7 +234,9 @@ function disposeMap() {
     leafletMap.remove();
     leafletMap = null;
   }
-  dispose3DView();
+  activeTileLayer = null;
+  activeBaseTileLayer = null;
+  activeOsmLayer = null;
   drawLayer = null;
   drawMode = false;
   drawPoints = [];
@@ -315,24 +338,21 @@ function home() {
     ranks = rotationEvidence(f.monthly, state.weights, p);
   const first = ranks.find((r) => r.feasible);
 
-  // Dates for timeline: manifest Sentinel-2 dates (for natural & ndvi) or original photo
-  let timelineDates = [];
-  if (layerMode === "photo") {
-    timelineDates = [
-      { date: "2024-01-28", label: formatDateLabel("2024-01-28"), available: true },
-    ];
-  } else {
-    // For Natural colour and Greenness, use dates from mapLayersData manifest
-    const manifestDates = mapLayersData?.layers?.find((l) => l.id === layerMode)?.dates?.map((d) => d.date) || [
-      "2024-03-09",
-      "2024-11-09",
-    ];
-    timelineDates = manifestDates.map((d) => ({
-      date: d,
-      label: formatDateLabel(d),
-      available: true,
-    }));
+  const online = isOnline();
+  if (!online && layerMode === "high-detail") {
+    layerMode = "natural";
   }
+
+  // Dates for timeline: manifest Sentinel-2 dates (for natural & ndvi)
+  const manifestDates = mapLayersData?.layers?.find((l) => l.id === "natural")?.dates?.map((d) => d.date) || [
+    "2024-03-09",
+    "2024-11-09",
+  ];
+  const timelineDates = manifestDates.map((d) => ({
+    date: d,
+    label: formatDateLabel(d),
+    available: true,
+  }));
 
   // Ensure activeDate is valid for current mode
   if (!timelineDates.some((td) => td.date === activeDate)) {
@@ -340,38 +360,40 @@ function home() {
   }
 
   // Determine active chip info based on layerMode and activeDate
-  let chipSensor, chipDate, chipRes, chipSource, chipIsEstimate;
-  if (layerMode === "natural") {
-    chipSensor = "Copernicus Sentinel-2";
-    chipDate = formatDateLabel(activeDate);
-    chipRes = "10 m";
-    chipSource = "ESA / Planetary Computer";
-    chipIsEstimate = true;
-  } else if (layerMode === "ndvi") {
-    chipSensor = "Sentinel-2 NDVI";
-    chipDate = formatDateLabel(activeDate);
-    chipRes = "10 m";
-    chipSource = "ESA / Planetary Computer";
-    chipIsEstimate = true;
+  let chipHtml = "";
+  if (layerMode === "high-detail") {
+    const chipText = t(
+      "High-detail photo · Esri · date varies · online",
+      "উচ্চ রেজোলিউশন ছবি · এসরি · বিভিন্ন তারিখ · অনলাইন",
+    );
+    chipHtml = `<span class="map-chip-text">${esc(chipText)}</span> ${truth("REMOTE_OBSERVED")}`;
+  } else if (layerMode === "natural") {
+    const chipLabel = `ESA / Planetary Computer · ${formatDateLabel(activeDate)} · 10 m · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`;
+    chipHtml = esc(chipLabel);
   } else {
-    chipSensor = "Landsat 8";
-    chipDate = formatDateLabel(activeDate);
-    chipRes = "30 m";
-    chipSource = "NASA / USGS";
-    chipIsEstimate = true;
+    const chipLabel = `Sentinel-2 NDVI · ${formatDateLabel(activeDate)} · 10 m · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`;
+    chipHtml = esc(chipLabel);
   }
 
-  const chipLabel = `${chipSource} · ${chipDate} · ${chipRes} · ${t("◈ Estimated", "◈ স্যাটেলাইট অনুমান")}`;
   const hasCustomBoundary = !!state.boundaries[f.id];
   const currentDateObj = timelineDates.find((d) => d.date === activeDate);
   const isDateReliable = currentDateObj ? currentDateObj.available : false;
 
   // Legend HTML per active layer
   let legendHtml = "";
-  if (layerMode === "natural") {
+  if (layerMode === "high-detail") {
     legendHtml = `
       <div class="map-legend-bar">
-        <strong>${t("Natural colour", "প্রাকৃতিক রং")}</strong>
+        <strong>${t("High detail", "উচ্চ স্পষ্টতা")}</strong>
+        <div class="map-legend-items">
+          <span class="map-legend-item">${t("World Imagery © Esri, Maxar, Earthstar Geographics", "বিশ্ব উপগ্রহ চিত্র © এসরি, ম্যাক্সার")}</span>
+        </div>
+      </div>
+    `;
+  } else if (layerMode === "natural") {
+    legendHtml = `
+      <div class="map-legend-bar">
+        <strong>${t("Natural colour 10 m", "প্রাকৃতিক রং ১০ মি")}</strong>
         <div class="map-legend-items">
           <span class="map-legend-item"><span class="legend-swatch" style="background:#4b5a37"></span> ${t("Vegetation / fields", "ফসল ও গাছপালা")}</span>
           <span class="map-legend-item"><span class="legend-swatch" style="background:#858374"></span> ${t("Bare soil / paths", "অনাবাদী জমি ও রাস্তা")}</span>
@@ -393,16 +415,9 @@ function home() {
         </div>
       </div>
     `;
-  } else {
-    legendHtml = `
-      <div class="map-legend-bar">
-        <strong>${t("Original 2024 photo", "আসল ২০২৪ ছবি")}</strong>
-        <div class="map-legend-items">
-          <span class="map-legend-item"><span class="legend-swatch" style="background:#525b42"></span> Landsat 8 True Colour · 30 m (${t("28 Jan 2024 dry season base", "২৮ জানু ২০২৪ শুষ্ক মৌসুম")})</span>
-        </div>
-      </div>
-    `;
   }
+
+  const showTimeline = layerMode !== "high-detail";
 
   return (
     header(
@@ -422,18 +437,11 @@ function home() {
     ) +
     chips() +
     `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
- <div class="view-mode-bar">
-   <div class="map-segmented view-mode-switch" role="tablist" aria-label="${t("2D or 3D view", "দ্বিমাত্রিক বা ত্রিমাত্রিক দৃশ্য")}">
-     <button type="button" class="button ${viewMode === "2d" ? "active" : ""}" data-action="set-view-mode" data-value="2d" role="tab" aria-selected="${viewMode === "2d"}">${icon("field", 14)} ${t("2D map", "২ডি মানচিত্র")}</button>
-     <button type="button" class="button ${viewMode === "3d" ? "active" : ""}" data-action="set-view-mode" data-value="3d" role="tab" aria-selected="${viewMode === "3d"}">${icon("planner", 14)} ${t("3D view", "৩ডি দৃশ্য")}</button>
-   </div>
-   ${viewMode === "3d" ? `<div class="terrain-chips"><span class="chip-exaggeration tag">${t("Height exaggerated 2.5×", "উচ্চতা ২.৫ গুণ বাড়ানো")}</span><span class="chip-smoothed-model tag">${t("Smoothed surface model", "মসৃণ করা পৃষ্ঠ মডেল")}</span><span class="chip-scenario-warning">${t("Real satellite + illustrative 3D — heights include trees and houses — check locally", "আসল স্যাটেলাইট ও নমুনা ৩ডি — উচ্চতায় গাছপালা ও বাড়ি অন্তর্ভুক্ত — স্থানীয়ভাবে যাচাই করুন")} ${truth("SCENARIO")}</span></div>` : ""}
- </div>
  <div class="map-switcher">
    <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
-     <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}">${icon("layers", 14)} ${t("Natural colour", "প্রাকৃতিক রং")}</button>
-     <button type="button" class="button ${layerMode === "ndvi" ? "active" : ""}" data-action="set-layer-mode" data-value="ndvi" role="tab" aria-selected="${layerMode === "ndvi"}">${icon("tree", 14)} ${t("Greenness (NDVI)", "সবুজভাব (NDVI)")}</button>
-     <button type="button" class="button ${layerMode === "photo" ? "active" : ""}" data-action="set-layer-mode" data-value="photo" role="tab" aria-selected="${layerMode === "photo"}">${icon("camera", 14)} ${t("Original 2024 photo", "আসল ২০২৪ ছবি")}</button>
+     <button type="button" class="button ${layerMode === "high-detail" ? "active" : ""}" data-action="set-layer-mode" data-value="high-detail" role="tab" aria-selected="${layerMode === "high-detail"}" ${!online ? "disabled" : ""} title="${!online ? t("Needs internet", "ইন্টারনেট প্রয়োজন") : ""}">${icon("camera", 14)} ${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}${!online ? ` <small class="layer-offline-note">(${t("needs internet", "ইন্টারনেট প্রয়োজন")})</small>` : ""}</button>
+     <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}">${icon("layers", 14)} ${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}</button>
+     <button type="button" class="button ${layerMode === "ndvi" ? "active" : ""}" data-action="set-layer-mode" data-value="ndvi" role="tab" aria-selected="${layerMode === "ndvi"}">${icon("tree", 14)} ${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}</button>
    </div>
    <div class="map-subcontrols">
      <div class="map-opacity-control">
@@ -443,6 +451,7 @@ function home() {
      <button type="button" class="button small ${showOsmContext ? "primary" : ""}" data-action="toggle-osm-context">${icon("field", 14)} ${t("Context lines", "রাস্তা ও নদী")}</button>
    </div>
  </div>
+ ${showTimeline ? `
  <div class="map-timeline">
    <span class="map-timeline-label">${icon("seasons", 14)} ${t("Observation date", "পর্যবেক্ষণের তারিখ")}:</span>
    <div class="map-timeline-dates">
@@ -454,27 +463,17 @@ function home() {
        .join("")}
    </div>
    <span class="map-timeline-status">${isDateReliable ? `<span class="tag green">✓ ${t("Clear observation", "পরিষ্কার ছবি")}</span>` : `<span class="tag amber">⊘ ${t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</span>`}</span>
- </div>
+ </div>` : ""}
  <div class="map-shell">
-   <div id="field-map" class="field-map ${viewMode === "3d" ? "hidden-2d" : ""}" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div>
-   <div id="field-3d" class="field-3d-container ${viewMode === "3d" ? "" : "hidden-3d"}" role="region" aria-label="${t("3D terrain view", "ত্রিমাত্রিক ভূপ্রকৃতি দৃশ্য")}"></div>
-   <div class="map-overline" id="map-label">${esc(chipLabel)}</div>
-   <div class="map-bottom">${viewMode === "3d" ? `${t("Drag to rotate · Pinch/scroll to zoom", "ঘোরাতে টানুন · জুম করতে পিঞ্চ বা স্ক্রোল করুন")}` : `N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E`}</div>
+   <div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div>
+   <div class="map-overline" id="map-label">${chipHtml}</div>
+   <div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div>
  </div>
- ${viewMode === "3d" ? `
-   <div class="terrain-water-legend">
-     <span class="legend-swatch water-shade-swatch"></span>
-     <span class="legend-text">${t("Lower ground — water may collect after heavy rain (check locally)", "নিচু জমি — ভারী বৃষ্টির পর পানি জমতে পারে (মাঠে যাচাই করুন)")}</span>
-     ${truth("MODELED")}
-   </div>
- ` : legendHtml}
+ ${legendHtml}
  <div class="map-actions">
-   <span class="note">${viewMode === "3d" ? t("Illustrative 3D surface model", "নমুনা ত্রিমাত্রিক ভূপ্রকৃতি") : esc(chipLabel)}</span>
+   <span class="note">${chipHtml}</span>
    <div class="map-controls">
-     ${viewMode === "3d"
-       ? `${button(t("Reset view", "আগের দৃশ্য"), "reset-3d-view", "small reset-view-btn")}`
-       : `${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}`
-     }
+     ${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}
    </div>
  </div><div id="drawing-help"></div></section>
  <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${state.boundaries[f.id] ? truth("FARMER_REPORTED", { source: "Farmer boundary", date: "2024" }) : truth("SCENARIO", { source: "Demo outline", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
@@ -623,38 +622,27 @@ function seasonView() {
   );
 }
 async function mountMap() {
-  if (viewMode === "3d") {
-    const container = document.querySelector("#field-3d");
-    if (!container) return;
-    try {
-      const { mount3DView } = await import("./terrain3d.js");
-      const f = field();
-      await mount3DView(container, {
-        siteId: f.id,
-        layerMode,
-        activeDate,
-        fieldPoly: polygon(),
-      });
-    } catch (err) {
-      console.error("Failed to mount 3D view:", err);
-      toast(t("3D terrain could not be loaded. Switched back to 2D.", "ত্রিমাত্রিক ভূপ্রকৃতি লোড করা যায়নি। ২ডি মানচিত্রে ফিরে যাওয়া হয়েছে।"));
-      viewMode = "2d";
-      repaint();
-    }
-    return;
-  }
-
   const el = document.querySelector("#field-map");
   if (!el || !window.L) return;
   await loadMapData();
   const f = field();
-  const maxZ = 17;
+  const online = isOnline();
+
+  if (!online && layerMode === "high-detail") {
+    layerMode = "natural";
+  }
+
+  tileErrorCount = 0;
+  const isHighDetailActive = layerMode === "high-detail" || (layerMode === "ndvi" && online);
+  const maxMapZoom = isHighDetailActive ? 19 : 16;
+  const fitMaxZoom = online ? 18 : 16;
+
   leafletMap = L.map(el, {
     zoomControl: false,
     scrollWheelZoom: false,
     zoomSnap: 0.5,
     minZoom: 8,
-    maxZoom: maxZ,
+    maxZoom: maxMapZoom,
     attributionControl: true,
     keyboard: true,
   });
@@ -715,7 +703,7 @@ async function mountMap() {
       L.DomEvent.on(resetBtn, "click", (e) => {
         L.DomEvent.preventDefault(e);
         if (poly && poly.getBounds().isValid()) {
-          current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: 16 });
+          current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: fitMaxZoom });
         } else {
           current.setView([f.lat, f.lon], 15);
         }
@@ -729,7 +717,7 @@ async function mountMap() {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const { latitude, longitude } = pos.coords;
-            current.setView([latitude, longitude], Math.min(15, maxZ));
+            current.setView([latitude, longitude], Math.min(15, maxMapZoom));
             L.circleMarker([latitude, longitude], {
               radius: 8,
               color: "#315c3d",
@@ -790,20 +778,38 @@ async function mountMap() {
   if (regional) {
     current.setView([25.65, 89.25], 10);
   } else if (poly && poly.getBounds().isValid()) {
-    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: 16 });
+    current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: fitMaxZoom });
   } else {
     current.setView([f.lat, f.lon], 15);
   }
 
-  // 1. Add Imagery: Tiles (natural/ndvi) or original 2024 photo
+  // Helper to create High Detail Esri layer
+  function createHighDetailLayer() {
+    const esriUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+    const layer = L.tileLayer(esriUrl, {
+      maxNativeZoom: 19,
+      maxZoom: 19,
+      attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
+    });
+    layer.on("tileerror", () => {
+      tileErrorCount++;
+      if (tileErrorCount >= 3) {
+        switchToOfflineNatural("tileerror");
+      }
+    });
+    return layer;
+  }
+
   const s2Attribution =
     mapLayersData?.attribution ||
     "Contains modified Copernicus Sentinel data (2024). ESA / Microsoft Planetary Computer.";
 
-  if (layerMode === "natural" || layerMode === "ndvi") {
-    const layerManifest = mapLayersData?.layers?.find((l) => l.id === layerMode);
+  if (layerMode === "high-detail") {
+    activeTileLayer = createHighDetailLayer().addTo(current);
+  } else if (layerMode === "natural") {
+    const layerManifest = mapLayersData?.layers?.find((l) => l.id === "natural");
     const dateEntry = layerManifest?.dates?.find((d) => d.date === activeDate);
-    const tileUrl = dateEntry?.pathTemplate || `/tiles/${layerMode}/${activeDate}/{z}/{x}/{y}.png`;
+    const tileUrl = dateEntry?.pathTemplate || `/tiles/natural/${activeDate}/{z}/{x}/{y}.png`;
     const minZoom = dateEntry?.minZoom ?? 9;
     const maxZoom = dateEntry?.maxZoom ?? 16;
     let tileBounds = undefined;
@@ -816,21 +822,38 @@ async function mountMap() {
     }
     activeTileLayer = L.tileLayer(tileUrl, {
       minZoom,
-      maxZoom: 17,
+      maxZoom: 16,
+      maxNativeZoom: maxZoom,
+      bounds: tileBounds,
+      opacity: 1.0,
+      attribution: s2Attribution,
+    }).addTo(current);
+  } else if (layerMode === "ndvi") {
+    // When online: draw High detail underneath, NDVI over it
+    if (online) {
+      activeBaseTileLayer = createHighDetailLayer().addTo(current);
+    }
+    const layerManifest = mapLayersData?.layers?.find((l) => l.id === "ndvi");
+    const dateEntry = layerManifest?.dates?.find((d) => d.date === activeDate);
+    const tileUrl = dateEntry?.pathTemplate || `/tiles/ndvi/${activeDate}/{z}/{x}/{y}.png`;
+    const minZoom = dateEntry?.minZoom ?? 9;
+    const maxZoom = dateEntry?.maxZoom ?? 16;
+    let tileBounds = undefined;
+    if (dateEntry?.bounds && dateEntry.bounds.length === 4) {
+      const [w, s, e, n] = dateEntry.bounds;
+      tileBounds = [
+        [s, w],
+        [n, e],
+      ];
+    }
+    activeTileLayer = L.tileLayer(tileUrl, {
+      minZoom,
+      maxZoom: 16,
       maxNativeZoom: maxZoom,
       bounds: tileBounds,
       opacity: layerOpacity,
       attribution: s2Attribution,
     }).addTo(current);
-  } else if (layerMode === "photo") {
-    const photo = f.imagery[0];
-    if (photo && photo.bounds && photo.bounds.length === 4) {
-      const [w, s, e, n] = photo.bounds;
-      activePhotoOverlay = L.imageOverlay(photo.url, [[s, w], [n, e]], {
-        opacity: layerOpacity,
-        attribution: photo.source || "Landsat · NASA / USGS",
-      }).addTo(current);
-    }
   }
 
   // 2. Context lines from public/data/context-osm.geojson (filtered for validity)
@@ -1040,9 +1063,6 @@ async function mountMap() {
     let cellSizeMetres = targetGrid?.cellSizeMetres || 20;
     if (targetGrid) {
       probeNdvi = queryNdvi(targetGrid, lat, lng);
-    } else if (activeDate === "2024-01-28") {
-      probeNdvi = f.imagery[0]?.ndvi ?? null;
-      cellSizeMetres = 30;
     }
     const ndviDisplayStr = formatNdvi(probeNdvi);
 
@@ -1068,7 +1088,7 @@ async function mountMap() {
           </div>
           <div class="inspect-item">
             <dt>${t("Observation date", "পর্যবেক্ষণের তারিখ")}</dt>
-            <dd>${esc(activeDate)}</dd>
+            <dd>${esc(layerMode === "high-detail" ? t("date varies", "বিভিন্ন তারিখ") : activeDate)}</dd>
           </div>
           <div class="inspect-item">
             <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
@@ -1084,7 +1104,7 @@ async function mountMap() {
           </div>
         </dl>
         <div class="inspect-footer">
-          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${layerMode === "photo" ? "Landsat 8 · 30 m" : "Sentinel-2 L2A · 10/20 m"} · ${esc(activeDate)}
+          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${layerMode === "high-detail" ? "Esri World Imagery" : "Sentinel-2 L2A · 10/20 m"} · ${esc(layerMode === "high-detail" ? t("Online", "অনলাইন") : activeDate)}
         </div>
       </div>
     `;
@@ -1165,28 +1185,13 @@ function editProfile() {
   );
 }
 function fieldAction(action, value) {
-  if (action === "set-view-mode") {
-    if (value === "3d") {
-      if (!isWebGLAvailable()) {
-        toast(t("3D view requires WebGL, which is unavailable on this device or browser. Staying in 2D map.", "ত্রিমাত্রিক দৃশ্যের জন্য WebGL প্রয়োজন, যা এই ডিভাইসে অনুপলব্ধ। ২ডি মানচিত্রেই রাখা হলো।"));
-        viewMode = "2d";
-        return;
-      }
-      viewMode = "3d";
-      repaint();
-    } else {
-      viewMode = "2d";
-      repaint();
-    }
-  }
-  if (action === "reset-3d-view") {
-    reset3DView();
-  }
   if (action === "set-layer-mode") {
+    if (value === "high-detail" && !isOnline()) {
+      toast(t("High detail needs internet connection", "উচ্চ স্পষ্টতা দেখার জন্য ইন্টারনেট সংযোগ প্রয়োজন"));
+      return;
+    }
     layerMode = value;
-    if (value === "photo") {
-      activeDate = "2024-01-28";
-    } else {
+    if (value === "natural" || value === "ndvi") {
       activeDate = "2024-03-09";
     }
     repaint();
@@ -1310,12 +1315,7 @@ function fieldInput(el) {
   if (el.name === "layerOpacity") {
     layerOpacity = parseFloat(el.value);
     if (activeTileLayer) activeTileLayer.setOpacity(layerOpacity);
-    if (activePhotoOverlay) activePhotoOverlay.setOpacity(layerOpacity);
   }
-}
-
-function setViewMode(mode) {
-  viewMode = mode;
 }
 
 export {
@@ -1333,6 +1333,6 @@ export {
   filterOsmFeature,
   queryNdvi,
   projectWgs84ToUtm45N,
-  viewMode,
-  setViewMode,
+  getLayerMode,
+  setLayerMode,
 };
