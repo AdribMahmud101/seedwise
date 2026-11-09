@@ -98,7 +98,7 @@ test("tap popup loads NDMI lazily, retries failures, shares one fetch, and trans
     assert.equal((html.match(/POWER · ~50 km/g) || []).length, 2);
     assert.match(html, /◈ Estimated · Sentinel-2 L2A · NASA POWER · GPM IMERG/);
     assert.doesNotMatch(html, /Maxar|Observation date|Cell size|Surface wetness|undefined|NaN/);
-    const grid = popupMoisture.grids.find(g => g.siteId === site);
+    const grid = popupMoisture.grids.find(g => g.siteId === site && g.date === "2024-11-09");
     const ndmi = queryNdvi(grid, f.lat, f.lon);
     assert.ok(Number.isFinite(ndmi));
     assert.ok(html.includes(`${ndmi} · ${ndmi < 0 ? "Dry" : ndmi <= 0.2 ? "Moderate" : "Moist"}`));
