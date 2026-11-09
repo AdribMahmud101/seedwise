@@ -28,6 +28,7 @@ This folder reorganizes every spec, doc and prototype in the project into one st
 | 15 | [ui-ux-spec](15-ui-ux-spec.md) | **UI/UX rules every agent follows** — base UI kept, done checklist |
 | 16 | [nasa-data-by-route](16-nasa-data-by-route.md) | Which NASA data each screen uses, in easy words |
 | 17 | [open-data-access](17-open-data-access.md) | How to call each open-data API, tested live, with example URLs |
+| 18 | [field-map-stack](18-field-map-stack.md) | Field map stack: engines, imagery and data layers, features, pipeline, licences |
 
 ## Source keys
 
