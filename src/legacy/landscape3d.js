@@ -1,0 +1,430 @@
+/**
+ * LAND3D - 3D landscape of Mithapukur, Pirganj, and Gangachara.
+ * Lazy-loads MapLibre GL JS v5 only when scrolled into view (IntersectionObserver).
+ */
+import { t, truth } from "./ui.js";
+
+let maplibreLoading = null;
+let currentMap = null;
+let currentMode = "height"; // "height" | "photo"
+let observer = null;
+
+// The 3 pilot upazila pin locations and bilingual names
+const UPAZILAS = [
+  {
+    id: "gangachara",
+    en: "Gangachara",
+    bn: "গঙ্গাচড়া",
+    lng: 89.1955,
+    lat: 25.8538,
+  },
+  {
+    id: "mithapukur",
+    en: "Mithapukur",
+    bn: "মিঠাপুকুর",
+    lng: 89.2760,
+    lat: 25.5549,
+  },
+  {
+    id: "pirganj",
+    en: "Pirganj",
+    bn: "পীরগঞ্জ",
+    lng: 89.2732,
+    lat: 25.4100,
+  },
+];
+
+// Center & camera parameters
+const INITIAL_CAMERA = {
+  center: [89.25, 25.62],
+  zoom: 9.3,
+  pitch: 60,
+  bearing: -15,
+};
+
+function hasWebGL() {
+  try {
+    const canvas = document.createElement("canvas");
+    return Boolean(
+      window.WebGLRenderingContext &&
+        (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")),
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+function loadMapLibre() {
+  if (window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (maplibreLoading) return maplibreLoading;
+
+  maplibreLoading = new Promise((resolve, reject) => {
+    // Add CSS
+    if (!document.querySelector('link[href*="maplibre-gl.css"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "/assets/maplibre/maplibre-gl.css";
+      document.head.appendChild(link);
+    }
+    // Add Script
+    const script = document.createElement("script");
+    script.src = "/assets/maplibre/maplibre-gl.js";
+    script.async = true;
+    script.onload = () => resolve(window.maplibregl);
+    script.onerror = (err) => reject(new Error("Failed to load MapLibre GL JS: " + err));
+    document.head.appendChild(script);
+  });
+  return maplibreLoading;
+}
+
+export function landscapePanel() {
+  const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+  const photoDisabled = !isOnline;
+  const photoTitle = photoDisabled
+    ? t("Needs internet", "ইন্টারনেট প্রয়োজন")
+    : t("Esri World Imagery", "এসরি স্যাটেলাইট ছবি");
+
+  return `
+    <section class="panel landscape-panel" id="landscape-3d-panel">
+      <div class="panel-head">
+        <div>
+          <h2>${t("Your land in 3D", "আপনার এলাকা ত্রিমাত্রিকে")}</h2>
+          <p class="panel-sub">${t("Low green = where water collects · higher tan = drains first", "নিচু সবুজ = যেখানে পানি জমে · উঁচু বাদামি = আগে পানি নামে")}</p>
+        </div>
+      </div>
+      <div class="landscape-card">
+        <div class="landscape-viewport" id="landscape-container">
+          <div class="landscape-controls">
+            <div class="landscape-seg" role="group" aria-label="${t("Map style", "মানচিত্রের ধরন")}">
+              <button type="button" class="landscape-btn ${currentMode === "height" ? "active" : ""}" data-landscape-mode="height" style="min-height:44px;min-width:44px;">
+                ${t("Height colours", "উচ্চতার রঙ")}
+              </button>
+              <button type="button" class="landscape-btn ${currentMode === "photo" ? "active" : ""}" data-landscape-mode="photo" ${photoDisabled ? "disabled" : ""} title="${photoTitle}" style="min-height:44px;min-width:44px;">
+                ${t("Photo", "স্যাটেলাইট")}
+              </button>
+            </div>
+            <button type="button" class="landscape-btn icon-only" data-landscape-action="reset" title="${t("Reset view", "আগের দৃশ্য")}" aria-label="${t("Reset view", "আগের দৃশ্য")}" style="min-height:44px;min-width:44px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="landscape-overlay-bottom">
+            <div class="landscape-chip">
+              <span>${t("Height exaggerated 10× · NASADEM 30 m · includes trees", "উচ্চতা ১০ গুণ বর্ধিত · নাসা ডেম ৩০ মি · গাছপালা অন্তর্ভুক্ত")}</span>
+              <span class="badge-modeled">${t("MODELED", "মডেল")}</span>
+            </div>
+
+            <div class="landscape-legend" id="landscape-legend" style="${currentMode === 'photo' ? 'display:none;' : ''}">
+              <div class="landscape-legend-bar"></div>
+              <div class="landscape-legend-labels">
+                <span>${t("Lower", "নিচু")}</span>
+                <span>← →</span>
+                <span>${t("Higher", "উঁচু")}</span>
+              </div>
+            </div>
+          </div>
+
+          <noscript>
+            <div class="landscape-fallback">
+              ${t("JavaScript is required to display the 3D landscape.", "ত্রিমাত্রিক ল্যান্ডস্কেপ দেখতে জাভাস্ক্রিপ্ট প্রয়োজন।")}
+            </div>
+          </noscript>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+export function initLandscapeObserver() {
+  const container = document.getElementById("landscape-container");
+  if (!container) return;
+
+  if (!hasWebGL()) {
+    container.innerHTML = `
+      <div class="landscape-fallback">
+        <p><strong>${t("3D terrain preview unavailable", "ত্রিমাত্রিক ভূপ্রকৃতি প্রিভিউ অনুপলব্ধ")}</strong></p>
+        <p>${t("Your browser or device does not support WebGL hardware acceleration.", "আপনার ব্রাউজার বা ডিভাইসে WebGL সমর্থন নেই।")}</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (currentMap) {
+    // Already initialized
+    return;
+  }
+
+  // Lazy-load ONLY when the panel scrolls into view (IntersectionObserver)
+  if (typeof IntersectionObserver !== "undefined") {
+    if (observer) observer.disconnect();
+    observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          observer.disconnect();
+          observer = null;
+          setupMap(container);
+          break;
+        }
+      }
+    }, { rootMargin: "100px" });
+    observer.observe(container);
+  } else {
+    setupMap(container);
+  }
+}
+
+async function setupMap(container) {
+  try {
+    const maplibregl = await loadMapLibre();
+    if (!container || !container.isConnected) return;
+
+    // Filter upazila outlines from rangpur_upazilas.geojson
+    let upazilasGeojson = { type: "FeatureCollection", features: [] };
+    try {
+      const res = await fetch("/data/rangpur_upazilas.geojson");
+      if (res.ok) {
+        const full = await res.json();
+        const targets = ["mitha pukur", "pirganj", "gangachara"];
+        upazilasGeojson.features = full.features.filter((f) =>
+          targets.includes((f.properties?.name || "").toLowerCase()),
+        );
+      }
+    } catch (e) {
+      // offline fallback
+    }
+
+    const startCamera = {
+      center: INITIAL_CAMERA.center,
+      zoom: INITIAL_CAMERA.zoom - 1.2,
+      pitch: 30,
+      bearing: 0,
+    };
+
+    const map = new maplibregl.Map({
+      container: container,
+      style: {
+        version: 8,
+        sources: {
+          "terrain-dem": {
+            type: "raster-dem",
+            encoding: "terrarium",
+            tiles: ["/landscape/dem/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            minzoom: 8,
+            maxzoom: 12,
+          },
+          "color-tiles": {
+            type: "raster",
+            tiles: ["/landscape/color/{z}/{x}/{y}.webp"],
+            tileSize: 256,
+            minzoom: 8,
+            maxzoom: 12,
+          },
+          "esri-photo": {
+            type: "raster",
+            tiles: [
+              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            ],
+            tileSize: 256,
+            maxzoom: 18,
+            attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
+          },
+          "rivers": {
+            type: "geojson",
+            data: "/data/landscape-rivers.geojson",
+          },
+          "upazila-bounds": {
+            type: "geojson",
+            data: upazilasGeojson,
+          },
+        },
+        layers: [
+          {
+            id: "color-layer",
+            type: "raster",
+            source: "color-tiles",
+            layout: {
+              visibility: currentMode === "height" ? "visible" : "none",
+            },
+          },
+          {
+            id: "photo-layer",
+            type: "raster",
+            source: "esri-photo",
+            layout: {
+              visibility: currentMode === "photo" ? "visible" : "none",
+            },
+          },
+          {
+            id: "rivers-layer",
+            type: "line",
+            source: "rivers",
+            paint: {
+              "line-color": "#38bdf8",
+              "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.2, 12, 3],
+              "line-opacity": 0.85,
+            },
+          },
+          {
+            id: "upazila-lines",
+            type: "line",
+            source: "upazila-bounds",
+            paint: {
+              "line-color": "#ffffff",
+              "line-width": 1.5,
+              "line-opacity": 0.9,
+              "line-dasharray": [3, 2],
+            },
+          },
+        ],
+        sky: {
+          "sky-color": "#18261e",
+          "sky-horizon-blend": 0.5,
+          "horizon-color": "#8ba895",
+          "horizon-fog-blend": 0.7,
+          "fog-color": "#4a6352",
+          "fog-ground-blend": 0.6,
+        },
+        terrain: {
+          source: "terrain-dem",
+          exaggeration: 10,
+        },
+      },
+      center: startCamera.center,
+      zoom: startCamera.zoom,
+      pitch: startCamera.pitch,
+      bearing: startCamera.bearing,
+      maxPitch: 75,
+      dragRotate: true,
+      touchPitch: true,
+      attributionControl: false,
+    });
+
+    currentMap = map;
+
+    // Add upazila HTML pin labels
+    map.on("load", () => {
+      UPAZILAS.forEach((up) => {
+        const el = document.createElement("div");
+        el.className = "landscape-pin";
+        el.innerHTML = `
+          <div class="landscape-pin-tag">
+            <span>${up.en}</span>
+            <small>${up.bn}</small>
+          </div>
+          <div class="landscape-pin-point"></div>
+        `;
+        new maplibregl.Marker({ element: el, anchor: "bottom" })
+          .setLngLat([up.lng, up.lat])
+          .addTo(map);
+      });
+
+      // Fly-in animation (2 s)
+      const prefersReducedMotion =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (!prefersReducedMotion) {
+        map.flyTo({
+          center: INITIAL_CAMERA.center,
+          zoom: INITIAL_CAMERA.zoom,
+          pitch: INITIAL_CAMERA.pitch,
+          bearing: INITIAL_CAMERA.bearing,
+          duration: 2000,
+          essential: true,
+        });
+      } else {
+        map.jumpTo(INITIAL_CAMERA);
+      }
+    });
+
+    // Wire segmented control & reset button
+    container.addEventListener("click", (e) => {
+      const modeBtn = e.target.closest("[data-landscape-mode]");
+      if (modeBtn) {
+        const mode = modeBtn.dataset.landscapeMode;
+        setLandscapeMode(mode);
+        return;
+      }
+      const resetBtn = e.target.closest("[data-landscape-action='reset']");
+      if (resetBtn) {
+        resetLandscapeView();
+        return;
+      }
+    });
+
+    // Update online / offline status dynamically
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+  } catch (err) {
+    console.error("MapLibre setup error:", err);
+  }
+}
+
+export function setLandscapeMode(mode) {
+  currentMode = mode;
+  // Update buttons
+  const buttons = document.querySelectorAll("[data-landscape-mode]");
+  buttons.forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.landscapeMode === mode);
+  });
+  // Update legend visibility
+  const legend = document.getElementById("landscape-legend");
+  if (legend) {
+    legend.style.display = mode === "photo" ? "none" : "";
+  }
+  // Update map layers
+  if (currentMap && currentMap.isStyleLoaded()) {
+    currentMap.setLayoutProperty(
+      "color-layer",
+      "visibility",
+      mode === "height" ? "visible" : "none",
+    );
+    currentMap.setLayoutProperty(
+      "photo-layer",
+      "visibility",
+      mode === "photo" ? "visible" : "none",
+    );
+  }
+}
+
+export function resetLandscapeView() {
+  if (currentMap) {
+    currentMap.flyTo({
+      ...INITIAL_CAMERA,
+      duration: 1000,
+    });
+  }
+}
+
+function updateOnlineStatus() {
+  const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+  const photoBtn = document.querySelector('[data-landscape-mode="photo"]');
+  if (photoBtn) {
+    photoBtn.disabled = !isOnline;
+    photoBtn.title = !isOnline
+      ? t("Needs internet", "ইন্টারনেট প্রয়োজন")
+      : t("Esri World Imagery", "এসরি স্যাটেলাইট ছবি");
+    if (!isOnline && currentMode === "photo") {
+      setLandscapeMode("height");
+    }
+  }
+}
+
+export function disposeLandscape() {
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  if (currentMap) {
+    try {
+      currentMap.remove();
+    } catch (e) {}
+    currentMap = null;
+  }
+  window.removeEventListener("online", updateOnlineStatus);
+  window.removeEventListener("offline", updateOnlineStatus);
+}
