@@ -11,6 +11,8 @@
 | Administrative boundaries | geoBoundaries gbOpen BGD ADM3, release 9469f09, BBS / OCHA ROAP. CC BY 3.0 IGO. Rangpur geometry was supplied in the original Ropon Radar package. |
 | Map engine | Leaflet 1.9.4, BSD 2-Clause. Copyright Vladimir Agafonkin and contributors. |
 | Fonts | IBM Plex Sans and Mono, Fraunces and Noto Sans Bengali. SIL Open Font License 1.1. Self-hosted files supplied with the original project. |
+| Sentinel-1 SAR water and ponding | Sentinel-1 RTC (Interferometric Wide Swath, Radiometric Terrain Corrected backscatter) from European Space Agency (ESA) Copernicus Programme, accessed through Microsoft Planetary Computer. Backscatter grids (VV, VH in dB) and ponding water masks (VV < -18 dB) for pilot fields across 2024 seasons. Source, item IDs, spatial bounds, and retrieval receipts preserved in `public/data/s1-water.json`. |
+| Soil nutrients (P, K, Zn, B, pH, OM, N, S) | Soil Resource Development Institute (SRDI) *Upazila Nirdeshika* (Land and Soil Resource Utilization Guide) for Mithapukur, Pirganj, and Gangachara Upazilas (Ministry of Agriculture, Bangladesh), and Bangladesh Agricultural Research Council (BARC) Fertilizer Recommendation Guide 2018 (FRG-2018) soil test interpretation thresholds. Data and citations preserved in `public/data/soil-nutrients.json`. |
 | Original Ropon Radar | Apache-2.0. Original color and type direction, fonts and district geometry were retained. The synthetic environmental demo generator is excluded. |
 
 
