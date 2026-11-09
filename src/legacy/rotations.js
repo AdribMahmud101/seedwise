@@ -26,6 +26,12 @@ import {
 import { rotationEvidence } from './engine.js';
 import { setPlantCrop } from './planner.js';
 
+// Studio 3D integration state
+let studioOpened = false;
+let studioModule = null;
+let activeRotationId = null;
+let studioDataModule = null;
+
 const priorities = [
   ['water', 'Water saving', 'পানি সাশ্রয়', 'water'],
   ['soil', 'Soil protection', 'মাটি সুরক্ষা', 'clinic'],
@@ -65,6 +71,33 @@ function ranking() {
   if (!f?.monthly || !f.monthly.length) return [];
   return rotationEvidence(f.monthly, state.weights, profile());
 }
+
+function getSelectedRotationId() {
+  if (activeRotationId) return activeRotationId;
+  const items = ranking();
+  return items.length > 0 ? items[0].id : 'mustard';
+}
+
+function posterCard() {
+  return `<section class="studio-poster" id="studio-poster-root">
+    <div class="studio-poster-inner">
+      <div class="studio-poster-badge">✦ ${t("Interactive 3D Field", "ইন্টারেক্টিভ ৩ডি জমি")}</div>
+      <h2>${t("Your field, season by season", "আপনার জমি, মৌসুম ধরে ধরে")}</h2>
+      <p class="studio-poster-desc">${t("Watch real crops grow on your plot with 3D soil cutaway, root depth and NASA/Sentinel environmental observations.", "মাটির গভীরতা, ফসলের শিকড় ও নাসার তথ্যের সাথে আপনার জমিতে ফসলচক্রের বাস্তব দৃশ্য দেখুন।")}</p>
+      <div class="studio-poster-actions">
+        <button class="button primary" data-action="open-studio3d">${t("Open 3D studio", "৩ডি স্টুডিও খুলুন")}</button>
+        <span class="studio-poster-note">${t("3D · ~180 KB · then works offline", "৩ডি · ~১৮০ কেবি · এরপর অফলাইনেও চলবে")}</span>
+      </div>
+    </div>
+    <div class="studio-poster-art" aria-hidden="true">
+      <div class="art-field-block">
+        <div class="art-field-top"></div>
+        <div class="art-field-side"></div>
+      </div>
+    </div>
+  </section>`;
+}
+
 function rankedCards() {
   const f = field();
   if (!f?.monthly || !f.monthly.length) {
@@ -85,7 +118,7 @@ function rankedCards() {
  ${r.issues.length ? `<div class="rotation-warning">${tag(t('Needs review', 'যাচাই দরকার'), 'amber')} ${r.issues.map((v) => esc(t(v, issueBn[v]))).join(' ')}</div>` : ''}
  <details class="disclosure"><summary>${t('See the evidence and score breakdown', 'প্রমাণ ও স্কোরের হিসাব দেখুন')}</summary><p>${t('Screening water gap under 2024 weather', '২০২৪ সালের আবহাওয়ায় আনুমানিক পানির ঘাটতি')} <b>${num(r.deficit, 0)} mm ${truth('MODELED', { source: 'IMERG/POWER FAO-56', date: '2024' })}</b>. ${t('Trial irrigation totals', 'গবেষণায় মোট সেচ')} ${study.referenceIrrigationMm ? `${study.referenceIrrigationMm.join('–')} mm ${truth('MODELED', { source: 'Trial observations' })}` : t('unreported for this sequence', 'এই চক্রের তথ্য নেই')}. ${sources(study.sourceIds)}</p>
  <div class="mini-contributions">${priorities.map(([key, en, bn]) => `<span>${t(en, bn)} <b>${sum ? num((100 * r.benefits[key] * state.weights[key]) / sum, 1) : '—'} ${sum ? truth('SCENARIO') : ''}</b></span>`).join('')}</div></details>
- <div class="rotation-bottom"><span>${tag(r.feasible ? t('Fits entered constraints', 'শর্তে মানানসই') : t('Conditional', 'শর্তসাপেক্ষ'), r.feasible ? 'green' : 'amber')}</span><div class="toolbar-inline">${button(saved ? t('Update saved plan', 'পরিকল্পনা হালনাগাদ') : t('Save plan', 'সংরক্ষণ'), 'save-rotation', 'small', 'save', r.id)}${button(t('Plan planting', 'বপন সাজান'), 'layout-for', 'small', 'right', r.id)}</div></div></article>`;
+ <div class="rotation-bottom"><span>${tag(r.feasible ? t('Fits entered constraints', 'শর্তে মানানসই') : t('Conditional', 'শর্তসাপেক্ষ'), r.feasible ? 'green' : 'amber')}</span><div class="toolbar-inline">${button(t('Preview in 3D', '৩ডি-তে দেখুন'), 'preview-3d', 'small ghost', 'search', r.id)}${button(saved ? t('Update saved plan', 'পরিকল্পনা হালনাগাদ') : t('Save plan', 'সংরক্ষণ'), 'save-rotation', 'small', 'save', r.id)}${button(t('Plan planting', 'বপন সাজান'), 'layout-for', 'small', 'right', r.id)}</div></div></article>`;
     })
     .join('');
 }
@@ -109,11 +142,91 @@ function rotations() {
         )
     ) +
     chips() +
+    `<div id="studio-3d-host">${posterCard()}</div>` +
     `<div class="priority-layout"><section class="panel priority-box"><div class="panel-header"><h2>${t('My priorities', 'আমার অগ্রাধিকার')}</h2></div><div class="panel-body">${priorities.map(([key, en, bn, symbol]) => `<div class="priority-item"><label for="weight-${key}">${icon(symbol, 15)} ${t(en, bn)} <span class="count" id="value-${key}">${num(state.weights[key])}</span></label><input id="weight-${key}" data-weight="${key}" type="range" min="0" max="5" value="${state.weights[key]}"></div>`).join('')}<div class="preset-row">${button(t('Balanced', 'সমান'), 'preset', 'small', '', 'balanced')}${button(t('Save water', 'পানি বাঁচাই'), 'preset', 'small', '', 'water')}</div><p class="priority-note note">${t('0 means ignore. 5 gives a goal the greatest weight. If all are zero, scores stay blank.', '০ মানে এই লক্ষ্য বাদ। ৫ সবচেয়ে বেশি গুরুত্ব। সব ০ হলে স্কোর ফাঁকা থাকে।')}</p></div><div class="panel-body priority-context"><div class="eyebrow">${t('Field assumptions', 'জমির অনুমান')}</div><p>${t('Aman harvest', 'আমন কাটা')} <strong>${esc(p.harvest)}</strong></p><p>${t('Flood delay', 'বন্যায় দেরি')} <strong>${num(p.floodDays)} d ${truth('FARMER_REPORTED')}</strong></p><button class="text-link" data-action="score-method">${t('How scoring works', 'স্কোরের পদ্ধতি')}</button></div></section>
  <div><div class="ranking-label"><span class="eyebrow">${t('Four rotation scenarios', 'চারটি ফসলচক্র')}</span><span class="note">${t('Fit points, out of 100', 'মোট ১০০ পয়েন্ট')}</span></div><div id="rotation-list">${rankedCards()}</div></div></div>
  ${saved.length ? `<div class="section-space">${panel(t('Saved to this field', 'এই জমির সংরক্ষিত পরিকল্পনা'), saved.map((s) => `<div class="saved-plan"><span><b>${esc(s.crops)}</b> · ${num(s.score)} / 100 ${truth('SCENARIO')} <small>${esc(s.savedAt.slice(0, 10))}</small></span>${button(t('Export', 'রপ্তানি'), 'export-plan', 'small', 'download', s.rotation)}</div>`).join(''))}</div>` : ''}`
   );
 }
+
+/**
+ * Lazy load studio3d and studiodata modules
+ */
+async function loadStudio3dModules() {
+  if (!studioModule) {
+    studioModule = await import('./studio3d.js');
+  }
+  if (!studioDataModule) {
+    studioDataModule = await import('./studiodata.js');
+  }
+  return { studioModule, studioDataModule };
+}
+
+/**
+ * Open 3D Studio and mount to DOM
+ */
+export async function openStudio3d() {
+  studioOpened = true;
+  const host = document.querySelector('#studio-3d-host');
+  if (!host) return;
+
+  const f = field();
+  const rotId = getSelectedRotationId();
+
+  try {
+    const { studioModule, studioDataModule } = await loadStudio3dModules();
+    const studioData = studioDataModule.buildStudioData({
+      fieldId: f?.id,
+      rotationId: rotId,
+      custom: f?.custom,
+    });
+
+    host.innerHTML = studioModule.studio3dHtml(studioData, state.month || 0);
+    await studioModule.mountStudio3d(host, studioData);
+  } catch (err) {
+    console.error("Failed to load studio3d:", err);
+    host.innerHTML = `<div class="studio-fallback-msg">${t("Failed to load 3D studio.", "৩ডি স্টুডিও লোড হতে সমস্যা হয়েছে।")}</div>`;
+  }
+}
+
+/**
+ * Lifecycle hook called on page render for rotations
+ */
+export function mountRotations() {
+  if (studioOpened) {
+    openStudio3d();
+    return;
+  }
+
+  // Desktop (>= 1024px, no saveData) auto-opens when scrolled into view
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+  const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData;
+
+  if (isDesktop && !saveData && 'IntersectionObserver' in window) {
+    const poster = document.querySelector('#studio-poster-root');
+    if (poster) {
+      const obs = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          openStudio3d();
+        }
+      }, { threshold: 0.1 });
+      obs.observe(poster);
+    }
+  }
+}
+
+/**
+ * Lifecycle hook called when leaving rotations page
+ */
+export function disposeRotations() {
+  studioOpened = false;
+  activeRotationId = null;
+  if (studioModule?.disposeStudio3d) {
+    studioModule.disposeStudio3d();
+  }
+}
+
 function method() {
   modal(
     t('How the fit score works', 'স্কোর কীভাবে হয়'),
@@ -121,6 +234,14 @@ function method() {
   );
 }
 function rotationAction(action, value) {
+  if (action === 'open-studio3d') {
+    openStudio3d();
+  }
+  if (action === 'preview-3d') {
+    activeRotationId = value;
+    openStudio3d();
+    document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth' });
+  }
   if (action === 'preset') {
     state.weights =
       value === 'water'
@@ -187,4 +308,4 @@ function rotationInput(el) {
   }
 }
 
-export { rotations, rotationAction, rotationInput };
+export { rotations, rotationAction, rotationInput, posterCard };

@@ -26,7 +26,13 @@ import {
   fieldSubmit,
   searchResults,
 } from "./fields.js";
-import { rotations, rotationAction, rotationInput } from "./rotations.js";
+import {
+  rotations,
+  rotationAction,
+  rotationInput,
+  mountRotations,
+  disposeRotations,
+} from "./rotations.js";
 import {
   planner,
   drawPlanner,
@@ -91,6 +97,11 @@ function render() {
  <main class="main" id="main-content" tabindex="-1">${current[3]()}<footer class="workspace-foot"><span>ROPON RADAR &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();
+  if (current[0] === "rotations") {
+    mountRotations();
+  } else {
+    disposeRotations();
+  }
   if (current[0] === "water") {
     initLandscapeObserver();
   } else {
