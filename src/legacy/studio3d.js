@@ -1626,7 +1626,12 @@ function fitPerspective(data, close = false) {
 
   // Block fills ~70 % of the frame on 3D view; close-up pushes in closer.
   // Shift target down to center the block in the frame below the UI
-  const distance = close ? fit.distance * 0.72 : fit.distance * 0.92;
+  const isDesktop3d = !isPhone() && !close;
+  const distance = close
+    ? fit.distance * 0.72
+    : isDesktop3d
+      ? fit.distance * 0.92 * 1.3
+      : fit.distance * 0.92;
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
   const target = [fit.target[0], -depth * 0.45, fit.target[2]];
@@ -1637,6 +1642,13 @@ function fitPerspective(data, close = false) {
   );
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
+  if (isDesktop3d && canvasHostEl) {
+    const w = canvasHostEl.clientWidth || 600;
+    const h = canvasHostEl.clientHeight || 400;
+    cameraPersp.setViewOffset(w, h, (0.5 - 0.62) * w, (0.5 - 0.66) * h, w, h);
+  } else {
+    cameraPersp.clearViewOffset();
+  }
   cameraPersp.updateProjectionMatrix();
 
   controls.target.set(target[0], target[1], target[2]);
