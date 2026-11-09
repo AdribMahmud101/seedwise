@@ -1,0 +1,476 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-11-09T19:19:02.970288+00:00",
+  "source": "ISRIC SoilGrids 2.0 (250 m) & BARC Fertilizer Recommendation Guide 2018",
+  "sourceUrl": "https://rest.isric.org/soilgrids/v2.0/properties/query",
+  "standardReference": "BARC (2018). Fertilizer Recommendation Guide - 2018 (FRG-2018). Bangladesh Agricultural Research Council, Farmgate, Dhaka.",
+  "standardsUrl": "http://www.barc.gov.bd/",
+  "agency": "ISRIC - World Soil Information & Bangladesh Agricultural Research Council (BARC)",
+  "sites": {
+    "mithapukur": {
+      "siteId": "mithapukur",
+      "name": "Mithapukur",
+      "district": "Rangpur",
+      "upazila": "Mithapukur",
+      "aez": "AEZ-3 Tista Meander Floodplain",
+      "lat": 25.54,
+      "lon": 89.27,
+      "nutrients": {
+        "P": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "Modified Olsen / Bray & Kurtz",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "K": {
+          "value": null,
+          "unit": "meq/100g",
+          "method": "1.0 N NH4OAc extractable K",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "Zn": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "DTPA extractable Zn",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "B": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "Hot water soluble B (Azomethine-H)",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "pH": {
+          "value": null,
+          "unit": "pH",
+          "method": "1:2.5 soil-water suspension",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "N": {
+          "value": null,
+          "unit": "%",
+          "method": "Kjeldahl total N",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "OM": {
+          "value": null,
+          "unit": "%",
+          "method": "Walkley-Black wet oxidation * 1.724",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "S": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "0.15% CaCl2 extractable S",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        }
+      }
+    },
+    "pirganj": {
+      "siteId": "pirganj",
+      "name": "Pirganj",
+      "district": "Rangpur",
+      "upazila": "Pirganj",
+      "aez": "AEZ-3 Tista Meander Floodplain / AEZ-27 North Eastern Barind Tract",
+      "lat": 25.5,
+      "lon": 89.22,
+      "nutrients": {
+        "P": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "Modified Olsen / Bray & Kurtz",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "K": {
+          "value": null,
+          "unit": "meq/100g",
+          "method": "1.0 N NH4OAc extractable K",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "Zn": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "DTPA extractable Zn",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "B": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "Hot water soluble B (Azomethine-H)",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "pH": {
+          "value": null,
+          "unit": "pH",
+          "method": "1:2.5 soil-water suspension",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "N": {
+          "value": null,
+          "unit": "%",
+          "method": "Kjeldahl total N",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "OM": {
+          "value": null,
+          "unit": "%",
+          "method": "Walkley-Black wet oxidation * 1.724",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "S": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "0.15% CaCl2 extractable S",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        }
+      }
+    },
+    "gangachara": {
+      "siteId": "gangachara",
+      "name": "Gangachara",
+      "district": "Rangpur",
+      "upazila": "Gangachara",
+      "aez": "AEZ-2 Active Tista Floodplain / AEZ-3 Tista Meander Floodplain",
+      "lat": 25.85,
+      "lon": 89.2,
+      "nutrients": {
+        "P": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "Modified Olsen / Bray & Kurtz",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "K": {
+          "value": null,
+          "unit": "meq/100g",
+          "method": "1.0 N NH4OAc extractable K",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "Zn": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "DTPA extractable Zn",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "B": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "Hot water soluble B (Azomethine-H)",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "pH": {
+          "value": null,
+          "unit": "pH",
+          "method": "1:2.5 soil-water suspension",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "N": {
+          "value": null,
+          "unit": "%",
+          "method": "Kjeldahl total N",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "OM": {
+          "value": null,
+          "unit": "%",
+          "method": "Walkley-Black wet oxidation * 1.724",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        },
+        "S": {
+          "value": null,
+          "unit": "µg/g",
+          "method": "0.15% CaCl2 extractable S",
+          "class_id": null,
+          "class_en": null,
+          "class_bn": null,
+          "source": null,
+          "url": null,
+          "year": null,
+          "scale": null,
+          "truth": null,
+          "status": "no open source found",
+          "searched": [
+            "https://rest.isric.org/soilgrids/v2.0/properties/query",
+            "http://srdi.portal.gov.bd/"
+          ]
+        }
+      }
+    }
+  }
+}
