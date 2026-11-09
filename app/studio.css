@@ -1,4 +1,4 @@
-/* STUDIO2 · 3D Field Studio styles */
+/* STUDIO3 · 3D Field Studio styles */
 .studio-poster {
   margin: 18px 0 24px;
   background: linear-gradient(135deg, #1b3322 0%, #294c34 50%, #3e6b48 100%);
@@ -171,9 +171,11 @@
   text-align: left;
   font: inherit;
   font-size: 12px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  column-gap: 8px;
   align-items: center;
+  min-height: 44px;
   transition: all 0.15s ease;
 }
 
@@ -182,6 +184,37 @@
   border-color: #7b9367;
   border-left: 3px solid var(--green);
   font-weight: 600;
+}
+
+.studio-rot-rank {
+  font: 11px Mono, monospace;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.studio-rot-label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.studio-rot-label strong {
+  font-weight: inherit;
+  line-height: 1.3;
+}
+
+.studio-rot-label .note {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green);
+}
+
+.studio-rot-score {
+  font: 11px Mono, monospace;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 
 .studio-layers-radio {
@@ -205,6 +238,64 @@
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+.studio-terrain-tools {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.studio-terrain-tools label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.studio-terrain-tools output {
+  font: 12px Mono, monospace;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.studio-terrain-tools input[type="range"] {
+  width: 100%;
+  height: 24px;
+  cursor: pointer;
+}
+
+.studio-terrain-tools small {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Field observation panel */
+.studio-obs-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.studio-obs-label {
+  font-size: 12px;
+}
+
+.studio-obs-date {
+  font: 11px Mono, monospace;
+  color: var(--text-dim);
+}
+
+.studio-obs-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #233d2b;
 }
 
 /* Sparkline & observation */
@@ -233,7 +324,31 @@
 
 .sparkline-dot.active {
   fill: #e65100;
-  r: 4;
+  r: 5;
+}
+
+.sparkline-dates {
+  display: flex;
+  justify-content: space-between;
+  font: 10px Mono, monospace;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.studio-soil-summary {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.studio-soil-summary small {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.35;
 }
 
 /* Weather & shortfall */
@@ -285,17 +400,69 @@
 }
 
 .studio-stage-canvas-host {
-  flex: 1;
-  min-height: 440px;
+  flex: none;
+  height: clamp(480px, 64vh, 680px);
+  min-height: 0;
   position: relative;
-  background: #e8eee6;
+  overflow: hidden;
+  background: linear-gradient(180deg, #e9f0ec 0%, #f4f6ef 55%, #d7dccd 100%);
   outline: none;
 }
 
 .studio-stage-canvas-host canvas {
+  position: absolute;
+  inset: 0;
   width: 100% !important;
   height: 100% !important;
   display: block;
+}
+
+/* Soil-depth ruler shown when the block is cut away */
+.studio-depth-ticks {
+  position: absolute;
+  left: 16px;
+  top: 112px;
+  bottom: 92px;
+  width: 52px;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.studio-depth-ticks.visible,
+.studio-stage-canvas-host.show-depth-ticks .studio-depth-ticks {
+  opacity: 1;
+}
+
+.studio-depth-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: grid;
+  grid-template-columns: 16px auto auto;
+  align-items: center;
+  column-gap: 2px;
+  color: #4b3624;
+  font: 10px Mono, monospace;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.studio-depth-tick i {
+  display: block;
+  height: 1px;
+  background: #6b5138;
+}
+
+.studio-depth-tick b {
+  font-weight: 700;
+}
+
+.studio-depth-tick small {
+  font-size: 8px;
+  color: #6b5138;
 }
 
 /* Controls overlays on canvas */
@@ -366,13 +533,20 @@
   border-top: 12px solid #555555;
 }
 
-.studio-view-toggle {
+.studio-overlay-tl {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
+  top: 12px;
+  left: 64px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.studio-view-toggle {
   display: flex;
   gap: 4px;
-  z-index: 5;
   background: rgba(255, 255, 255, 0.92);
   padding: 3px;
   border-radius: 4px;
@@ -410,28 +584,34 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
 }
 
 .studio-cutaway-bar input[type="range"] {
-  width: 90px;
+  width: 120px;
+  min-width: 90px;
   height: 24px;
   cursor: pointer;
 }
 
+.studio-cutaway-note {
+  font: 11px Mono, monospace;
+  color: var(--text-dim);
+}
+
 /* Surroundings toggle */
 .studio-surround-bar {
-  position: absolute;
-  top: 12px;
-  left: 64px;
-  z-index: 5;
   background: rgba(255, 255, 255, 0.92);
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 4px;
   border: 1px solid var(--line);
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  min-height: 36px;
+  cursor: pointer;
 }
 
 /* Loading overlay */
@@ -559,8 +739,11 @@
     order: 1;
   }
   .studio-stage-canvas-host {
-    height: clamp(340px, 60svh, 560px);
-    min-height: 340px;
+    /* Leave room for the top-left overlays (view toggle + surroundings) and the
+       bottom cutaway bar so none of them overlap. */
+    height: clamp(360px, 60svh, 560px);
+    min-height: 360px;
+    padding-bottom: 60px;
   }
   .studio-rail {
     order: 2;
@@ -569,5 +752,40 @@
     border-right: none;
     border-top: 1px solid var(--line);
     padding: 12px;
+  }
+  .studio-overlay-tl {
+    left: 64px;
+    right: 64px;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .studio-cutaway-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    justify-content: center;
+  }
+  .studio-cutaway-bar input[type="range"] {
+    flex: 1;
+    width: auto;
+  }
+  .studio-stage-controls {
+    top: 64px;
+    right: 12px;
+  }
+  .studio-view-btn {
+    min-height: 44px;
+    padding: 4px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .studio-surround-bar {
+    min-height: 44px;
+  }
+  .studio-depth-ticks {
+    top: 130px;
+    bottom: 104px;
+    left: 12px;
+    width: 44px;
   }
 }

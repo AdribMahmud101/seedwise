@@ -182,6 +182,23 @@ async function loadStudio3dModules() {
 }
 
 /**
+ * Build the picker options the studio shows in the left rail, ranked and scored.
+ */
+function rotationOptionsFor(activeId) {
+  const items = ranking();
+  const fallback = [
+    { id: 'baseline', label: 'Keep the familiar rhythm', bn: 'পরিচিত ফসলচক্র' },
+    { id: 'mustard', label: 'Make the winter gap count', bn: 'শীতের ফাঁকে সরিষা' },
+    { id: 'potato', label: 'Plan for a potato harvest', bn: 'আলুর মৌসুম পরিকল্পনা' },
+    { id: 'legume', label: 'Bring a pulse into the cycle', bn: 'ফসলচক্রে ডাল যোগ করুন' },
+  ];
+  const source = items.length
+    ? items.map((r) => ({ id: r.id, label: r.label, bn: r.bn, score: r.score, feasible: r.feasible }))
+    : fallback;
+  return source.map((r) => ({ ...r, active: r.id === activeId }));
+}
+
+/**
  * Open 3D Studio and mount to DOM
  */
 export async function openStudio3d() {
@@ -204,8 +221,16 @@ export async function openStudio3d() {
       boundary: state.boundaries[f.id] ? 'farmer' : 'traced',
     });
 
-    host.innerHTML = studioModule.studio3dHtml(studioData, state.month || 0);
-    await studioModule.mountStudio3d(host, studioData);
+    const opts = {
+      rotations: rotationOptionsFor(rotId),
+      onRotationSelect: (id) => {
+        if (id === activeRotationId) return;
+        activeRotationId = id;
+        openStudio3d();
+      },
+    };
+    host.innerHTML = studioModule.studio3dHtml(studioData, state.month || 0, opts);
+    await studioModule.mountStudio3d(host, studioData, opts);
   } catch (err) {
     console.error("Failed to load studio3d:", err);
     host.innerHTML = `<div class="studio-fallback-msg">${t("Failed to load 3D studio.", "৩ডি স্টুডিও লোড হতে সমস্যা হয়েছে।")}</div>`;
