@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "source": "ISRIC SoilGrids 2.0 (250 m), mean predictions",
+  "url": "https://soilgrids.org/",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "retrievedAt": "2026-11-09T11:27:36.306285+00:00",
+  "statistic": "mean",
+  "unitsReference": "https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_01.html",
+  "textureReference": "https://www.nrcs.usda.gov/resources/education-and-teaching-materials/soil-texture-calculator",
+  "note": "Modeled 250 m soil properties, not field measurements. Texture uses normalized fine-earth fractions. Failed sites are null.",
+  "sites": {
+    "mithapukur": {
+      "source": "ISRIC SoilGrids 2.0 (250 m), mean predictions",
+      "cellM": 250,
+      "lat": 25.54,
+      "lon": 89.27,
+      "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+      "layers": [
+        {
+          "topCm": 0,
+          "bottomCm": 5,
+          "clayPct": 35.3,
+          "sandPct": 25.9,
+          "siltPct": 38.8,
+          "socGkg": 17.3,
+          "ph": 6.1,
+          "bulkDensity": 1.31,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 5,
+          "bottomCm": 15,
+          "clayPct": 36.3,
+          "sandPct": 25.0,
+          "siltPct": 38.7,
+          "socGkg": 13.5,
+          "ph": 6.1,
+          "bulkDensity": 1.35,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 15,
+          "bottomCm": 30,
+          "clayPct": 34.1,
+          "sandPct": 25.8,
+          "siltPct": 40.1,
+          "socGkg": 11.6,
+          "ph": 6.2,
+          "bulkDensity": 1.4,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 30,
+          "bottomCm": 60,
+          "clayPct": 31.4,
+          "sandPct": 26.5,
+          "siltPct": 42.1,
+          "socGkg": 10.7,
+          "ph": 6.4,
+          "bulkDensity": 1.41,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 60,
+          "bottomCm": 100,
+          "clayPct": 31.9,
+          "sandPct": 27.4,
+          "siltPct": 40.6,
+          "socGkg": 9.8,
+          "ph": 6.4,
+          "bulkDensity": 1.42,
+          "textureClass": "clay loam"
+        }
+      ]
+    },
+    "pirganj": {
+      "source": "ISRIC SoilGrids 2.0 (250 m), mean predictions",
+      "cellM": 250,
+      "lat": 25.5,
+      "lon": 89.22,
+      "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+      "layers": [
+        {
+          "topCm": 0,
+          "bottomCm": 5,
+          "clayPct": 31.0,
+          "sandPct": 25.3,
+          "siltPct": 43.7,
+          "socGkg": 18.4,
+          "ph": 6.0,
+          "bulkDensity": 1.27,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 5,
+          "bottomCm": 15,
+          "clayPct": 31.3,
+          "sandPct": 24.8,
+          "siltPct": 43.9,
+          "socGkg": 12.6,
+          "ph": 6.1,
+          "bulkDensity": 1.33,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 15,
+          "bottomCm": 30,
+          "clayPct": 30.8,
+          "sandPct": 25.0,
+          "siltPct": 44.1,
+          "socGkg": 11.7,
+          "ph": 6.2,
+          "bulkDensity": 1.37,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 30,
+          "bottomCm": 60,
+          "clayPct": 30.8,
+          "sandPct": 24.2,
+          "siltPct": 45.0,
+          "socGkg": 9.3,
+          "ph": 6.4,
+          "bulkDensity": 1.4,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 60,
+          "bottomCm": 100,
+          "clayPct": 29.5,
+          "sandPct": 25.1,
+          "siltPct": 45.4,
+          "socGkg": 10.2,
+          "ph": 6.4,
+          "bulkDensity": 1.4,
+          "textureClass": "clay loam"
+        }
+      ]
+    },
+    "gangachara": {
+      "source": "ISRIC SoilGrids 2.0 (250 m), mean predictions",
+      "cellM": 250,
+      "lat": 25.85,
+      "lon": 89.2,
+      "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+      "layers": [
+        {
+          "topCm": 0,
+          "bottomCm": 5,
+          "clayPct": 29.0,
+          "sandPct": 32.8,
+          "siltPct": 38.1,
+          "socGkg": 19.5,
+          "ph": 5.8,
+          "bulkDensity": 1.29,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 5,
+          "bottomCm": 15,
+          "clayPct": 30.4,
+          "sandPct": 32.6,
+          "siltPct": 37.0,
+          "socGkg": 14.6,
+          "ph": 5.9,
+          "bulkDensity": 1.33,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 15,
+          "bottomCm": 30,
+          "clayPct": 30.3,
+          "sandPct": 31.9,
+          "siltPct": 37.8,
+          "socGkg": 13.3,
+          "ph": 6.0,
+          "bulkDensity": 1.4,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 30,
+          "bottomCm": 60,
+          "clayPct": 29.2,
+          "sandPct": 32.3,
+          "siltPct": 38.6,
+          "socGkg": 10.4,
+          "ph": 6.2,
+          "bulkDensity": 1.42,
+          "textureClass": "clay loam"
+        },
+        {
+          "topCm": 60,
+          "bottomCm": 100,
+          "clayPct": 29.1,
+          "sandPct": 33.2,
+          "siltPct": 37.7,
+          "socGkg": 11.3,
+          "ph": 6.2,
+          "bulkDensity": 1.43,
+          "textureClass": "clay loam"
+        }
+      ]
+    }
+  }
+}

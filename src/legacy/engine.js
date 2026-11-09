@@ -261,7 +261,9 @@ export function rankRotations(weights, options = {}) {
 }
 // Compare covered months using the same weather year and representative crop coefficients.
 // The calculation excludes storage, carryover, paddy seepage and application losses.
-export function rotationEvidence(monthly, weights, options) {
+export function monthlyRotationWater(monthly, rotationId) {
+  const strategy = STRATEGIES.find((s) => s.id === rotationId);
+  if (!strategy) throw new RangeError(`Unknown rotation: ${rotationId}`);
   const coefficients = {
     aman: 1.1,
     boro: 1.1,
@@ -270,13 +272,19 @@ export function rotationEvidence(monthly, weights, options) {
     pulse: 0.85,
     fallow: 0,
   };
+  return strategy.months.map((crop, i) => {
+    const m = monthly[i];
+    const needMm = finite(m?.et0) ? m.et0 * coefficients[crop] : null;
+    const shortfallMm = finite(needMm) && finite(m?.rainGpm)
+      ? Math.max(0, needMm - m.rainGpm * 0.65)
+      : null;
+    return { crop, needMm, shortfallMm };
+  });
+}
+export function rotationEvidence(monthly, weights, options) {
   const deficits = Object.fromEntries(
     STRATEGIES.map((s) => {
-      const monthlyDeficits = s.months.map((crop, i) => {
-        const m = monthly[i];
-        if (!m || !finite(m.et0) || !finite(m.rainGpm)) return null;
-        return Math.max(0, m.et0 * coefficients[crop] - m.rainGpm * 0.65);
-      });
+      const monthlyDeficits = monthlyRotationWater(monthly, s.id).map((m) => m.shortfallMm);
       return [
         s.id,
         monthlyDeficits.every(finite) ? sum(monthlyDeficits) : null,
