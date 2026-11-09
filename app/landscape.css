@@ -177,7 +177,7 @@
   height: 6px;
   width: 100%;
   border-radius: 3px;
-  background: linear-gradient(to right, rgb(34, 115, 60), rgb(115, 142, 65), rgb(205, 180, 125), rgb(235, 215, 175));
+  background: linear-gradient(to right, rgb(16, 76, 60), rgb(52, 112, 72), rgb(128, 140, 65), rgb(225, 198, 155));
 }
 
 .landscape-legend-labels {
@@ -199,6 +199,7 @@
 }
 
 .landscape-pin-tag {
+  font-family: Plex, Bangla, sans-serif;
   background: rgba(12, 20, 15, 0.92);
   color: #f8fafc;
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -212,6 +213,7 @@
 
 .landscape-pin-tag small {
   display: block;
+  font-family: Bangla, Plex, sans-serif;
   font-size: 11px;
   font-weight: 400;
   color: #94a3b8;

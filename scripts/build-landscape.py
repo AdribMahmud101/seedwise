@@ -205,13 +205,17 @@ def render_color_tile(elev_grid, cell_size_m):
     shaded = np.sin(altitude) * np.cos(slope) + np.cos(altitude) * np.sin(slope) * np.cos(azimuth - aspect)
     shaded = np.clip(shaded, 0.0, 1.0)
 
+    # 2nd to 98th percentile stretch of regional elevation
+    # In Rangpur pilot upazilas: 2nd percentile ~20m, 98th percentile ~41m
+    p2 = 20.0
+    p98 = 41.0
+    t = np.clip((smoothed - p2) / (p98 - p2), 0.0, 1.0)
+
     # Hypsometric ramp:
-    # deep green lowlands (13-20m) -> olive (25-32m) -> warm sand/tan high ground (38-55m)
-    # Range in pilot upazilas: 13m to 55m
-    t = np.clip((smoothed - 13.0) / (55.0 - 13.0), 0.0, 1.0)
-    r = np.interp(t, [0.0, 0.25, 0.65, 1.0], [34, 115, 205, 235])
-    g = np.interp(t, [0.0, 0.25, 0.65, 1.0], [115, 142, 180, 215])
-    b = np.interp(t, [0.0, 0.25, 0.65, 1.0], [60, 65, 125, 175])
+    # Lowlands: cool deep green / teal-green -> mid olive -> warm sand high ground
+    r = np.interp(t, [0.0, 0.30, 0.65, 1.0], [16, 52, 128, 225])
+    g = np.interp(t, [0.0, 0.30, 0.65, 1.0], [76, 112, 140, 198])
+    b = np.interp(t, [0.0, 0.30, 0.65, 1.0], [60, 72, 65, 155])
     rgb = np.stack([r, g, b], axis=-1)
 
     # Soft hillshade blend
@@ -312,8 +316,11 @@ out geom;'''
     features = []
     for el in d.get('elements', []):
         tags = el.get('tags', {})
-        name = tags.get('name', tags.get('name:en', tags.get('name:bn', '')))
-        waterway = tags.get('waterway', 'river')
+        name = tags.get('name', tags.get('name:en', tags.get('name:bn', ''))).strip()
+        waterway = tags.get('waterway', '')
+        # Review fix: Keep only OSM waterway=river with names (Teesta, Ghaghat, Karatoya, Jamuneswari, etc.)
+        if waterway != 'river' or not name:
+            continue
         if el['type'] == 'way':
             pts = [(p['lon'], p['lat']) for p in el.get('geometry', []) if 'lon' in p]
             simplified = simplify_line(pts, tol)
@@ -322,7 +329,7 @@ out geom;'''
                     'type': 'Feature',
                     'properties': {
                         'name': name,
-                        'waterway': waterway,
+                        'waterway': 'river',
                     },
                     'geometry': {
                         'type': 'LineString',
