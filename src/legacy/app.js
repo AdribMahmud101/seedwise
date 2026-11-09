@@ -68,7 +68,7 @@ function page() {
 function evidence() {
   modal(
     t("Evidence register", "তথ্যসূত্রের খাতা"),
-    `<p class="note">${t("Weather values are frozen to 2024. Each prepared field has a dated image and an illustrative boundary. The rotation scores combine these data with stated planning assumptions.", "আবহাওয়ার তথ্য ২০২৪ সালের। প্রতিটি স্থানে তারিখসহ ছবি ও নমুনা সীমানা আছে। এই তথ্যের সঙ্গে স্পষ্ট অনুমান মিলিয়ে ফসলচক্রের স্কোর হয়।")}</p>${[...earth.sources, ...agronomy.sources].map((s, i) => `<div class="source-row"><span class="source-no">${String(i + 1).padStart(2, "0")}</span><div><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name || s.title)} ↗</a><p>${esc(s.spatialSupport || s.method || s.locator || s.role || "")}</p></div></div>`).join("")}`,
+    `<p class="note">${t("Weather values are frozen to 2024. Each prepared field has a dated image and a boundary traced from the satellite photo. The rotation scores combine these data with stated planning assumptions.", "আবহাওয়ার তথ্য ২০২৪ সালের। প্রতিটি স্থানে তারিখসহ ছবি ও ছবি দেখে আঁকা সীমানা আছে। এই তথ্যের সঙ্গে স্পষ্ট অনুমান মিলিয়ে ফসলচক্রের স্কোর হয়।")}</p>${[...earth.sources, ...agronomy.sources].map((s, i) => `<div class="source-row"><span class="source-no">${String(i + 1).padStart(2, "0")}</span><div><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name || s.title)} ↗</a><p>${esc(s.spatialSupport || s.method || s.locator || s.role || "")}</p></div></div>`).join("")}`,
   );
 }
 function render() {

@@ -469,7 +469,9 @@ test("MAP5: layer switcher buttons, online/offline state, and SW excludes Esri t
   assert.ok(!htmlOnline.includes("2D map"), "No 2D map switch");
 
   // Attribution & chip text for high detail
-  assert.ok(htmlOnline.includes("Imagery © Esri, Maxar, Earthstar Geographics"), "Includes Esri attribution");
+  // Esri credit is shown by the map's own attribution control (static duplicate removed)
+  const fieldsSrc = (await import("node:fs")).readFileSync(new URL("../src/legacy/fields.js", import.meta.url), "utf8");
+  assert.ok(fieldsSrc.includes('attribution: "Imagery © Esri, Maxar, Earthstar Geographics"'), "Esri layer carries attribution");
   assert.ok(htmlOnline.includes("High-detail photo · Maxar · 28 Nov 2022 · online"), "Includes high detail chip");
 
   // Timeline shows only for Sentinel-2 layers, NOT high-detail

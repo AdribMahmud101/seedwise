@@ -654,7 +654,8 @@ small {
 .leaflet-bar a svg {
   display: block;
 }
-.corner-marker-handle {
+/* beats Leaflet's `.leaflet-marker-icon { display: block }` so the dot centres on the corner */
+.leaflet-marker-icon.corner-marker-handle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -825,11 +826,14 @@ small {
   border-bottom: 1px solid var(--line);
 }
 .net-area-edit {
-  padding: 2px 8px;
-  min-height: 0;
-  font-size: 11px;
-  margin-left: 6px;
+  /* 44px tap target without pushing the value below the neighbouring cell */
+  padding: 0 8px;
+  min-height: 44px;
+  margin: -16px 0 -16px 4px;
+  font-size: 12px;
   vertical-align: middle;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .field-recommend {
   padding: 18px 0;
@@ -2918,3 +2922,70 @@ dialog .modal-body {
 
 /* Zoom limit reached (High detail depth varies by place) */
 .map-shell a.leaflet-disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* Five observation tiles: one row on wide screens, no orphan tile elsewhere */
+@media (min-width: 1100px) {
+  .data-row:has(> .data-stat:nth-child(5)) {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+@media (min-width: 701px) and (max-width: 1099px) {
+  .data-row:has(> .data-stat:nth-child(5)) {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .data-row:has(> .data-stat:nth-child(5)) > .data-stat {
+    grid-column: span 2;
+  }
+  .data-row:has(> .data-stat:nth-child(5)) > .data-stat:nth-child(n + 4) {
+    grid-column: span 3;
+    border-top: 1px solid var(--line);
+  }
+  .data-row:has(> .data-stat:nth-child(5)) > .data-stat:nth-child(3) {
+    border-right: 0;
+  }
+}
+@media (max-width: 700px) {
+  .data-row > .data-stat:nth-child(5):last-child {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* Boundary editing bar */
+.draw-bar {
+  display: grid;
+  gap: 10px;
+}
+.draw-tip {
+  margin: 0;
+}
+.draw-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.draw-size-label {
+  font-weight: 600;
+}
+.draw-step {
+  min-width: 44px;
+  font-size: 18px;
+}
+.draw-size-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.draw-size-input input {
+  width: 84px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+  background: var(--surface);
+}
+.field-inspect-popup .leaflet-popup-content {
+  overscroll-behavior: contain;
+}

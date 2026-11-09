@@ -83,7 +83,7 @@ function boundaryAction(action, value) {
     delete state.boundaries[state.fieldId];
     persist();
     repaint();
-    toast(t('Boundary reset to demo outline', 'নমুনা সীমানায় ফিরে যাওয়া হয়েছে'));
+    toast(t('Outline reset', 'সীমানা আগের মতো করা হয়েছে'));
   }
   if (action === 'export-geometry' && measured) {
     const ring = measured.map(([lat, lon]) => [lon, lat]);

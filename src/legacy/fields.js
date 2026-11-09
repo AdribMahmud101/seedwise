@@ -122,7 +122,8 @@ let leafletMap = null,
   activeDate = "2024-11-09",
   layerOpacity = 0.6,
   showOsmContext = true,
-  tileErrorCount = 0;
+  tileErrorCount = 0,
+  lastView = null; // keeps pan/zoom across repaints of the same field
 
 const colors = {
   wetness: "#658261",
@@ -425,11 +426,13 @@ function setField(id) {
   drawMode = false;
   drawPoints = [];
   cornerMarkers = [];
+  lastView = null;
   persist();
   repaint();
 }
 function disposeMap() {
   if (leafletMap) {
+    lastView = { fieldId: state.fieldId, regional, center: leafletMap.getCenter(), zoom: leafletMap.getZoom() };
     leafletMap.off();
     leafletMap.remove();
     leafletMap = null;
@@ -438,8 +441,6 @@ function disposeMap() {
   activeBaseTileLayer = null;
   activeOsmLayer = null;
   drawLayer = null;
-  drawMode = false;
-  drawPoints = [];
   cornerMarkers = [];
 }
 function spark(values, color) {
@@ -684,25 +685,16 @@ function home() {
     ? truth("FARMER_REPORTED", { source: "Farmer boundary", date: "2024" })
     : f.custom
       ? truth("SCENARIO", { source: "New custom field", date: "2024" })
-      : truth("SCENARIO", { source: "Demo outline", date: "2024" });
+      : truth("MODELED", { source: "Traced on Maxar photo", date: "28 Nov 2022" });
   const boundaryLabel = state.boundaries[f.id]
     ? t("Farmer drawn", "কৃষকের আঁকা")
     : f.custom
       ? t("Initial ~20 decimals", "প্রাথমিক ~২০ শতক")
-      : t("Demo outline", "নমুনা সীমানা");
+      : t("Traced from photo", "ছবি দেখে আঁকা");
 
   // Legend HTML per active layer
   let legendHtml = "";
-  if (layerMode === "high-detail") {
-    legendHtml = `
-      <div class="map-legend-bar">
-        <strong>${t("High detail", "উচ্চ স্পষ্টতা")}</strong>
-        <div class="map-legend-items">
-          <span class="map-legend-item">${t("World Imagery © Esri, Maxar, Earthstar Geographics", "বিশ্ব উপগ্রহ চিত্র © এসরি, ম্যাক্সার")}</span>
-        </div>
-      </div>
-    `;
-  } else if (layerMode === "natural") {
+  if (layerMode === "natural") {
     legendHtml = `
       <div class="map-legend-bar">
         <strong>${t("Natural colour 10 m", "প্রাকৃতিক রং ১০ মি")}</strong>
@@ -789,9 +781,8 @@ function home() {
    ${truth("MODELED")}
  </div>` : ""}
  <div class="map-actions">
-   <span class="note">${chipHtml}</span>
    <div class="map-controls">
-     ${button(pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন"), "toggle-pick-map", `small ${pickMapMode ? "primary" : ""}`, "pin")}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}
+     ${button(pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন"), "toggle-pick-map", `small ${pickMapMode ? "primary" : ""}`, "pin")}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary && !drawMode ? button(t("Reset outline", "আগের সীমানা"), "reset-demo", "small ghost") : ""}
    </div>
  </div><div id="drawing-help"></div></section>
  <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${boundaryTruth}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(net.netHa)}">${num(net.netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${num(net.netHa * 247.105381, 1)} ${t("decimals", "শতক")}</small>${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
@@ -1135,6 +1126,8 @@ async function mountMap() {
   // Set initial map view before adding layers to guarantee valid renderer bounds
   if (regional) {
     current.setView([25.65, 89.25], 10);
+  } else if (lastView && lastView.fieldId === f.id && !lastView.regional) {
+    current.setView(lastView.center, lastView.zoom);
   } else if (poly && poly.getBounds().isValid()) {
     current.fitBounds(poly.getBounds(), { padding: [24, 24], maxZoom: fitMaxZoom });
   } else {
@@ -1393,14 +1386,15 @@ async function mountMap() {
       current.setView([25.65, 89.25], 10);
     }
   } else {
-    poly.bindTooltip(t("Demo plot", "নমুনা জমি"), {
+    poly.bindTooltip(fieldName(f), {
       direction: "center",
       permanent: false,
     });
   }
 
   if (drawMode) {
-    drawPoints = polygon().map((p) => [...p]);
+    if (!drawPoints.length) drawPoints = polygon().map((p) => [...p]);
+    syncPolyGeom(drawPoints);
     if (drawLayer) drawLayer.remove();
     drawLayer = L.polygon(drawPoints, {
       color: "#f6d879",
@@ -1440,7 +1434,7 @@ async function mountMap() {
           return;
         }
       }
-      drawPoints.push([lat, lng]);
+      drawPoints.splice(bestInsertIndex(drawPoints, [lat, lng]), 0, [lat, lng]);
       if (drawLayer) drawLayer.remove();
       drawLayer = L.polygon(drawPoints, {
         color: "#f6d879",
@@ -1458,20 +1452,64 @@ async function mountMap() {
     if (current !== leafletMap) return;
     const popupHtml = inspectPopup(f, lat, lng);
 
-    L.popup({ className: "field-inspect-popup", maxWidth: 280, closeButton: true })
+    const home = current.getCenter();
+    let autoPanned = false;
+    const onAutoPan = () => (autoPanned = true);
+    const onUserDrag = () => (autoPanned = false); // user moved the map: leave it where they put it
+    current.once("autopanstart", onAutoPan);
+    current.on("dragstart", onUserDrag);
+    L.popup({
+      className: "field-inspect-popup",
+      maxWidth: 280,
+      maxHeight: Math.max(180, el.clientHeight - 96),
+      autoPanPadding: [16, 16],
+      closeButton: true,
+    })
       .setLatLng(event.latlng)
       .setContent(popupHtml)
+      .on("remove", () => {
+        current.off("autopanstart", onAutoPan);
+        current.off("dragstart", onUserDrag);
+        if (autoPanned && current === leafletMap) current.panTo(home);
+      })
       .openOn(current);
   });
+}
+// Index at which inserting pt lengthens the outline least, so a tapped corner lands on the nearest edge.
+function bestInsertIndex(pts, pt) {
+  if (pts.length < 2) return pts.length;
+  const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  let best = pts.length, cost = Infinity;
+  pts.forEach((a, i) => {
+    const b = pts[(i + 1) % pts.length];
+    const c = d(a, pt) + d(pt, b) - d(a, b);
+    if (c < cost) [cost, best] = [c, i + 1];
+  });
+  return best;
+}
+// Scale an outline about its centre so its area changes by `factor` (shape kept).
+function scaleOutline(pts, factor) {
+  const k = Math.sqrt(factor);
+  const cLat = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+  const cLon = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  return pts.map(([la, lo]) => [cLat + (la - cLat) * k, cLon + (lo - cLon) * k]);
 }
 function updateDraw() {
   const help = document.querySelector("#drawing-help");
   if (!help) return;
   const currentAreaHa = polygonValid(drawPoints) ? areaHa(drawPoints) : 0;
   const areaLiveStr = currentAreaHa > 0 ? `<div style="margin: 6px 0; font-size: 13px;"><b>${t("Live area:", "বর্তমান আয়তন:")}</b> ${units(currentAreaHa)}</div>` : "";
+  const decimals = currentAreaHa * 247.105381;
   help.innerHTML = drawMode
-    ? `<div class="notice">${t("Drag corners or tap map to add. Tap a corner to remove.", "কোণ টেনে সরান বা মানচিত্রে চেপে যোগ করুন। মুছতে কোণে চাপুন।")} <b>${num(drawPoints.length)}</b> ${t("corners", "টি কোণ")} ${areaLiveStr}<div class="toolbar-inline">${button(t("Save boundary", "সীমানা সংরক্ষণ"), "finish-draw", "small primary")}${button(t("Enter corners", "কোণ লিখুন"), "coordinates", "small")}${button(t("Cancel", "বাতিল"), "cancel-draw", "small")}${drawPoints.length ? button(t("Undo corner", "শেষ কোণ বাদ"), "undo-corner", "small") : ""}${button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small")}</div></div>`
+    ? `<div class="notice draw-bar"><p class="draw-tip">${t("Drag a corner to reshape. Tap the map to add a corner on the nearest edge; tap a corner to remove it.", "কোণ টেনে আকার বদলান। মানচিত্রে চাপলে কাছের রেখায় নতুন কোণ বসবে; কোণে চাপলে মুছে যাবে।")}</p>
+<div class="draw-size"><span class="draw-size-label">${t("Size", "আয়তন")}</span>${button("−", "scale-boundary", "small draw-step", "", "0.95")}<label class="draw-size-input"><input id="boundary-size" type="number" inputmode="decimal" min="0.5" step="0.1" value="${decimals ? decimals.toFixed(1) : ""}" aria-label="${t("Field size in decimals", "জমির আয়তন শতকে")}"> ${t("decimals", "শতক")}</label>${button("+", "scale-boundary", "small draw-step", "", "1.05")}<span class="note">${num(currentAreaHa, 3)} ha · ${num(drawPoints.length)} ${t("corners", "টি কোণ")}</span></div>
+<div class="toolbar-inline">${button(t("Save boundary", "সীমানা সংরক্ষণ"), "finish-draw", "small primary")}${button(t("Cancel", "বাতিল"), "cancel-draw", "small")}${button(t("Enter corners", "কোণ লিখুন"), "coordinates", "small ghost")}${state.boundaries[state.fieldId] ? button(t("Reset outline", "আগের সীমানা"), "reset-demo", "small ghost") : ""}</div></div>`
     : "";
+  help.querySelector("#boundary-size")?.addEventListener("change", (e) => {
+    const target = Number(e.target.value);
+    if (!(target > 0) || !(decimals > 0)) return;
+    fieldAction("scale-boundary", String(target / decimals));
+  });
 }
 function searchModal() {
   modal(
@@ -1678,7 +1716,8 @@ function fieldAction(action, value) {
       regional = false;
     }
     drawMode = !drawMode;
-    if (!drawMode) {
+    if (drawMode) drawPoints = polygon().map((p) => [...p]);
+    else {
       drawPoints = [];
       if (drawLayer) drawLayer.remove();
       cornerMarkers.forEach((m) => m.remove());
@@ -1749,6 +1788,12 @@ function fieldAction(action, value) {
       loadCustomPower(f);
     }
   }
+  if (action === "scale-boundary") {
+    const factor = Number(value);
+    if (!drawMode || !(factor > 0) || drawPoints.length < 3) return;
+    drawPoints = scaleOutline(drawPoints, Math.min(Math.max(factor, 0.05), 20));
+    repaint();
+  }
   if (action === "undo-corner") {
     drawPoints.pop();
     if (drawPoints.length === 0) {
@@ -1765,7 +1810,7 @@ function fieldAction(action, value) {
     cornerMarkers = [];
     persist();
     repaint();
-    toast(t("Boundary reset to demo outline", "নমুনা সীমানায় ফিরে যাওয়া হয়েছে"));
+    toast(t("Outline reset", "সীমানা আগের মতো করা হয়েছে"));
   }
   if (action === "finish-draw") {
     if (!polygonValid(drawPoints)) {
@@ -1778,6 +1823,8 @@ function fieldAction(action, value) {
       return;
     }
     state.boundaries[state.fieldId] = drawPoints.slice();
+    drawMode = false;
+    drawPoints = [];
     persist();
     repaint();
     toast(
