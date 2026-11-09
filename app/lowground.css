@@ -1,5 +1,6 @@
 .leaflet-image-layer.low-ground-overlay {
   image-rendering: auto;
+  mix-blend-mode: normal;
 }
 
 [data-action="toggle-low-ground"] {
@@ -23,7 +24,7 @@
 .low-ground-swatch {
   flex: 0 0 12px;
   margin-top: 3px;
-  background: rgb(47 111 181 / 55%);
+  background: #1f6fd1;
 }
 
 .low-ground-description {

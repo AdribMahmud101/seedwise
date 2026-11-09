@@ -57,31 +57,44 @@ def relative_grid(elevation, radius):
                                      for v in row[max(0, x - radius):min(width, x + radius + 1)]])
             for x in range(width)
         ])
-    radius = math.ceil(3 * SIGMA)
-    weights = [math.exp(-i * i / (2 * SIGMA * SIGMA)) for i in range(-radius, radius + 1)]
+    return blur_grid(relative, SIGMA)
+
+
+def blur_grid(grid, sigma):
+    height, width = len(grid), len(grid[0])
+    radius = math.ceil(3 * sigma)
+    weights = [math.exp(-i * i / (2 * sigma * sigma)) for i in range(-radius, radius + 1)]
     total = sum(weights)
     weights = [w / total for w in weights]
     horizontal = [[sum(row[min(width - 1, max(0, x + k - radius))] * w
-                       for k, w in enumerate(weights)) for x in range(width)] for row in relative]
+                       for k, w in enumerate(weights)) for x in range(width)] for row in grid]
     return [[sum(horizontal[min(height - 1, max(0, y + k - radius))][x] * w
                  for k, w in enumerate(weights)) for x in range(width)] for y in range(height)]
 
 
-def alpha(value, edge):
-    fade = min(1, max(0, edge / 4))
-    fade = fade * fade * (3 - 2 * fade)
-    return round(255 * 0.55 * min(1, max(0, (-value - 1) / 3)) * fade)
+def alpha(value):
+    return 0 if value > -1 else 0.25 + 0.5 * min(1, (-value - 1) / 2)
 
 
 def write_png(path, grid):
     def chunk(kind, body):
         return struct.pack('>I', len(body)) + kind + body + struct.pack('>I', zlib.crc32(kind + body))
     size = len(grid)
+    # A one-cell rim on the low side of the contour makes each patch readable over photos.
+    rim = [[value <= -1 and any(
+        grid[min(size - 1, max(0, y + dy))][min(size - 1, max(0, x + dx))] > -1
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)))
+        for x, value in enumerate(row)] for y, row in enumerate(grid)]
+    opacity = blur_grid([[alpha(value) + (0.1 if rim[y][x] else 0)
+                          for x, value in enumerate(row)] for y, row in enumerate(grid)], 1)
     raw = bytearray()
     for y, row in enumerate(grid):
         raw.append(0)
         for x, value in enumerate(row):
-            raw.extend((47, 111, 181, alpha(value, min(x, y, size - 1 - x, size - 1 - y))))
+            fade = min(1, min(x, y, size - 1 - x, size - 1 - y) / 4)
+            fade = fade * fade * (3 - 2 * fade)
+            color = (95, 159, 237) if rim[y][x] else (31, 111, 209)
+            raw.extend((*color, round(255 * opacity[y][x] * fade)))
     body = b'\x89PNG\r\n\x1a\n'
     body += chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 8, 6, 0, 0, 0))
     body += chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
@@ -136,7 +149,9 @@ def main():
                source='NASADEM 30 m (NASA JPL), via Microsoft Planetary Computer; NASADEM_HGT_n25e089',
                method=dict(relativeElevation='elevation minus median in a ~1 km square; then Gaussian smoothing',
                            windowMetres=1000, sigmaCells=SIGMA, lowThresholdMetres=-1, highThresholdMetres=1,
-                           alpha='0 at -1 m; linear to 0.55 at <= -4 m; outer 4 cells feathered',
+                           color='#1f6fd1',
+                           alpha='0.25 at -1 m; linear to 0.75 at <= -3 m; Gaussian alpha blur sigma 1 cell; outer 4 cells feathered',
+                           rim='1 low-side cell at -1 m contour; #5f9fed; alpha +0.1',
                            grid='200x200, north to south; l: below -1 m, e: -1 to +1 m, h: above +1 m'),
                caveat='Approximate (30 m, includes trees and buildings). Relative surface height, not flood prediction or drainage advice.')
     body = json.dumps(doc, separators=(',', ':'), allow_nan=False) + '\n'
@@ -148,5 +163,5 @@ def main():
 
 
 if __name__ == '__main__':
-    assert alpha(-1, 10) == 0 and alpha(-4, 10) == 140 and alpha(-5, 0) == 0
+    assert alpha(-1) == 0.25 and alpha(-2) == 0.5 and alpha(-3) == alpha(-5) == 0.75
     main()
