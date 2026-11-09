@@ -460,7 +460,22 @@ function exampleBanner() {
   return `<div class="example-banner">${t("Example — not your field", "উদাহরণ — আপনার জমি নয়")}</div>`;
 }
 
+// Fetch JSON that may be a gzip pack (moisture-grid.json); null when missing or offline.
+async function fetchJsonMaybeGzip(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const body = bytes[0] === 0x1f && bytes[1] === 0x8b
+      ? new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))
+      : bytes;
+    return await new Response(body).json();
+  } catch {
+    return null;
+  }
+}
 export {
+  fetchJsonMaybeGzip,
   recordId,
   state,
   earth,

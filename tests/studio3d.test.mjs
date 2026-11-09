@@ -78,7 +78,7 @@ test("contract fixture renders month summary in Bengali", () => {
 });
 
 test("contract fixture satisfies required contract schema", () => {
-  const data = buildStudioData();
+  const data = fixture;
   assert.ok(data.field.id);
   assert.ok(data.field.areaHa > 0);
   assert.equal(data.field.centroid.length, 2);

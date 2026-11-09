@@ -22,7 +22,10 @@ import {
   download,
   timeline,
   stateEmpty,
+  polygon,
+  fetchJsonMaybeGzip,
 } from './ui.js';
+import { getCachedPower } from './powerlive.js';
 import { rotationEvidence } from './engine.js';
 import { setPlantCrop } from './planner.js';
 
@@ -149,6 +152,22 @@ function rotations() {
   );
 }
 
+let studioInputs = null;
+// Prepared-site layers for the studio; fetched once, only when the studio opens.
+async function loadStudioInputs() {
+  if (!studioInputs) {
+    const json = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const [ndviGrid, moistureGrid, lowGround, soilProfile] = await Promise.all([
+      json('data/ndvi-grid.json'),
+      fetchJsonMaybeGzip('data/moisture-grid.json'),
+      json('data/low-ground.json'),
+      json('data/soil-profile.json'),
+    ]);
+    studioInputs = { ndviGrid, moistureGrid, lowGround, soilProfile };
+  }
+  return studioInputs;
+}
+
 /**
  * Lazy load studio3d and studiodata modules
  */
@@ -176,9 +195,13 @@ export async function openStudio3d() {
   try {
     const { studioModule, studioDataModule } = await loadStudio3dModules();
     const studioData = studioDataModule.buildStudioData({
-      fieldId: f?.id,
+      field: f,
+      polygon: polygon(),
       rotationId: rotId,
-      custom: f?.custom,
+      agronomy,
+      ...(await loadStudioInputs()),
+      cachedPower: f?.custom ? getCachedPower(f.id) : null,
+      boundary: state.boundaries[f.id] ? 'farmer' : 'traced',
     });
 
     host.innerHTML = studioModule.studio3dHtml(studioData, state.month || 0);

@@ -38,6 +38,7 @@ import {
   truth,
   stateEmpty,
   stateError,
+  fetchJsonMaybeGzip,
 } from "./ui.js";
 import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
 import {
@@ -313,15 +314,8 @@ async function loadMoistureData() {
   if (!moistureGridLoading) {
     moistureGridLoading = (async () => {
       try {
-        const response = await fetch("data/moisture-grid.json");
-        if (response.ok) {
-          const bytes = new Uint8Array(await response.arrayBuffer());
-          // The full grid pack is gzip JSON to stay within the offline budget.
-          const body = bytes[0] === 0x1f && bytes[1] === 0x8b
-            ? new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))
-            : bytes;
-          moistureGridData = await new Response(body).json();
-        }
+        // The full grid pack is gzip JSON to stay within the offline budget.
+        moistureGridData = await fetchJsonMaybeGzip("data/moisture-grid.json");
       } catch {
         // Missing offline pack: show no reliable observation and allow another tap to retry.
       } finally {
