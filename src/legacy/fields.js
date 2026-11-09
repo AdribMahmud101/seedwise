@@ -787,7 +787,7 @@ async function mountMap() {
   function createHighDetailLayer() {
     const esriUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
     const layer = L.tileLayer(esriUrl, {
-      maxNativeZoom: 19,
+      maxNativeZoom: 18, // Esri has no Rangpur imagery at z19 ("Map data not yet available"); upscale z18
       maxZoom: 19,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
     });
