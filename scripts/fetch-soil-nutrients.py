@@ -231,7 +231,7 @@ def fetch_soilgrids(site_id: str, lat: float, lon: float) -> dict:
         url = SOILGRIDS_REST + '?' + urllib.parse.urlencode(params)
         
         try:
-            data = fetch_url(url, timeout=30)
+            data = fetch_url(url, timeout=15)
             result = json.loads(data)
             
             # Extract the value from the response
