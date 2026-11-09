@@ -6,8 +6,6 @@
 
 **Sentinel-2 map tiles.** Offline map tiles from Sentinel-2 Level-2A provide true-colour imagery at 10 m resolution from two acquisition dates. The tiles are accessed anonymously through Microsoft Planetary Computer, with scene IDs, processing baselines, product metadata, request patterns and fetch receipts preserved in the data assets.
 
-**NASADEM terrain.** NASADEM Merged DEM Global 1 arc second provides surface elevation data. NASADEM is a surface model that includes trees and houses. Height grids for field 3D terrain models are preserved with acquisition notes and bounds.
-
 **NASA SMAP L4 soil moisture.** NASA SMAP L4 Global provides volumetric soil moisture (m³/m³) at ~9 km resolution as a model-assimilated product combining SMAP radiometer observations with land surface model simulations. Values include SFMC (0–5 cm), RZMC (root zone 0–100 cm), and percentiles. This is distinct from the POWER 0–1 wetness index.
 
 **History.** The 2021–2025 archive aggregates daily values to months. Rain and ETo are totals. Temperature and wetness are means. Valid counts are included. A detailed UTC 2024 replay supports daily QA. Four other years supply the same-month reference. This short comparison is not a long-term climate normal.

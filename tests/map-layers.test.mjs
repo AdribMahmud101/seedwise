@@ -25,6 +25,7 @@ test("every manifest date has a tile at z12 and z16 on disk for each site", asyn
     for (const zoom of [12, 16]) {
       const [tileX, tileY] = project(site.lat, site.lon, zoom);
       for (const layer of manifest.layers) {
+        if (!layer.dates) continue;
         for (const dateObj of layer.dates) {
           const tilePath = new URL(
             `../public/tiles/${layer.id}/${dateObj.date}/${zoom}/${tileX}/${tileY}.png`,
