@@ -28,6 +28,7 @@ import {
   repaint,
 } from "./ui.js";
 import { STRATEGIES } from "./engine.js";
+import { landscapePanel, initLandscapeObserver, disposeLandscape } from "./landscape3d.js";
 
 function smapCard() {
   const siteId = state.fieldId;
@@ -106,6 +107,7 @@ function water() {
       ),
     ) +
     chips() +
+    landscapePanel() +
     tabs("water", [
       ["budget", t("Water balance", "পানির হিসাব")],
       ["soil", t("AEZ soil reference", "AEZ মাটির তথ্য")],
@@ -226,4 +228,4 @@ function waterSubmit(form) {
   return true;
 }
 
-export { water, waterAction, waterInput, waterSubmit };
+export { water, waterAction, waterInput, waterSubmit, initLandscapeObserver, disposeLandscape };
