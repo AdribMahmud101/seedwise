@@ -19,9 +19,11 @@ import { rotationEvidence, STRATEGIES, PLANTING, capacity } from './engine.js';
 function fieldReport() {
   const f = field(),
     p = profile(),
-    m = f.monthly[state.month],
+    monthly = f?.monthly || [],
+    m = monthly[state.month] || {},
     saved = state.plans.filter((r) => r.fieldId === f.id).at(-1);
-  const suggestion = rotationEvidence(f.monthly, state.weights, p)[0];
+  const ranks = monthly.length ? rotationEvidence(monthly, state.weights, p) : [];
+  const suggestion = ranks[0] || { crops: ["—"], bnCrops: ["—"], score: 0, issues: [] };
   const r = saved
     ? STRATEGIES.find((r) => r.id === saved.rotation)
     : suggestion;

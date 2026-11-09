@@ -21,6 +21,7 @@ import {
   modal,
   download,
   timeline,
+  stateEmpty,
 } from './ui.js';
 import { rotationEvidence } from './engine.js';
 import { setPlantCrop } from './planner.js';
@@ -60,9 +61,17 @@ const riskBn = {
   legume: 'আলুর খরচ বেশি। মুগের জন্য উপযুক্ত সময় ও পানি নিষ্কাশন দরকার।',
 };
 function ranking() {
-  return rotationEvidence(field().monthly, state.weights, profile());
+  const f = field();
+  if (!f?.monthly || !f.monthly.length) return [];
+  return rotationEvidence(f.monthly, state.weights, profile());
 }
 function rankedCards() {
+  const f = field();
+  if (!f?.monthly || !f.monthly.length) {
+    return stateEmpty(
+      t("Weather data not loaded for this field", "এই জমির আবহাওয়ার তথ্য লোড করা নেই"),
+    );
+  }
   const items = ranking();
   return items
     .map((r, i) => {

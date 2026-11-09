@@ -1,9 +1,11 @@
 import { areaHa } from "./engine.js";
+import { getCachedPower } from "./powerlive.js";
 
 const storageKey = "ropon-radar.workspace.3";
 const defaults = {
   lang: "en",
   fieldId: "mithapukur",
+  customFields: [],
   month: 10,
   weights: { water: 4, soil: 3, cost: 2, risk: 3 },
   profiles: {},
@@ -48,7 +50,7 @@ async function loadData() {
   [earth, agronomy, archive, smap] = await Promise.all(
     responses.map((r) => r.json()),
   );
-  if (!earth.fields.some((f) => f.id === state.fieldId))
+  if (!allFields().some((f) => f.id === state.fieldId))
     state.fieldId = "mithapukur";
 }
 function persist() {
@@ -90,8 +92,23 @@ function monthName(monthIndex = state.month, short = false) {
     timeZone: "UTC",
   }).format(new Date(Date.UTC(2024, monthIndex, 15)));
 }
+function allFields() {
+  const custom = (state.customFields || []).map((cf) => {
+    const cached = getCachedPower(cf.id);
+    return {
+      ...cf,
+      custom: true,
+      imagery: cf.imagery || [],
+      monthly: cached?.monthly || cf.monthly || null,
+      daily: cached?.daily || cf.daily || null,
+      qa: cached?.qa || cf.qa || null,
+      retrievedAt: cached?.retrievedAt || cf.retrievedAt || null,
+    };
+  });
+  return [...(earth?.fields || []), ...custom];
+}
 function field() {
-  return earth.fields.find((f) => f.id === state.fieldId);
+  return allFields().find((f) => f.id === state.fieldId) || earth?.fields?.[0];
 }
 const siteNames = {
   mithapukur: "মিঠাপুকুর",
@@ -99,9 +116,13 @@ const siteNames = {
   gangachara: "গঙ্গাচড়া",
 };
 function fieldName(f = field()) {
-  return t(f.name, siteNames[f.id]);
+  if (!f) return "";
+  if (siteNames[f.id]) return t(f.name, siteNames[f.id]);
+  if (f.name_bn && state.lang === "bn") return f.name_bn;
+  return f.name || t("My field", "আমার জমি");
 }
 function basePolygon(f = field()) {
+  if (!f) return [];
   // Real plots traced on the Maxar 28 Nov 2022 photo (Mithapukur 23, Pirganj 33, Gangachara 44 decimals).
   const shapes = {
     mithapukur: [
@@ -125,7 +146,18 @@ function basePolygon(f = field()) {
       [0.000854, -0.000653],
     ],
   };
-  return shapes[f.id].map(([dy, dx]) => [f.lat + dy, f.lon + dx]);
+  if (shapes[f.id]) {
+    return shapes[f.id].map(([dy, dx]) => [f.lat + dy, f.lon + dx]);
+  }
+  // Custom field default: small boundary square ~20 decimals (side ~28.45 m)
+  const dy = 0.000128;
+  const dx = 0.000128 / Math.cos(((f.lat || 25.5) * Math.PI) / 180);
+  return [
+    [f.lat - dy, f.lon - dx],
+    [f.lat - dy, f.lon + dx],
+    [f.lat + dy, f.lon + dx],
+    [f.lat + dy, f.lon - dx],
+  ];
 }
 function polygon() {
   return state.boundaries[state.fieldId] || basePolygon();
@@ -250,7 +282,15 @@ function truth(tag, opts = {}) {
   return `<span class="truth ${cls}" title="${esc(title)}" aria-label="${esc(labelText)}">${esc(labelText)}</span>`;
 }
 function chips() {
-  return `<div class="field-selector" aria-label="${t("Prepared fields", "প্রস্তুত জমি")}">${earth.fields.map((f, i) => `<button data-field="${f.id}" class="field-chip ${state.fieldId === f.id ? "selected" : ""}" aria-pressed="${state.fieldId === f.id}"><span class="tiny-dot"></span>${esc(fieldName(f))} <small class="mono">${String(i + 1).padStart(2, "0")}</small></button>`).join("")}</div>`;
+  const fields = allFields();
+  return `<div class="field-selector" aria-label="${t("Field selector", "জমি নির্বাচন")}">${fields.map((f, i) => {
+    const isCustom = !!f.custom;
+    const isSelected = state.fieldId === f.id;
+    const deleteBtn = isCustom
+      ? `<button type="button" class="chip-delete-btn" data-action="delete-field" data-value="${f.id}" title="${t("Delete custom field", "জমি মুছুন")}" aria-label="${t("Delete", "মুছুন")} ${esc(fieldName(f))}">×</button>`
+      : "";
+    return `<div class="chip-wrapper"><button data-field="${f.id}" class="field-chip ${isSelected ? "selected" : ""}" aria-pressed="${isSelected}"><span class="tiny-dot ${isCustom ? "custom-dot" : ""}"></span>${esc(fieldName(f))} <small class="mono">${isCustom ? "★" : String(i + 1).padStart(2, "0")}</small></button>${deleteBtn}</div>`;
+  }).join("")}</div>`;
 }
 function input(label, name, value = "", attributes = "", type = "number") {
   return `<div class="form-field"><label for="in-${esc(name)}">${esc(label)}</label><input id="in-${esc(name)}" name="${esc(name)}" type="${type}" value="${esc(value)}" ${attributes}></div>`;
@@ -277,7 +317,7 @@ function monthControl(year = 2024) {
   return `<div class="timeline-controls"><span class="month-name">${monthName()} ${num(year).replace(/[,٬]/g, "")}</span><input type="range" min="0" max="11" step="1" value="${state.month}" data-month aria-label="${t("Historical month", "পুরনো মাস")}"><span class="mono note">01 — 12</span></div>`;
 }
 function toast(message) {
-  const el = document.querySelector("#toast");
+  const el = typeof document !== "undefined" && document.querySelector ? document.querySelector("#toast") : null;
   if (el) {
     el.textContent = message;
     el.classList.add("show");
@@ -296,7 +336,9 @@ function recordId() {
       ).join("");
 }
 function repaint() {
-  window.dispatchEvent(new Event("workspace-render"));
+  if (typeof window !== "undefined" && window.dispatchEvent) {
+    window.dispatchEvent(new Event("workspace-render"));
+  }
 }
 function modal(title, body) {
   const d = document.querySelector("#modal");
@@ -304,7 +346,7 @@ function modal(title, body) {
   if (!d.open) d.showModal();
 }
 function close() {
-  document.querySelector("#modal").close();
+  document.querySelector?.("#modal")?.close?.();
 }
 function download(filename, content, type = "application/json") {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -421,6 +463,7 @@ export {
   recordId,
   state,
   earth,
+  allFields,
   agronomy,
   archive,
   smap,

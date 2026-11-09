@@ -2,6 +2,7 @@ import { units } from "./boundary.js";
 import {
   state,
   earth,
+  allFields,
   agronomy,
   archive,
   persist,
@@ -34,11 +35,53 @@ import {
   csv,
   chart,
   truth,
+  stateEmpty,
+  stateError,
 } from "./ui.js";
 import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
+import {
+  getCachedPower,
+  fetchLivePower,
+} from "./powerlive.js";
 
 function isOnline() {
   return typeof navigator !== "undefined" && "onLine" in navigator ? !!navigator.onLine : true;
+}
+
+// Bangladesh coordinate bounding box
+export const BD_BBOX = {
+  minLat: 20.5,
+  maxLat: 26.7,
+  minLon: 88.0,
+  maxLon: 92.7,
+};
+
+let placesData = null;
+let powerLoading = false;
+let powerError = null;
+
+async function loadCustomPower(f = field(), fetchFn = fetch) {
+  if (!f || !f.custom) return;
+  const cached = getCachedPower(f.id);
+  if (cached && cached.monthly && cached.monthly.length > 0) {
+    powerLoading = false;
+    powerError = null;
+    return cached;
+  }
+  powerLoading = true;
+  powerError = null;
+  repaint();
+  try {
+    const res = await fetchLivePower(f, fetchFn);
+    powerLoading = false;
+    powerError = null;
+    repaint();
+    return res;
+  } catch (err) {
+    powerLoading = false;
+    powerError = err;
+    repaint();
+  }
 }
 
 let leafletMap = null,
@@ -46,6 +89,7 @@ let leafletMap = null,
   drawPoints = [],
   cornerMarkers = [],
   drawMode = false,
+  pickMapMode = false,
   regional = false,
   showLandsat = false,
   mapLayersData = null,
@@ -245,6 +289,14 @@ function filterOsmFeature(feature) {
 }
 
 async function loadMapData() {
+  if (!placesData) {
+    try {
+      const res = await fetch("data/places-rangpur.json");
+      if (res.ok) placesData = await res.json();
+    } catch {
+      // offline fallback or test runner
+    }
+  }
   // Optional local overlay must not prevent the imagery or context data from loading.
   if (!lowGroundData) {
     try {
@@ -313,7 +365,39 @@ function spark(values, color) {
   return `<svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"><path d="M0 25h120" stroke="#dce2d6" stroke-dasharray="2 3"/><path d="${path}" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke" fill="none"/></svg>`;
 }
 function stats(months = field().monthly) {
-  const m = months[state.month];
+  const f = field();
+  if (f.custom && !months) {
+    if (powerLoading) {
+      return panel(
+        t("Historical observations", "পুরনো পর্যবেক্ষণ"),
+        `<div class="empty"><h3>${t("Loading weather data from NASA POWER…", "NASA POWER থেকে আবহাওয়া তথ্য লোড হচ্ছে…")}</h3></div>`,
+      );
+    }
+    if (powerError) {
+      return panel(
+        t("Historical observations", "পুরনো পর্যবেক্ষণ"),
+        stateError(
+          powerError.offline
+            ? t("Internet needed to fetch NASA weather data", "NASA আবহাওয়ার তথ্য আনার জন্য ইন্টারনেট প্রয়োজন")
+            : t("Could not load NASA weather data", "NASA আবহাওয়ার তথ্য লোড করা যায়নি"),
+          "retry-power",
+        ),
+      );
+    }
+    return panel(
+      t("Historical observations", "পুরনো পর্যবেক্ষণ"),
+      stateEmpty(
+        t("Needs internet connection to fetch NASA weather data", "NASA আবহাওয়ার তথ্য সংগ্রহের জন্য ইন্টারনেট প্রয়োজন"),
+        t("Fetch weather data", "আবহাওয়া তথ্য আনুন"),
+        "retry-power",
+      ),
+    );
+  }
+  if (!months || !months.length) {
+    return "";
+  }
+  const m = months[state.month] || {};
+  const retrievedDate = f.custom && f.retrievedAt ? f.retrievedAt.slice(0, 10) : "2024";
   const defs = [
     [
       "wetness",
@@ -323,7 +407,7 @@ function stats(months = field().monthly) {
       t("POWER · index from 0 to 1", "POWER · সূচক ০ থেকে ১"),
       2,
       "MODELED",
-      { source: "NASA POWER", date: "2024", cell: "50km" },
+      { source: "NASA POWER", date: f.custom ? `fetched ${retrievedDate}` : "2024", cell: "50km" },
     ],
     [
       "rainGpm",
@@ -333,7 +417,7 @@ function stats(months = field().monthly) {
       t("IMERG · monthly total", "IMERG · মাসের মোট"),
       1,
       "REMOTE_OBSERVED",
-      { source: "NASA GPM IMERG", date: "2024", cell: "10km" },
+      { source: "NASA GPM IMERG", date: f.custom ? `fetched ${retrievedDate}` : "2024", cell: "10km" },
     ],
     [
       "tmean",
@@ -343,7 +427,7 @@ function stats(months = field().monthly) {
       t("POWER · monthly average", "POWER · মাসিক গড়"),
       1,
       "MODELED",
-      { source: "NASA POWER", date: "2024", cell: "50km" },
+      { source: "NASA POWER", date: f.custom ? `fetched ${retrievedDate}` : "2024", cell: "50km" },
     ],
     [
       "et0",
@@ -353,7 +437,7 @@ function stats(months = field().monthly) {
       t("FAO-56 ETo · monthly total", "FAO-56 ETo · মাসের মোট"),
       1,
       "MODELED",
-      { source: "FAO-56 ETo", date: "2024", cell: "50km" },
+      { source: "FAO-56 ETo", date: f.custom ? `fetched ${retrievedDate}` : "2024", cell: "50km" },
     ],
   ];
   return `<div class="data-row">${defs
@@ -384,8 +468,8 @@ function pointInPoly(pt, poly) {
 function home() {
   const f = field(),
     p = profile(),
-    photoImage = f.imagery[0],
-    ranks = rotationEvidence(f.monthly, state.weights, p);
+    photoImage = f.imagery?.[0],
+    ranks = f.monthly ? rotationEvidence(f.monthly, state.weights, p) : [];
   const first = ranks.find((r) => r.feasible);
 
   const online = isOnline();
@@ -411,7 +495,21 @@ function home() {
 
   // Determine active chip info based on layerMode and activeDate
   let chipHtml = "";
-  if (layerMode === "high-detail") {
+  if (f.custom) {
+    if (layerMode === "high-detail") {
+      const chipText = t(
+        "High-detail photo · Maxar · World Imagery · online",
+        "উচ্চ রেজোলিউশন ছবি · ম্যাক্সার · এসরি ওয়ার্ল্ড ইমেজারি · অনলাইন",
+      );
+      chipHtml = `<span class="map-chip-text">${esc(chipText)}</span> ${truth("REMOTE_OBSERVED")}`;
+    } else {
+      const chipText = t(
+        "Not prepared for this field · Satellite tiles unavailable",
+        "এই জমির জন্য প্রস্তুত নয় · স্যাটেলাইট টাইলস প্রস্তুত নেই",
+      );
+      chipHtml = `<span class="map-chip-text">${esc(chipText)}</span> ${truth("UNKNOWN")}`;
+    }
+  } else if (layerMode === "high-detail") {
     const chipText = t(
       "High-detail photo · Maxar · 28 Nov 2022 · online",
       "উচ্চ রেজোলিউশন ছবি · ম্যাক্সার · ২৮ নভেম্বর ২০২২ · অনলাইন",
@@ -429,6 +527,21 @@ function home() {
   const lowGroundSite = lowGroundData?.sites?.find((site) => site.id === f.id && site.png);
   const currentDateObj = timelineDates.find((d) => d.date === activeDate);
   const isDateReliable = currentDateObj ? currentDateObj.available : false;
+  const customIdx = (state.customFields || []).findIndex((cf) => cf.id === f.id);
+  const plotDossierNum = f.custom ? `CF–0${customIdx + 1}` : `RG–0${earth.fields.indexOf(f) + 1}`;
+  const dossierLocation = f.custom
+    ? `${num(f.lat, 4)}° N, ${num(f.lon, 4)}° E · ${t("Bangladesh", "বাংলাদেশ")}`
+    : t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ");
+  const boundaryTruth = state.boundaries[f.id]
+    ? truth("FARMER_REPORTED", { source: "Farmer boundary", date: "2024" })
+    : f.custom
+      ? truth("SCENARIO", { source: "New custom field", date: "2024" })
+      : truth("SCENARIO", { source: "Demo outline", date: "2024" });
+  const boundaryLabel = state.boundaries[f.id]
+    ? t("Farmer drawn", "কৃষকের আঁকা")
+    : f.custom
+      ? t("Initial ~20 decimals", "প্রাথমিক ~২০ শতক")
+      : t("Demo outline", "নমুনা সীমানা");
 
   // Legend HTML per active layer
   let legendHtml = "";
@@ -530,10 +643,10 @@ function home() {
  <div class="map-actions">
    <span class="note">${chipHtml}</span>
    <div class="map-controls">
-     ${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}
+     ${button(pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন"), "toggle-pick-map", `small ${pickMapMode ? "primary" : ""}`, "pin")}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}
    </div>
  </div><div id="drawing-help"></div></section>
- <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${state.boundaries[f.id] ? truth("FARMER_REPORTED", { source: "Farmer boundary", date: "2024" }) : truth("SCENARIO", { source: "Demo outline", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
+ <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${boundaryTruth}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
  <div class="section-label"><div><div class="eyebrow">${t("Historical observations", "পুরনো পর্যবেক্ষণ")}</div><h2>${monthName()} 2024</h2></div>${goButton(t("See past seasons", "পুরনো মৌসুম"), "seasons", "small")}</div>${stats()}
@@ -574,8 +687,24 @@ function home() {
   );
 }
 function seasonView() {
-  const f = field(),
-    year = Number(state.historyYear || 2024),
+  const f = field();
+  if (f.custom || !archive?.fields?.[f.id]?.monthly) {
+    return (
+      header(
+        t("Season archive  /  02", "মৌসুমের খাতা  /  ০২"),
+        t("Past seasons", "পুরনো মৌসুম"),
+        t(
+          "Replay five years. Choose a year and a month to read the regional record.",
+          "পাঁচ বছরের আঞ্চলিক তথ্য দেখুন। বছর ও মাস বেছে নিন।",
+        ),
+      ) +
+      chips() +
+      stateEmpty(
+        t("Historical archive is not available for this custom field", "এই জমির জন্য পুরনো মৌসুমের তথ্য নেই"),
+      )
+    );
+  }
+  const year = Number(state.historyYear || 2024),
     archiveMonths = archive.fields[f.id].monthly,
     months = archiveMonths.filter((v) => v.month.startsWith(String(year)));
   const m = months[state.month],
@@ -793,6 +922,12 @@ async function mountMap() {
           (pos) => {
             const { latitude, longitude } = pos.coords;
             current.setView([latitude, longitude], Math.min(15, maxMapZoom));
+            const popupContent = `
+              <div style="text-align: center; padding: 4px;">
+                <p style="margin: 0 0 8px 0; font-weight: bold;">${t("Your current position", "আপনার বর্তমান অবস্থান")}</p>
+                <button type="button" class="button small primary" data-action="start-custom-field" data-value="${latitude},${longitude},${t("My field", "আমার জমি")}">${t("Start my field here", "এখানে আমার জমি শুরু করুন")}</button>
+              </div>
+            `;
             L.circleMarker([latitude, longitude], {
               radius: 8,
               color: "#315c3d",
@@ -801,7 +936,7 @@ async function mountMap() {
               weight: 3,
             })
               .addTo(current)
-              .bindPopup(t("Your current position", "আপনার বর্তমান অবস্থান"))
+              .bindPopup(popupContent)
               .openPopup();
           },
           (err) => {
@@ -1130,16 +1265,32 @@ async function mountMap() {
 
   current.on("click", (event) => {
     const { lat, lng } = event.latlng;
+    if (pickMapMode) {
+      const popupHtml = `
+        <div style="text-align: center; padding: 6px;">
+          <p style="margin: 0 0 6px 0; font-weight: bold;">${t("Point on map", "মানচিত্রের বিন্দু")}</p>
+          <div style="font-size: 12px; margin-bottom: 8px;">${num(lat, 4)}° N · ${num(lng, 4)}° E</div>
+          <button type="button" class="button small primary" data-action="start-custom-field" data-value="${lat},${lng},${t("My field", "আমার জমি")}">${t("Start my field here", "এখানে আমার জমি শুরু করুন")}</button>
+        </div>
+      `;
+      L.popup({ maxWidth: 240 })
+        .setLatLng(event.latlng)
+        .setContent(popupHtml)
+        .openOn(current);
+      return;
+    }
     if (drawMode) {
-      const [w, s, e, n] = f.imagery[0]?.bounds || [];
-      if (!(lng >= w && lng <= e && lat >= s && lat <= n)) {
-        toast(
-          t(
-            "Draw inside this prepared image.",
-            "প্রস্তুত ছবির ভেতরে সীমানা আঁকুন।",
-          ),
-        );
-        return;
+      if (!f.custom) {
+        const [w, s, e, n] = f.imagery?.[0]?.bounds || [];
+        if (!(lng >= w && lng <= e && lat >= s && lat <= n)) {
+          toast(
+            t(
+              "Draw inside this prepared image.",
+              "প্রস্তুত ছবির ভেতরে সীমানা আঁকুন।",
+            ),
+          );
+          return;
+        }
       }
       drawPoints.push([lat, lng]);
       if (drawLayer) drawLayer.remove();
@@ -1151,6 +1302,49 @@ async function mountMap() {
       syncPolyGeom(drawPoints);
       renderCornerHandles();
       updateDraw();
+      return;
+    }
+
+    if (f.custom) {
+      const pts = polygon();
+      const isInside = pointInPoly([lat, lng], pts);
+      const m = f.monthly?.[state.month] || {};
+      const statusWord = isInside
+        ? t("Inside field boundary", "জমির সীমানার ভেতরে")
+        : t("Outside field boundary", "জমির সীমানার বাইরে");
+      const popupHtml = `
+        <div class="inspect-card">
+          <div class="inspect-header">
+            <strong>${isInside ? "✓ " + esc(fieldName(f)) : esc(statusWord)}</strong>
+            <span class="tag ${isInside ? "green" : "amber"}">${isInside ? t("Field plot", "জমি") : t("Surroundings", "আশেপাশে")}</span>
+          </div>
+          <div class="inspect-coords">${num(lat, 5)}° N · ${num(lng, 5)}° E</div>
+          <div class="notice section-space" style="font-size: 12px; margin: 6px 0;">
+            ${t("Sentinel-2 NDVI and DEM low ground are not prepared for this custom field.", "কাস্টম জমির জন্য সেন্টিনেল-২ NDVI বা নিচু জমির ম্যাপ প্রস্তুত নেই।")}
+          </div>
+          <dl class="inspect-grid">
+            <div class="inspect-item">
+              <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
+              <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : t("No data", "তথ্য নেই")}</dd>
+            </div>
+            <div class="inspect-item">
+              <dt>${t("Rainfall", "বৃষ্টি")}</dt>
+              <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : t("No data", "তথ্য নেই")}</dd>
+            </div>
+            <div class="inspect-item">
+              <dt>${t("Temp", "তাপমাত্রা")}</dt>
+              <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : t("No data", "তথ্য নেই")}</dd>
+            </div>
+          </dl>
+          <div class="inspect-footer">
+            ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · NASA POWER / IMERG
+          </div>
+        </div>
+      `;
+      L.popup({ className: "field-inspect-popup", maxWidth: 280, closeButton: true })
+        .setLatLng(event.latlng)
+        .setContent(popupHtml)
+        .openOn(current);
       return;
     }
 
@@ -1239,25 +1433,92 @@ function searchModal() {
 function searchResults(query) {
   const q = query.trim().toLowerCase(),
     xy = q.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
-  const matches = earth.fields.filter((f, i) => {
+  
+  // 1. Prepared fields match
+  const preparedMatches = (earth?.fields || []).filter((f, i) => {
     if (xy) {
       const a = Number(xy[1]),
         b = Number(xy[2]),
-        [w, s, e, n] = f.imagery[0]?.bounds || [];
+        [w, s, e, n] = f.imagery?.[0]?.bounds || [];
       return a >= s && a <= n && b >= w && b <= e;
     }
     return [f.name, fieldName(f), `rg-0${i + 1}`, `rg–0${i + 1}`].some((v) =>
       v.toLowerCase().includes(q),
     );
   });
-  return matches.length
-    ? matches
-        .map(
-          (f) =>
-            `<button class="result-option" data-action="select-result" data-value="${f.id}">${icon("pin")}<span><b>${esc(fieldName(f))}</b><small>${f.lat}° N · ${f.lon}° E</small></span>${icon("right")}</button>`,
-        )
-        .join("")
-    : `<div class="empty">${t("No prepared coverage here. Try Mithapukur, Pirganj, or Gangachara.", "এই স্থানের তথ্য প্রস্তুত নেই। মিঠাপুকুর, পীরগঞ্জ বা গঙ্গাচড়া লিখুন।")}${xy ? button(t("Measure an unsupported plot", "অন্য জমি মাপুন"), "measure-new", "small", "draw", xy[1] + "," + xy[2]) : ""}</div>`;
+
+  // 2. Custom fields match
+  const customMatches = (state.customFields || []).filter((f) => {
+    if (!q) return false;
+    return [f.name, f.name_bn || ""].some((v) => v.toLowerCase().includes(q));
+  });
+
+  // 3. Coordinate check anywhere in Bangladesh
+  let coordMatch = null;
+  if (xy) {
+    const lat = Number(xy[1]),
+      lon = Number(xy[2]);
+    if (
+      lat >= BD_BBOX.minLat &&
+      lat <= BD_BBOX.maxLat &&
+      lon >= BD_BBOX.minLon &&
+      lon <= BD_BBOX.maxLon
+    ) {
+      coordMatch = { lat, lon };
+    }
+  }
+
+  // 4. Places match (from OSM Overpass places)
+  let placeMatches = [];
+  if (q && placesData?.places) {
+    placeMatches = placesData.places
+      .filter((p) => {
+        const nameEn = (p.name || "").toLowerCase();
+        const nameBn = (p.name_bn || "").toLowerCase();
+        return nameEn.includes(q) || nameBn.includes(q);
+      })
+      .slice(0, 10);
+  }
+
+  const results = [];
+
+  // Add prepared fields
+  for (const f of preparedMatches) {
+    results.push(
+      `<button class="result-option" data-action="select-result" data-value="${f.id}">${icon("pin")}<span><b>${esc(fieldName(f))}</b><small>${f.lat}° N · ${f.lon}° E</small></span>${icon("right")}</button>`,
+    );
+  }
+
+  // Add custom fields
+  for (const f of customMatches) {
+    results.push(
+      `<button class="result-option" data-action="select-result" data-value="${f.id}">${icon("pin")}<span><b>★ ${esc(fieldName(f))}</b><small>${num(f.lat, 4)}° N · ${num(f.lon, 4)}° E</small></span>${icon("right")}</button>`,
+    );
+  }
+
+  // Add coordinate start field
+  if (coordMatch) {
+    const val = `${coordMatch.lat},${coordMatch.lon},`;
+    results.push(
+      `<div class="result-option-action">${icon("pin")}<span><b>${t("Start a field at coordinates", "স্থানাঙ্কে নতুন জমি শুরু করুন")}</b><small>${num(coordMatch.lat, 4)}° N · ${num(coordMatch.lon, 4)}° E</small></span>${button(t("Start a field here", "এখানে নতুন জমি শুরু করুন"), "start-custom-field", "small primary", "draw", val)}</div>`,
+    );
+  }
+
+  // Add village / place matches
+  for (const p of placeMatches) {
+    const displayName = state.lang === "bn" && p.name_bn ? p.name_bn : p.name;
+    const sub = `${p.kind || "village"} · ${num(p.lat, 4)}° N · ${num(p.lon, 4)}° E`;
+    const val = `${p.lat},${p.lon},${p.name || ""},${p.name_bn || ""}`;
+    results.push(
+      `<div class="result-option-action">${icon("pin")}<span><b>${esc(displayName)}</b><small>${esc(sub)}</small></span>${button(t("Start a field here", "এখানে নতুন জমি শুরু করুন"), "start-custom-field", "small primary", "draw", val)}</div>`,
+    );
+  }
+
+  if (results.length) {
+    return results.join("");
+  }
+
+  return `<div class="empty">${t("No matches found. Try a village name (e.g. Alampur, Pirganj), upazila, or coordinates (20.5–26.7 N, 88–92.7 E).", "কোনো ফলাফল পাওয়া যায়নি। গ্রামের নাম (যেমন আলমপুর, পীরগঞ্জ), উপজেলা বা স্থানাঙ্ক (২০.৫–২৬.৭ উঃ, ৮৮–৯২.৭ পূঃ) লিখুন।")}</div>`;
 }
 function editProfile() {
   const p = profile();
@@ -1349,6 +1610,61 @@ function fieldAction(action, value) {
     cornerMarkers.forEach((m) => m.remove());
     cornerMarkers = [];
     repaint();
+  }
+  if (action === "toggle-pick-map") {
+    pickMapMode = !pickMapMode;
+    if (pickMapMode && regional) regional = false;
+    repaint();
+  }
+  if (action === "start-custom-field") {
+    close();
+    const parts = (value || "").split(",");
+    const lat = parseFloat(parts[0]);
+    const lon = parseFloat(parts[1]);
+    const name = parts[2] || t("My field", "আমার জমি");
+    const name_bn = parts[3] || (parts[2] ? parts[2] : "আমার জমি");
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      toast(t("Invalid coordinates for field", "জমির স্থানাঙ্ক সঠিক নয়"));
+      return;
+    }
+    const newId = `custom-${Date.now()}`;
+    const newField = {
+      id: newId,
+      name,
+      name_bn,
+      lat,
+      lon,
+      custom: true,
+      imagery: [],
+    };
+    state.customFields = state.customFields || [];
+    state.customFields.push(newField);
+    state.fieldId = newId;
+    pickMapMode = false;
+    regional = false;
+    persist();
+    repaint();
+    toast(t("New field started! Loading NASA weather…", "নতুন জমি তৈরি হয়েছে! আবহাওয়া লোড হচ্ছে…"));
+
+    // Trigger live weather fetch in background
+    loadCustomPower(newField);
+  }
+  if (action === "delete-field") {
+    const fieldId = value || state.fieldId;
+    state.customFields = (state.customFields || []).filter((cf) => cf.id !== fieldId);
+    delete state.boundaries[fieldId];
+    if (state.fieldId === fieldId) {
+      state.fieldId = "mithapukur";
+    }
+    persist();
+    repaint();
+    toast(t("Field deleted", "জমি মুছে ফেলা হয়েছে"));
+  }
+  if (action === "retry-power") {
+    const f = field();
+    if (f?.custom) {
+      loadCustomPower(f);
+    }
   }
   if (action === "undo-corner") {
     drawPoints.pop();
@@ -1447,4 +1763,5 @@ export {
   setLayerMode,
   loadMapData,
   queryLowGround,
+  loadCustomPower,
 };

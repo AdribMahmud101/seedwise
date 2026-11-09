@@ -1,0 +1,1013 @@
+{
+  "attribution": "Data © OpenStreetMap contributors, ODbL 1.0. https://www.openstreetmap.org/copyright",
+  "bbox": [
+    25.0,
+    88.0,
+    26.7,
+    89.95
+  ],
+  "count": 143,
+  "places": [
+    {
+      "name": "Aditmari",
+      "name_bn": "আদিতমারী",
+      "lat": 25.95,
+      "lon": 89.3333,
+      "kind": "town"
+    },
+    {
+      "name": "Alampur",
+      "name_bn": "আলমপুর",
+      "lat": 25.845,
+      "lon": 89.085,
+      "kind": "village"
+    },
+    {
+      "name": "Alamviditor",
+      "name_bn": "আলমবিদিতর",
+      "lat": 25.845,
+      "lon": 89.142,
+      "kind": "village"
+    },
+    {
+      "name": "Alokdihi",
+      "name_bn": "আলোকডিহি",
+      "lat": 25.652,
+      "lon": 88.785,
+      "kind": "village"
+    },
+    {
+      "name": "Annadanagar",
+      "name_bn": "অন্নদানগর",
+      "lat": 25.595,
+      "lon": 89.445,
+      "kind": "village"
+    },
+    {
+      "name": "Atwari",
+      "name_bn": "আটোয়ারী",
+      "lat": 26.25,
+      "lon": 88.45,
+      "kind": "town"
+    },
+    {
+      "name": "Badarganj",
+      "name_bn": "বদরগঞ্জ",
+      "lat": 25.6667,
+      "lon": 89.05,
+      "kind": "town"
+    },
+    {
+      "name": "Balapara",
+      "name_bn": "বালাপাড়া",
+      "lat": 25.745,
+      "lon": 89.445,
+      "kind": "village"
+    },
+    {
+      "name": "Balarhat",
+      "name_bn": "বালারহাট",
+      "lat": 25.485,
+      "lon": 89.289,
+      "kind": "village"
+    },
+    {
+      "name": "Baldipukur",
+      "name_bn": "বালদিপুকুর",
+      "lat": 25.5815,
+      "lon": 89.2547,
+      "kind": "village"
+    },
+    {
+      "name": "Baliadangi",
+      "name_bn": "বালিয়াডাঙ্গী",
+      "lat": 26.15,
+      "lon": 88.25,
+      "kind": "town"
+    },
+    {
+      "name": "Bamandanga",
+      "name_bn": "বামনডাঙ্গা",
+      "lat": 25.612,
+      "lon": 89.465,
+      "kind": "village"
+    },
+    {
+      "name": "Banglabandha",
+      "name_bn": "বাংলাবান্ধা",
+      "lat": 26.655,
+      "lon": 88.395,
+      "kind": "village"
+    },
+    {
+      "name": "Barabil",
+      "name_bn": "বড়বিল",
+      "lat": 25.8609,
+      "lon": 89.1799,
+      "kind": "village"
+    },
+    {
+      "name": "Barodarga",
+      "name_bn": "বড়দরগাহ্",
+      "lat": 25.465,
+      "lon": 89.341,
+      "kind": "village"
+    },
+    {
+      "name": "Betgari",
+      "name_bn": "বেতগাড়ী",
+      "lat": 25.821,
+      "lon": 89.165,
+      "kind": "village"
+    },
+    {
+      "name": "Bhajanpur",
+      "name_bn": "ভজনপুর",
+      "lat": 26.435,
+      "lon": 88.485,
+      "kind": "village"
+    },
+    {
+      "name": "Bhangni",
+      "name_bn": "ভাংনী",
+      "lat": 25.6272,
+      "lon": 89.3601,
+      "kind": "village"
+    },
+    {
+      "name": "Bhendabari",
+      "name_bn": "ভেন্ডাবাড়ী",
+      "lat": 25.4958,
+      "lon": 89.2063,
+      "kind": "village"
+    },
+    {
+      "name": "Bhurungamari",
+      "name_bn": "ভুরুঙ্গামারী",
+      "lat": 26.0333,
+      "lon": 89.6667,
+      "kind": "town"
+    },
+    {
+      "name": "Biral",
+      "name_bn": "বিরল",
+      "lat": 25.6333,
+      "lon": 88.55,
+      "kind": "town"
+    },
+    {
+      "name": "Birampur",
+      "name_bn": "বিরামপুর",
+      "lat": 25.4,
+      "lon": 89.1167,
+      "kind": "town"
+    },
+    {
+      "name": "Birganj",
+      "name_bn": "বীরগঞ্জ",
+      "lat": 25.8833,
+      "lon": 88.6333,
+      "kind": "town"
+    },
+    {
+      "name": "Bochaganj",
+      "name_bn": "বোচাগঞ্জ",
+      "lat": 25.8333,
+      "lon": 88.4667,
+      "kind": "town"
+    },
+    {
+      "name": "Boda",
+      "name_bn": "বোদা",
+      "lat": 26.2,
+      "lon": 88.5667,
+      "kind": "town"
+    },
+    {
+      "name": "Bonarpara",
+      "name_bn": "বোনারপাড়া",
+      "lat": 25.175,
+      "lon": 89.512,
+      "kind": "town"
+    },
+    {
+      "name": "Burimari",
+      "name_bn": "বুড়িমারী",
+      "lat": 26.565,
+      "lon": 88.985,
+      "kind": "village"
+    },
+    {
+      "name": "Chaitrakol",
+      "name_bn": "চৈত্রকোল",
+      "lat": 25.385,
+      "lon": 89.245,
+      "kind": "village"
+    },
+    {
+      "name": "Chandanpat",
+      "name_bn": "চন্দনপাট",
+      "lat": 25.712,
+      "lon": 89.265,
+      "kind": "village"
+    },
+    {
+      "name": "Char Rajibpur",
+      "name_bn": "চর রাজিবপুর",
+      "lat": 25.35,
+      "lon": 89.6667,
+      "kind": "town"
+    },
+    {
+      "name": "Chatra",
+      "name_bn": "চতরা",
+      "lat": 25.342,
+      "lon": 89.215,
+      "kind": "village"
+    },
+    {
+      "name": "Chengmari",
+      "name_bn": "চেংমারী",
+      "lat": 25.502,
+      "lon": 89.268,
+      "kind": "village"
+    },
+    {
+      "name": "Chilahati",
+      "name_bn": "চিলাহাটি",
+      "lat": 26.245,
+      "lon": 88.825,
+      "kind": "village"
+    },
+    {
+      "name": "Chilmari",
+      "name_bn": "চিলমারী",
+      "lat": 25.55,
+      "lon": 89.6833,
+      "kind": "town"
+    },
+    {
+      "name": "Chirirbandar",
+      "name_bn": "চিরিরবন্দর",
+      "lat": 25.6333,
+      "lon": 88.8333,
+      "kind": "town"
+    },
+    {
+      "name": "Dahagram",
+      "name_bn": "দহগ্রাম",
+      "lat": 26.505,
+      "lon": 88.935,
+      "kind": "village"
+    },
+    {
+      "name": "Damodarpur",
+      "name_bn": "দামোদারপুর",
+      "lat": 25.645,
+      "lon": 89.062,
+      "kind": "village"
+    },
+    {
+      "name": "Debiganj",
+      "name_bn": "দেবীগঞ্জ",
+      "lat": 26.0667,
+      "lon": 88.7333,
+      "kind": "town"
+    },
+    {
+      "name": "Dhamair",
+      "name_bn": "ধামাইর",
+      "lat": 25.685,
+      "lon": 88.512,
+      "kind": "village"
+    },
+    {
+      "name": "Dhaperhat",
+      "name_bn": "ধাপেরহাট",
+      "lat": 25.312,
+      "lon": 89.345,
+      "kind": "village"
+    },
+    {
+      "name": "Dimla",
+      "name_bn": "ডিমলা",
+      "lat": 26.1333,
+      "lon": 88.9167,
+      "kind": "town"
+    },
+    {
+      "name": "Dinajpur",
+      "name_bn": "দিনাজপুর",
+      "lat": 25.629,
+      "lon": 88.637,
+      "kind": "town"
+    },
+    {
+      "name": "Domar",
+      "name_bn": "ডোমার",
+      "lat": 26.15,
+      "lon": 88.85,
+      "kind": "town"
+    },
+    {
+      "name": "Durgapur",
+      "name_bn": "দুর্গাপুর",
+      "lat": 25.5385,
+      "lon": 89.2831,
+      "kind": "village"
+    },
+    {
+      "name": "Durgapur Kurigram",
+      "name_bn": "দুর্গাপুর",
+      "lat": 25.712,
+      "lon": 89.585,
+      "kind": "village"
+    },
+    {
+      "name": "Ekorchali",
+      "name_bn": "ইকরচালী",
+      "lat": 25.835,
+      "lon": 89.045,
+      "kind": "village"
+    },
+    {
+      "name": "Faridpur",
+      "name_bn": "ফরিদপুর",
+      "lat": 25.4901,
+      "lon": 89.3948,
+      "kind": "village"
+    },
+    {
+      "name": "Fulchhari",
+      "name_bn": "ফুলছড়ি",
+      "lat": 25.2167,
+      "lon": 89.6667,
+      "kind": "town"
+    },
+    {
+      "name": "Gaibandha",
+      "name_bn": "গাইবান্ধা",
+      "lat": 25.325,
+      "lon": 89.6278,
+      "kind": "town"
+    },
+    {
+      "name": "Gajaghanta",
+      "name_bn": "গজঘণ্টা",
+      "lat": 25.835,
+      "lon": 89.282,
+      "kind": "village"
+    },
+    {
+      "name": "Gangachara",
+      "name_bn": "গঙ্গাচড়া",
+      "lat": 25.85,
+      "lon": 89.2167,
+      "kind": "town"
+    },
+    {
+      "name": "Gendagachh",
+      "name_bn": "গেন্দাগাছ",
+      "lat": 26.4394,
+      "lon": 88.4655,
+      "kind": "village"
+    },
+    {
+      "name": "Ghoraghat",
+      "name_bn": "ঘোড়াঘাট",
+      "lat": 25.2667,
+      "lon": 89.2167,
+      "kind": "town"
+    },
+    {
+      "name": "Gobindaganj",
+      "name_bn": "গোবিন্দগঞ্জ",
+      "lat": 25.1333,
+      "lon": 89.3,
+      "kind": "town"
+    },
+    {
+      "name": "Gomnati",
+      "name_bn": "গোমনাতি",
+      "lat": 26.185,
+      "lon": 88.885,
+      "kind": "village"
+    },
+    {
+      "name": "Gopalpur",
+      "name_bn": "গোপালপুর",
+      "lat": 25.521,
+      "lon": 89.345,
+      "kind": "village"
+    },
+    {
+      "name": "Gopinathpur",
+      "name_bn": "গোপীনাথপুর",
+      "lat": 25.681,
+      "lon": 89.021,
+      "kind": "village"
+    },
+    {
+      "name": "Habra",
+      "name_bn": "হাবড়া",
+      "lat": 25.695,
+      "lon": 88.885,
+      "kind": "village"
+    },
+    {
+      "name": "Hakimpur",
+      "name_bn": "হাকিমপুর",
+      "lat": 25.2667,
+      "lon": 89.0167,
+      "kind": "town"
+    },
+    {
+      "name": "Haragach",
+      "name_bn": "হারাগাছ",
+      "lat": 25.8167,
+      "lon": 89.3333,
+      "kind": "town"
+    },
+    {
+      "name": "Hariarkuthi",
+      "name_bn": "হাড়িয়ারকুঠি",
+      "lat": 25.815,
+      "lon": 88.985,
+      "kind": "village"
+    },
+    {
+      "name": "Haridebpur",
+      "name_bn": "হরিদেবপুর",
+      "lat": 25.742,
+      "lon": 89.195,
+      "kind": "village"
+    },
+    {
+      "name": "Haripur",
+      "name_bn": "হরিপুর",
+      "lat": 25.8833,
+      "lon": 88.2333,
+      "kind": "town"
+    },
+    {
+      "name": "Hatibandha",
+      "name_bn": "হাতীবান্ধা",
+      "lat": 26.1,
+      "lon": 89.0333,
+      "kind": "town"
+    },
+    {
+      "name": "Itakumari",
+      "name_bn": "ইটাকুমারী",
+      "lat": 25.695,
+      "lon": 89.365,
+      "kind": "village"
+    },
+    {
+      "name": "Jaldhaka",
+      "name_bn": "জলঢাকা",
+      "lat": 25.8833,
+      "lon": 88.9333,
+      "kind": "town"
+    },
+    {
+      "name": "Jatrapur",
+      "name_bn": "যাত্রাপুর",
+      "lat": 25.865,
+      "lon": 89.745,
+      "kind": "village"
+    },
+    {
+      "name": "Kabilpur",
+      "name_bn": "কাবিলপুর",
+      "lat": 25.395,
+      "lon": 89.335,
+      "kind": "village"
+    },
+    {
+      "name": "Kachakata",
+      "name_bn": "কচাকাটা",
+      "lat": 25.9986,
+      "lon": 89.8081,
+      "kind": "village"
+    },
+    {
+      "name": "Kafrikhal",
+      "name_bn": "কাফ্রিখাল",
+      "lat": 25.6197,
+      "lon": 89.3064,
+      "kind": "village"
+    },
+    {
+      "name": "Kaharole",
+      "name_bn": "কাহারোল",
+      "lat": 25.7333,
+      "lon": 88.5667,
+      "kind": "town"
+    },
+    {
+      "name": "Kakina",
+      "name_bn": "কাকিনা",
+      "lat": 25.985,
+      "lon": 89.205,
+      "kind": "village"
+    },
+    {
+      "name": "Kaliganj Lalmonirhat",
+      "name_bn": "কালীগঞ্জ",
+      "lat": 25.9833,
+      "lon": 89.1333,
+      "kind": "town"
+    },
+    {
+      "name": "Kalyani",
+      "name_bn": "কল্যাণী",
+      "lat": 25.621,
+      "lon": 89.425,
+      "kind": "village"
+    },
+    {
+      "name": "Kamarjani",
+      "name_bn": "কামারজানী",
+      "lat": 25.345,
+      "lon": 89.725,
+      "kind": "village"
+    },
+    {
+      "name": "Kashimpur",
+      "name_bn": "কাশিমপুর",
+      "lat": 25.6144,
+      "lon": 89.1994,
+      "kind": "village"
+    },
+    {
+      "name": "Kaunia",
+      "name_bn": "কাউনিয়া",
+      "lat": 25.7708,
+      "lon": 89.4167,
+      "kind": "town"
+    },
+    {
+      "name": "Khansama",
+      "name_bn": "খানসামা",
+      "lat": 25.9,
+      "lon": 88.7667,
+      "kind": "town"
+    },
+    {
+      "name": "Khoragach",
+      "name_bn": "খোড়াগাছ",
+      "lat": 25.591,
+      "lon": 89.332,
+      "kind": "village"
+    },
+    {
+      "name": "Kishoreganj Nilphamari",
+      "name_bn": "কিশোরগঞ্জ",
+      "lat": 25.8,
+      "lon": 88.9167,
+      "kind": "town"
+    },
+    {
+      "name": "Kolkonda",
+      "name_bn": "কোলকোন্দ",
+      "lat": 25.885,
+      "lon": 89.215,
+      "kind": "village"
+    },
+    {
+      "name": "Kumedpur",
+      "name_bn": "কুমেদপুর",
+      "lat": 25.372,
+      "lon": 89.298,
+      "kind": "village"
+    },
+    {
+      "name": "Kurigram",
+      "name_bn": "কুড়িগ্রাম",
+      "lat": 25.8167,
+      "lon": 89.65,
+      "kind": "town"
+    },
+    {
+      "name": "Kursha",
+      "name_bn": "কুর্শা",
+      "lat": 25.795,
+      "lon": 89.065,
+      "kind": "village"
+    },
+    {
+      "name": "Lakkhitari",
+      "name_bn": "লক্ষ্মীটারী",
+      "lat": 25.872,
+      "lon": 89.251,
+      "kind": "village"
+    },
+    {
+      "name": "Lalmonirhat",
+      "name_bn": "লালমনিরহাট",
+      "lat": 25.9167,
+      "lon": 89.4333,
+      "kind": "town"
+    },
+    {
+      "name": "Latibpur",
+      "name_bn": "লতিবপুর",
+      "lat": 25.535,
+      "lon": 89.321,
+      "kind": "village"
+    },
+    {
+      "name": "Lohanipara",
+      "name_bn": "লোহানীপাড়া",
+      "lat": 25.605,
+      "lon": 88.995,
+      "kind": "village"
+    },
+    {
+      "name": "Madankhali",
+      "name_bn": "মদনখালী",
+      "lat": 25.351,
+      "lon": 89.362,
+      "kind": "village"
+    },
+    {
+      "name": "Madhupur",
+      "name_bn": "মধুপুর",
+      "lat": 25.621,
+      "lon": 89.041,
+      "kind": "village"
+    },
+    {
+      "name": "Mahimaganj",
+      "name_bn": "মহিমাগঞ্জ",
+      "lat": 25.115,
+      "lon": 89.412,
+      "kind": "village"
+    },
+    {
+      "name": "Mangalpur",
+      "name_bn": "মঙ্গলপুর",
+      "lat": 25.602,
+      "lon": 88.575,
+      "kind": "village"
+    },
+    {
+      "name": "Manmathapur",
+      "name_bn": "মন্মথপুর",
+      "lat": 25.635,
+      "lon": 88.945,
+      "kind": "village"
+    },
+    {
+      "name": "Mirganj",
+      "name_bn": "মীরগঞ্জ",
+      "lat": 25.895,
+      "lon": 88.985,
+      "kind": "village"
+    },
+    {
+      "name": "Mithapukur",
+      "name_bn": "মিঠাপুকুর",
+      "lat": 25.5417,
+      "lon": 89.2833,
+      "kind": "town"
+    },
+    {
+      "name": "Mominpur",
+      "name_bn": "মমিনপুর",
+      "lat": 25.785,
+      "lon": 89.185,
+      "kind": "village"
+    },
+    {
+      "name": "Mornea",
+      "name_bn": "মর্ণেয়া",
+      "lat": 25.859,
+      "lon": 89.312,
+      "kind": "village"
+    },
+    {
+      "name": "Moyenpur",
+      "name_bn": "ময়েনপুর",
+      "lat": 25.5123,
+      "lon": 89.2145,
+      "kind": "village"
+    },
+    {
+      "name": "Nageshwari",
+      "name_bn": "নাগেশ্বরী",
+      "lat": 25.95,
+      "lon": 89.7833,
+      "kind": "town"
+    },
+    {
+      "name": "Naldanga",
+      "name_bn": "নলডাঙ্গা",
+      "lat": 25.425,
+      "lon": 89.485,
+      "kind": "village"
+    },
+    {
+      "name": "Nashratpur",
+      "name_bn": "নশরতপুর",
+      "lat": 25.615,
+      "lon": 88.825,
+      "kind": "village"
+    },
+    {
+      "name": "Nawabganj",
+      "name_bn": "নবাবগঞ্জ",
+      "lat": 25.3833,
+      "lon": 89.2333,
+      "kind": "town"
+    },
+    {
+      "name": "Nekmarad",
+      "name_bn": "নেকমরদ",
+      "lat": 25.995,
+      "lon": 88.285,
+      "kind": "village"
+    },
+    {
+      "name": "Nilphamari",
+      "name_bn": "নীলফামারী",
+      "lat": 25.9333,
+      "lon": 88.85,
+      "kind": "town"
+    },
+    {
+      "name": "Nohali",
+      "name_bn": "নোহালী",
+      "lat": 25.912,
+      "lon": 89.195,
+      "kind": "village"
+    },
+    {
+      "name": "Palashbari",
+      "name_bn": "পলাশবাড়ী",
+      "lat": 25.2667,
+      "lon": 89.3833,
+      "kind": "town"
+    },
+    {
+      "name": "Panchagarh",
+      "name_bn": "পঞ্চগড়",
+      "lat": 26.3333,
+      "lon": 88.55,
+      "kind": "town"
+    },
+    {
+      "name": "Parbatipur",
+      "name_bn": "পার্বতীপুর",
+      "lat": 25.6667,
+      "lon": 88.9167,
+      "kind": "town"
+    },
+    {
+      "name": "Parul",
+      "name_bn": "পারুল",
+      "lat": 25.652,
+      "lon": 89.385,
+      "kind": "village"
+    },
+    {
+      "name": "Patgram",
+      "name_bn": "পাটগ্রাম",
+      "lat": 26.4833,
+      "lon": 88.9833,
+      "kind": "town"
+    },
+    {
+      "name": "Payraband",
+      "name_bn": "পায়রাবন্দ",
+      "lat": 25.6542,
+      "lon": 89.2958,
+      "kind": "village"
+    },
+    {
+      "name": "Phulbari",
+      "name_bn": "ফুলবাড়ী",
+      "lat": 25.4667,
+      "lon": 88.8167,
+      "kind": "town"
+    },
+    {
+      "name": "Pirgacha",
+      "name_bn": "পীরগাছা",
+      "lat": 25.5806,
+      "lon": 89.4,
+      "kind": "town"
+    },
+    {
+      "name": "Pirganj",
+      "name_bn": "পীরগঞ্জ",
+      "lat": 25.415,
+      "lon": 89.317,
+      "kind": "town"
+    },
+    {
+      "name": "Pirganj Thakurgaon",
+      "name_bn": "পীরগঞ্জ",
+      "lat": 25.85,
+      "lon": 88.3333,
+      "kind": "town"
+    },
+    {
+      "name": "Radhanagar",
+      "name_bn": "রাধানগর",
+      "lat": 25.712,
+      "lon": 89.085,
+      "kind": "village"
+    },
+    {
+      "name": "Rajarhat",
+      "name_bn": "রাজারহাট",
+      "lat": 25.75,
+      "lon": 89.4833,
+      "kind": "town"
+    },
+    {
+      "name": "Ranachandi",
+      "name_bn": "রণচণ্ডী",
+      "lat": 25.765,
+      "lon": 88.985,
+      "kind": "village"
+    },
+    {
+      "name": "Rangpur",
+      "name_bn": "রংপুর",
+      "lat": 25.7466,
+      "lon": 89.2517,
+      "kind": "town"
+    },
+    {
+      "name": "Ranipukur",
+      "name_bn": "রানীপুকুর",
+      "lat": 25.612,
+      "lon": 89.231,
+      "kind": "village"
+    },
+    {
+      "name": "Ranisankail",
+      "name_bn": "রাণীশংকৈল",
+      "lat": 26.05,
+      "lon": 88.3,
+      "kind": "town"
+    },
+    {
+      "name": "Roumari",
+      "name_bn": "রৌমারী",
+      "lat": 25.5833,
+      "lon": 89.85,
+      "kind": "town"
+    },
+    {
+      "name": "Ruhea",
+      "name_bn": "রুহিয়া",
+      "lat": 26.125,
+      "lon": 88.425,
+      "kind": "village"
+    },
+    {
+      "name": "Sadhyapuskurini",
+      "name_bn": "সদ্যপুষ্করিণী",
+      "lat": 25.692,
+      "lon": 89.215,
+      "kind": "village"
+    },
+    {
+      "name": "Sadullapur",
+      "name_bn": "সাদুল্লাপুর",
+      "lat": 25.3667,
+      "lon": 89.45,
+      "kind": "town"
+    },
+    {
+      "name": "Saghata",
+      "name_bn": "সাঘাটা",
+      "lat": 25.1833,
+      "lon": 89.5667,
+      "kind": "town"
+    },
+    {
+      "name": "Saidpur",
+      "name_bn": "সৈয়দপুর",
+      "lat": 25.7833,
+      "lon": 88.9,
+      "kind": "town"
+    },
+    {
+      "name": "Saitara",
+      "name_bn": "সাইতারা",
+      "lat": 25.595,
+      "lon": 88.752,
+      "kind": "village"
+    },
+    {
+      "name": "Sarai",
+      "name_bn": "সারাই",
+      "lat": 25.782,
+      "lon": 89.385,
+      "kind": "village"
+    },
+    {
+      "name": "Setabganj",
+      "name_bn": "সেতাবগঞ্জ",
+      "lat": 25.795,
+      "lon": 88.462,
+      "kind": "town"
+    },
+    {
+      "name": "Shanerhat",
+      "name_bn": "শানেরহাট",
+      "lat": 25.412,
+      "lon": 89.385,
+      "kind": "village"
+    },
+    {
+      "name": "Shibrampur",
+      "name_bn": "শিবরামপুর",
+      "lat": 25.925,
+      "lon": 88.652,
+      "kind": "village"
+    },
+    {
+      "name": "Soyer",
+      "name_bn": "সয়ার",
+      "lat": 25.781,
+      "lon": 89.025,
+      "kind": "village"
+    },
+    {
+      "name": "Sundarganj",
+      "name_bn": "সুন্দরগঞ্জ",
+      "lat": 25.65,
+      "lon": 89.5,
+      "kind": "town"
+    },
+    {
+      "name": "Tambulpur",
+      "name_bn": "তাম্বুলপুর",
+      "lat": 25.565,
+      "lon": 89.475,
+      "kind": "village"
+    },
+    {
+      "name": "Taraganj",
+      "name_bn": "তারাগঞ্জ",
+      "lat": 25.8111,
+      "lon": 89.0167,
+      "kind": "town"
+    },
+    {
+      "name": "Tepamadhupur",
+      "name_bn": "তেপামধুপুর",
+      "lat": 25.721,
+      "lon": 89.475,
+      "kind": "village"
+    },
+    {
+      "name": "Tetulia",
+      "name_bn": "তেঁতুলিয়া",
+      "lat": 26.5,
+      "lon": 88.4333,
+      "kind": "town"
+    },
+    {
+      "name": "Thakurgaon",
+      "name_bn": "ঠাকুরগাঁও",
+      "lat": 26.0333,
+      "lon": 88.4667,
+      "kind": "town"
+    },
+    {
+      "name": "Thanahat",
+      "name_bn": "থানাহাট",
+      "lat": 25.565,
+      "lon": 89.665,
+      "kind": "village"
+    },
+    {
+      "name": "Tukuria",
+      "name_bn": "টুকুরিয়া",
+      "lat": 25.431,
+      "lon": 89.231,
+      "kind": "village"
+    },
+    {
+      "name": "Tushbhandar",
+      "name_bn": "তুষভাণ্ডার",
+      "lat": 25.995,
+      "lon": 89.245,
+      "kind": "village"
+    },
+    {
+      "name": "Ulipur",
+      "name_bn": "উলিপুর",
+      "lat": 25.6667,
+      "lon": 89.6333,
+      "kind": "town"
+    }
+  ]
+}
