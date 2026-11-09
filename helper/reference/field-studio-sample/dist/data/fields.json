@@ -1,0 +1,125 @@
+{
+ "fields": {
+  "burirhat": {
+   "id": "burirhat",
+   "name": "Burirhat research farm",
+   "bn": "বুড়িরহাট গবেষণা খামার",
+   "kind": "BARI Regional Agricultural Research Station · trial plot block",
+   "how": "Plot mosaic visible in Sentinel-2 seasonal composites, next to the OSM landmark ‘Burirhat Farm Shahi Mosque’ (25.8210 N, 89.2354 E). Individual treatment plots are not published, so values are block medians.",
+   "polygon": [
+    [
+     89.2356,
+     25.822797
+    ],
+    [
+     89.238793,
+     25.822797
+    ],
+    [
+     89.238793,
+     25.820731
+    ],
+    [
+     89.2356,
+     25.820731
+    ],
+    [
+     89.2356,
+     25.822797
+    ]
+   ],
+   "centroid": [
+    89.2372,
+    25.82176
+   ],
+   "area_ha": 7.36,
+   "size_m": [
+    320,
+    230
+   ],
+   "pixels": 736,
+   "grid": {
+    "rows": [
+     130,
+     153
+    ],
+    "cols": [
+     152,
+     184
+    ]
+   },
+   "radar_water_freq": 0.0006,
+   "elev_m": 35.5,
+   "elev_range": [
+    33.0,
+    40.0
+   ],
+   "elev_pct_10km": 73
+  },
+  "farmer": {
+   "id": "farmer",
+   "name": "Burirhat north paddy (example plot)",
+   "bn": "বুড়িরহাট উত্তর ধানক্ষেত (উদাহরণ)",
+   "kind": "Smallholder paddy block · owner not identified",
+   "how": "Selected because Sentinel-2 NDVI showed a Boro green-up (Feb–Mar), a low pre-monsoon period and an Aman green-up (Sep–Oct) in every year 2022–2025. That pattern matches Boro → fallow → Aman; the crop names are inferred, not reported by a farmer.",
+   "polygon": [
+    [
+     89.235101,
+     25.832229
+    ],
+    [
+     89.235899,
+     25.832229
+    ],
+    [
+     89.235899,
+     25.831241
+    ],
+    [
+     89.235101,
+     25.831241
+    ],
+    [
+     89.235101,
+     25.832229
+    ]
+   ],
+   "centroid": [
+    89.2355,
+    25.83173
+   ],
+   "area_ha": 0.88,
+   "size_m": [
+    80,
+    110
+   ],
+   "pixels": 88,
+   "grid": {
+    "rows": [
+     25,
+     36
+    ],
+    "cols": [
+     147,
+     155
+    ]
+   },
+   "radar_water_freq": 0.0088,
+   "elev_m": 33.0,
+   "elev_range": [
+    32.0,
+    34.0
+   ],
+   "elev_pct_10km": 21
+  }
+ },
+ "bbox": [
+  89.22043079480994,
+  25.807525332375135,
+  89.25036920519005,
+  25.834474667624868
+ ],
+ "grid_px": 300,
+ "map_px": 600,
+ "basemap": "maps/truecolor.png"
+}

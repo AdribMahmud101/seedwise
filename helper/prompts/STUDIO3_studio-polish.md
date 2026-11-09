@@ -1,4 +1,14 @@
-# STUDIO3 · Make the 3D field studio look like the approved mockup
+# STUDIO3 · Port the owner's sample 3D field model into our studio, fed by our real data
+
+**Source to port:** `helper/reference/field-studio-sample/` (owner's approved standalone demo: `dist/app.mjs`,
+`field-shape.mjs`, `software-renderer.mjs`, `style.css`, README). Port its 3D field model into
+`src/legacy/studio3d.js` using our npm `three` (not its vendored copy): exact polygon outline, sampled elevation
+surface, crop rows, textured soil sides, movable cutaway, camera/framing, close-up + top views, height exaggeration,
+contours, wind sway (skip with reduced motion), and its Canvas software-renderer fallback when WebGL is missing.
+Replace ALL its demo data (Burirhat fields, its power/ndvi/s1 json, illustrative rotations) with our `StudioData`
+from `buildStudioData()` (+ `public/landscape/dem` Terrarium tiles for elevation if you need a surface; label
+"30 m NASADEM, flat at plot scale"). Keep our lazy poster, rail, truth labels, bilingual text, repaint re-attach.
+Do not ship the reference folder (it must not be imported by app code).
 
 Target look: `helper/prompts/STUDIO3_mockup.png` (owner-approved). Current state: `STUDIO3_now-1280.png`,
 `STUDIO3_now-390.png`. Files: `src/legacy/studio3d.js`, `app/studio.css`, `src/legacy/rotations.js` (picker only).

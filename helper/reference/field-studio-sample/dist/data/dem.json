@@ -1,0 +1,1 @@
+{"source": "NASADEM HGT v001 (NASA JPL; SRTM reprocessed, 1 arc-second \u2248 30 m) via Microsoft Planetary Computer", "bbox": [89.18550264936648, 25.77608444125045, 89.28529735063351, 25.865915558749553], "min": 23.0, "max": 50.0, "p10": 31.0, "p50": 34.0, "p90": 37.0}
