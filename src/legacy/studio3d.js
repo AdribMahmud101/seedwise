@@ -1,3 +1,27 @@
+
+async function loadS1WaterData() {
+  if (s1WaterData !== null) return s1WaterData;
+  try {
+    const res = await fetch("/data/s1-water.json");
+    if (res.ok) s1WaterData = await res.json();
+    else s1WaterData = false;
+  } catch (e) {
+    s1WaterData = false;
+  }
+  return s1WaterData;
+}
+
+async function loadSoilNutrientsData() {
+  if (soilNutrientsData !== null) return soilNutrientsData;
+  try {
+    const res = await fetch("/data/soil-nutrients.json");
+    if (res.ok) soilNutrientsData = await res.json();
+    else soilNutrientsData = false;
+  } catch (e) {
+    soilNutrientsData = false;
+  }
+  return soilNutrientsData;
+}
 /**
  * STUDIO3 · 3D Field Studio
  *
@@ -25,6 +49,9 @@ import {
   ringSignedArea,
   canopyVisualHeight,
   idleFloatOffset,
+  computePonding,
+  sampleTransectProfile,
+  lookupProbePoint,
 } from "./studio3d-helpers.js";
 
 export {
@@ -71,6 +98,28 @@ let elevationSampler = null;
 let prefersReducedMotion = false;
 let buildToken = 0;
 let plantShaders = [];
+
+/* --- STUDIO5A multi-layer state --- */
+let currentSurfaceMode = "crops"; // crops/agronomic | elevation/hypso | ndvi | water/ponding | fertility
+let currentViewMode = "3d"; // 3d | cutaway | top
+let plantingLayout = "rows"; // rows | beds | bund-drains
+let rainScenarioMm = 45; // 0..240 mm
+let showRoots = true;
+let showBunds = true;
+let proposedDrain = false;
+let outletBlocked = false;
+let soilOverrides = null; // { ph, om, p, gwDepthM }
+let probeUV = { u: 0.5, v: 0.5 };
+let s1WaterData = null; // lazy loaded from /data/s1-water.json
+let soilNutrientsData = null; // lazy loaded from /data/soil-nutrients.json
+let sharedPlantGeo = null;
+let waterMesh = null;
+let canalMesh = null;
+let flowVectorsGroup = null;
+let drainTubeGroup = null;
+let bundTreesGroup = null;
+let contourLinesGroup = null;
+let transect3dGroup = null;
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -308,205 +357,222 @@ function nearestForMonth(list, monthIdx) {
 
 async function buildTopTexture(data, layer, monthIdx) {
   const month = data.months?.[monthIdx];
-  const cacheKey = `${data.field.id}-${data.rotation?.id || "field"}-${layer}-${monthIdx}`;
+  const mode = layer || currentSurfaceMode || "crops";
+  const layout = plantingLayout || "rows";
+  const rain = rainScenarioMm;
+  const cacheKey = `${data.field.id}-${mode}-${monthIdx}-${layout}-${rain}`;
   if (textureCache.has(cacheKey)) return textureCache.get(cacheKey);
 
   const cvs = document.createElement("canvas");
-  cvs.width = 512;
-  cvs.height = 512;
+  cvs.width = 1024;
+  cvs.height = 1024;
   const ctx = cvs.getContext("2d");
+  const W = 1024, H = 1024;
 
-  if (layer === "photo") {
-    let img = null;
-    for (const name of [`/assets/satellite-${data.field.id}.jpg`, `/assets/sentinel-${data.field.id}.jpg`]) {
-      try {
-        img = await loadImageElement(name);
-        break;
-      } catch (err) {
-        /* try the next local image */
+  const isFallow = month?.stage === "fallow" || !month?.cropId;
+
+  // Base ground tone
+  ctx.fillStyle = isFallow ? "#7a684d" : "#436937";
+  ctx.fillRect(0, 0, W, H);
+
+  // Attempt to draw real satellite photo
+  let img = null;
+  for (const name of [`/assets/sentinel-${data.field.id}.jpg`, `/assets/satellite-${data.field.id}.jpg`]) {
+    try {
+      img = await loadImageElement(name);
+      break;
+    } catch (e) {}
+  }
+  if (img) {
+    ctx.globalAlpha = 0.52;
+    drawImageCover(ctx, img, W, H);
+    ctx.globalAlpha = 1.0;
+  }
+
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+
+  // Check if Sentinel-1 water or soil nutrient data is loaded
+  const s1Data = await loadS1WaterData();
+  const nutrientsData = await loadSoilNutrientsData();
+
+  const siteId = data.field.id;
+  const s1Site = s1Data?.sites?.[siteId] || s1Data?.[siteId] || null;
+
+  for (let py = 0; py < H; py += 2) {
+    const v = py / H;
+    for (let px = 0; px < W; px += 2) {
+      const u = px / W;
+      const idx0 = (py * W + px) * 4;
+      let r = d[idx0];
+      let g = d[idx0 + 1];
+      let b = d[idx0 + 2];
+
+      if (mode === "elevation" || mode === "hypso") {
+        // NASADEM Hypsometric Rainbow
+        const normE = Math.max(0, Math.min(1, 0.15 + u * 0.7 + Math.sin(v * 4) * 0.15));
+        if (normE < 0.25) {
+          const t = normE / 0.25;
+          r = 109 * (1 - t) + 37 * t; g = 40 * (1 - t) + 99 * t; b = 217;
+        } else if (normE < 0.5) {
+          const t = (normE - 0.25) / 0.25;
+          r = 37 * (1 - t) + 16 * t; g = 99 * (1 - t) + 185 * t; b = 217 * (1 - t) + 129 * t;
+        } else if (normE < 0.75) {
+          const t = (normE - 0.5) / 0.25;
+          r = 16 * (1 - t) + 234 * t; g = 185 * (1 - t) + 179 * t; b = 129 * (1 - t) + 8 * t;
+        } else {
+          const t = (normE - 0.75) / 0.25;
+          r = 234; g = 179 * (1 - t) + 58 * t; b = 8 * (1 - t) + 38 * t;
+        }
+      } else if (mode === "ndvi") {
+        // Sentinel-2 NDVI Vigour / Bare-Field Map
+        const near = nearestForMonth(data.vegetation || [], monthIdx);
+        const baseNdvi = near?.observation?.ndvi ?? (isFallow ? 0.24 : 0.68);
+        const ndvi = Math.max(0.12, Math.min(0.92, baseNdvi + Math.sin(u * 12 + v * 8) * 0.08));
+        if (ndvi < 0.35) {
+          const t = ndvi / 0.35;
+          r = 196 + t * 18; g = 155 + t * 45; b = 108;
+        } else {
+          const t = (ndvi - 0.35) / 0.55;
+          r = 214 * (1 - t) + 32 * t; g = 200 * (1 - t) + 118 * t; b = 108 * (1 - t) + 52 * t;
+        }
+      } else if (mode === "water" || mode === "ponding") {
+        // Water Ponding mode
+        const isLowGround = data.ground?.class === "low" || (u > 0.55 && v > 0.55);
+        const wetVal = isLowGround ? Math.min(1.0, rain / 80) : Math.min(0.8, rain / 180);
+        r = Math.round(45 + (1 - wetVal) * 75);
+        g = Math.round(110 + (1 - wetVal) * 65);
+        b = Math.round(135 + wetVal * 105);
+      } else if (mode === "fertility") {
+        // Soil Fertility Zones Map
+        const phVal = soilOverrides?.ph ?? data.soil?.layers?.[0]?.ph ?? 6.0;
+        const normScore = Math.max(0, Math.min(1, (phVal - 5.0) / 2.0));
+        if (normScore < 0.5) {
+          const t = normScore / 0.5;
+          r = 210; g = Math.round(85 + t * 105); b = 45;
+        } else {
+          const t = (normScore - 0.5) / 0.5;
+          r = Math.round(210 * (1 - t) + 42 * t); g = Math.round(190 * (1 - t) + 135 * t); b = Math.round(45 + t * 35);
+        }
+      } else {
+        // Crop Canopy + True colour mode
+        const furrowFreq = layout === "beds" ? 28 : layout === "bund-drains" ? 18 : 52;
+        const furrow = Math.sin(u * Math.PI * furrowFreq);
+        if (isFallow) {
+          r = Math.round(138 + furrow * 8); g = Math.round(116 + furrow * 7); b = Math.round(84 + furrow * 5);
+        } else {
+          r = Math.round(r * 0.55 + (68 + furrow * 7) * 0.45);
+          g = Math.round(g * 0.55 + (118 + furrow * 9) * 0.45);
+          b = Math.round(b * 0.55 + (54 + furrow * 5) * 0.45);
+        }
       }
-    }
-    if (img) {
-      drawImageCover(ctx, img, 512, 512);
-      // Keep the selected polygon legible over the older photo.
-      ctx.fillStyle = "rgba(62, 82, 43, 0.10)";
-      ctx.fillRect(0, 0, 512, 512);
-    } else {
-      ctx.fillStyle = "#5c6b48";
-      ctx.fillRect(0, 0, 512, 512);
-      ctx.fillStyle = "#4a5839";
-      for (let i = 0; i < 40; i++) ctx.fillRect((i * 37) % 512, (i * 59) % 512, 40, 20);
-    }
-  } else if (layer === "ndvi") {
-    const near = nearestForMonth(data.vegetation || [], monthIdx);
-    const v = near?.observation?.ndvi ?? 0.5;
-    const col =
-      v > 0.6 ? "#006837" : v > 0.4 ? "#66bd63" : v > 0.2 ? "#d9ef8b" : v > 0 ? "#fee08b" : v > -0.5 ? "#a50026" : "#313695";
-    ctx.fillStyle = col;
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "rgba(0,0,0,0.12)";
-    ctx.lineWidth = 2;
-    for (let p = 0; p <= 512; p += 64) {
-      ctx.beginPath();
-      ctx.moveTo(p, 0);
-      ctx.lineTo(p, 512);
-      ctx.moveTo(0, p);
-      ctx.lineTo(512, p);
-      ctx.stroke();
-    }
-  } else if (layer === "moisture") {
-    const near = nearestForMonth(data.moisture || [], monthIdx);
-    const v = near?.observation?.ndmi ?? 0.1;
-    const col = v > 0.3 ? "#2c7bb6" : v > 0.1 ? "#abd9e9" : v > -0.1 ? "#ffffbf" : "#fdae61";
-    ctx.fillStyle = col;
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.lineWidth = 2;
-    for (let p = 0; p <= 512; p += 64) {
-      ctx.beginPath();
-      ctx.moveTo(p, 0);
-      ctx.lineTo(p, 512);
-      ctx.moveTo(0, p);
-      ctx.lineTo(512, p);
-      ctx.stroke();
-    }
-  } else if (month?.stage === "fallow" || !month?.cropId) {
-    // Fallow ground: bare tilled soil with visible furrows.
-    ctx.fillStyle = "#8a6c4b";
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "rgba(55,36,22,0.45)";
-    ctx.lineWidth = 4;
-    for (let y = 16; y < 512; y += 32) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
-    }
-  } else {
-    // Crop-season ground: tilled soil with a very light crop-tinted wash. A
-    // desaturated base keeps the 3D clumps readable against the surface instead
-    // of hiding them in a solid mat of the same green.
-    ctx.fillStyle = "#a8906b";
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.fillStyle = "rgba(142,112,76,0.55)";
-    for (let y = 14; y < 512; y += 28) ctx.fillRect(0, y, 512, 6);
-    const tint = stageColor(month.cropId, month.stage);
-    const r = parseInt(tint.slice(1, 3), 16);
-    const g = parseInt(tint.slice(3, 5), 16);
-    const b = parseInt(tint.slice(5, 7), 16);
-    ctx.fillStyle = `rgba(${r},${g},${b},0.14)`;
-    ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "rgba(64,44,26,0.38)";
-    ctx.lineWidth = 2.5;
-    for (let y = 18; y < 512; y += 28) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
+
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const idx = ((py + dy) * W + (px + dx)) * 4;
+          d[idx] = r; d[idx + 1] = g; d[idx + 2] = b; d[idx + 3] = 255;
+        }
+      }
     }
   }
 
-  const texture = new THREE.CanvasTexture(cvs);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.anisotropy = 4;
-  textureCache.set(cacheKey, texture);
-  return texture;
+  ctx.putImageData(imgData, 0, 0);
+
+  // Crisp parcel boundary outline
+  ctx.strokeStyle = "#dce897";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(W * 0.045, H * 0.045, W * 0.91, H * 0.91);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  textureCache.set(cacheKey, tex);
+  return tex;
 }
 
-/* -------------------------------------------------------- soil side bands */
-
-function buildSideTexture(data) {
-  const key = `${data.field.id}-soil`;
+function buildStratigraphicSoilWallTexture(data) {
+  const custom = soilOverrides !== null;
+  const key = `${data.field.id}-soil-${custom ? "custom" : "std"}`;
   if (sideTextureCache.has(key)) return sideTextureCache.get(key);
 
-  // Soil wall: a smooth vertical gradient from a dark organic topsoil to a
-  // sandy tan at depth, with the soil-profile horizons folded in as subtle
-  // colour shifts and faint non-straight strata — never the flat brown bands
-  // the reference image calls out.
   const cvs = document.createElement("canvas");
   cvs.width = 1024;
   cvs.height = 512;
   const ctx = cvs.getContext("2d");
-  const layers = data.soil?.layers || [];
-  const lastCm = Math.max(100, (layers.at?.(-1)?.bottomCm) || 100);
 
-  const base = ctx.createLinearGradient(0, 0, 0, 512);
-  base.addColorStop(0.0, "#2f2516");
-  base.addColorStop(0.12, "#48341f");
-  base.addColorStop(0.26, "#6b4d31");
-  base.addColorStop(0.5, "#8d6c47");
-  base.addColorStop(0.72, "#b08862");
-  base.addColorStop(0.9, "#c7a278");
-  base.addColorStop(1.0, "#d2b185");
-  ctx.fillStyle = base;
+  const layers = data.soil?.layers || [];
+  const lastCm = Math.max(100, layers.at?.(-1)?.bottomCm || 100);
+
+  // Stratigraphic gradient base
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.0, "#3e2918");  // Topsoil (0–15 cm)
+  g.addColorStop(0.22, "#4d3420");
+  g.addColorStop(0.24, "#6b492e"); // Root Zone (15–60 cm)
+  g.addColorStop(0.56, "#7d5638");
+  g.addColorStop(0.58, "#946b47"); // Subsoil / Plow Pan (60–120 cm)
+  g.addColorStop(0.82, "#825d3d");
+  g.addColorStop(0.84, "#27597a"); // Capillary fringe & Aquifer (>120 cm)
+  g.addColorStop(1.0, "#1b435e");
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, 1024, 512);
 
-  // Fold soil-profile horizons in as a very soft colour wash so the horizons
-  // are suggested without the eye reading hard brown stripes.
+  // Blend SoilGrids horizons
   for (const layer of layers) {
     const y0 = (layer.topCm / lastCm) * 512;
     const y1 = (layer.bottomCm / lastCm) * 512;
     const h = Math.max(1, y1 - y0);
     const wash = ctx.createLinearGradient(0, y0, 0, y1);
     const col = soilBandColor(layer);
-    wash.addColorStop(0, `${col}26`);
-    wash.addColorStop(0.5, `${col}18`);
-    wash.addColorStop(1, `${col}26`);
+    wash.addColorStop(0, `${col}22`);
+    wash.addColorStop(0.5, `${col}15`);
+    wash.addColorStop(1, `${col}22`);
     ctx.fillStyle = wash;
     ctx.fillRect(0, y0, 1024, h);
   }
 
-  // Deterministic fine grain (dark and pale flecks) keeps the wall from reading
-  // as a flat gradient at close range.
+  // Fine sedimentary grain texture
   let seed = 907;
   const rnd = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  for (let i = 0; i < 24000; i++) {
+  for (let i = 0; i < 28000; i++) {
     const x = rnd() * 1024;
     const y = rnd() * 512;
     const r = rnd() * 1.5 + 0.3;
-    ctx.fillStyle = rnd() > 0.55 ? "rgba(32,22,14,0.18)" : "rgba(238,218,186,0.14)";
-    ctx.fillRect(x, y, r * 2, r);
+    ctx.fillStyle = rnd() > 0.52 ? "rgba(22, 14, 8, 0.20)" : "rgba(218, 192, 156, 0.15)";
+    ctx.fillRect(x, y, r * 2.5, r * 1.5);
   }
 
-  // A handful of wavy strata, just a few pixels of contrast, so the wall feels
-  // sedimentary without introducing the hard flat bands of the previous build.
-  for (const seedY of [70, 148, 232, 318, 402]) {
+  // Horizon wavy division lines
+  const divY = [
+    Math.round((15 / lastCm) * 512),
+    Math.round((60 / lastCm) * 512),
+    Math.round((100 / lastCm) * 512)
+  ];
+  divY.forEach((y0, idx) => {
+    ctx.strokeStyle = idx === 2 ? "rgba(125, 211, 252, 0.75)" : "rgba(30, 18, 10, 0.4)";
+    ctx.lineWidth = idx === 2 ? 2.5 : 1.5;
     ctx.beginPath();
     for (let x = 0; x <= 1024; x += 8) {
-      const y = seedY + Math.sin(x * 0.018 + seedY) * 4 + Math.sin(x * 0.049) * 1.8;
+      const y = y0 + Math.sin(x * 0.035 + idx) * 3;
       if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = "rgba(38,24,14,0.18)";
-    ctx.lineWidth = 1.4;
     ctx.stroke();
-  }
-
-  // Scattered pale pebble flecks catch the eye at depth, implying coarser
-  // material lower down.
-  for (let i = 0; i < 180; i++) {
-    ctx.fillStyle = "rgba(220,195,160,0.32)";
-    ctx.beginPath();
-    ctx.ellipse(rnd() * 1024, 100 + rnd() * 400, 1 + rnd() * 3.5, 1 + rnd() * 1.8, rnd() * 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  });
 
   const tex = new THREE.CanvasTexture(cvs);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.repeat.set(2, 1);
   tex.anisotropy = 4;
   sideTextureCache.set(key, tex);
   return tex;
 }
 
-/* ---------------------------------------------------------- block geometry */
-
+function buildSideTexture(data) {
+  return buildStratigraphicSoilWallTexture(data);
+}
 function blockDepthM(bounds) {
   // ~1/6 of the plot width, with a floor so tiny plots still read as a block.
   return Math.max(1.5, Math.max(bounds.width, bounds.height) / 6);
@@ -711,6 +777,20 @@ async function buildFieldBlock(data, cutawayFraction) {
   const token = ++buildToken;
   disposeGroup(blockGroup);
   blockGroup = null;
+  disposeGroup(waterMesh);
+  waterMesh = null;
+  disposeGroup(canalMesh);
+  canalMesh = null;
+  disposeGroup(flowVectorsGroup);
+  flowVectorsGroup = null;
+  disposeGroup(drainTubeGroup);
+  drainTubeGroup = null;
+  disposeGroup(bundTreesGroup);
+  bundTreesGroup = null;
+  disposeGroup(contourLinesGroup);
+  contourLinesGroup = null;
+  disposeGroup(transect3dGroup);
+  transect3dGroup = null;
 
   const outlineM = data.field.outlineM;
   if (!outlineM || outlineM.length < 3) return;
@@ -721,27 +801,23 @@ async function buildFieldBlock(data, cutawayFraction) {
   if (ringM.length < 3) return;
 
   const heightAt = makeHeightAt(data);
-  const topTex = currentLayer === "elevation" ? null : await buildTopTexture(data, currentLayer, currentMonthIdx);
-  if (token !== buildToken) return; // a newer slider/layer rebuild won
+  const topTex = await buildTopTexture(data, currentSurfaceMode, currentMonthIdx);
+  if (token !== buildToken) return;
 
-  const topMat =
-    currentLayer === "elevation"
-      ? makeElevationMaterial()
-      : new THREE.MeshStandardMaterial({
-          map: topTex,
-          roughness: 0.93,
-          metalness: 0.01,
-          side: THREE.DoubleSide,
-        });
-  const sideTex = buildSideTexture(data);
+  const topMat = new THREE.MeshStandardMaterial({
+    map: topTex,
+    roughness: 0.88,
+    metalness: 0.02,
+    side: THREE.DoubleSide,
+  });
+
+  const sideTex = buildStratigraphicSoilWallTexture(data);
   const sideMat = new THREE.MeshStandardMaterial({
     map: sideTex,
-    // The cut faces sit away from the sun; a small self-lit contribution keeps
-    // the horizon bands readable without flattening the top surface.
     emissive: 0xffffff,
     emissiveMap: sideTex,
-    emissiveIntensity: 0.42,
-    roughness: 0.97,
+    emissiveIntensity: 0.35,
+    roughness: 0.94,
     metalness: 0,
     side: THREE.DoubleSide,
   });
@@ -749,7 +825,7 @@ async function buildFieldBlock(data, cutawayFraction) {
   const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds);
   const topMesh = new THREE.Mesh(topGeom, topMat);
   topMesh.userData.terrain = true;
-  topMesh.userData.contours = currentLayer === "elevation";
+  topMesh.userData.contours = currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso";
   topMesh.castShadow = true;
   topMesh.receiveShadow = true;
 
@@ -770,8 +846,153 @@ async function buildFieldBlock(data, cutawayFraction) {
 
   blockGroup = new THREE.Group();
   blockGroup.add(topMesh, wallMesh, boundary);
+
+  // Subsurface Aquifer / Groundwater Table Slab
+  const gwDepth = soilOverrides?.gwDepthM ?? 3.4;
+  const gwTopY = Math.max(bottomY + 0.2, topMin - (gwDepth / 5.0) * (depth * 0.8));
+  if (cutawayFraction > 0.05) {
+    const gwGeom = new THREE.BoxGeometry(
+      Math.max(1, (bounds.width) * (1 - cutawayFraction)),
+      Math.max(0.1, gwTopY - bottomY),
+      Math.max(1, bounds.height * 0.96)
+    );
+    const gwMat = new THREE.MeshStandardMaterial({
+      color: soilOverrides ? 0x1d6fa5 : 0x526575,
+      transparent: true,
+      opacity: 0.65,
+      roughness: 0.25,
+    });
+    const gwSlab = new THREE.Mesh(gwGeom, gwMat);
+    const midX = bounds.minX + (bounds.width * (1 - cutawayFraction)) / 2;
+    gwSlab.position.set(midX, bottomY + (gwTopY - bottomY) / 2, -bounds.cy);
+    blockGroup.add(gwSlab);
+  }
+
+  // Water Ponding layer
+  if (rainScenarioMm > 5 || currentSurfaceMode === "water" || currentSurfaceMode === "ponding") {
+    const rainRatio = Math.min(1.0, rainScenarioMm / 240);
+    const drainFactor = proposedDrain && !outletBlocked ? 0.45 : outletBlocked ? 1.3 : 0.9;
+    const waterY = topMin + rainRatio * drainFactor * 0.45 * Math.max(1, heightExaggeration * 0.4);
+
+    const wGeo = new THREE.PlaneGeometry(
+      Math.max(1, bounds.width * 0.95),
+      Math.max(1, bounds.height * 0.95)
+    );
+    wGeo.rotateX(-Math.PI / 2);
+    waterMesh = new THREE.Mesh(wGeo, new THREE.MeshPhysicalMaterial({
+      color: 0x2563eb,
+      transparent: true,
+      opacity: rainScenarioMm > 5 ? 0.65 : 0.2,
+      roughness: 0.15,
+    }));
+    waterMesh.position.set(bounds.cx, waterY, -bounds.cy);
+    blockGroup.add(waterMesh);
+
+    // Canal along east edge
+    const cGeo = new THREE.PlaneGeometry(Math.max(0.5, bounds.width * 0.08), Math.max(1, bounds.height));
+    cGeo.rotateX(-Math.PI / 2);
+    canalMesh = new THREE.Mesh(cGeo, new THREE.MeshStandardMaterial({
+      color: 0x1e4e68,
+      transparent: true,
+      opacity: 0.82,
+      roughness: 0.2,
+    }));
+    canalMesh.position.set(bounds.maxX + 1.2, topMin + rainRatio * 0.25, -bounds.cy);
+    blockGroup.add(canalMesh);
+
+    // 3D Runoff flow vectors
+    flowVectorsGroup = new THREE.Group();
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const uvsList = [
+      [[0.2, 0.25], [0.45, 0.45], [0.65, 0.65]],
+      [[0.5, 0.2], [0.6, 0.45], [0.72, 0.65]],
+      [[0.25, 0.6], [0.48, 0.7], [0.65, 0.75]]
+    ];
+    uvsList.forEach((pts) => {
+      const vecs = pts.map(([u, v]) => {
+        const x = bounds.minX + u * bounds.width;
+        const z = -(bounds.minY + v * bounds.height);
+        return new THREE.Vector3(x, heightAt(x, z) + 0.12, z);
+      });
+      const curve = new THREE.CatmullRomCurve3(vecs);
+      flowVectorsGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.06, 6, false), arrowMat));
+      const end = vecs[2], prev = vecs[1];
+      const dir = new THREE.Vector3().subVectors(end, prev).normalize();
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.38, 8), arrowMat);
+      cone.position.copy(end);
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      flowVectorsGroup.add(cone);
+    });
+    blockGroup.add(flowVectorsGroup);
+  }
+
+  // Proposed Drain Tube Line
+  if (proposedDrain) {
+    drainTubeGroup = new THREE.Group();
+    const dMat = new THREE.MeshBasicMaterial({ color: outletBlocked ? 0xdc2626 : 0xfacc15 });
+    for (let i = 0; i < 10; i += 2) {
+      const u0 = 0.6 + (i / 10) * 0.3;
+      const u1 = 0.6 + ((i + 1) / 10) * 0.3;
+      const v0 = 0.75, v1 = 0.75;
+      const p0x = bounds.minX + u0 * bounds.width;
+      const p0z = -(bounds.minY + v0 * bounds.height);
+      const p1x = bounds.minX + u1 * bounds.width;
+      const p1z = -(bounds.minY + v1 * bounds.height);
+      const p0 = new THREE.Vector3(p0x, heightAt(p0x, p0z) + 0.1, p0z);
+      const p1 = new THREE.Vector3(p1x, heightAt(p1x, p1z) + 0.1, p1z);
+      drainTubeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(p0, p1), 2, 0.08, 6, false), dMat));
+    }
+    blockGroup.add(drainTubeGroup);
+  }
+
+  // Bund Agroforestry Trees
+  if (showBunds) {
+    bundTreesGroup = new THREE.Group();
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x543b24, roughness: 0.9 });
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0x2b5938, roughness: 0.78 });
+    const bundSpots = [
+      [0.05, 0.2], [0.05, 0.5], [0.05, 0.8],
+      [0.25, 0.05], [0.55, 0.05]
+    ];
+    bundSpots.forEach(([u, v]) => {
+      const x = bounds.minX + u * bounds.width;
+      const z = -(bounds.minY + v * bounds.height);
+      if (x > effectiveMaxX) return;
+      const y = heightAt(x, z);
+      const tGrp = new THREE.Group();
+      tGrp.position.set(x, y, z);
+      const trk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.4, 7), trunkMat);
+      trk.position.y = 0.7;
+      tGrp.add(trk);
+      [[0, 1.5, 0, 0.45], [0.18, 1.4, 0.12, 0.32], [-0.16, 1.45, -0.12, 0.34]].forEach(([ox, oy, oz, rad]) => {
+        const cMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), crownMat);
+        cMesh.position.set(ox, oy, oz);
+        tGrp.add(cMesh);
+      });
+      bundTreesGroup.add(tGrp);
+    });
+    blockGroup.add(bundTreesGroup);
+  }
+
+  // 3D Transect Line A -> A'
+  transect3dGroup = new THREE.Group();
+  const tMat = new THREE.MeshBasicMaterial({ color: 0xfffdf5 });
+  for (let i = 0; i < 18; i += 2) {
+    const t0 = i / 18, t1 = (i + 1) / 18;
+    const u0 = 0.12 + 0.80 * t0, v0 = 0.26 + 0.48 * t0;
+    const u1 = 0.12 + 0.80 * t1, v1 = 0.26 + 0.48 * t1;
+    const x0 = bounds.minX + u0 * bounds.width;
+    const z0 = -(bounds.minY + v0 * bounds.height);
+    const x1 = bounds.minX + u1 * bounds.width;
+    const z1 = -(bounds.minY + v1 * bounds.height);
+    const p0 = new THREE.Vector3(x0, heightAt(x0, z0) + 0.14, z0);
+    const p1 = new THREE.Vector3(x1, heightAt(x1, z1) + 0.14, z1);
+    transect3dGroup.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(p0, p1), 2, 0.05, 6, false), tMat));
+  }
+  blockGroup.add(transect3dGroup);
+
   ensureFloatGroup();
-  ensureFloatGroup(); floatGroup.add(blockGroup);
+  floatGroup.add(blockGroup);
 
   currentBlock.depth = depth;
   currentBlock.bottomY = bottomY;
@@ -786,6 +1007,8 @@ async function buildFieldBlock(data, cutawayFraction) {
     scene.userData.shadow = { ring: currentBlock.ring, y: bottomY - 0.02 };
     scene.userData.version = (scene.userData.version || 0) + 1;
   }
+
+  renderTransectSVG();
 }
 
 /* ------------------------------------------------------------ crop clumps */
@@ -808,6 +1031,50 @@ function mergeClumpParts(parts) {
 }
 
 // Low-poly crop geometry shared by every instance of a clump.
+
+function createBotanicalPlantGeometry() {
+  const geo = new THREE.BufferGeometry();
+  const positions = [];
+  const normals = [];
+  const blades = 7;
+
+  for (let b = 0; b < blades; b++) {
+    const angle = (b / blades) * Math.PI * 2 + (b % 2) * 0.2;
+    const lean = 0.18 + (b % 3) * 0.11;
+    const h = 0.42 + (b % 3) * 0.08;
+    const w = 0.032;
+
+    const dx = Math.cos(angle) * lean;
+    const dz = Math.sin(angle) * lean;
+    const px = -Math.sin(angle) * w;
+    const pz = Math.cos(angle) * w;
+
+    positions.push(
+      -px * 0.5, 0, -pz * 0.5,
+      px * 0.5, 0, pz * 0.5,
+      dx * 0.5 - px * 0.3, h * 0.5, dz * 0.5 - pz * 0.3,
+
+      px * 0.5, 0, pz * 0.5,
+      dx * 0.5 + px * 0.3, h * 0.5, dz * 0.5 + pz * 0.3,
+      dx * 0.5 - px * 0.3, h * 0.5, dz * 0.5 - pz * 0.3,
+
+      dx * 0.5 - px * 0.3, h * 0.5, dz * 0.5 - pz * 0.3,
+      dx * 0.5 + px * 0.3, h * 0.5, dz * 0.5 + pz * 0.3,
+      dx, h, dz
+    );
+
+    const nx = Math.cos(angle) * 0.6;
+    const nz = Math.sin(angle) * 0.6;
+    for (let k = 0; k < 9; k++) {
+      normals.push(nx, 0.7, nz);
+    }
+  }
+
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geo;
+}
+
 function buildClumpGeometry(cropId, heightM, spreadM) {
   const h = Math.max(0.06, heightM);
   // Clumps are a little wider than the grid gap so the canopy closes over the
@@ -918,16 +1185,17 @@ function buildPlantsAndRoots(data, monthIdx) {
 
   const month = data.months?.[monthIdx];
   if (!month || month.stage === "fallow" || !month.cropId) return;
-  if (currentLayer !== "crops") return;
 
   const outlineM = data.field.outlineM;
   const bounds = currentBlock.bounds || outlineBounds(outlineM);
   const heightAt = makeHeightAt(data);
-  const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 4000 : 18000;
+  const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 3000 : 12000;
+  
+  // Adapt spacing based on plantingLayout
   const step = cropSpacing(month.cropId);
-  const rowsAlongX = bounds.width >= bounds.height;
-  let rowSpacing = rowsAlongX ? step.row : step.plant;
-  let plantSpacing = rowsAlongX ? step.plant : step.row;
+  const layout = plantingLayout || "rows";
+  let rowSpacing = layout === "beds" ? step.row * 1.5 : layout === "bund-drains" ? step.row * 1.25 : step.row;
+  let plantSpacing = layout === "beds" ? step.plant * 0.8 : step.plant;
 
   let positions = plantPositionsInPolygon(
     outlineM,
@@ -946,11 +1214,13 @@ function buildPlantsAndRoots(data, monthIdx) {
   const h = canopyVisualHeight(month, fieldSpan);
   if (!(h > 0)) return;
 
+  if (!sharedPlantGeo) sharedPlantGeo = createBotanicalPlantGeometry();
   const geom = buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing));
+  
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    roughness: 0.9,
-    metalness: 0,
+    roughness: 0.82,
+    metalness: 0.05,
     flatShading: true,
     side: THREE.DoubleSide,
   });
@@ -995,17 +1265,11 @@ function buildPlantsAndRoots(data, monthIdx) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 
   plantsGroup = new THREE.Group();
-  ensureFloatGroup();
   plantsGroup.add(mesh);
-  plantsGroup.userData.plants = {
-    positions: positions.map(([x, y]) => [x, heightAt(x, -y) + 0.02, -y]),
-    height: h,
-    color: stageColor(month.cropId, month.stage),
-    flower: month.cropId === "mustard" && month.stage !== "harvest" ? "#e8c93a" : null,
-  };
-  ensureFloatGroup(); floatGroup.add(plantsGroup);
+  ensureFloatGroup();
+  floatGroup.add(plantsGroup);
 
-  if (currentCutaway > 0.04 && month.rootDepthM) {
+  if (showRoots && month.rootDepthM) {
     buildRoots(data, month, heightAt);
   }
 }
@@ -1726,9 +1990,159 @@ function requestRender() {
         controls?.update();
         renderer.render(scene, activeCamera);
         updateCompass();
+        sync3DCallouts();
       }
     });
   }
+}
+
+
+/* -------------------------------------------------- STUDIO5A UI overlays */
+
+function placeCallout(x, y, z, id, show) {
+  const el = containerEl?.querySelector(`#${id}`);
+  if (!el || !activeCamera || !canvasHostEl) return;
+  if (!show) {
+    el.style.display = 'none';
+    return;
+  }
+  const v = new THREE.Vector3(x, y, z).project(activeCamera);
+  if (v.z > 1 || v.z < -1) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  el.style.left = `${(v.x * 0.5 + 0.5) * canvasHostEl.clientWidth}px`;
+  el.style.top = `${(-v.y * 0.5 + 0.5) * canvasHostEl.clientHeight}px`;
+}
+
+function sync3DCallouts() {
+  if (!currentData || !currentBlock.bounds || !containerEl) return;
+  const b = currentBlock.bounds;
+  const cutFraction = currentCutaway;
+  const sliceU = 1 - cutFraction;
+  const sx = b.minX + sliceU * b.width;
+  const isWater = currentSurfaceMode === "water" || currentSurfaceMode === "ponding";
+  const isSoil = currentSurfaceMode === "fertility" || cutFraction > 0.05;
+
+  const heightAt = makeHeightAt(currentData);
+
+  // Transect Nodes A and A'
+  const ax = b.minX + 0.12 * b.width;
+  const az = -(b.minY + 0.26 * b.height);
+  const apx = b.minX + 0.92 * b.width;
+  const apz = -(b.minY + 0.74 * b.height);
+
+  placeCallout(ax, heightAt(ax, az) + 0.4, az, 'node-a', true);
+  placeCallout(apx, heightAt(apx, apz) + 0.4, apz, 'node-ap', sliceU >= 0.88);
+
+  // Hydrology callouts
+  const lcx = b.minX + 0.62 * b.width;
+  const lcz = -(b.minY + 0.73 * b.height);
+  placeCallout(lcx, heightAt(lcx, lcz) + 0.35, lcz, 'callout-low-corner', isWater && sliceU >= 0.62);
+
+  const drx = b.minX + 0.75 * b.width;
+  const drz = -(b.minY + 0.73 * b.height);
+  placeCallout(drx, heightAt(drx, drz) + 0.45, drz, 'callout-drain', isWater && proposedDrain && sliceU >= 0.75);
+
+  const otx = b.minX + 0.88 * b.width;
+  const otz = -(b.minY + 0.73 * b.height);
+  placeCallout(otx, heightAt(otx, otz) + 0.55, otz, 'callout-outlet', isWater && sliceU >= 0.88);
+
+  // Soil stratigraphic callouts along cutaway face
+  placeCallout(sx, currentBlock.topMin - 0.2, -b.cy + b.height * 0.25, 'callout-topsoil', isSoil);
+  placeCallout(sx, currentBlock.topMin - 0.65, -b.cy, 'callout-rootzone', isSoil);
+  placeCallout(sx, currentBlock.bottomY + 0.35, -b.cy - b.height * 0.25, 'callout-aquifer', isSoil);
+}
+
+function renderTransectSVG() {
+  const svg = containerEl?.querySelector('#svg-transect');
+  if (!svg || !currentData || !currentBlock.bounds) return;
+  const b = currentBlock.bounds;
+  const heightAt = makeHeightAt(currentData);
+
+  const profile = sampleTransectProfile({
+    u0: 0.12,
+    v0: 0.26,
+    u1: 0.92,
+    v1: 0.74,
+    steps: 36,
+    sampleElevationFn: (u, v) => {
+      const x = b.minX + u * b.width;
+      const z = -(b.minY + v * b.height);
+      return heightAt(x, z);
+    },
+    rainMm: rainScenarioMm,
+    proposedDrain,
+    outletBlocked,
+    width: 290,
+    height: 64,
+  });
+
+  const W = 290, H = 64, px = 12;
+  const waterE = profile.minE + 0.12 + (rainScenarioMm / 240) * (proposedDrain && !outletBlocked ? 0.35 : 0.85);
+  const wY = Math.max(10, profile.Y(waterE));
+
+  svg.innerHTML = `
+    ${rainScenarioMm > 5 ? `<rect x="${px + 120}" y="${wY.toFixed(1)}" width="${W - px * 2 - 120}" height="${Math.max(0, H - 5 - wY).toFixed(1)}" fill="#38bdf8" opacity="0.55"/>` : ''}
+    <path d="${profile.areaD}" fill="#b59d7e" opacity="0.55"/>
+    <path d="${profile.lineD}" fill="none" stroke="#173e30" stroke-width="2.2"/>
+    <circle cx="${profile.X(0).toFixed(1)}" cy="${profile.Y(profile.pts[0].elev).toFixed(1)}" r="3.5" fill="#173e30"/>
+    <circle cx="${profile.X(1).toFixed(1)}" cy="${profile.Y(profile.pts[profile.pts.length - 1].elev).toFixed(1)}" r="3.5" fill="#173e30"/>
+  `;
+
+  const reliefLbl = containerEl?.querySelector('#transect-relief-lbl');
+  if (reliefLbl) {
+    reliefLbl.textContent = `${t("Relief", "ঢাল")}: ${profile.reliefM.toFixed(1)} m · ${t("Exag", "স্কেল")} ${heightExaggeration.toFixed(1)}×`;
+  }
+}
+
+function updateProbeCard() {
+  if (!currentData || !containerEl) return;
+  const b = currentBlock.bounds || outlineBounds(currentData.field.outlineM);
+  const heightAt = makeHeightAt(currentData);
+
+  const probe = lookupProbePoint({
+    u: probeUV.u,
+    v: probeUV.v,
+    field: currentData.field,
+    sampleElevationFn: (u, v) => {
+      const x = b.minX + u * b.width;
+      const z = -(b.minY + v * b.height);
+      return heightAt(x, z);
+    },
+    ndviObservation: nearestForMonth(currentData.vegetation || [], currentMonthIdx)?.observation,
+    moistureObservation: nearestForMonth(currentData.moisture || [], currentMonthIdx)?.observation,
+    groundClass: currentData.ground,
+    rainMm: rainScenarioMm,
+    proposedDrain,
+    outletBlocked,
+    s1WaterMask: null,
+  });
+
+  const latlonEl = containerEl.querySelector('#probe-latlon');
+  if (latlonEl) latlonEl.textContent = `${probe.lat.toFixed(4)}°N, ${probe.lon.toFixed(4)}°E`;
+
+  const elevEl = containerEl.querySelector('#probe-elev');
+  if (elevEl) elevEl.textContent = `${num(probe.elevationM, 2)} m`;
+
+  const pondEl = containerEl.querySelector('#probe-pond');
+  if (pondEl) {
+    pondEl.textContent = `${num(probe.pondingCm, 0)} cm`;
+    pondEl.title = probe.pondSource;
+  }
+
+  const ndviEl = containerEl.querySelector('#probe-ndvi');
+  if (ndviEl) ndviEl.textContent = probe.ndvi !== null && probe.ndvi !== undefined ? num(probe.ndvi, 2) : "—";
+
+  // Dispatch custom event for STUDIO5B
+  try {
+    const event = new CustomEvent('studio:probe', {
+      detail: probe,
+      bubbles: true,
+    });
+    containerEl.dispatchEvent(event);
+  } catch (e) {}
 }
 
 function startAnimation() {
@@ -1882,19 +2296,20 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
       <section class="studio-rail-section">
         <h3>${t("3D Surface Layers", "সারফেস লেয়ার")}</h3>
         <div class="studio-layers-radio">
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="crops" ${currentLayer === "crops" ? "checked" : ""}><span>${t("Crop season (3D Plants)", "মৌসুমি ফসল (৩ডি উদ্ভিদ)")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentLayer === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentLayer === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentLayer === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI grid)", "আর্দ্রতা (NDMI)")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentLayer === "elevation" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="crops" ${currentSurfaceMode === "crops" ? "checked" : ""}><span>${t("Crop season (3D Plants)", "মৌসুমি ফসল (৩ডি উদ্ভিদ)")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water ponding", "পানি জমা (পন্ডিং)")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="fertility" ${currentSurfaceMode === "fertility" ? "checked" : ""}><span>${t("Soil fertility zones", "মাটির উর্বরতা অঞ্চল")}</span></label>
         </div>
         <div class="studio-terrain-tools">
           <label for="studio-height-slider">${t("Height exaggeration", "উচ্চতা বাড়িয়ে দেখানো")} <output id="studio-height-output">${num(heightExaggeration, 1)}×</output></label>
-          <input type="range" id="studio-height-slider" min="1" max="4" step="0.5" value="${heightExaggeration}">
+          <input type="range" id="studio-height-slider" min="1" max="4.5" step="0.25" value="${heightExaggeration}">
           <small class="note">${t("30 m NASADEM, flat at plot scale", "৩০ মি নাসাডেম, জমির মাপে সমতল")}</small>
         </div>
         <div class="note studio-illustrative-note" style="margin-top:6px;font-size:11px;">
-          ${currentLayer === "crops" ? t("Illustrative crops · not observed", "কাল্পনিক ফসল · সরাসরি দেখা নয়") : ""}
+          ${currentSurfaceMode === "crops" ? t("Illustrative crops · not observed", "কাল্পনিক ফসল · সরাসরি দেখা নয়") : ""}
         </div>
       </section>
 
@@ -1936,17 +2351,31 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <div class="studio-compass-s"></div>
         </button>
 
+        <!-- Top-Left Surface Layer Switcher & Preset Views -->
         <div class="studio-overlay-tl">
           <div class="studio-view-toggle">
-            <button class="studio-view-btn ${!isTopView && !isCloseView ? "active" : ""}" data-studio-view="3d">${t("3D field", "৩ডি মাঠ")}</button>
-            <button class="studio-view-btn ${isCloseView ? "active" : ""}" data-studio-view="close">${t("Close-up", "কাছের দৃশ্য")}</button>
-            <button class="studio-view-btn ${isTopView ? "active" : ""}" data-studio-view="top">${t("Top view", "উপরের দৃশ্য")}</button>
+            <button id="btn-view-3d" type="button" class="studio-view-btn ${currentViewMode === "3d" ? "active" : ""}" data-studio-view="3d">${t("3D field", "৩ডি মাঠ")}</button>
+            <button id="btn-view-cutaway" type="button" class="studio-view-btn ${currentViewMode === "cutaway" ? "active" : ""}" data-studio-view="cutaway">${t("Root Slice", "মাটির স্তর ও শিকড়")}</button>
+            <button id="btn-view-2d" type="button" class="studio-view-btn ${currentViewMode === "top" ? "active" : ""}" data-studio-view="top">${t("Top view", "উপরের দৃশ্য")}</button>
           </div>
+
+          <div class="studio-surface-selector">
+            <span class="eyebrow" style="font-size:10px;text-transform:uppercase;">${t("Surface:", "সারফেস:")}</span>
+            <select id="select-surface-mode" aria-label="${t("Surface mode", "সারফেস মোড")}">
+              <option value="crops" ${currentSurfaceMode === "crops" ? "selected" : ""}>${t("Crop canopy + true colour", "ফসল ক্যানোপি + আসল রঙ")}</option>
+              <option value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "selected" : ""}>${t("NASADEM elevation + contours", "নাসাডেম উচ্চতা ও কনট্যুর")}</option>
+              <option value="ndvi" ${currentSurfaceMode === "ndvi" ? "selected" : ""}>${t("Sentinel-2 NDVI vigour/bare-field", "সেন্টিনেল-২ এনডিভিআই / খালি জমি")}</option>
+              <option value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "selected" : ""}>${t("Water ponding", "পানি জমা (পন্ডিং)")}</option>
+              <option value="fertility" ${currentSurfaceMode === "fertility" ? "selected" : ""}>${t("Soil fertility zones", "মাটির উর্বরতা অঞ্চল")}</option>
+            </select>
+          </div>
+
           <div class="studio-slice-card">
             <span class="studio-slice-end studio-slice-end-left">${t("Slice field", "মাঠ কাটুন")}</span>
             <input type="range" id="studio-cutaway-slider" min="0" max="0.8" step="0.05" value="${currentCutaway}" aria-label="${t("Slice field to full field", "খণ্ডিত থেকে পুরো মাঠ")}">
             <span class="studio-slice-end studio-slice-end-right">${t("Full field", "পুরো মাঠ")}</span>
           </div>
+
           <span class="studio-crop-chip">● ${t("Illustrative crop preview · not observed plants", "কাল্পনিক ফসল পূর্বদর্শন · পর্যবেক্ষিত উদ্ভিদ নয়")}</span>
           <div class="studio-caption-copy">
             <h2>${t("Your field. Brought to life.", "আপনার জমি। জীবন্ত রূপে।")}</h2>
@@ -1963,12 +2392,76 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
 
         ${depthTicksHtml()}
 
+        <!-- Architectural Callouts overlay -->
+        <div id="overlay-callouts" class="studio-callout-overlay">
+          <div id="node-a" class="callout-3d"><div class="transect-node">A</div></div>
+          <div id="node-ap" class="callout-3d"><div class="transect-node">A'</div></div>
+
+          <div id="callout-low-corner" class="callout-3d">
+            <div class="callout-box water">${t("Low basin corner · Water collects first", "নিচু অংশ · পানি আগে জমে")}</div>
+            <div class="callout-line"></div><div class="callout-dot"></div>
+          </div>
+
+          <div id="callout-drain" class="callout-3d">
+            <div class="callout-box warn" id="callout-drain-txt">${t("Proposed drain trench", "পরিকল্পিত নালা")}</div>
+            <div class="callout-line"></div><div class="callout-dot"></div>
+          </div>
+
+          <div id="callout-outlet" class="callout-3d">
+            <div class="callout-box warn" id="callout-outlet-txt">${t("Canal outlet · Verify locally", "খালের মুখ · স্থানীয়ভাবে যাচাই করুন")}</div>
+            <div class="callout-line"></div><div class="callout-dot"></div>
+          </div>
+
+          <div id="callout-topsoil" class="callout-3d">
+            <div class="callout-box soil">
+              <div style="font-size:10px;text-transform:uppercase;color:var(--text-dim,#536456);">0–15 cm · ${t("Topsoil", "উপরের মাটি")}</div>
+              <div id="callout-topsoil-val">${soilOverrides ? t("Measured · by farmer", "মাপা · কৃষক কর্তৃক") : (data.soil?.layers?.[0]?.textureClass || "Sandy clay loam")}</div>
+            </div>
+          </div>
+
+          <div id="callout-rootzone" class="callout-3d">
+            <div class="callout-box soil">
+              <div style="font-size:10px;text-transform:uppercase;color:var(--text-dim,#536456);">15–60 cm · ${t("Root Zone", "শিকড় অঞ্চল")}</div>
+              <div id="callout-rootzone-val">${t("Active roots & N-nodules", "সক্রিয় শিকড় ও নাইট্রোজেন নডিউল")}</div>
+            </div>
+          </div>
+
+          <div id="callout-aquifer" class="callout-3d">
+            <div class="callout-box water">
+              <div style="font-size:10px;text-transform:uppercase;color:#234f61;">&gt;120 cm · ${t("Subsoil & Water Table", "গভীর স্তর ও পানির স্তর")}</div>
+              <div id="callout-aquifer-val">${soilOverrides?.gwDepthM ? `${soilOverrides.gwDepthM} m (${t("Measured", "মাপা")})` : t("Regional baseline ~3.4 m", "আঞ্চলিক গড় ~৩.৪ মি")}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tap Point Probe Card -->
+        <div class="studio-probe-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e4d8;padding-bottom:3px;margin-bottom:4px;">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--deep,#173e30);">${t("Point Probe (Click Field)", "পয়েন্ট প্রোব (জমিতে চাপুন)")}</span>
+            <span id="probe-latlon" class="mono" style="font-size:10px;color:var(--text-dim,#536456);">25.8317°N, 89.2355°E</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;font-size:11px;" class="mono">
+            <div><span style="font-size:9px;color:var(--text-dim,#536456);display:block;">${t("Elev", "উচ্চতা")}</span><strong id="probe-elev">32.8 m</strong></div>
+            <div><span style="font-size:9px;color:var(--text-dim,#536456);display:block;">${t("Ponding", "জমা পানি")}</span><strong id="probe-pond" style="color:#234f61;">0 cm</strong></div>
+            <div><span style="font-size:9px;color:var(--text-dim,#536456);display:block;">${t("NDVI", "সবুজ")}</span><strong id="probe-ndvi" style="color:#315d42;">0.72</strong></div>
+          </div>
+        </div>
+
+        <!-- Transect SVG cross-section Profile Card -->
+        <div class="studio-transect-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--deep,#173e30);">${t("Transect Profile · A → A'", "ট্রানসেক্ট প্রোফাইল · A → A'")}</span>
+            <span id="transect-relief-lbl" class="mono" style="font-size:10px;color:var(--text-dim,#536456);">${t("Relief: 2.5 m", "ঢাল: ২.৫ মি")}</span>
+          </div>
+          <svg id="svg-transect" viewBox="0 0 290 68" style="width:100%;height:64px;display:block;"></svg>
+        </div>
+
         <div class="studio-terrain-card">
           <div class="studio-terrain-head">
             <label for="studio-height-slider-stage">${t("Terrain height", "ভূমির উচ্চতা")}</label>
             <output id="studio-height-output-stage">${num(heightExaggeration, 0)}×</output>
           </div>
-          <input type="range" id="studio-height-slider-stage" min="1" max="4" step="0.5" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
+          <input type="range" id="studio-height-slider-stage" min="1" max="4.5" step="0.25" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
           <small>${t("True scale · NASADEM ~30 m", "প্রকৃত স্কেল · নাসাডেম ~৩০ মি")}</small>
           <label class="studio-terrain-surround">
             <input type="checkbox" id="studio-surroundings-chk" ${showSurroundings ? "checked" : ""}>
@@ -1980,6 +2473,51 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <b>${t("FIELD MODEL", "মাঠ মডেল")}</b>
           <span>${t("Selected boundary + terrain", "নির্বাচিত সীমানা + ভূমি")}</span>
           <span>${t("Illustrative plants &amp; enlarged soil section", "কাল্পনিক উদ্ভিদ ও বড় করে দেখানো মাটির অংশ")}</span>
+        </div>
+      </div>
+
+      <!-- Interaction deck below viewport: Slice slider, Rain scenario slider, Relief scale slider + Roots & Bunds toggles -->
+      <div class="studio-dock-deck">
+        <div class="studio-dock-item">
+          <div class="studio-dock-head">
+            <label for="slider-slice">${t("Subsurface Cutaway Slice", "মাটির নিচের স্তর কাটুন")}</label>
+            <span id="lbl-slice-pct" class="mono" style="color:#315d42;">${Math.round((1 - currentCutaway) * 100)}%</span>
+          </div>
+          <input id="slider-slice" type="range" min="0" max="80" value="${Math.round(currentCutaway * 100)}" class="w-full">
+          <div class="studio-dock-sub">
+            <span>${t("Full Parcel", "পুরো জমি")}</span>
+            <span>${t("Deep Cutaway", "গভীর অংশ")}</span>
+          </div>
+        </div>
+
+        <div class="studio-dock-item">
+          <div class="studio-dock-head">
+            <label for="slider-rain">${t("Rainfall / Flood Scenario", "বৃষ্টিপাত / বন্যা পরিস্থিতি")} ${truth("SCENARIO")}</label>
+            <span id="lbl-rain-mm" class="mono" style="color:#234f61;">${rainScenarioMm} mm</span>
+          </div>
+          <input id="slider-rain" type="range" min="0" max="240" step="5" value="${rainScenarioMm}" class="w-full">
+          <div class="studio-dock-sub">
+            <span>0 mm (${t("Dry Spell", "শুষ্ক")})</span>
+            <span>240 mm (${t("Deluge", "অতিবৃষ্টি")})</span>
+          </div>
+        </div>
+
+        <div class="studio-dock-item">
+          <div class="studio-dock-head">
+            <label for="slider-exag">${t("Vertical Relief Scale", "উচ্চতা স্কেল")}</label>
+            <span id="lbl-exag-val" class="mono" style="color:#173e30;">${heightExaggeration.toFixed(1)}×</span>
+          </div>
+          <input id="slider-exag" type="range" min="1.0" max="4.5" step="0.25" value="${heightExaggeration}" class="w-full">
+          <div class="studio-dock-toggles">
+            <label>
+              <input id="chk-show-roots" type="checkbox" ${showRoots ? "checked" : ""}>
+              <span>${t("Show roots", "শিকড় দেখুন")}</span>
+            </label>
+            <label>
+              <input id="chk-show-bunds" type="checkbox" ${showBunds ? "checked" : ""}>
+              <span>${t("Show bunds", "আইল ও গাছ")}</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -2020,7 +2558,7 @@ export async function mountStudio3d(container, data, opts = {}) {
   isDisposed = false;
   prefersReducedMotion = whenReducedMotion();
 
-  const host = container.querySelector(".studio-stage-canvas-host");
+  const host = containerEl.querySelector(".studio-stage-canvas-host");
   if (!host) return;
   canvasHostEl = host;
 
@@ -2135,57 +2673,166 @@ export async function setStudioMonth(monthIdx) {
 }
 
 function bindEvents(container) {
-  container.querySelectorAll('input[name="studio-layer"]').forEach((radio) => {
+  // Radio layer switcher in rail
+  containerEl.querySelectorAll('input[name="studio-layer"]').forEach((radio) => {
     radio.onchange = async (e) => {
-      currentLayer = e.target.value;
-      const illustrative = container.querySelector(".studio-illustrative-note");
-      if (illustrative) {
-        illustrative.textContent =
-          currentLayer === "crops" ? t("Illustrative crops · not observed", "কাল্পনিক ফসল · সরাসরি দেখা নয়") : "";
-      }
-      await buildFieldBlock(currentData, currentCutaway);
-      buildPlantsAndRoots(currentData, currentMonthIdx);
-      requestRender();
-      startAnimation();
+      setSurfaceMode(e.target.value);
     };
   });
 
-  const cutawaySlider = container.querySelector("#studio-cutaway-slider");
-  if (cutawaySlider) {
-    cutawaySlider.oninput = async (e) => {
-      currentCutaway = parseFloat(e.target.value);
+  // Surface mode dropdown
+  const surfaceSelect = containerEl.querySelector("#select-surface-mode");
+  if (surfaceSelect) {
+    surfaceSelect.onchange = (e) => {
+      setSurfaceMode(e.target.value);
+    };
+  }
+
+  // Camera presets: 3D Block | Root Slice | Top 2D
+  const btn3d = containerEl.querySelector("#btn-view-3d");
+  if (btn3d) {
+    btn3d.onclick = () => {
+      currentViewMode = "3d";
+      isTopView = false;
+      isCloseView = false;
+      containerEl.querySelectorAll(".studio-view-btn").forEach((b) => b.classList.remove("active"));
+      btn3d.classList.add("active");
+      activeCamera = cameraPersp;
+      controls.object = activeCamera;
+      controls.enableRotate = true;
+      fillPerspectiveAspect();
+      fitPerspective(currentData, false);
+      requestRender();
+    };
+  }
+
+  const btnCut = containerEl.querySelector("#btn-view-cutaway");
+  if (btnCut) {
+    btnCut.onclick = async () => {
+      currentViewMode = "cutaway";
+      isTopView = false;
+      isCloseView = true;
+      currentCutaway = 0.42; // Open slice
+      containerEl.querySelectorAll(".studio-view-btn").forEach((b) => b.classList.remove("active"));
+      btnCut.classList.add("active");
+      const cutSlider = containerEl.querySelector("#studio-cutaway-slider");
+      if (cutSlider) cutSlider.value = "0.42";
+      const deckSlice = containerEl.querySelector("#slider-slice");
+      if (deckSlice) deckSlice.value = "42";
+      const lblSlice = containerEl.querySelector("#lbl-slice-pct");
+      if (lblSlice) lblSlice.textContent = "58%";
       updateDepthTicks();
       await buildFieldBlock(currentData, currentCutaway);
+      buildPlantsAndRoots(currentData, currentMonthIdx);
+      activeCamera = cameraPersp;
+      controls.object = activeCamera;
+      controls.enableRotate = true;
+      fillPerspectiveAspect();
+      fitPerspective(currentData, true);
+      requestRender();
+    };
+  }
+
+  const btn2d = containerEl.querySelector("#btn-view-2d");
+  if (btn2d) {
+    btn2d.onclick = () => {
+      currentViewMode = "top";
+      isTopView = true;
+      isCloseView = false;
+      containerEl.querySelectorAll(".studio-view-btn").forEach((b) => b.classList.remove("active"));
+      btn2d.classList.add("active");
+      activeCamera = cameraOrtho;
+      controls.object = activeCamera;
+      controls.enableRotate = false;
+      fitOrtho(currentData);
+      requestRender();
+    };
+  }
+
+  // Slice sliders (top-left bar & bottom deck)
+  const cutawaySlider = containerEl.querySelector("#studio-cutaway-slider");
+  const deckSlice = containerEl.querySelector("#slider-slice");
+
+  const onSliceChange = async (valFrac) => {
+    currentCutaway = valFrac;
+    if (cutawaySlider) cutawaySlider.value = String(currentCutaway);
+    if (deckSlice) deckSlice.value = String(Math.round(currentCutaway * 100));
+    const lbl = containerEl.querySelector("#lbl-slice-pct");
+    if (lbl) lbl.textContent = `${Math.round((1 - currentCutaway) * 100)}%`;
+    updateDepthTicks();
+    await buildFieldBlock(currentData, currentCutaway);
+    buildPlantsAndRoots(currentData, currentMonthIdx);
+    requestRender();
+  };
+
+  if (cutawaySlider) {
+    cutawaySlider.oninput = (e) => onSliceChange(parseFloat(e.target.value));
+  }
+  if (deckSlice) {
+    deckSlice.oninput = (e) => onSliceChange(parseFloat(e.target.value) / 100);
+  }
+
+  // Rainfall scenario slider
+  const rainSlider = containerEl.querySelector("#slider-rain");
+  if (rainSlider) {
+    rainSlider.oninput = async (e) => {
+      rainScenarioMm = parseInt(e.target.value, 10);
+      const rainLbl = containerEl.querySelector("#lbl-rain-mm");
+      if (rainLbl) rainLbl.textContent = `${rainScenarioMm} mm`;
+      await buildFieldBlock(currentData, currentCutaway);
+      renderTransectSVG();
+      updateProbeCard();
+      requestRender();
+    };
+  }
+
+  // Height / Vertical relief sliders
+  const heightSliders = containerEl.querySelectorAll(
+    "#studio-height-slider, #studio-height-slider-stage, #slider-exag"
+  );
+  heightSliders.forEach((slider) => {
+    slider.oninput = async (e) => {
+      heightExaggeration = parseFloat(e.target.value);
+      containerEl.querySelectorAll(
+        "#studio-height-slider, #studio-height-slider-stage, #slider-exag"
+      ).forEach((s) => {
+        if (s !== e.target) s.value = String(heightExaggeration);
+      });
+      const outRail = containerEl.querySelector("#studio-height-output");
+      const outStage = containerEl.querySelector("#studio-height-output-stage");
+      const outExag = containerEl.querySelector("#lbl-exag-val");
+      const label = `${heightExaggeration.toFixed(1)}×`;
+      if (outRail) outRail.textContent = label;
+      if (outStage) outStage.textContent = label;
+      if (outExag) outExag.textContent = label;
+      await buildFieldBlock(currentData, currentCutaway);
+      buildPlantsAndRoots(currentData, currentMonthIdx);
+      await buildSurroundings(currentData);
+      renderTransectSVG();
+      requestRender();
+    };
+  });
+
+  // Toggles for roots and bunds
+  const chkRoots = containerEl.querySelector("#chk-show-roots");
+  if (chkRoots) {
+    chkRoots.onchange = (e) => {
+      showRoots = e.target.checked;
       buildPlantsAndRoots(currentData, currentMonthIdx);
       requestRender();
     };
   }
 
-  const heightSliders = container.querySelectorAll(
-    "#studio-height-slider, #studio-height-slider-stage",
-  );
-  heightSliders.forEach((slider) => {
-    slider.oninput = async (e) => {
-      heightExaggeration = parseFloat(e.target.value);
-      container.querySelectorAll(
-        "#studio-height-slider, #studio-height-slider-stage",
-      ).forEach((s) => {
-        if (s !== e.target) s.value = String(heightExaggeration);
-      });
-      const outRail = container.querySelector("#studio-height-output");
-      const outStage = container.querySelector("#studio-height-output-stage");
-      const label = `${num(heightExaggeration, heightExaggeration === Math.round(heightExaggeration) ? 0 : 1)}×`;
-      if (outRail) outRail.textContent = label;
-      if (outStage) outStage.textContent = label;
+  const chkBunds = containerEl.querySelector("#chk-show-bunds");
+  if (chkBunds) {
+    chkBunds.onchange = async (e) => {
+      showBunds = e.target.checked;
       await buildFieldBlock(currentData, currentCutaway);
-      buildPlantsAndRoots(currentData, currentMonthIdx);
-      await buildSurroundings(currentData);
-      fitCameras(currentData);
       requestRender();
     };
-  });
+  }
 
-  const surroundChk = container.querySelector("#studio-surroundings-chk");
+  const surroundChk = containerEl.querySelector("#studio-surroundings-chk");
   if (surroundChk) {
     surroundChk.onchange = async (e) => {
       showSurroundings = e.target.checked;
@@ -2194,27 +2841,17 @@ function bindEvents(container) {
     };
   }
 
-  container.querySelectorAll("[data-studio-view]").forEach((btn) => {
+  // View toggle & camera buttons
+  containerEl.querySelectorAll("[data-studio-view]").forEach((btn) => {
     btn.onclick = () => {
       const mode = btn.dataset.studioView;
-      isTopView = mode === "top";
-      isCloseView = mode === "close";
-      container.querySelectorAll("[data-studio-view]").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      activeCamera = isTopView ? cameraOrtho : cameraPersp;
-      controls.object = activeCamera;
-      controls.enableRotate = !isTopView;
-      if (isTopView) fitOrtho(currentData);
-      else {
-        fillPerspectiveAspect();
-        fitPerspective(currentData, isCloseView);
-      }
-      requestRender();
-      startAnimation();
+      if (mode === "3d" && btn3d) btn3d.click();
+      else if (mode === "cutaway" && btnCut) btnCut.click();
+      else if (mode === "top" && btn2d) btn2d.click();
     };
   });
 
-  container.querySelectorAll("[data-studio-ctrl]").forEach((btn) => {
+  containerEl.querySelectorAll("[data-studio-ctrl]").forEach((btn) => {
     btn.onclick = () => {
       const act = btn.dataset.studioCtrl;
       if (act === "zoom-in") {
@@ -2236,7 +2873,7 @@ function bindEvents(container) {
       } else if (act === "reset") {
         fitCameras(currentData);
       } else if (act === "fullscreen") {
-        const stage = container.querySelector(".studio-stage-wrap");
+        const stage = containerEl.querySelector(".studio-stage-wrap");
         if (!document.fullscreenElement) stage?.requestFullscreen().catch(() => {});
         else document.exitFullscreen().catch(() => {});
       }
@@ -2244,7 +2881,7 @@ function bindEvents(container) {
     };
   });
 
-  const compass = container.querySelector(".studio-compass");
+  const compass = containerEl.querySelector(".studio-compass");
   if (compass) {
     compass.onclick = () => {
       fitCameras(currentData);
@@ -2252,57 +2889,101 @@ function bindEvents(container) {
     };
   }
 
-  const monthSlider = container.querySelector("#studio-month-slider");
+  const monthSlider = containerEl.querySelector("#studio-month-slider");
   if (monthSlider) monthSlider.oninput = (e) => setStudioMonth(parseInt(e.target.value, 10));
 
-  const playBtn = container.querySelector("[data-studio-action='toggle-play']");
+  const playBtn = containerEl.querySelector("[data-studio-action='toggle-play']");
   if (playBtn) playBtn.onclick = () => togglePlay();
 
-  container.querySelectorAll("[data-studio-rot-id]").forEach((btn) => {
-    btn.onclick = () => {
-      const id = btn.dataset.studioRotId;
-      if (!id || id === activeRotationId) return;
-      if (typeof onRotationSelect === "function") onRotationSelect(id);
-    };
-  });
+  // Raycasting for tap / click probe card
+  if (canvas) {
+    let downPos = { x: 0, y: 0 };
+    canvas.addEventListener("pointerdown", (e) => {
+      downPos = { x: e.clientX, y: e.clientY };
+    });
 
-  const host = container.querySelector(".studio-stage-canvas-host");
-  if (host) {
-    host.onkeydown = (e) => {
-      if (e.key === "ArrowLeft") {
-        controls?.rotateLeft(0.08);
+    canvas.addEventListener("pointerup", (e) => {
+      if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 6) return;
+      if (!currentData || !currentBlock.bounds || !activeCamera) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, activeCamera);
+      const hits = blockGroup ? raycaster.intersectObjects(blockGroup.children, true) : [];
+      if (hits.length > 0) {
+        const pt = hits[0].point;
+        const b = currentBlock.bounds;
+        probeUV = {
+          u: Math.max(0, Math.min(1, (pt.x - b.minX) / Math.max(1e-6, b.width))),
+          v: Math.max(0, Math.min(1, (-pt.z - b.minY) / Math.max(1e-6, b.height))),
+        };
+        updateProbeCard();
         requestRender();
-        e.preventDefault();
-      } else if (e.key === "ArrowRight") {
-        controls?.rotateLeft(-0.08);
-        requestRender();
-        e.preventDefault();
-      } else if (e.key === "ArrowUp") {
-        controls?.rotateUp(0.08);
-        requestRender();
-        e.preventDefault();
-      } else if (e.key === "ArrowDown") {
-        controls?.rotateUp(-0.08);
-        requestRender();
-        e.preventDefault();
-      } else if (e.key === "+" || e.key === "=") {
-        const offset = cameraPersp.position.clone().sub(controls.target).multiplyScalar(0.9);
-        cameraPersp.position.copy(controls.target).add(offset);
-        requestRender();
-        e.preventDefault();
-      } else if (e.key === "-" || e.key === "_") {
-        const offset = cameraPersp.position.clone().sub(controls.target).multiplyScalar(1.1);
-        cameraPersp.position.copy(controls.target).add(offset);
-        requestRender();
-        e.preventDefault();
       }
-    };
-    host.addEventListener("pointerenter", () => {
-      host.classList.add("show-depth-ticks");
     });
-    host.addEventListener("pointerleave", () => {
-      host.classList.remove("show-depth-ticks");
+  }
+
+  // Initial draw of transect and probe
+  renderTransectSVG();
+  updateProbeCard();
+}
+
+/* ------------------------------------------------------------- STUDIO5A APIs */
+
+export function setSoilOverrides(overrides) {
+  soilOverrides = overrides ? { ...overrides } : null;
+  sideTextureCache.clear();
+  if (containerEl && currentData) {
+    const topsoilVal = containerEl.querySelector('#callout-topsoil-val');
+    if (topsoilVal) {
+      topsoilVal.textContent = soilOverrides ? t("Measured · by farmer", "মাপা · কৃষক কর্তৃক") : "Sandy clay loam";
+    }
+    const aquiferVal = containerEl.querySelector('#callout-aquifer-val');
+    if (aquiferVal) {
+      aquiferVal.textContent = soilOverrides?.gwDepthM ? `${soilOverrides.gwDepthM} m (${t("Measured", "মাপা")})` : t("Regional baseline ~3.4 m", "আঞ্চলিক গড় ~৩.৪ মি");
+    }
+    buildFieldBlock(currentData, currentCutaway).then(() => {
+      updateProbeCard();
+      requestRender();
     });
+  }
+}
+
+export function setPlantingLayout(layout) {
+  plantingLayout = layout || "rows";
+  textureCache.clear();
+  if (containerEl && currentData) {
+    buildTopTexture(currentData, currentSurfaceMode, currentMonthIdx).then(() => {
+      buildFieldBlock(currentData, currentCutaway);
+      buildPlantsAndRoots(currentData, currentMonthIdx);
+      requestRender();
+    });
+  }
+}
+
+export function setSurfaceMode(mode) {
+  currentSurfaceMode = mode || "crops";
+  currentLayer = currentSurfaceMode;
+  if (containerEl) {
+    const select = containerEl.querySelector("#select-surface-mode");
+    if (select && select.value !== currentSurfaceMode) select.value = currentSurfaceMode;
+    containerEl.querySelectorAll('input[name="studio-layer"]').forEach((r) => {
+      r.checked = r.value === currentSurfaceMode;
+    });
+    const illustrative = containerEl.querySelector(".studio-illustrative-note");
+    if (illustrative) {
+      illustrative.textContent = currentSurfaceMode === "crops" ? t("Illustrative crops · not observed", "কাল্পনিক ফসল · সরাসরি দেখা নয়") : "";
+    }
+    if (currentData) {
+      buildFieldBlock(currentData, currentCutaway).then(() => {
+        buildPlantsAndRoots(currentData, currentMonthIdx);
+        updateProbeCard();
+        requestRender();
+      });
+    }
   }
 }
 
