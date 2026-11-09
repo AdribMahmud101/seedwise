@@ -2,7 +2,7 @@
  * LAND3D - 3D landscape of Mithapukur, Pirganj, and Gangachara.
  * Lazy-loads MapLibre GL JS v5 only when scrolled into view (IntersectionObserver).
  */
-import { t, truth } from "./ui.js";
+import { t, truth, panel } from "./ui.js";
 
 let maplibreLoading = null;
 let currentMap = null;
@@ -36,10 +36,10 @@ const UPAZILAS = [
 
 // Center & camera parameters
 const INITIAL_CAMERA = {
-  center: [89.25, 25.62],
-  zoom: 9.3,
-  pitch: 60,
-  bearing: -15,
+  center: [89.25, 25.60],
+  zoom: 9.6,
+  pitch: 52,
+  bearing: -10,
 };
 
 function hasWebGL() {
@@ -84,58 +84,53 @@ export function landscapePanel() {
     ? t("Needs internet", "ইন্টারনেট প্রয়োজন")
     : t("Esri World Imagery", "এসরি স্যাটেলাইট ছবি");
 
-  return `
-    <section class="panel landscape-panel" id="landscape-3d-panel">
-      <div class="panel-head">
-        <div>
-          <h2>${t("Your land in 3D", "আপনার এলাকা ত্রিমাত্রিকে")}</h2>
-          <p class="panel-sub">${t("Low green = where water collects · higher tan = drains first", "নিচু সবুজ = যেখানে পানি জমে · উঁচু বাদামি = আগে পানি নামে")}</p>
-        </div>
-      </div>
-      <div class="landscape-card">
-        <div class="landscape-viewport" id="landscape-container">
-          <div class="landscape-controls">
-            <div class="landscape-seg" role="group" aria-label="${t("Map style", "মানচিত্রের ধরন")}">
-              <button type="button" class="landscape-btn ${currentMode === "height" ? "active" : ""}" data-landscape-mode="height" style="min-height:44px;min-width:44px;">
-                ${t("Height colours", "উচ্চতার রঙ")}
-              </button>
-              <button type="button" class="landscape-btn ${currentMode === "photo" ? "active" : ""}" data-landscape-mode="photo" ${photoDisabled ? "disabled" : ""} title="${photoTitle}" style="min-height:44px;min-width:44px;">
-                ${t("Photo", "স্যাটেলাইট")}
-              </button>
-            </div>
-            <button type="button" class="landscape-btn icon-only" data-landscape-action="reset" title="${t("Reset view", "আগের দৃশ্য")}" aria-label="${t("Reset view", "আগের দৃশ্য")}" style="min-height:44px;min-width:44px;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                <path d="M3 3v5h5"/>
-              </svg>
+  const body = `
+    <div class="landscape-card">
+      <p class="note">${t("Low green = where water collects · higher tan = drains first", "নিচু সবুজ = যেখানে পানি জমে · উঁচু বাদামি = আগে পানি নামে")}</p>
+      <div class="landscape-viewport" id="landscape-container">
+        <div class="landscape-controls">
+          <div class="landscape-seg" role="group" aria-label="${t("Map style", "মানচিত্রের ধরন")}">
+            <button type="button" class="landscape-btn ${currentMode === "height" ? "active" : ""}" data-landscape-mode="height" style="min-height:44px;min-width:44px;">
+              ${t("Height colours", "উচ্চতার রঙ")}
+            </button>
+            <button type="button" class="landscape-btn ${currentMode === "photo" ? "active" : ""}" data-landscape-mode="photo" ${photoDisabled ? "disabled" : ""} title="${photoTitle}" style="min-height:44px;min-width:44px;">
+              ${t("Photo", "স্যাটেলাইট")}
             </button>
           </div>
+          <button type="button" class="landscape-btn icon-only" data-landscape-action="reset" title="${t("Reset view", "আগের দৃশ্য")}" aria-label="${t("Reset view", "আগের দৃশ্য")}" style="min-height:44px;min-width:44px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+          </button>
+        </div>
 
-          <div class="landscape-overlay-bottom">
-            <div class="landscape-chip">
-              <span>${t("Height exaggerated 10× · NASADEM 30 m · includes trees", "উচ্চতা ১০ গুণ বর্ধিত · নাসা ডেম ৩০ মি · গাছপালা অন্তর্ভুক্ত")}</span>
-              <span class="badge-modeled">${t("MODELED", "মডেল")}</span>
-            </div>
-
-            <div class="landscape-legend" id="landscape-legend" style="${currentMode === 'photo' ? 'display:none;' : ''}">
-              <div class="landscape-legend-bar"></div>
-              <div class="landscape-legend-labels">
-                <span>${t("Lower", "নিচু")}</span>
-                <span>← →</span>
-                <span>${t("Higher", "উঁচু")}</span>
-              </div>
-            </div>
+        <div class="landscape-overlay-bottom">
+          <div class="landscape-chip">
+            <span>${t("Height exaggerated 10× · NASADEM 30 m · includes trees", "উচ্চতা ১০ গুণ বর্ধিত · নাসা ডেম ৩০ মি · গাছপালা অন্তর্ভুক্ত")}</span>
+            ${truth("MODELED")}
           </div>
 
-          <noscript>
-            <div class="landscape-fallback">
-              ${t("JavaScript is required to display the 3D landscape.", "ত্রিমাত্রিক ল্যান্ডস্কেপ দেখতে জাভাস্ক্রিপ্ট প্রয়োজন।")}
+          <div class="landscape-legend" id="landscape-legend" style="${currentMode === 'photo' ? 'display:none;' : ''}">
+            <div class="landscape-legend-bar"></div>
+            <div class="landscape-legend-labels">
+              <span>${t("Lower", "নিচু")}</span>
+              <span>← →</span>
+              <span>${t("Higher", "উঁচু")}</span>
             </div>
-          </noscript>
+          </div>
         </div>
+
+        <noscript>
+          <div class="landscape-fallback">
+            ${t("JavaScript is required to display the 3D landscape.", "ত্রিমাত্রিক ল্যান্ডস্কেপ দেখতে জাভাস্ক্রিপ্ট প্রয়োজন।")}
+          </div>
+        </noscript>
       </div>
-    </section>
+    </div>
   `;
+
+  return `<div id="landscape-3d-panel">${panel(t("Your land in 3D", "আপনার এলাকা ত্রিমাত্রিকে"), body)}</div>`;
 }
 
 export function initLandscapeObserver() {
@@ -196,15 +191,21 @@ async function setupMap(container) {
       // offline fallback
     }
 
+    const dataBbox = [89.057375, 25.272260, 89.480445, 25.993650];
+
     const startCamera = {
       center: INITIAL_CAMERA.center,
-      zoom: INITIAL_CAMERA.zoom - 1.2,
-      pitch: 30,
+      zoom: INITIAL_CAMERA.zoom - 0.5,
+      pitch: 28,
       bearing: 0,
     };
 
     const map = new maplibregl.Map({
       container: container,
+      maxBounds: [
+        [88.85, 25.05],
+        [89.68, 26.20],
+      ],
       style: {
         version: 8,
         sources: {
@@ -215,6 +216,7 @@ async function setupMap(container) {
             tileSize: 256,
             minzoom: 8,
             maxzoom: 12,
+            bounds: dataBbox,
           },
           "color-tiles": {
             type: "raster",
@@ -222,6 +224,7 @@ async function setupMap(container) {
             tileSize: 256,
             minzoom: 8,
             maxzoom: 12,
+            bounds: dataBbox,
           },
           "esri-photo": {
             type: "raster",
@@ -259,13 +262,34 @@ async function setupMap(container) {
             },
           },
           {
-            id: "rivers-layer",
+            id: "rivers-glow",
             type: "line",
             source: "rivers",
             paint: {
               "line-color": "#38bdf8",
-              "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.2, 12, 3],
-              "line-opacity": 0.85,
+              "line-width": ["interpolate", ["linear"], ["zoom"], 8, 3.5, 12, 6],
+              "line-opacity": 0.45,
+              "line-blur": 2,
+            },
+          },
+          {
+            id: "rivers-layer",
+            type: "line",
+            source: "rivers",
+            paint: {
+              "line-color": "#0284c7",
+              "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 12, 3],
+              "line-opacity": 0.95,
+            },
+          },
+          {
+            id: "upazila-casing",
+            type: "line",
+            source: "upazila-bounds",
+            paint: {
+              "line-color": "#0f172a",
+              "line-width": 3,
+              "line-opacity": 0.4,
             },
           },
           {
@@ -275,17 +299,16 @@ async function setupMap(container) {
             paint: {
               "line-color": "#ffffff",
               "line-width": 1.5,
-              "line-opacity": 0.9,
-              "line-dasharray": [3, 2],
+              "line-opacity": 0.7,
             },
           },
         ],
         sky: {
-          "sky-color": "#18261e",
+          "sky-color": "#bae6fd",
           "sky-horizon-blend": 0.5,
-          "horizon-color": "#8ba895",
+          "horizon-color": "#e0f2fe",
           "horizon-fog-blend": 0.7,
-          "fog-color": "#4a6352",
+          "fog-color": "#f0f9ff",
           "fog-ground-blend": 0.6,
         },
         terrain: {
@@ -297,7 +320,7 @@ async function setupMap(container) {
       zoom: startCamera.zoom,
       pitch: startCamera.pitch,
       bearing: startCamera.bearing,
-      maxPitch: 75,
+      maxPitch: 65,
       dragRotate: true,
       touchPitch: true,
       attributionControl: false,

@@ -131,5 +131,5 @@ test("LAND3D: UI components, labels, truth chip, legend and controls render corr
   assert.ok(htmlBn.includes("আগের দৃশ্য"), "Includes Bengali reset view");
   assert.ok(htmlBn.includes("নিচু"), "Includes Bengali lower label");
   assert.ok(htmlBn.includes("উঁচু"), "Includes Bengali higher label");
-  assert.ok(htmlBn.includes("মডেল"), "Includes Bengali model badge");
+  assert.ok(htmlBn.includes("MODELED"), "Includes MODELED truth badge in Bengali view");
 });
