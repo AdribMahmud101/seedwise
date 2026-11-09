@@ -1,0 +1,2 @@
+Owner's target design for the #rotations tool (ChatGPT-generated, demo data for 2 Burirhat plots, three r128 + Tailwind CDN). Reference only — never ship, never copy its numbers. Port the UX, not the data.
+Key functions in its <script>: computeSurfaceY, sampleElevationM, updateDrapedCanvasTexture, buildStratigraphicSoilWallTexture, createBotanicalPlantGeometry, rebuild3DModel, makeWall, renderTransectSVG, placeCallout/sync3DCallouts, rankRotations, updateProbeCard, refreshUI, initControls.

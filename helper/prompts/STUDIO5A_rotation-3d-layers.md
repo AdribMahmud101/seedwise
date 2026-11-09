@@ -1,0 +1,12 @@
+# STUDIO5A · Multi-layer 3D for the rotation tool (3D side)
+
+Owner wants #rotations to become the multi-layer tool in `helper/reference/rotation-tool/reference.html` (open it in full; read README there). Today's studio (`src/legacy/studio3d.js`) is frozen as git tag `planner-3d-base` for the future Planner — you extend the rotation copy freely; do not worry about preserving its look.
+Port these from the reference into `src/legacy/studio3d.js` (+ `studio3d-helpers.js`, `app/studio.css`), using npm `three` (not r128 CDN), lazy-loaded as now:
+1. **Surface modes** (dropdown): Crop canopy + true colour · NASADEM elevation + contours · Sentinel-2 NDVI vigour/bare-field · Water ponding · Soil fertility zones. Data = ours via `buildStudioData()` (ndvi-grid, moisture-grid/NDMI, low-ground, soil-profile, NASADEM). We have no Sentinel-1: build ponding from low-ground + rain scenario and label it "Estimated", never "radar".
+2. **Views:** 3D Block · Root Slice (cutaway showing soil horizons + roots) · Top 2D. Slice slider, Vertical relief slider, Rainfall/flood scenario slider (water fills low cells; label SCENARIO), toggles Show roots, Show bunds.
+3. **Draped textures** (reference `updateDrapedCanvasTexture`) and stratigraphic soil wall from our SoilGrids horizons (`buildStratigraphicSoilWallTexture`).
+4. **Callouts** anchored to 3D points (reference `placeCallout`), **tap probe card** (lat/lon, elevation, NDVI, NDMI, low ground at the tapped cell — real values from our grids, with truth labels), **transect SVG** across the field.
+5. **API for STUDIO5B** (side panels, other file): export `setSoilOverrides({ph, om, p, gwDepthM})` (rebuilds cutaway, marks values "Measured · by farmer"), `setPlantingLayout('rows'|'beds'|'bund-drains')`, `setSurfaceMode(id)`, and dispatch `studio:probe` CustomEvent with probe values.
+Keep: real field outline, rotation/month crops, bilingual `t(en,bn)` on every string, truth labels, reduced-motion, WebGL fallback, repaint re-attach, phone 390 px with no overlap, ≥44 px targets.
+Acceptance: `npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --rule 'no-undef:error' src/legacy/studio3d.js src/legacy/studio3d-helpers.js` clean; `npm test` with new tests for pure helpers (ponding, transect sampling, probe lookup); `npm run build`. Never touch package-lock.json/node_modules. Commit.
+Out of scope: `src/legacy/rotations.js` side panels (STUDIO5B), deploy.
