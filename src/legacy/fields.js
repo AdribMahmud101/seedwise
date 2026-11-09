@@ -413,8 +413,8 @@ function home() {
   let chipHtml = "";
   if (layerMode === "high-detail") {
     const chipText = t(
-      "High-detail photo · Esri · date varies · online",
-      "উচ্চ রেজোলিউশন ছবি · এসরি · বিভিন্ন তারিখ · অনলাইন",
+      "High-detail photo · Maxar · 28 Nov 2022 · online",
+      "উচ্চ রেজোলিউশন ছবি · ম্যাক্সার · ২৮ নভেম্বর ২০২২ · অনলাইন",
     );
     chipHtml = `<span class="map-chip-text">${esc(chipText)}</span> ${truth("REMOTE_OBSERVED")}`;
   } else if (layerMode === "natural") {
@@ -860,7 +860,9 @@ async function mountMap() {
 
   // Helper to create High Detail Esri layer
   function createHighDetailLayer() {
-    const esriUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+    // Pinned Esri Wayback release 64776: Maxar 28 Nov 2022, 0.31 m, clear at all 3 pilot sites (live layer is hazy Dec 2023 over Mithapukur).
+    // shortcut: date label is exact only around the pilot sites; re-check with waybackconfig.json if sites change.
+    const esriUrl = "https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/64776/{z}/{y}/{x}";
     const layer = L.tileLayer(esriUrl, {
       maxNativeZoom: 18,
       maxZoom: 20,
@@ -1190,7 +1192,7 @@ async function mountMap() {
           </div>
           <div class="inspect-item">
             <dt>${t("Observation date", "পর্যবেক্ষণের তারিখ")}</dt>
-            <dd>${esc(layerMode === "high-detail" ? t("date varies", "বিভিন্ন তারিখ") : activeDate)}</dd>
+            <dd>${esc(layerMode === "high-detail" ? t("28 Nov 2022 (Maxar)", "২৮ নভেম্বর ২০২২ (ম্যাক্সার)") : activeDate)}</dd>
           </div>
           <div class="inspect-item">
             <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>

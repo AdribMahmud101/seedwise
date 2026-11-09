@@ -470,7 +470,7 @@ test("MAP5: layer switcher buttons, online/offline state, and SW excludes Esri t
 
   // Attribution & chip text for high detail
   assert.ok(htmlOnline.includes("Imagery © Esri, Maxar, Earthstar Geographics"), "Includes Esri attribution");
-  assert.ok(htmlOnline.includes("High-detail photo · Esri · date varies · online"), "Includes high detail chip");
+  assert.ok(htmlOnline.includes("High-detail photo · Maxar · 28 Nov 2022 · online"), "Includes high detail chip");
 
   // Timeline shows only for Sentinel-2 layers, NOT high-detail
   assert.ok(!htmlOnline.includes("Observation date"), "Observation date timeline hidden for high detail");

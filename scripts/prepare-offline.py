@@ -31,7 +31,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const r = event.request;
   const url = new URL(r.url);
-  if (url.hostname.includes('arcgisonline.com')) return;
+  if (url.hostname.includes('arcgisonline.com') || url.hostname.endsWith('arcgis.com')) return; // Esri terms: never cache
   if (r.method !== 'GET' || url.origin !== self.location.origin) return;
   if (r.mode === 'navigate') {
     event.respondWith(fetch(r).catch(() => caches.open(NAME).then(c => c.match('/'))));

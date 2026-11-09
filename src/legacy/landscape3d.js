@@ -270,7 +270,7 @@ async function setupMap(container) {
           "esri-photo": {
             type: "raster",
             tiles: [
-              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+              "https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/64776/{z}/{y}/{x}" // same clear Maxar 28 Nov 2022 release as the field map,
             ],
             tileSize: 256,
             maxzoom: 18,
