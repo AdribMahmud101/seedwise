@@ -102,6 +102,23 @@ export function nearestObservation(observations, monthIdx, year = 2024) {
   return best;
 }
 
+// Visible clump height for the 3D plants. Data heights (canopyHeightM × stageFraction)
+// are honoured whenever they are tall enough to read against the field width, but a
+// floor proportional to the field span keeps establishing crops and short cover visible
+// from the fitted overview camera instead of reading as a flat mat.
+export function canopyVisualHeight(month, fieldSpanM) {
+  if (!month || month.stage === "fallow" || !month.cropId) return 0;
+  const span = Number.isFinite(fieldSpanM) && fieldSpanM > 0 ? fieldSpanM : 30;
+  const dataHeight = Math.max(0, (month.canopyHeightM || 0) * (month.stageFraction || 0));
+  const floor = span * 0.012;
+  let h = Math.max(floor, dataHeight);
+  if (month.stage === "harvest") {
+    // Stubble reads as a shorter canopy but still above the ground.
+    h = Math.min(h, Math.max(floor * 0.55, 0.18));
+  }
+  return h;
+}
+
 const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS_BN = ["জানু","ফেব","মার্চ","এপ্রিল","মে","জুন","জুলাই","আগ","সেপ্ট","অক্টো","নভে","ডিসে"];
 const STAGE_EN = { establish: "establishing", grow: "growing", mature: "maturing", harvest: "harvest", fallow: "fallow" };

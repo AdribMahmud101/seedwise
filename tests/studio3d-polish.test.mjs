@@ -8,6 +8,7 @@ import {
   outlineBounds,
   distToPolygonEdge,
   fitCameraToBlock,
+  canopyVisualHeight,
 } from "../src/legacy/studio3d-helpers.js";
 import { studio3dHtml } from "../src/legacy/studio3d.js";
 import { state } from "../src/legacy/ui.js";
@@ -134,6 +135,48 @@ test("studio3dHtml lists all ranked rotations when options are provided", () => 
   // Only one option is marked active.
   const activeMatches = html.match(/class="studio-rotation-option active"/g) || [];
   assert.equal(activeMatches.length, 1);
+});
+
+test("canopyVisualHeight honours tall data heights and lifts short crops to a field-span floor", () => {
+  const span = 30;
+  // Mature mustard (0.9 m × 0.65 = 0.585 m) is already visible — honour the data height.
+  const tall = canopyVisualHeight(
+    { cropId: "mustard", stage: "grow", canopyHeightM: 0.9, stageFraction: 0.65 },
+    span,
+  );
+  assert.ok(Math.abs(tall - 0.585) < 1e-9, `expected 0.585, got ${tall}`);
+
+  // Boro just emerging (0.3 × 0.25 = 0.075 m) would read as a mat — lifted to the span floor.
+  const short = canopyVisualHeight(
+    { cropId: "boro", stage: "establish", canopyHeightM: 0.3, stageFraction: 0.25 },
+    span,
+  );
+  assert.ok(short >= span * 0.012 - 1e-9, `short crop ${short} must clear floor ${span * 0.012}`);
+  assert.ok(short > 0.075, "short-canopy crops must be lifted above their raw data height");
+
+  // Harvest caps the height so the stubble reads as spent, but still sits above the soil.
+  const harvest = canopyVisualHeight(
+    { cropId: "boro", stage: "harvest", canopyHeightM: 1, stageFraction: 1 },
+    span,
+  );
+  assert.ok(harvest < 0.5, `harvest stubble must stay short, got ${harvest}`);
+  assert.ok(harvest > 0, "harvest stubble must still be visible");
+
+  // Fallow and missing cropId return 0.
+  assert.equal(canopyVisualHeight({ stage: "fallow" }, span), 0);
+  assert.equal(canopyVisualHeight({ cropId: null }, span), 0);
+  assert.equal(canopyVisualHeight(null, span), 0);
+
+  // Field span scales the floor. Bigger fields get taller clumps so they stay readable from farther out.
+  const tinyFloor = canopyVisualHeight(
+    { cropId: "boro", stage: "establish", canopyHeightM: 0.3, stageFraction: 0.1 },
+    10,
+  );
+  const bigFloor = canopyVisualHeight(
+    { cropId: "boro", stage: "establish", canopyHeightM: 0.3, stageFraction: 0.1 },
+    120,
+  );
+  assert.ok(bigFloor > tinyFloor, "larger fields should lift the visible floor");
 });
 
 test("fitCameraToBlock positions a perspective camera above and off-axis, fitting the bounding sphere", () => {

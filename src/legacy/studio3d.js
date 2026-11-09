@@ -23,6 +23,7 @@ import {
   clipRing,
   pointInPolygon,
   ringSignedArea,
+  canopyVisualHeight,
 } from "./studio3d-helpers.js";
 
 export {
@@ -31,6 +32,7 @@ export {
   plantPositionsInPolygon,
   outlineBounds,
   clipRing,
+  canopyVisualHeight,
 } from "./studio3d-helpers.js";
 
 /* ------------------------------------------------------------------ state */
@@ -379,23 +381,22 @@ async function buildTopTexture(data, layer, monthIdx) {
       ctx.stroke();
     }
   } else {
-    // Crop-season ground: a dark version of the crop colour, so clumps read as
-    // a canopy instead of green dots floating on bare soil.
-    ctx.fillStyle = stageColor(month.cropId, month.stage);
+    // Crop-season ground: tilled soil with a very light crop-tinted wash. A
+    // desaturated base keeps the 3D clumps readable against the surface instead
+    // of hiding them in a solid mat of the same green.
+    ctx.fillStyle = "#a8906b";
     ctx.fillRect(0, 0, 512, 512);
-    ctx.fillStyle = "rgba(24,35,18,0.34)";
+    ctx.fillStyle = "rgba(142,112,76,0.55)";
+    for (let y = 14; y < 512; y += 28) ctx.fillRect(0, y, 512, 6);
+    const tint = stageColor(month.cropId, month.stage);
+    const r = parseInt(tint.slice(1, 3), 16);
+    const g = parseInt(tint.slice(3, 5), 16);
+    const b = parseInt(tint.slice(5, 7), 16);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.14)`;
     ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = "rgba(28,42,22,0.45)";
-    ctx.lineWidth = 5;
-    for (let y = 16; y < 512; y += 30) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = "rgba(160,185,110,0.12)";
-    ctx.lineWidth = 2;
-    for (let y = 22; y < 512; y += 30) {
+    ctx.strokeStyle = "rgba(64,44,26,0.38)";
+    ctx.lineWidth = 2.5;
+    for (let y = 18; y < 512; y += 28) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(512, y);
@@ -846,8 +847,9 @@ function buildPlantsAndRoots(data, monthIdx) {
   }
   if (positions.length === 0) return;
 
-  let h = Math.max(0.06, (month.canopyHeightM || 0.35) * (month.stageFraction || 0.5));
-  if (month.stage === "harvest") h = Math.min(h, 0.16);
+  const fieldSpan = Math.max(bounds.width, bounds.height);
+  const h = canopyVisualHeight(month, fieldSpan);
+  if (!(h > 0)) return;
 
   const geom = buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing));
   const mat = new THREE.MeshStandardMaterial({
