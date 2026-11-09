@@ -34,13 +34,45 @@ const UPAZILAS = [
   },
 ];
 
-// Center & camera parameters
-const INITIAL_CAMERA = {
-  center: [89.25, 25.60],
-  zoom: 9.6,
-  pitch: 52,
-  bearing: -10,
-};
+// Keep river lines on the land: cut each line where it leaves the faded data box.
+const LAND_BOX = [89.075, 25.29, 89.462, 25.976];
+function clipRivers(fc) {
+  const inBox = ([x, y]) => x >= LAND_BOX[0] && x <= LAND_BOX[2] && y >= LAND_BOX[1] && y <= LAND_BOX[3];
+  const features = [];
+  for (const f of fc.features || []) {
+    let run = [];
+    for (const pt of f.geometry?.coordinates || []) {
+      if (inBox(pt)) run.push(pt);
+      else { if (run.length > 1) features.push({ ...f, geometry: { type: "LineString", coordinates: run } }); run = []; }
+    }
+    if (run.length > 1) features.push({ ...f, geometry: { type: "LineString", coordinates: run } });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+// Upazila extent (data bbox minus its 3 km buffer); the camera frames this on every screen size.
+const UPAZILA_BBOX = [[89.087, 25.30], [89.45, 25.965]];
+const PITCH = 55, BEARING = -12;
+const HAZE = "#e8eee6"; // background, fog and faded data edge all share this, so the land floats in mist
+let maplibreglRef = null;
+let INITIAL_CAMERA = { center: [89.27, 25.63], zoom: 9.9, pitch: PITCH, bearing: BEARING };
+function frameCamera(map) {
+  // Wide screens look across the land from the west so the long north-south axis runs across the screen.
+  const el = map.getContainer();
+  const bearing = el.clientWidth / Math.max(1, el.clientHeight) > 1.2 ? 78 : BEARING;
+  const c = map.cameraForBounds(UPAZILA_BBOX, { padding: 12, bearing });
+  if (c) {
+    // cameraForBounds ignores pitch; tilting magnifies the near side, so zoom out and aim a little toward the viewer.
+    const ll = maplibreglRef.LngLat.convert(c.center), b = (bearing * Math.PI) / 180, d = 0.05;
+    INITIAL_CAMERA = {
+      center: [ll.lng - (Math.sin(b) * d) / Math.cos((ll.lat * Math.PI) / 180), ll.lat - Math.cos(b) * d],
+      zoom: c.zoom - 0.45,
+      pitch: PITCH,
+      bearing,
+    };
+  }
+  return INITIAL_CAMERA;
+}
 
 function hasWebGL() {
   try {
@@ -105,6 +137,12 @@ export function landscapePanel() {
           </button>
         </div>
 
+        <noscript>
+          <div class="landscape-fallback">
+            ${t("JavaScript is required to display the 3D landscape.", "ত্রিমাত্রিক ল্যান্ডস্কেপ দেখতে জাভাস্ক্রিপ্ট প্রয়োজন।")}
+          </div>
+        </noscript>
+      </div>
         <div class="landscape-overlay-bottom">
           <div class="landscape-chip">
             <span>${t("Height exaggerated 10× · NASADEM 30 m · includes trees", "উচ্চতা ১০ গুণ বর্ধিত · নাসা ডেম ৩০ মি · গাছপালা অন্তর্ভুক্ত")}</span>
@@ -121,12 +159,6 @@ export function landscapePanel() {
           </div>
         </div>
 
-        <noscript>
-          <div class="landscape-fallback">
-            ${t("JavaScript is required to display the 3D landscape.", "ত্রিমাত্রিক ল্যান্ডস্কেপ দেখতে জাভাস্ক্রিপ্ট প্রয়োজন।")}
-          </div>
-        </noscript>
-      </div>
     </div>
   `;
 
@@ -174,6 +206,7 @@ export function initLandscapeObserver() {
 async function setupMap(container) {
   try {
     const maplibregl = await loadMapLibre();
+    maplibreglRef = maplibregl;
     if (!container || !container.isConnected) return;
 
     // Filter upazila outlines from rangpur_upazilas.geojson
@@ -191,6 +224,14 @@ async function setupMap(container) {
       // offline fallback
     }
 
+    let riversGeojson = { type: "FeatureCollection", features: [] };
+    try {
+      const r = await fetch("/data/landscape-rivers.geojson");
+      if (r.ok) riversGeojson = clipRivers(await r.json());
+    } catch (e) {
+      // no rivers is acceptable
+    }
+
     const dataBbox = [89.057375, 25.272260, 89.480445, 25.993650];
 
     const startCamera = {
@@ -203,8 +244,8 @@ async function setupMap(container) {
     const map = new maplibregl.Map({
       container: container,
       maxBounds: [
-        [88.85, 25.05],
-        [89.68, 26.20],
+        [88.95, 25.15],
+        [89.6, 26.1],
       ],
       style: {
         version: 8,
@@ -233,11 +274,12 @@ async function setupMap(container) {
             ],
             tileSize: 256,
             maxzoom: 18,
+            bounds: [89.075, 25.29, 89.462, 25.976], // photo stays on the land, haze around it
             attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
           },
           "rivers": {
             type: "geojson",
-            data: "/data/landscape-rivers.geojson",
+            data: riversGeojson,
           },
           "upazila-bounds": {
             type: "geojson",
@@ -245,6 +287,7 @@ async function setupMap(container) {
           },
         },
         layers: [
+          { id: "haze", type: "background", paint: { "background-color": HAZE } },
           {
             id: "color-layer",
             type: "raster",
@@ -304,12 +347,12 @@ async function setupMap(container) {
           },
         ],
         sky: {
-          "sky-color": "#bae6fd",
-          "sky-horizon-blend": 0.5,
-          "horizon-color": "#e0f2fe",
-          "horizon-fog-blend": 0.7,
-          "fog-color": "#f0f9ff",
-          "fog-ground-blend": 0.6,
+          "sky-color": "#cfe3ee",
+          "sky-horizon-blend": 0.6,
+          "horizon-color": HAZE,
+          "horizon-fog-blend": 0.8,
+          "fog-color": HAZE,
+          "fog-ground-blend": 0.35,
         },
         terrain: {
           source: "terrain-dem",
@@ -345,6 +388,7 @@ async function setupMap(container) {
           .addTo(map);
       });
 
+      frameCamera(map);
       // Fly-in animation (2 s)
       const prefersReducedMotion =
         typeof window !== "undefined" &&

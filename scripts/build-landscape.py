@@ -135,6 +135,8 @@ def get_tile_range(bbox, z):
     y1 = int(math.floor((1.0 - math.asinh(math.tan(lat_rad_max)) / math.pi) / 2.0 * n))
     return min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1)
 
+FADE_DEG = 0.03  # ~3 km, the same as the bbox buffer
+
 def sample_dem_tile(master_dem, master_bbox, tile_bbox, size=256):
     # Tile coordinate mapping into master_dem
     # master_dem is (H, W), master_bbox is [min_lon, min_lat, max_lon, max_lat]
@@ -152,6 +154,12 @@ def sample_dem_tile(master_dem, master_bbox, tile_bbox, size=256):
     cols = (tile_lons - master_bbox[0]) / (master_bbox[2] - master_bbox[0]) * (W - 1)
     rows = (master_bbox[3] - tile_lats) / (master_bbox[3] - master_bbox[1]) * (H - 1)
 
+    # Fade toward the data edge (smoothstep over FADE_DEG) instead of smearing edge pixels outward.
+    dc_deg = np.minimum(cols, (W - 1) - cols) / (W - 1) * (master_bbox[2] - master_bbox[0])
+    dr_deg = np.minimum(rows, (H - 1) - rows) / (H - 1) * (master_bbox[3] - master_bbox[1])
+    f = np.clip(np.minimum(dr_deg[:, np.newaxis], dc_deg[np.newaxis, :]) / FADE_DEG, 0.0, 1.0)
+    fade = f * f * (3.0 - 2.0 * f)
+
     cols = np.clip(cols, 0, W - 1)
     rows = np.clip(rows, 0, H - 1)
 
@@ -168,7 +176,7 @@ def sample_dem_tile(master_dem, master_bbox, tile_bbox, size=256):
     top = master_dem[r0[:, np.newaxis], c0[np.newaxis, :]] * (1.0 - dc) + master_dem[r0[:, np.newaxis], c1[np.newaxis, :]] * dc
     bot = master_dem[r1[:, np.newaxis], c0[np.newaxis, :]] * (1.0 - dc) + master_dem[r1[:, np.newaxis], c1[np.newaxis, :]] * dc
     tile_elev = top * (1.0 - dr) + bot * dr
-    return tile_elev
+    return tile_elev, fade
 
 def gaussian_blur_2d(arr, sigma=1.2):
     radius = int(math.ceil(2 * sigma))
@@ -225,6 +233,7 @@ def render_color_tile(elev_grid, cell_size_m):
 
 def build_tiles(master_dem, bbox):
     total_tiles = 0
+    base = float(np.percentile(master_dem, 5))  # flat low plain the faded edge settles to
     for z in range(8, 13):
         x0, x1, y0, y1 = get_tile_range(bbox, z)
         # Approximate cell size in metres at this latitude (~25.6 deg)
@@ -234,7 +243,10 @@ def build_tiles(master_dem, bbox):
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):
                 tb = tile_bounds_latlon(x, y, z)
-                tile_dem = sample_dem_tile(master_dem, bbox, tb, size=256)
+                raw_dem, fade = sample_dem_tile(master_dem, bbox, tb, size=256)
+                if not fade.any():
+                    continue  # fully outside the data: skip, MapLibre shows the haze background
+                tile_dem = base + (raw_dem - base) * fade
 
                 # 1. Terrarium DEM tile
                 dem_img = encode_terrarium(tile_dem)
@@ -244,6 +256,7 @@ def build_tiles(master_dem, bbox):
 
                 # 2. Hypsometric color tile (WebP)
                 color_img = render_color_tile(tile_dem, cell_size_m)
+                color_img.putalpha(Image.fromarray((fade * 255).astype(np.uint8)))
                 color_path = COLOR_DIR / str(z) / str(x) / f'{y}.webp'
                 color_path.parent.mkdir(parents=True, exist_ok=True)
                 color_img.save(color_path, format='WEBP', quality=82)
