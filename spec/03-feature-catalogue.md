@@ -11,8 +11,8 @@ The 18 features come from F18 (translated from Banglish; wording kept close). Ea
 | # | Feature | Core view | Status |
 |---|---|---|---|
 | 1 | Select & save field | `#field` | CORE |
-| 2 | 3D terrain view | `#field` (3D) | PROTO |
-| 3 | Slope & cross-section | `#field` (3D) | PROTO |
+| 2 | 3D terrain view | `#water` (district 3D landscape) | BUILT — field-scale 3D dropped [14 D-Q4 amendment] |
+| 3 | Slope & cross-section | — | DROPPED: 30 m DEM cannot resolve plot slope; needs survey or drone |
 | 4 | Waterlogging (where water collects) | `#water` | PROTO |
 | 5 | Drain design & test | `#water` | PROTO |
 | 6 | Rain & flood scenario | `#water` / `#recovery` | PARTIAL |

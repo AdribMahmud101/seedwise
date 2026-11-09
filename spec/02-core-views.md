@@ -28,6 +28,7 @@ Shared: `ui.js` (state, data loading, `t(en, bn)` i18n, modal), `engine.js` (pla
 - Shows boundary area, planning crop, expected harvest, next decision, "Review field constraints". [`fields.js`]
 - Climate tiles: surface wetness (POWER index 0–1), IMERG monthly total, mean temperature, FAO-56 ETo monthly total. [`fields.js`]
 - Entry point to Disaster recovery. [CORE/DR]
+- **Update 9 Nov 2026:** demo outlines now trace real plots on the Maxar 28 Nov 2022 photo (23 / 33 / 44 decimals); search adds Rangpur villages and "Start a field here" (any point, live POWER data cached, D-Q4 amendment); net cultivable area after bunds/drains/paths (farmer inputs); SMAP soil water tile. The dated Landsat photo moved to `#seasons`; field-scale 3D, slope and A–A′ transect were dropped (30 m DEM cannot resolve plot slope) — replaced by the Low ground layer and the district 3D landscape in `#water`.
 - **Rules:** initial outlines are illustrative; redrawing changes planting area; area = local equirectangular projection + shoelace formula. [CORE/M "Spatial support"]
 
 ## 02 · `#seasons` — Past seasons

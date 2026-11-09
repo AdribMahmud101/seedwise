@@ -4,7 +4,7 @@
 
 The field map is a static web page. Leaflet draws the 2D field map, MapLibre GL draws the 3D landscape, and every layer is either a pre-built offline file or a free online imagery service. There is no server and no database; Cloudflare serves the files at <https://roponradar.onefusionlab.systems>.
 
-It covers the three pilot sites (Mithapukur, Pirganj, Gangachara) and lives in two views: `#field` (2D field map) and `#water` ("Your land in 3D").
+It covers the three pilot sites (Mithapukur, Pirganj, Gangachara) plus any field a farmer starts, and lives in two views: `#field` (2D field map) and `#water` ("Your land in 3D").
 
 ## 1. App platform
 
@@ -14,7 +14,7 @@ It covers the three pilot sites (Mithapukur, Pirganj, Gangachara) and lives in t
 | View code | Plain JavaScript modules in `src/legacy/` | `fields.js` (2D map), `boundary.js` (field outline), `landscape3d.js` (3D), `water.js` |
 | Styling | CSS files in `app/` | `style.css`, `lowground.css`, `landscape.css`, `labels.css` |
 | Languages | `t(en, bn)` helper | Every label in English and Bengali |
-| Saved data | Browser `localStorage` | The farmer's field boundary and settings stay on the phone |
+| Saved data | Browser `localStorage` | Field boundaries, custom fields, cultivable-area inputs and fetched POWER data stay on the phone |
 | Offline | Service worker built by `scripts/prepare-offline.py` | Caches app files and offline tiles; never caches Esri imagery |
 | Hosting | Cloudflare Workers static assets, `wrangler` | Deployed with `npm run deploy` to a custom domain |
 | Source | GitHub (private repo) | Code, briefs and spec |
@@ -42,6 +42,9 @@ Both are self-hosted so the app works offline. The earlier three.js field-scale 
 | 3D colours | Built from NASADEM: height colours + hillshade, edges faded into haze | 30 m | — | Offline | Estimated |
 | 3D photo mode | Same Esri Wayback release | 0.31 m | 28 Nov 2022 | Online only | Estimated |
 | 3D rivers and borders | OSM named rivers; geoBoundaries upazilas | Vector | — | Offline | — |
+| Village search | OSM places (83 villages, 60 towns in Rangpur) via `fetch-places.py` | Point | Fetched Nov 2026 | Offline (`places-rangpur.json`, 24 KB) | — |
+| New-field weather | NASA POWER daily point API (AG community) + IMERG, summarised in the browser (`powerlive.js`, FAO-56 ETo) | ~50 km / ~10 km | 2024 | Fetched live once, then cached on the phone | Estimated |
+| Soil water (SMAP) tile | NASA SMAP L4 surface soil moisture, pilot sites only | 9 km | 2024 monthly | Offline JSON | Estimated |
 
 Why Wayback release 64776: the live Esri layer shows a hazy 14 Dec 2023 capture over Mithapukur and a hazy Jan 2024 capture over Gangachara. Of the 198 archived releases, the Maxar 28 Nov 2022 capture is clear at all three sites.
 
@@ -58,6 +61,9 @@ Why Wayback release 64776: the live Esri layer shows a hazy 14 Dec 2023 capture 
 | Low ground toggle | One button, off by default; the legend appears only when it is on |
 | Locate, reset, full screen | Map controls on the right, all 44 px tap targets |
 | 3D landscape | Lazy-loaded; frames all 3 upazilas (side view on wide screens, north-up on phones); Height colours / Photo switch and reset; one 2 s fly-in, no auto-rotate; shows a message without WebGL |
+| Start any field | Search a village or coordinates, Locate me, or Pick on map → "Start a field here" makes a ~20-decimal outline to edit; fields marked ★ can be deleted |
+| New-field data | POWER is fetched live once per new field and cached; offline shows "Internet needed" with a retry, never another site's numbers; SMAP shows "Not prepared for this field" |
+| Cultivable area | Gross area minus bunds, drains, paths and other land (`netarea.js`); farmer edits widths per field |
 | Truth labels | Every layer and value carries Measured, Estimated, Scenario or Unknown (`truth()` in `ui.js`) |
 
 ## 5. Data pipeline and quality checks
@@ -75,7 +81,7 @@ All offline map data is built once by Python scripts and committed as static fil
 
 Checks before every release:
 
-- **Unit tests:** `npm test` (Node test runner), 58 tests, including the `map-layers`, `low-ground`, `landscape` and `esri-zoom` suites.
+- **Unit tests:** `npm test` (Node test runner), 68 tests, including the `map-layers`, `low-ground`, `landscape`, `esri-zoom`, `custom-fields` (POWER parity with the Python fixture) and `netarea` suites.
 - **Build:** `npm run build` must compile on the main branch.
 - **Browser checks:** headless Chrome (Playwright) at 1280 px and 360 px, English and Bengali: no sideways scroll, no text under 12 px, no tap target under 44 px, no console errors, no 404s, only expected outside hosts.
 - **Size budgets:** low-ground overlays ≤ 300 KB; 3D landscape files ≤ 4 MB; MapLibre not loaded on first page load.
@@ -99,4 +105,4 @@ Known limits:
 - Sentinel-2 is 10 m, so it looks soft up close; only two dates are stored (30 MB tile budget).
 - NASADEM heights include trees and houses; low ground and 3D are approximate.
 - 3D has not yet been tested on a real phone GPU.
-- The demo field outlines do not follow real plot edges yet.
+- Village search has only 143 OSM places; coordinates, Locate me and Pick on map work anywhere.

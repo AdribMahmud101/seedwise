@@ -65,7 +65,7 @@ The app holds 33 agronomy sources in total. All of them open from the **Evidence
 
 | Screen (route) | What the farmer does here | NASA data used | What the data shows on this screen |
 |---|---|---|---|
-| **My field** `#field` | Picks the field, draws its edge | Landsat photo, Sentinel-2 photo, POWER wetness (top), IMERG rain, POWER temperature, ETo | Real satellite photo under the field; the month's rain, soil wetness score, temperature and crop water need |
+| **My field** `#field` | Picks the field (prepared site, village or any point), draws its edge | High-detail photo (Maxar via Esri), Sentinel-2 photo + NDVI, NASADEM low ground, POWER wetness (top), SMAP soil water, IMERG rain, POWER temperature, ETo (live POWER for new fields) | Real satellite photo under the field; the month's rain, soil wetness score, temperature and crop water need |
 | **Past seasons** `#seasons` | Compares one month across 2021–2025 | IMERG rain + POWER rain, POWER temperature, POWER wetness (top + root), ETo; Landsat greenness and cloud gaps (2024) | How this month compares with the other four years; when clouds hid the crop |
 | **Rotation studio** `#rotations` | Compares 4 crop plans | IMERG rain + ETo (2024, monthly) | "Water fit": which plan needs more water than the rain gives |
 | **Planting planner** `#planner` | Lays out rows and counts plants | **None** | Uses field size, spacing and published crop trials only |
