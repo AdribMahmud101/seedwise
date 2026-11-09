@@ -102,27 +102,27 @@ function fieldName(f = field()) {
   return t(f.name, siteNames[f.id]);
 }
 function basePolygon(f = field()) {
+  // Real plots traced on the Maxar 28 Nov 2022 photo (Mithapukur 23, Pirganj 33, Gangachara 44 decimals).
   const shapes = {
     mithapukur: [
-      [-0.00063, -0.00092],
-      [-0.00079, 0.00062],
-      [0.00006, 0.00111],
-      [0.00079, 0.00052],
-      [0.00059, -0.00083],
+      [0.001043, 0.001147],
+      [0.000992, 0.001421],
+      [0.000692, 0.001343],
+      [0.000728, 0.001091],
     ],
     pirganj: [
-      [-0.00051, -0.00073],
-      [-0.0007, 0.0004],
-      [0.00031, 0.00092],
-      [0.00069, 0.00026],
-      [0.00055, -0.0008],
+      [0.000745, 0.000838],
+      [0.000736, 0.001298],
+      [0.000487, 0.00129],
+      [0.000479, 0.000832],
     ],
     gangachara: [
-      [-0.00069, -0.00075],
-      [-0.00084, 0.00071],
-      [0.00008, 0.00098],
-      [0.00078, 0.00045],
-      [0.00044, -0.00088],
+      [0.001101, -0.000599],
+      [0.001071, -0.00021],
+      [0.00086, -0.000217],
+      [0.000691, -0.000264],
+      [0.000721, -0.000666],
+      [0.000854, -0.000653],
     ],
   };
   return shapes[f.id].map(([dy, dx]) => [f.lat + dy, f.lon + dx]);
@@ -133,10 +133,14 @@ function polygon() {
 function area() {
   return areaHa(polygon());
 }
+// Example Aman harvest: 10 Nov of the current year (an editable demo assumption, not a forecast).
+function defaultHarvest(today = new Date()) {
+  return `${today.getFullYear()}-11-10`;
+}
 function profile() {
   return {
     crop: "aman",
-    harvest: "2026-11-10",
+    harvest: defaultHarvest(),
     irrigation: "reliable",
     budget: "medium",
     floodDays: 0,

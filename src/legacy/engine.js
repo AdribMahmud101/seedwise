@@ -208,7 +208,7 @@ export const STRATEGIES = [
 ];
 export function rankRotations(weights, options = {}) {
   const denominator = Object.values(weights).reduce((a, b) => a + Number(b), 0);
-  const harvest = new Date(options.harvest || '2026-11-10');
+  const harvest = new Date(options.harvest || `${new Date().getFullYear()}-11-10`);
   return STRATEGIES.map((strategy) => {
     const issues = [];
     const benefits = { ...strategy.benefits };
