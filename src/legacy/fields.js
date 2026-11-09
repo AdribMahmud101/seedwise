@@ -1558,7 +1558,9 @@ function searchResults(query) {
   // Add village / place matches
   for (const p of placeMatches) {
     const displayName = state.lang === "bn" && p.name_bn ? p.name_bn : p.name;
-    const sub = `${p.kind || "village"} · ${num(p.lat, 4)}° N · ${num(p.lon, 4)}° E`;
+    const kindBn = { village: "গ্রাম", town: "শহর", hamlet: "পাড়া", suburb: "এলাকা", locality: "এলাকা" };
+    const kind = p.kind || "village";
+    const sub = `${t(kind, kindBn[kind] || kind)} · ${num(p.lat, 4)}° N · ${num(p.lon, 4)}° E`;
     const val = `${p.lat},${p.lon},${p.name || ""},${p.name_bn || ""}`;
     results.push(
       `<div class="result-option-action">${icon("pin")}<span><b>${esc(displayName)}</b><small>${esc(sub)}</small></span>${button(t("Start a field here", "এখানে নতুন জমি শুরু করুন"), "start-custom-field", "small primary", "draw", val)}</div>`,
