@@ -124,7 +124,8 @@ let leafletMap = null,
   layerOpacity = 0.6,
   showOsmContext = true,
   tileErrorCount = 0,
-  lastView = null; // keeps pan/zoom across repaints of the same field
+  lastView = null, // keeps pan/zoom across repaints of the same field
+  mountedFieldId = null; // field the live map shows; state.fieldId may already point at the next one
 
 const colors = {
   wetness: "#658261",
@@ -445,7 +446,7 @@ function disposeMap() {
   const sheet = document.querySelector("#inspect-sheet");
   if (sheet) sheet.innerHTML = "";
   if (leafletMap) {
-    lastView = { fieldId: state.fieldId, regional, center: leafletMap.getCenter(), zoom: leafletMap.getZoom() };
+    lastView = { fieldId: mountedFieldId, regional, center: leafletMap.getCenter(), zoom: leafletMap.getZoom() };
     leafletMap.off();
     leafletMap.remove();
     leafletMap = null;
@@ -995,6 +996,7 @@ async function mountMap() {
     keyboard: true,
   });
   const current = leafletMap;
+  mountedFieldId = f.id;
 
   // Custom 44px Controls: Zoom (+/-), Reset view, Locate me, Full screen
   const FieldNavControl = L.Control.extend({
