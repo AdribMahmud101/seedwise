@@ -120,6 +120,8 @@ The base CSS uses 7–12 px text in many places, a 33 px icon button and 12 px b
 
 ## 8. 3D view (toggle inside `#field` and `#water`)
 
+> **Superseded for `#field` (9 Nov 2026, owner):** 3D terrain removed from the field map; the map uses an online High-detail photo layer with Sentinel-2 10 m as offline fallback. See 14 D-Q4 amendment.
+
 Patterns borrowed from GeoPard (layers + probe) and OptiSurface (water flow, before/after):
 
 | Rule | Detail |

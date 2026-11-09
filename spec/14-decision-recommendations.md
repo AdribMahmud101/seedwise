@@ -48,6 +48,8 @@ All recommendations below were validated by the project owner on 8 Nov 2026 and 
 | Q2 | FFWC registration | One team member registers for the API now. The app links to the official FFWC bulletin meanwhile (already done in CORE). | ✅ |
 | Q3 | BARC/SRDI reuse | Use only published documents with page-level citations (as CORE does); no bulk scraping. | ✅ |
 | Q4 | Deployment | **Offline static export** (CORE today). Auth/service is post-hackathon. | ✅ |
+
+> **Amendment 9 Nov 2026 (owner):** #field gets an **online "High detail" imagery layer** (Esri World Imagery, network-only, not cached) as default when online; Sentinel-2 10 m stays the offline fallback. **3D terrain removed from #field** (30 m DEM is noise at plot scale on a flat floodplain) — overrides the 3D part of C4.
 | Q5 | IVR/SMS channel | **Out of scope.** Keep the Banglish message templates (11 §3) for on-screen action cards. | ✅ |
 | Q6 | 18-Feature Google Doc | **Resolved 9 Nov 2026:** the Google Doc is public and its text is identical to F18 (`specs/Shob plan aar features…txt`). No export needed. | ✅ |
 

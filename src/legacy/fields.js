@@ -771,7 +771,7 @@ async function mountMap() {
     color: "#e3f9a2",
     weight: 2.5,
     fillColor: "#c8e383",
-    fillOpacity: 0.22,
+    fillOpacity: 0.06,
   });
 
   // Set initial map view before adding layers to guarantee valid renderer bounds
@@ -848,7 +848,7 @@ async function mountMap() {
     }
     activeTileLayer = L.tileLayer(tileUrl, {
       minZoom,
-      maxZoom: 16,
+      maxZoom: online ? 19 : 16, // overlay must survive the zoom-18 photo view,
       maxNativeZoom: maxZoom,
       bounds: tileBounds,
       opacity: layerOpacity,
