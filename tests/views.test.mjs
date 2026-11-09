@@ -591,4 +591,42 @@ test("truth badges in #field and #seasons have proper source, date, cell info", 
   assert.ok(seasonsHtml.includes("cell:") || seasonsHtml.includes("cell:"), `Truth badges in #seasons have cell info`);
 });
 
+test("MOB1: phone short labels, inspect-sheet, and SW tile caching behavior", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+
+  // 1. Phone short labels present in EN and BN renders
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  const enHtml = home();
+  assert.ok(enHtml.includes("label-short"), "label-short class present in EN render");
+  assert.ok(enHtml.includes("Photo"), "EN short label Photo present");
+  assert.ok(enHtml.includes("Colour 10 m"), "EN short label Colour 10 m present");
+  assert.ok(enHtml.includes("NDVI"), "EN short label NDVI present");
+  assert.ok(enHtml.includes('id="inspect-sheet"'), "#inspect-sheet container rendered in EN");
+  assert.ok(enHtml.includes('aria-live="polite"'), "inspect-sheet has aria-live polite");
+
+  state.lang = "bn";
+  const bnHtml = home();
+  assert.ok(bnHtml.includes("ছবি"), "BN short label ছবি present");
+  assert.ok(bnHtml.includes("রং ১০ মি"), "BN short label রং ১০ মি present");
+  assert.ok(bnHtml.includes("NDVI"), "BN short label NDVI present");
+
+  // 2. SW precache list excludes /tiles/, but fetch handler caches /tiles/
+  const prepareOfflinePy = await readFile(new URL("../scripts/prepare-offline.py", import.meta.url), "utf8");
+  assert.ok(
+    prepareOfflinePy.includes("'tiles' not in p.parts"),
+    "prepare-offline.py excludes tiles from precache files list",
+  );
+  assert.ok(
+    prepareOfflinePy.includes("url.pathname.startsWith('/tiles/')"),
+    "prepare-offline.py fetch handler caches /tiles/",
+  );
+});
+
+
 

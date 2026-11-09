@@ -762,13 +762,16 @@ small {
   z-index: 10000 !important;
   width: 100vw !important;
   height: 100vh !important;
+  height: 100dvh !important;
   max-width: none !important;
   border-radius: 0 !important;
   margin: 0 !important;
 }
 .field-map-fullscreen .field-map {
   height: calc(100vh - 54px) !important;
+  height: calc(100dvh - 54px) !important;
   min-height: calc(100vh - 54px) !important;
+  min-height: calc(100dvh - 54px) !important;
 }
 .leaflet-tooltip {
   font: 12px Mono !important;
@@ -2986,6 +2989,209 @@ dialog .modal-body {
   font: inherit;
   background: var(--surface);
 }
-.field-inspect-popup .leaflet-popup-content {
-  overscroll-behavior: contain;
+.label-short {
+  display: none;
 }
+.inspect-sheet {
+  display: none;
+}
+@media (max-width: 600px) {
+  .label-full {
+    display: none;
+  }
+  .label-short {
+    display: inline;
+  }
+
+  /* 1. Map height on phones */
+  #field-map,
+  .grid-two > section:first-child:has(.field-map) .field-map {
+    height: clamp(340px, 62svh, 560px) !important;
+    min-height: clamp(340px, 62svh, 560px) !important;
+  }
+  .field-map-fullscreen,
+  .field-map-fullscreen .field-map {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+  }
+
+  /* 2. Layer switcher */
+  .map-segmented {
+    display: flex;
+    width: 100%;
+    gap: 2px;
+  }
+  .map-segmented .button {
+    flex: 1;
+    min-height: 44px;
+    padding: 6px 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  /* 3. Opacity + Context lines + Low ground in one row */
+  .map-subcontrols {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .map-opacity-control {
+    flex: 1;
+    min-width: 96px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .map-opacity-control input[type="range"] {
+    width: 100%;
+    min-width: 48px;
+  }
+  .map-subcontrols .button {
+    flex-shrink: 0;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  /* 4. Tap inspect sheet */
+  .inspect-sheet {
+    display: block;
+    margin-top: 10px;
+  }
+  .inspect-sheet:empty {
+    display: none;
+  }
+  .inspect-sheet-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(36, 57, 44, 0.08);
+  }
+  .inspect-sheet-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 6px;
+  }
+  .inspect-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .inspect-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--ink);
+  }
+  .inspect-sheet-card .inspect-card {
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* 5. Hide coordinate box on phones */
+  .map-bottom {
+    display: none !important;
+  }
+
+  /* 6. Imagery chip on map: one line with ellipsis */
+  .map-overline {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 32px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .map-overline .map-chip-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 7. Field chips: single horizontally scrollable row */
+  .field-selector {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    padding-bottom: 4px;
+  }
+  .field-selector .chip-wrapper,
+  .field-selector .field-chip {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+
+  /* 8. Page header: actions in one row under the title */
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .page-head-actions {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+  }
+  .page-head-actions .button {
+    flex: 1;
+    min-height: 44px;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* 9. Map action buttons: 3 equal columns in one row, icon above short label */
+  .map-actions .map-controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    width: 100%;
+    gap: 6px;
+  }
+  .map-actions .map-controls .map-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 6px 4px;
+    font-size: 12px;
+    gap: 2px;
+  }
+  .map-actions .map-controls .map-action-btn svg {
+    margin: 0;
+  }
+
+  /* 11. iOS zoom on focus: inputs & selects >= 16px */
+  #field input,
+  #field select,
+  #boundary-size,
+  #lookup,
+  dialog input,
+  dialog select,
+  .search-form input {
+    font-size: 16px !important;
+  }
+}
+

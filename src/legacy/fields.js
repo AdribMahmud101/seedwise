@@ -104,6 +104,7 @@ let leafletMap = null,
   drawLayer = null,
   drawPoints = [],
   cornerMarkers = [],
+  tapMarker = null,
   drawMode = false,
   pickMapMode = false,
   regional = false,
@@ -429,8 +430,20 @@ function setField(id) {
   lastView = null;
   persist();
   repaint();
+  setTimeout(() => {
+    const selectedChip = document.querySelector(".field-selector .field-chip.selected");
+    if (selectedChip && typeof selectedChip.scrollIntoView === "function") {
+      selectedChip.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+    }
+  }, 0);
 }
 function disposeMap() {
+  if (tapMarker) {
+    tapMarker.remove();
+    tapMarker = null;
+  }
+  const sheet = document.querySelector("#inspect-sheet");
+  if (sheet) sheet.innerHTML = "";
   if (leafletMap) {
     lastView = { fieldId: state.fieldId, regional, center: leafletMap.getCenter(), zoom: leafletMap.getZoom() };
     leafletMap.off();
@@ -580,20 +593,20 @@ function stats(months = field().monthly) {
           return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">—<small>${unit}</small></div>${spark(
             Array(12).fill(null),
             colors.wetness,
-          )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`;
+          )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
         } else {
           // SMAP tile with data - use 2024 monthly SFMC values for spark line
           return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(smapData.sfmc, places)}<small>${unit}</small></div>${spark(
             smapData.monthly2024,
             colors.smap,
-          )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`;
+          )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
         }
       } else {
         // Regular tiles
         return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(m[key], places)}<small>${unit}</small></div>${spark(
           months.map((v) => v[key]),
           colors[key],
-        )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`;
+        )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
       }
     })
     .join("")}</div>`;
@@ -743,9 +756,9 @@ function home() {
     `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
  <div class="map-switcher">
    <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
-     <button type="button" class="button ${layerMode === "high-detail" ? "active" : ""}" data-action="set-layer-mode" data-value="high-detail" role="tab" aria-selected="${layerMode === "high-detail"}" ${!online ? "disabled" : ""} title="${!online ? t("Needs internet", "ইন্টারনেট প্রয়োজন") : ""}">${icon("camera", 14)} ${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}${!online ? ` <small class="layer-offline-note">(${t("needs internet", "ইন্টারনেট প্রয়োজন")})</small>` : ""}</button>
-     <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}">${icon("layers", 14)} ${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}</button>
-     <button type="button" class="button ${layerMode === "ndvi" ? "active" : ""}" data-action="set-layer-mode" data-value="ndvi" role="tab" aria-selected="${layerMode === "ndvi"}">${icon("tree", 14)} ${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}</button>
+     <button type="button" class="button ${layerMode === "high-detail" ? "active" : ""}" data-action="set-layer-mode" data-value="high-detail" role="tab" aria-selected="${layerMode === "high-detail"}" ${!online ? "disabled" : ""} title="${!online ? t("Needs internet", "ইন্টারনেট প্রয়োজন") : ""}" aria-label="${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}">${icon("camera", 14)} <span class="label-full">${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}</span><span class="label-short">${t("Photo", "ছবি")}</span>${!online ? ` <small class="layer-offline-note">(${t("needs internet", "ইন্টারনেট প্রয়োজন")})</small>` : ""}</button>
+     <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}" title="${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}" aria-label="${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}">${icon("layers", 14)} <span class="label-full">${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}</span><span class="label-short">${t("Colour 10 m", "রং ১০ মি")}</span></button>
+     <button type="button" class="button ${layerMode === "ndvi" ? "active" : ""}" data-action="set-layer-mode" data-value="ndvi" role="tab" aria-selected="${layerMode === "ndvi"}" title="${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}" aria-label="${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}">${icon("tree", 14)} <span class="label-full">${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}</span><span class="label-short">${t("NDVI", "NDVI")}</span></button>
    </div>
    <div class="map-subcontrols">
      <div class="map-opacity-control">
@@ -782,10 +795,13 @@ function home() {
  </div>` : ""}
  <div class="map-actions">
    <div class="map-controls">
-     ${button(pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন"), "toggle-pick-map", `small ${pickMapMode ? "primary" : ""}`, "pin")}${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary && !drawMode ? button(t("Reset outline", "আগের সীমানা"), "reset-demo", "small ghost") : ""}
+     <button type="button" class="button small ${pickMapMode ? "primary" : ""} map-action-btn" data-action="toggle-pick-map" data-value="" title="${pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন")}" aria-label="${pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন")}">${icon("pin")}<span class="label-full">${pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন")}</span><span class="label-short">${pickMapMode ? t("Cancel", "বাতিল") : t("Pick", "বাছুন")}</span></button>
+     <button type="button" class="button small map-action-btn" data-action="region" data-value="" title="${regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা")}" aria-label="${regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা")}">${icon("layers")}<span class="label-full">${regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা")}</span><span class="label-short">${regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা")}</span></button>
+     <button type="button" class="button small ${drawMode ? "primary" : ""} map-action-btn" data-action="draw" data-value="" title="${drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা")}" aria-label="${drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা")}">${icon("draw")}<span class="label-full">${drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা")}</span><span class="label-short">${drawMode ? t("Editing", "সম্পাদনা") : t("Boundary", "সীমানা")}</span></button>
+     ${hasCustomBoundary && !drawMode ? button(t("Reset outline", "আগের সীমানা"), "reset-demo", "small ghost") : ""}
    </div>
- </div><div id="drawing-help"></div></section>
- <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${boundaryTruth}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(net.netHa)}">${num(net.netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${num(net.netHa * 247.105381, 1)} ${t("decimals", "শতক")}</small>${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
+ </div><div id="inspect-sheet" class="inspect-sheet" aria-live="polite"></div><div id="drawing-help"></div></section>
+ <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${boundaryTruth}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(net.netHa)}">${num(net.netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${num(net.netHa * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
  <div class="section-label"><div><div class="eyebrow">${t("Historical observations", "পুরনো পর্যবেক্ষণ")}</div><h2>${monthName()} 2024</h2></div>${goButton(t("See past seasons", "পুরনো মৌসুম"), "seasons", "small")}</div>${stats()}
@@ -947,6 +963,10 @@ function seasonView() {
   );
 }
 async function mountMap() {
+  const selectedChip = document.querySelector(".field-selector .field-chip.selected");
+  if (selectedChip && typeof selectedChip.scrollIntoView === "function") {
+    selectedChip.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+  }
   const el = document.querySelector("#field-map");
   if (!el || !window.L) return;
   await loadMapData();
@@ -1067,16 +1087,43 @@ async function mountMap() {
                 <button type="button" class="button small primary" data-action="start-custom-field" data-value="${latitude},${longitude},${t("My field", "আমার জমি")}">${t("Start my field here", "এখানে আমার জমি শুরু করুন")}</button>
               </div>
             `;
-            L.circleMarker([latitude, longitude], {
-              radius: 8,
-              color: "#315c3d",
-              fillColor: "#e5eadb",
-              fillOpacity: 1,
-              weight: 3,
-            })
-              .addTo(current)
-              .bindPopup(popupContent)
-              .openPopup();
+            const isPhone = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 600px)").matches;
+            if (tapMarker) {
+              tapMarker.remove();
+              tapMarker = null;
+            }
+            if (isPhone) {
+              tapMarker = L.circleMarker([latitude, longitude], {
+                radius: 6,
+                color: "#315c3d",
+                fillColor: "#e5eadb",
+                fillOpacity: 1,
+                weight: 2,
+              }).addTo(current);
+              const sheet = document.querySelector("#inspect-sheet");
+              if (sheet) {
+                sheet.innerHTML = `
+                  <div class="inspect-sheet-card">
+                    <div class="inspect-sheet-head">
+                      <strong>${t("Your current position", "আপনার বর্তমান অবস্থান")}</strong>
+                      <button type="button" class="inspect-close-btn" data-action="close-inspect" aria-label="${t("Close", "বন্ধ করুন")}">✕</button>
+                    </div>
+                    <div style="font-size: 12px; margin: 4px 0 8px 0; color: var(--muted);">${num(latitude, 4)}° N · ${num(longitude, 4)}° E</div>
+                    <button type="button" class="button small primary full" data-action="start-custom-field" data-value="${latitude},${longitude},${t("My field", "আমার জমি")}">${t("Start my field here", "এখানে আমার জমি শুরু করুন")}</button>
+                  </div>`;
+              }
+            } else {
+              L.circleMarker([latitude, longitude], {
+                radius: 8,
+                color: "#315c3d",
+                fillColor: "#e5eadb",
+                fillOpacity: 1,
+                weight: 3,
+              })
+                .addTo(current)
+                .bindPopup(popupContent)
+                .openPopup();
+            }
           },
           (err) => {
             if (err.code === 1) {
@@ -1407,7 +1454,35 @@ async function mountMap() {
 
   current.on("click", async (event) => {
     const { lat, lng } = event.latlng;
+    const isPhone = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 600px)").matches;
+
     if (pickMapMode) {
+      if (tapMarker) {
+        tapMarker.remove();
+        tapMarker = null;
+      }
+      if (isPhone) {
+        tapMarker = L.circleMarker([lat, lng], {
+          radius: 6,
+          color: "#315c3d",
+          fillColor: "#e5eadb",
+          fillOpacity: 1,
+          weight: 2,
+        }).addTo(current);
+        const sheet = document.querySelector("#inspect-sheet");
+        if (sheet) {
+          sheet.innerHTML = `
+            <div class="inspect-sheet-card">
+              <div class="inspect-sheet-head">
+                <strong>${t("Point on map", "মানচিত্রের বিন্দু")}</strong>
+                <button type="button" class="inspect-close-btn" data-action="close-inspect" aria-label="${t("Close", "বন্ধ করুন")}">✕</button>
+              </div>
+              <div style="font-size: 12px; margin: 4px 0 8px 0; color: var(--muted);">${num(lat, 4)}° N · ${num(lng, 4)}° E</div>
+              <button type="button" class="button small primary full" data-action="start-custom-field" data-value="${lat},${lng},${t("My field", "আমার জমি")}">${t("Start my field here", "এখানে আমার জমি শুরু করুন")}</button>
+            </div>`;
+        }
+        return;
+      }
       const popupHtml = `
         <div style="text-align: center; padding: 6px;">
           <p style="margin: 0 0 6px 0; font-weight: bold;">${t("Point on map", "মানচিত্রের বিন্দু")}</p>
@@ -1451,6 +1526,27 @@ async function mountMap() {
     await loadMoistureData();
     if (current !== leafletMap) return;
     const popupHtml = inspectPopup(f, lat, lng);
+
+    if (tapMarker) {
+      tapMarker.remove();
+      tapMarker = null;
+    }
+
+    if (isPhone) {
+      tapMarker = L.circleMarker([lat, lng], {
+        radius: 6,
+        color: "#315c3d",
+        fillColor: "#e5eadb",
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(current);
+      const sheet = document.querySelector("#inspect-sheet");
+      if (sheet) {
+        const closeBtnHtml = `<div class="inspect-sheet-bar"><button type="button" class="inspect-close-btn" data-action="close-inspect" aria-label="${t("Close", "বন্ধ করুন")}">✕</button></div>`;
+        sheet.innerHTML = `<div class="inspect-sheet-card">${closeBtnHtml}${popupHtml}</div>`;
+      }
+      return;
+    }
 
     const home = current.getCenter();
     let autoPanned = false;
@@ -1664,6 +1760,15 @@ function editProfile() {
   );
 }
 function fieldAction(action, value) {
+  if (action === "close-inspect") {
+    if (tapMarker) {
+      tapMarker.remove();
+      tapMarker = null;
+    }
+    const sheet = document.querySelector("#inspect-sheet");
+    if (sheet) sheet.innerHTML = "";
+    return;
+  }
   if (action === "set-layer-mode") {
     if (value === "high-detail" && !isOnline()) {
       toast(t("High detail needs internet connection", "উচ্চ স্পষ্টতা দেখার জন্য ইন্টারনেট সংযোগ প্রয়োজন"));

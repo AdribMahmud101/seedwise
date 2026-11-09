@@ -39,14 +39,6 @@
 }
 
 @media (max-width: 480px) {
-  .map-segmented {
-    flex-direction: column;
-  }
-
-  .map-segmented .button {
-    white-space: normal;
-  }
-
   .map-subcontrols {
     justify-content: flex-start;
   }
