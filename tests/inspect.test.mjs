@@ -91,7 +91,7 @@ test("tap popup loads NDMI lazily, retries failures, shares one fetch, and trans
     assert.match(html, /At this spot/);
     assert.match(html, /Area weather · November 2024/);
     assert.match(html, /Greenness NDVI/);
-    assert.match(html, /9 Mar 2024/);
+    assert.match(html, /9 Nov 2024/);
     assert.match(html, /Mar → Nov/);
     assert.match(html, /Plant & soil moisture \(NDMI\)/);
     assert.match(html, /IMERG · ~10 km/);
