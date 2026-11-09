@@ -36,6 +36,7 @@ import {
   truth,
 } from "./ui.js";
 import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
+import { getSmapSurfaceForMonth } from "./water.js";
 
 function isOnline() {
   return typeof navigator !== "undefined" && "onLine" in navigator ? !!navigator.onLine : true;
@@ -67,6 +68,7 @@ const colors = {
   rainGpm: "#518899",
   tmean: "#bd8d49",
   et0: "#9e9275",
+  smap: "#658261",
 };
 
 function getLayerMode() {
@@ -314,17 +316,49 @@ function spark(values, color) {
 }
 function stats(months = field().monthly) {
   const m = months[state.month];
+  const f = field();
   const defs = [
     [
       "wetness",
-      t("Surface wetness", "মাটির উপরিভাগের আর্দ্রতা"),
+      t("Wetness index (POWER, 0–1)", "আর্দ্রতা সূচক (POWER, ০–১)"),
       "",
       "water",
-      t("POWER · index from 0 to 1", "POWER · সূচক ০ থেকে ১"),
+      t("NASA POWER · index from 0 to 1", "NASA POWER · সূচক ০ থেকে ১"),
       2,
       "MODELED",
       { source: "NASA POWER", date: "2024", cell: "50km" },
     ],
+  ];
+
+  // Add SMAP tile if field is prepared
+  const smapData = getSmapSurfaceForMonth(f.id, state.month);
+  if (smapData) {
+    const statusLabel = smapData.status === "Dry" ? t("Dry", "শুষ্ক") : smapData.status === "Normal" ? t("Normal", "স্বাভাবিক") : t("Wet", "ভিজা");
+    defs.push([
+      "smap",
+      t("Soil water (SMAP)", "মাটির পানি (SMAP)"),
+      "m³/m³",
+      "water",
+      t("NASA SMAP L4 · 9 km", "NASA SMAP L4 · ৯ কিমি") + `<br><small>${statusLabel}</small>`,
+      2,
+      "REMOTE_OBSERVED",
+      { source: "NASA SMAP L4", date: "2024", cell: "9 km" },
+    ]);
+  } else {
+    // For unprepared fields, add empty SMAP tile
+    defs.push([
+      "smap",
+      t("Soil water (SMAP)", "মাটির পানি (SMAP)"),
+      "",
+      "water",
+      t("Not prepared for this field", "এই জমির তথ্য প্রস্তুত নেই"),
+      0,
+      null,
+      null,
+    ]);
+  }
+
+  defs.push(
     [
       "rainGpm",
       t("Rainfall", "বৃষ্টিপাত"),
@@ -355,15 +389,33 @@ function stats(months = field().monthly) {
       "MODELED",
       { source: "FAO-56 ETo", date: "2024", cell: "50km" },
     ],
-  ];
+  );
+  
   return `<div class="data-row">${defs
-    .map(
-      ([key, label, unit, symbol, foot, places, tag, opts]) =>
-        `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(m[key], places)}<small>${unit}</small></div>${spark(
+    .map(([key, label, unit, symbol, foot, places, tag, opts]) => {
+      if (key === "smap") {
+        // Special handling for SMAP tile
+        if (!smapData) {
+          // Empty state for unprepared fields
+          return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">—<small>${unit}</small></div>${spark(
+            Array(12).fill(null),
+            colors.wetness,
+          )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`;
+        } else {
+          // SMAP tile with data - use 2024 monthly SFMC values for spark line
+          return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(smapData.sfmc, places)}<small>${unit}</small></div>${spark(
+            smapData.monthly2024,
+            colors.smap,
+          )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`;
+        }
+      } else {
+        // Regular tiles
+        return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(m[key], places)}<small>${unit}</small></div>${spark(
           months.map((v) => v[key]),
           colors[key],
-        )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`,
-    )
+        )}<div class="stat-foot">${foot}${tag ? truth(tag, opts) : ""}</div></article>`;
+      }
+    })
     .join("")}</div>`;
 }
 function mapImage(f) {

@@ -30,6 +30,45 @@ import {
 import { STRATEGIES } from "./engine.js";
 import { landscapePanel, initLandscapeObserver, disposeLandscape } from "./landscape3d.js";
 
+// Helper function to get SMAP surface moisture for a field and month
+// Returns { sfmc: number, status: string, monthly2024: array } or null if not prepared
+export function getSmapSurfaceForMonth(fieldId, monthIndex, year = 2024) {
+  const siteData = smap?.sites?.[fieldId];
+  if (!siteData) return null;
+
+  const monthStr = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const monthly = siteData.monthly || [];
+  const monthEntry = monthly.find((m) => m.month === monthStr);
+
+  if (!monthEntry || monthEntry.SFMC_mean === null || monthEntry.SFMC_mean === undefined) {
+    return null;
+  }
+
+  const sfmc = monthEntry.SFMC_mean;
+  
+  // Determine status word from SFMC percentile (use PRMC_PRCNTL_mean as proxy if SFMC_PRCNTL_mean not available)
+  const prcntl = monthEntry.SFMC_PRCNTL_mean ?? monthEntry.PRMC_PRCNTL_mean;
+  let status;
+  if (prcntl === null || prcntl === undefined) {
+    status = null;
+  } else if (prcntl < 30) {
+    status = "Dry";
+  } else if (prcntl <= 70) {
+    status = "Normal";
+  } else {
+    status = "Wet";
+  }
+
+  // Get all 2024 monthly SFMC values for spark line
+  const monthly2024 = [];
+  for (let i = 0; i < 12; i++) {
+    const m = monthly.find((m) => m.month === `2024-${String(i + 1).padStart(2, "0")}`);
+    monthly2024.push(m?.SFMC_mean ?? null);
+  }
+
+  return { sfmc, status, prcntl, monthly2024 };
+}
+
 function smapCard() {
   const siteId = state.fieldId;
   const year = 2024;
