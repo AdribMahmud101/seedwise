@@ -12,6 +12,7 @@ root = Path(__file__).resolve().parents[1] / 'out'
 if not root.exists():
     raise SystemExit('out/ not found. Run `next build` first.')
 skip = {'sw.js', '404.html'}
+# Includes data/ndvi-grid.json and data/moisture-grid.json, even before the first tap.
 files = sorted(p for p in root.rglob('*')
                if p.is_file() and p.name not in skip and '_next' not in p.parts and p.suffix != '.txt')
 digest = hashlib.sha256()

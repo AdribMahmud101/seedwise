@@ -141,7 +141,7 @@ def tile_pattern(layer, scene, offset):
     return API + '/tiles/WebMercatorQuad/{z}/{x}/{y}@1x.png?' + urllib.parse.urlencode(args)
 
 
-def source_metadata(item):
+def source_metadata(item, band_ids=(3, 7)):
     name = item['id'] + '-product.xml'
     path = RAW / name
     url = item['assets']['product-metadata']['href']
@@ -160,7 +160,7 @@ def source_metadata(item):
                if e.tag.split('}')[-1] == 'BOA_ADD_OFFSET'}
     quantification = next(float(e.text) for e in root.iter()
                           if e.tag.split('}')[-1] == 'BOA_QUANTIFICATION_VALUE')
-    red, nir = offsets.get(3, 0), offsets.get(7, 0)
+    red, nir = (offsets.get(band, 0) for band in band_ids)
     if red != nir or quantification <= 0:
         raise ValueError('Unexpected Sentinel-2 radiometric metadata')
     return {'boaAddOffset': red, 'quantificationValue': quantification,

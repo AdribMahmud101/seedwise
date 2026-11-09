@@ -110,6 +110,8 @@ let leafletMap = null,
   showLandsat = false,
   mapLayersData = null,
   ndviGridData = null,
+  moistureGridData = null,
+  moistureGridLoading = null,
   osmContextData = null,
   lowGroundData = null,
   showLowGround = false,
@@ -337,6 +339,85 @@ async function loadMapData() {
       // offline fallback or test runner without local server
     }
   }
+}
+
+async function loadMoistureData() {
+  if (moistureGridData) return;
+  if (!moistureGridLoading) {
+    moistureGridLoading = (async () => {
+      try {
+        const response = await fetch("data/moisture-grid.json");
+        if (response.ok) {
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          // The full grid pack is gzip JSON to stay within the offline budget.
+          const body = bytes[0] === 0x1f && bytes[1] === 0x8b
+            ? new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))
+            : bytes;
+          moistureGridData = await new Response(body).json();
+        }
+      } catch {
+        // Missing offline pack: show no reliable observation and allow another tap to retry.
+      } finally {
+        moistureGridLoading = null;
+      }
+    })();
+  }
+  await moistureGridLoading;
+}
+
+function inspectPopup(f, lat, lon) {
+  const isInside = pointInPoly([lat, lon], state.boundaries[f.id] || polygon());
+  const statusWord = isInside
+    ? t("Inside field boundary", "জমির সীমানার ভেতরে")
+    : t("Outside field boundary", "জমির সীমানার বাইরে");
+  const siteGrids = f.custom ? [] : ndviGridData?.grids?.filter(g => g.siteId === f.id) || [];
+  const target = siteGrids.find(g => g.date === activeDate) || siteGrids[0];
+  const moisture = f.custom ? null : moistureGridData?.grids?.find(g => g.siteId === f.id && g.date === target?.date);
+  const ndmi = queryNdvi(moisture, lat, lon);
+  const unavailable = t("Not prepared for this field", "এই জমির জন্য প্রস্তুত নেই");
+  const noObservation = t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই");
+  const dateLabel = grid => grid ? new Intl.DateTimeFormat(state.lang === "bn" ? "bn-BD" : "en-GB", {
+    day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+  }).format(new Date(grid.date + "T00:00:00Z")) : "";
+  const march = siteGrids.find(g => g.date.startsWith("2024-03-"));
+  const november = siteGrids.find(g => g.date.startsWith("2024-11-"));
+  const ground = f.custom ? unavailable : queryLowGround(lowGroundData?.sites?.find(s => s.id === f.id), lat, lon) || noObservation;
+  const months = f.custom ? getCachedPower(f.id)?.monthly || f.monthly : f.monthly;
+  const m = months?.[state.month] || {};
+  const weather = (value, places, unit = "") => Number.isFinite(value) ? num(value, places) + unit : t("No data", "তথ্য নেই");
+  const moistureWord = ndmi < 0 ? t("Dry", "শুকনো") : ndmi <= 0.2 ? t("Moderate", "মাঝারি") : t("Moist", "আর্দ্র");
+  return `
+    <div class="inspect-card">
+      <div class="inspect-header">
+        <strong>${isInside ? "✓ " + esc(fieldName(f)) : esc(statusWord)}</strong>
+        <span class="tag ${isInside ? "green" : "amber"}">${isInside ? t("Field plot", "জমি") : t("Surroundings", "আশেপাশে")}</span>
+      </div>
+      <div class="inspect-coords">${num(lat, 5)}° N · ${num(lon, 5)}° E</div>
+      <h3 class="inspect-group">${t("At this spot", "এই জায়গায়")}</h3>
+      <dl class="inspect-grid">
+        <div class="inspect-item">
+          <dt>${t("Greenness NDVI", "সবুজভাব NDVI")}</dt>
+          <dd>${f.custom ? unavailable : esc(formatNdvi(queryNdvi(target, lat, lon)))}
+            ${target ? `<small>${esc(dateLabel(target))}</small>` : ""}
+            ${march && november ? `<small>${t("Mar → Nov", "মার্চ → নভেম্বর")}: ${esc(formatNdvi(queryNdvi(march, lat, lon)))} → ${esc(formatNdvi(queryNdvi(november, lat, lon)))}</small>` : ""}
+          </dd>
+        </div>
+        <div class="inspect-item">
+          <dt>${t("Plant & soil moisture (NDMI)", "উদ্ভিদ ও মাটির আর্দ্রতা (NDMI)")}</dt>
+          <dd>${f.custom ? unavailable : ndmi === null ? noObservation : `${num(ndmi, 3)} · ${moistureWord}`}
+            ${moisture ? `<small>${esc(dateLabel(moisture))}</small>` : ""}
+          </dd>
+        </div>
+        <div class="inspect-item inspect-ground"><dt>${t("Ground", "জমি")}</dt><dd>${esc(ground)}</dd></div>
+      </dl>
+      <h3 class="inspect-group">${t("Area weather", "এলাকার আবহাওয়া")} · ${monthName()} ${t("2024", "২০২৪")}</h3>
+      <dl class="inspect-grid">
+        <div class="inspect-item"><dt>${t("Rain", "বৃষ্টি")}</dt><dd>${weather(m.rainGpm, 1, t(" mm", " মিমি"))}</dd><small>${t("IMERG · ~10 km", "IMERG · প্রায় ১০ কিমি")}</small></div>
+        <div class="inspect-item"><dt>${t("Wetness index", "আর্দ্রতা সূচক")}</dt><dd>${weather(m.wetness, 2)}</dd><small>${t("POWER · ~50 km", "POWER · প্রায় ৫০ কিমি")}</small></div>
+        <div class="inspect-item"><dt>${t("Temp", "তাপমাত্রা")}</dt><dd>${weather(m.tmean, 1, " °C")}</dd><small>${t("POWER · ~50 km", "POWER · প্রায় ৫০ কিমি")}</small></div>
+      </dl>
+      <div class="inspect-footer">${t("◈ Estimated · Sentinel-2 L2A · NASA POWER · GPM IMERG", "◈ স্যাটেলাইট অনুমান · Sentinel-2 L2A · NASA POWER · GPM IMERG")}</div>
+    </div>`;
 }
 function setField(id) {
   state.fieldId = id;
@@ -1330,7 +1411,7 @@ async function mountMap() {
     updateDraw();
   }
 
-  current.on("click", (event) => {
+  current.on("click", async (event) => {
     const { lat, lng } = event.latlng;
     if (pickMapMode) {
       const popupHtml = `
@@ -1372,108 +1453,10 @@ async function mountMap() {
       return;
     }
 
-    if (f.custom) {
-      const pts = polygon();
-      const isInside = pointInPoly([lat, lng], pts);
-      const m = f.monthly?.[state.month] || {};
-      const statusWord = isInside
-        ? t("Inside field boundary", "জমির সীমানার ভেতরে")
-        : t("Outside field boundary", "জমির সীমানার বাইরে");
-      const popupHtml = `
-        <div class="inspect-card">
-          <div class="inspect-header">
-            <strong>${isInside ? "✓ " + esc(fieldName(f)) : esc(statusWord)}</strong>
-            <span class="tag ${isInside ? "green" : "amber"}">${isInside ? t("Field plot", "জমি") : t("Surroundings", "আশেপাশে")}</span>
-          </div>
-          <div class="inspect-coords">${num(lat, 5)}° N · ${num(lng, 5)}° E</div>
-          <div class="notice section-space" style="font-size: 12px; margin: 6px 0;">
-            ${t("Sentinel-2 NDVI and DEM low ground are not prepared for this custom field.", "কাস্টম জমির জন্য সেন্টিনেল-২ NDVI বা নিচু জমির ম্যাপ প্রস্তুত নেই।")}
-          </div>
-          <dl class="inspect-grid">
-            <div class="inspect-item">
-              <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
-              <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : t("No data", "তথ্য নেই")}</dd>
-            </div>
-            <div class="inspect-item">
-              <dt>${t("Rainfall", "বৃষ্টি")}</dt>
-              <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : t("No data", "তথ্য নেই")}</dd>
-            </div>
-            <div class="inspect-item">
-              <dt>${t("Temp", "তাপমাত্রা")}</dt>
-              <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : t("No data", "তথ্য নেই")}</dd>
-            </div>
-          </dl>
-          <div class="inspect-footer">
-            ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · NASA POWER / IMERG
-          </div>
-        </div>
-      `;
-      L.popup({ className: "field-inspect-popup", maxWidth: 280, closeButton: true })
-        .setLatLng(event.latlng)
-        .setContent(popupHtml)
-        .openOn(current);
-      return;
-    }
-
     // Tap to inspect: fetch ndvi from ndvi-grid.json
-    const pts = polygon();
-    const isInside = pointInPoly([lat, lng], pts);
-    const m = f.monthly?.[state.month] || {};
-
-    const targetGrid = ndviGridData?.grids?.find(
-      (g) => g.siteId === f.id && g.date === activeDate,
-    ) || ndviGridData?.grids?.find((g) => g.siteId === f.id);
-    let probeNdvi = null;
-    let cellSizeMetres = targetGrid?.cellSizeMetres || 20;
-    if (targetGrid) {
-      probeNdvi = queryNdvi(targetGrid, lat, lng);
-    }
-    const ndviDisplayStr = formatNdvi(probeNdvi);
-    const ground = queryLowGround(lowGroundSite, lat, lng);
-
-    const statusWord = isInside
-      ? t("Inside field boundary", "জমির সীমানার ভেতরে")
-      : t("Outside field boundary", "জমির সীমানার বাইরে");
-
-    const popupHtml = `
-      <div class="inspect-card">
-        <div class="inspect-header">
-          <strong>${isInside ? "✓ " + esc(fieldName(f)) : esc(statusWord)}</strong>
-          <span class="tag ${isInside ? "green" : "amber"}">${isInside ? t("Field plot", "জমি") : t("Surroundings", "আশেপাশে")}</span>
-        </div>
-        <div class="inspect-coords">${num(lat, 5)}° N · ${num(lng, 5)}° E</div>
-        <dl class="inspect-grid">
-          <div class="inspect-item">
-            <dt>${t("NDVI (Greenness)", "NDVI (সবুজভাব)")}</dt>
-            <dd><strong>${esc(ndviDisplayStr)}</strong></dd>
-          </div>
-          <div class="inspect-item">
-            <dt>${t("Cell size", "সেল সাইজ")}</dt>
-            <dd>${num(cellSizeMetres)} m</dd>
-          </div>
-          <div class="inspect-item">
-            <dt>${t("Observation date", "পর্যবেক্ষণের তারিখ")}</dt>
-            <dd>${esc(layerMode === "high-detail" ? t("28 Nov 2022 (Maxar)", "২৮ নভেম্বর ২০২২ (ম্যাক্সার)") : activeDate)}</dd>
-          </div>
-          <div class="inspect-item">
-            <dt>${t("Surface wetness", "মাটির আর্দ্রতা")}</dt>
-            <dd>${Number.isFinite(m.wetness) ? num(m.wetness, 2) : t("No data", "তথ্য নেই")}</dd>
-          </div>
-          <div class="inspect-item">
-            <dt>${t("Rainfall", "বৃষ্টি")}</dt>
-            <dd>${Number.isFinite(m.rainGpm) ? num(m.rainGpm, 1) + " mm" : t("No data", "তথ্য নেই")}</dd>
-          </div>
-          <div class="inspect-item">
-            <dt>${t("Temp", "তাপমাত্রা")}</dt>
-            <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : t("No data", "তথ্য নেই")}</dd>
-          </div>
-        </dl>
-        ${ground ? `<div class="low-ground-inspect">${t("Ground", "জমি")}: ${esc(ground)}</div>` : ""}
-        <div class="inspect-footer">
-          ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${layerMode === "high-detail" ? "Esri World Imagery" : "Sentinel-2 L2A · 10/20 m"} · ${esc(layerMode === "high-detail" ? t("Online", "অনলাইন") : activeDate)}
-        </div>
-      </div>
-    `;
+    await loadMoistureData();
+    if (current !== leafletMap) return;
+    const popupHtml = inspectPopup(f, lat, lng);
 
     L.popup({ className: "field-inspect-popup", maxWidth: 280, closeButton: true })
       .setLatLng(event.latlng)
@@ -1879,6 +1862,8 @@ export {
   getLayerMode,
   setLayerMode,
   loadMapData,
+  loadMoistureData,
+  inspectPopup,
   queryLowGround,
   loadCustomPower,
 };

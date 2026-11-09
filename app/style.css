@@ -698,6 +698,8 @@ small {
 .inspect-card {
   min-width: 190px;
   max-width: 250px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .inspect-header {
   display: flex;
@@ -707,6 +709,14 @@ small {
   margin-bottom: 6px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.inspect-header .tag {
+  font-size: 12px;
+}
+.inspect-group {
+  margin: 8px 0 4px;
+  font-size: 13px;
 }
 .inspect-coords {
   font: 12px Mono;
@@ -715,13 +725,13 @@ small {
 }
 .inspect-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 6px 10px;
   margin-bottom: 8px;
   font-size: 13px;
 }
 .inspect-item dt {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
 }
@@ -729,6 +739,15 @@ small {
   margin: 0;
   font-weight: 600;
   color: var(--ink);
+}
+.inspect-item small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.inspect-ground {
+  grid-column: 1 / -1;
 }
 .inspect-footer {
   font-size: 12px;
