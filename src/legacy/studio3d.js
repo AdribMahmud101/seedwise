@@ -24,6 +24,7 @@ import {
   pointInPolygon,
   ringSignedArea,
   canopyVisualHeight,
+  idleFloatOffset,
 } from "./studio3d-helpers.js";
 
 export {
@@ -33,6 +34,7 @@ export {
   outlineBounds,
   clipRing,
   canopyVisualHeight,
+  idleFloatOffset,
 } from "./studio3d-helpers.js";
 
 /* ------------------------------------------------------------------ state */
@@ -49,7 +51,7 @@ let currentData = null;
 let currentMonthIdx = 0;
 let currentLayer = "crops"; // crops | photo | ndvi | moisture | elevation
 let currentCutaway = 0; // 0..0.8
-let showSurroundings = true;
+let showSurroundings = false;
 let isTopView = false;
 let isCloseView = false;
 let isPlaying = false;
@@ -419,38 +421,78 @@ function buildSideTexture(data) {
   const key = `${data.field.id}-soil`;
   if (sideTextureCache.has(key)) return sideTextureCache.get(key);
 
+  // Soil wall: a smooth vertical gradient from a dark organic topsoil to a
+  // sandy tan at depth, with the soil-profile horizons folded in as subtle
+  // colour shifts and faint non-straight strata — never the flat brown bands
+  // the reference image calls out.
   const cvs = document.createElement("canvas");
-  cvs.width = 128;
+  cvs.width = 1024;
   cvs.height = 512;
   const ctx = cvs.getContext("2d");
   const layers = data.soil?.layers || [];
+  const lastCm = Math.max(100, (layers.at?.(-1)?.bottomCm) || 100);
 
-  if (layers.length === 0) {
-    ctx.fillStyle = "#6e5944";
-    ctx.fillRect(0, 0, 128, 512);
-  } else {
-    const lastCm = layers[layers.length - 1].bottomCm || 100;
-    const total = Math.max(100, lastCm);
-    for (const layer of layers) {
-      const y0 = (layer.topCm / total) * 512;
-      const y1 = (layer.bottomCm / total) * 512;
-      ctx.fillStyle = soilBandColor(layer);
-      ctx.fillRect(0, y0, 128, Math.max(1, y1 - y0));
-      // A bright then dark separator makes each horizon legible at plot scale.
-      ctx.fillStyle = "rgba(246,232,204,0.42)";
-      ctx.fillRect(0, y1 - 3, 128, 2);
-      ctx.fillStyle = "rgba(18,12,8,0.62)";
-      ctx.fillRect(0, y1 - 1, 128, 4);
+  const base = ctx.createLinearGradient(0, 0, 0, 512);
+  base.addColorStop(0.0, "#2f2516");
+  base.addColorStop(0.12, "#48341f");
+  base.addColorStop(0.26, "#6b4d31");
+  base.addColorStop(0.5, "#8d6c47");
+  base.addColorStop(0.72, "#b08862");
+  base.addColorStop(0.9, "#c7a278");
+  base.addColorStop(1.0, "#d2b185");
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, 1024, 512);
+
+  // Fold soil-profile horizons in as a very soft colour wash so the horizons
+  // are suggested without the eye reading hard brown stripes.
+  for (const layer of layers) {
+    const y0 = (layer.topCm / lastCm) * 512;
+    const y1 = (layer.bottomCm / lastCm) * 512;
+    const h = Math.max(1, y1 - y0);
+    const wash = ctx.createLinearGradient(0, y0, 0, y1);
+    const col = soilBandColor(layer);
+    wash.addColorStop(0, `${col}26`);
+    wash.addColorStop(0.5, `${col}18`);
+    wash.addColorStop(1, `${col}26`);
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, y0, 1024, h);
+  }
+
+  // Deterministic fine grain (dark and pale flecks) keeps the wall from reading
+  // as a flat gradient at close range.
+  let seed = 907;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  for (let i = 0; i < 24000; i++) {
+    const x = rnd() * 1024;
+    const y = rnd() * 512;
+    const r = rnd() * 1.5 + 0.3;
+    ctx.fillStyle = rnd() > 0.55 ? "rgba(32,22,14,0.18)" : "rgba(238,218,186,0.14)";
+    ctx.fillRect(x, y, r * 2, r);
+  }
+
+  // A handful of wavy strata, just a few pixels of contrast, so the wall feels
+  // sedimentary without introducing the hard flat bands of the previous build.
+  for (const seedY of [70, 148, 232, 318, 402]) {
+    ctx.beginPath();
+    for (let x = 0; x <= 1024; x += 8) {
+      const y = seedY + Math.sin(x * 0.018 + seedY) * 4 + Math.sin(x * 0.049) * 1.8;
+      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    // Fine grain and small root/stone flecks keep the wall from looking flat.
-    ctx.fillStyle = "rgba(20,15,10,0.08)";
-    for (let y = 2; y < 512; y += 6) ctx.fillRect(0, y, 128, 1);
-    ctx.fillStyle = "rgba(232,213,183,0.22)";
-    for (let i = 0; i < 90; i++) {
-      const x = (i * 37) % 128;
-      const y = (i * 83) % 512;
-      ctx.fillRect(x, y, 1 + (i % 3), 1);
-    }
+    ctx.strokeStyle = "rgba(38,24,14,0.18)";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+  }
+
+  // Scattered pale pebble flecks catch the eye at depth, implying coarser
+  // material lower down.
+  for (let i = 0; i < 180; i++) {
+    ctx.fillStyle = "rgba(220,195,160,0.32)";
+    ctx.beginPath();
+    ctx.ellipse(rnd() * 1024, 100 + rnd() * 400, 1 + rnd() * 3.5, 1 + rnd() * 1.8, rnd() * 3, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   const tex = new THREE.CanvasTexture(cvs);
@@ -607,10 +649,30 @@ function buildWallMesh(ringM, heightAt, bottomY, sideMaterial) {
 }
 
 function buildBoundaryLine(ringM, heightAt) {
-  const points = ringM.map(([x, y]) => new THREE.Vector3(x, heightAt(x, -y) + 0.09, -y));
+  // Subdivide each edge so the rim tracks the wavy terrain top instead of
+  // chording across it, and sit the line a hair above the surface so it reads
+  // as a crisp pale outline — not a slab stripe.
+  const points = [];
+  for (let i = 0; i < ringM.length; i++) {
+    const a = ringM[i];
+    const b = ringM[(i + 1) % ringM.length];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const steps = Math.max(2, Math.ceil(len / 1.5));
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const x = a[0] + (b[0] - a[0]) * t;
+      const y = a[1] + (b[1] - a[1]) * t;
+      points.push(new THREE.Vector3(x, heightAt(x, -y) + 0.045, -y));
+    }
+  }
   if (points.length) points.push(points[0].clone());
   const geom = new THREE.BufferGeometry().setFromPoints(points);
-  const mat = new THREE.LineBasicMaterial({ color: 0xd8f0a6, transparent: true, opacity: 0.9 });
+  const mat = new THREE.LineBasicMaterial({
+    color: 0xf3f6e5,
+    transparent: true,
+    opacity: 0.85,
+    depthTest: true,
+  });
   const line = new THREE.Line(geom, mat);
   line.userData.boundary = points.map((p) => [p.x, p.y, p.z]);
   return line;
@@ -708,7 +770,8 @@ async function buildFieldBlock(data, cutawayFraction) {
 
   blockGroup = new THREE.Group();
   blockGroup.add(topMesh, wallMesh, boundary);
-  scene.add(blockGroup);
+  ensureFloatGroup();
+  ensureFloatGroup(); floatGroup.add(blockGroup);
 
   currentBlock.depth = depth;
   currentBlock.bottomY = bottomY;
@@ -752,26 +815,55 @@ function buildClumpGeometry(cropId, heightM, spreadM) {
   const r = Math.max(0.08, spreadM * 0.46);
 
   if (cropId === "aman" || cropId === "boro") {
-    // Rice: five crossed, tapered blades give a tuft silhouette.
+    // Rice/grass family: a dense tuft of fine tapered blades. Each blade is a
+    // narrow quad that leans gently outward from the base to make a soft fuzzy
+    // top silhouette without silhouetting any single blade. Eight blades are
+    // already in-geometry; InstancedMesh reuses this tuft across the field so
+    // the entire crop still renders in one draw call.
     const parts = [];
-    for (let k = 0; k < 5; k++) {
-      const angle = (k / 5) * Math.PI * 2;
+    const blades = 8;
+    for (let k = 0; k < blades; k++) {
+      // Spread the blades around and give each a tiny deterministic jitter so
+      // the tuft reads as hand-sown, not as a star.
+      const angle = (k / blades) * Math.PI * 2 + Math.sin(k * 11.3) * 0.18;
       const c = Math.cos(angle);
       const s = Math.sin(angle);
-      const w = r * 0.19;
-      const lean = r * 0.5;
+      const bladeH = h * (0.82 + Math.abs(Math.sin(k * 3.7)) * 0.3);
+      const baseW = Math.max(0.012, r * 0.055);
+      const midW = baseW * 0.65;
+      const tipW = baseW * 0.18;
+      const lean = r * (0.38 + Math.abs(Math.cos(k * 2.1)) * 0.22);
+      // Two-strip quad: base → mid → tip for a soft taper.
+      const bx0 = -baseW * s;
+      const bz0 = baseW * c;
+      const bx1 = baseW * s;
+      const bz1 = -baseW * c;
+      const mx = lean * c * 0.5;
+      const mz = lean * s * 0.5;
+      const mX0 = mx - midW * s;
+      const mZ0 = mz + midW * c;
+      const mX1 = mx + midW * s;
+      const mZ1 = mz - midW * c;
+      const tx = lean * c;
+      const tz = lean * s;
+      const tX0 = tx - tipW * s;
+      const tZ0 = tz + tipW * c;
+      const tX1 = tx + tipW * s;
+      const tZ1 = tz - tipW * c;
       const g = new THREE.BufferGeometry();
       const verts = [
-        -w * c, 0, -w * s,
-        w * c, 0, w * s,
-        lean * c, h, lean * s,
+        bx0, 0, bz0,       bx1, 0, bz1,       mX0, bladeH * 0.5, mZ0,
+        bx1, 0, bz1,       mX1, bladeH * 0.5, mZ1,  mX0, bladeH * 0.5, mZ0,
+        mX0, bladeH * 0.5, mZ0, mX1, bladeH * 0.5, mZ1, tX0, bladeH, tZ0,
+        mX1, bladeH * 0.5, mZ1, tX1, bladeH, tZ1,     tX0, bladeH, tZ0,
       ];
       g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
       g.computeVertexNormals();
       parts.push(g);
     }
-    const base = new THREE.ConeGeometry(r * 0.22, h * 0.7, 3);
-    base.translate(0, h * 0.35, 0);
+    // A low inner cone fills the tuft centre so distant clumps don't go hollow.
+    const base = new THREE.ConeGeometry(r * 0.26, h * 0.55, 5);
+    base.translate(0, h * 0.28, 0);
     parts.push(base);
     return mergeClumpParts(parts);
   }
@@ -807,11 +899,14 @@ function deterministic(i, seed) {
 }
 
 function cropSpacing(cropId) {
-  if (cropId === "mustard") return { row: 0.34, plant: 0.22 };
-  if (cropId === "boro" || cropId === "aman") return { row: 0.38, plant: 0.25 };
-  if (cropId === "potato") return { row: 0.52, plant: 0.36 };
-  if (cropId === "mungbean") return { row: 0.38, plant: 0.26 };
-  return { row: 0.42, plant: 0.28 };
+  // Rice tufts sit tight enough to form a continuous canopy at the fitted
+  // overview camera; the other crops stay on a looser grid so leaves stay
+  // individually readable.
+  if (cropId === "mustard") return { row: 0.3, plant: 0.2 };
+  if (cropId === "boro" || cropId === "aman") return { row: 0.3, plant: 0.2 };
+  if (cropId === "potato") return { row: 0.5, plant: 0.34 };
+  if (cropId === "mungbean") return { row: 0.34, plant: 0.24 };
+  return { row: 0.4, plant: 0.26 };
 }
 
 function buildPlantsAndRoots(data, monthIdx) {
@@ -900,6 +995,7 @@ function buildPlantsAndRoots(data, monthIdx) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 
   plantsGroup = new THREE.Group();
+  ensureFloatGroup();
   plantsGroup.add(mesh);
   plantsGroup.userData.plants = {
     positions: positions.map(([x, y]) => [x, heightAt(x, -y) + 0.02, -y]),
@@ -907,7 +1003,7 @@ function buildPlantsAndRoots(data, monthIdx) {
     color: stageColor(month.cropId, month.stage),
     flower: month.cropId === "mustard" && month.stage !== "harvest" ? "#e8c93a" : null,
   };
-  scene.add(plantsGroup);
+  ensureFloatGroup(); floatGroup.add(plantsGroup);
 
   if (currentCutaway > 0.04 && month.rootDepthM) {
     buildRoots(data, month, heightAt);
@@ -968,21 +1064,25 @@ function buildRoots(data, month, heightAt) {
   rootsGroup.add(new THREE.LineSegments(geom, mat));
   rootsGroup.userData.lines = lines;
   rootsGroup.userData.rootDepth = rootDepth;
-  scene.add(rootsGroup);
+  ensureFloatGroup();
+  ensureFloatGroup(); floatGroup.add(rootsGroup);
 }
 
 /* --------------------------------------------------- surroundings/shadow */
 
 function buildShadowTexture() {
   if (shadowTextureCache.has("shadow")) return shadowTextureCache.get("shadow");
+  // Soft contact shadow — darker core, gentle falloff, no hard edge — so the
+  // block reads as hovering a short way above the ground.
   const cvs = document.createElement("canvas");
   cvs.width = 256;
   cvs.height = 256;
   const ctx = cvs.getContext("2d");
-  const grad = ctx.createRadialGradient(128, 128, 18, 128, 128, 128);
-  grad.addColorStop(0, "rgba(35,45,30,0.38)");
-  grad.addColorStop(0.55, "rgba(35,45,30,0.18)");
-  grad.addColorStop(1, "rgba(35,45,30,0)");
+  const grad = ctx.createRadialGradient(128, 128, 10, 128, 128, 126);
+  grad.addColorStop(0, "rgba(28,40,25,0.44)");
+  grad.addColorStop(0.35, "rgba(28,40,25,0.26)");
+  grad.addColorStop(0.72, "rgba(28,40,25,0.09)");
+  grad.addColorStop(1, "rgba(28,40,25,0)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 256, 256);
   const tex = new THREE.CanvasTexture(cvs);
@@ -1068,16 +1168,17 @@ async function buildSurroundings(data) {
     scene.add(surroundingsGroup);
   }
 
-  const sgeom = new THREE.PlaneGeometry(radius * 2.1, radius * 2.1);
+  const shadowGap = Math.max(0.5, Math.min(2.2, radius * 0.055));
+  const sgeom = new THREE.PlaneGeometry(radius * 2.4, radius * 2.4);
   sgeom.rotateX(-Math.PI / 2);
   const smat = new THREE.MeshBasicMaterial({
     map: buildShadowTexture(),
     transparent: true,
     depthWrite: false,
-    opacity: 0.9,
+    opacity: 0.95,
   });
   shadowPlane = new THREE.Mesh(sgeom, smat);
-  shadowPlane.position.set(bounds.cx, bottomY - 0.035, -bounds.cy);
+  shadowPlane.position.set(bounds.cx, bottomY - shadowGap, -bounds.cy);
   scene.add(shadowPlane);
 
   if (scene) {
@@ -1332,11 +1433,46 @@ class SoftwareRenderer {
   }
 }
 
+/* --------------------------------------------------- idle float transform */
+
+let floatGroup = null; // idle-float parent for block, plants, roots
+let isDragging = false;
+function ensureFloatGroup() {
+  if (!scene) return;
+  if (!floatGroup || floatGroup.parent !== scene) {
+    if (floatGroup && floatGroup.parent) floatGroup.parent.remove(floatGroup);
+    floatGroup = new THREE.Group();
+    scene.add(floatGroup);
+  }
+}
+
+// Apply an idle hover/drift to the block + plants + roots. Shadow stays put so
+// the block visibly lifts off the ground. The user dragging the orbit controls
+// freezes the offset so direct manipulation feels direct.
+function applyIdleFloat(timeS) {
+  if (!floatGroup) return;
+  const span = currentBlock.bounds
+    ? Math.max(currentBlock.bounds.width, currentBlock.bounds.height)
+    : 30;
+  const { dy, yaw } = idleFloatOffset(timeS, span, isDragging, prefersReducedMotion);
+  floatGroup.position.y = dy;
+  if (currentBlock.bounds) {
+    const cx = currentBlock.bounds.cx;
+    const cz = -currentBlock.bounds.cy;
+    floatGroup.position.x = cx * (1 - Math.cos(yaw)) + cz * Math.sin(yaw);
+    floatGroup.position.z = cz * (1 - Math.cos(yaw)) - cx * Math.sin(yaw);
+    floatGroup.rotation.y = yaw;
+  } else {
+    floatGroup.rotation.y = yaw;
+  }
+}
+
 /* --------------------------------------------------------------- three init */
 
 function createScene() {
   scene = new THREE.Scene();
   scene.background = buildSkyTexture();
+  scene.fog = new THREE.Fog(0xe2e8dc, 80, 450);
 
   cameraPersp = new THREE.PerspectiveCamera(38, 1, 0.1, 10000);
   cameraPersp.position.set(0, 25, 35);
@@ -1382,6 +1518,19 @@ function setupControls() {
   controls.maxDistance = 180;
   controls.target.set(0, 0, 0);
   controls.addEventListener("change", requestRender);
+  controls.addEventListener("start", () => {
+    isDragging = true;
+    if (floatGroup) {
+      // Settle the group back to rest while the user is dragging.
+      floatGroup.position.set(0, 0, 0);
+      floatGroup.rotation.set(0, 0, 0);
+    }
+    requestRender();
+  });
+  controls.addEventListener("end", () => {
+    isDragging = false;
+    startAnimation();
+  });
 }
 
 function initThree(host) {
@@ -1393,7 +1542,7 @@ function initThree(host) {
     if (!isSoftwareRenderer) {
       try {
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isPhone() ? 1.5 : 2));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.06;
@@ -1459,21 +1608,27 @@ function fitPerspective(data, close = false) {
   if (!cameraPersp || !data) return;
   const b = outlineBounds(data.field.outlineM);
   const depth = currentBlock.depth || blockDepthM(b);
-  const margin = isPhone() ? 0.18 : 0.12;
+  // Reference look: a low, nearly side-on shot of the block with a touch of
+  // yaw so the far wall peeks and the floating shadow sits visible below.
+  // Close-up still swings in tighter and higher.
+  const elevationDeg = close ? 22 : 14;
+  const yawDeg = close ? 26 : 10;
+  const margin = isPhone() ? 0.22 : 0.18;
   const fit = fitCameraToBlock({
     outlineM: data.field.outlineM,
     depthM: depth,
     fovDeg: cameraPersp.fov,
     aspect: hostAspect(),
-    elevationDeg: close ? 22 : 35,
-    yawDeg: close ? 26 : 18,
+    elevationDeg,
+    yawDeg,
     margin: close ? 0.14 : margin,
   });
 
-  const distance = close ? fit.distance * 0.72 : fit.distance;
-  const el = ((close ? 22 : 35) * Math.PI) / 180;
-  const yaw = ((close ? 26 : 18) * Math.PI) / 180;
-  const target = [fit.target[0], -depth / 2, fit.target[2]];
+  // Block fills ~70 % of the frame on 3D view; close-up pushes in closer.
+  const distance = close ? fit.distance * 0.72 : fit.distance * 0.92;
+  const el = (elevationDeg * Math.PI) / 180;
+  const yaw = (yawDeg * Math.PI) / 180;
+  const target = [fit.target[0], -depth * 0.25, fit.target[2]];
   cameraPersp.position.set(
     target[0] + Math.cos(el) * Math.sin(yaw) * distance,
     target[1] + Math.sin(el) * distance,
@@ -1564,8 +1719,11 @@ function requestRender() {
 }
 
 function startAnimation() {
-  const wind = !isSoftwareRenderer && !prefersReducedMotion && !!plantsGroup;
-  if (!wind) {
+  // Idle float animates the block even when there is no wind sway; wind sway
+  // only runs when there are crops and the user has not asked for reduced motion.
+  const needsFloat = !isSoftwareRenderer && !prefersReducedMotion;
+  const needsWind = needsFloat && !!plantsGroup;
+  if (!needsFloat && !needsWind) {
     stopAnimation();
     requestRender();
     return;
@@ -1574,9 +1732,13 @@ function startAnimation() {
   const loop = (time) => {
     animFrameId = requestAnimationFrame(loop);
     if (!renderer || !scene || !activeCamera || !isVisible) return;
-    for (const shader of plantShaders) {
-      if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = time / 1000;
+    const t = time / 1000;
+    if (needsWind) {
+      for (const shader of plantShaders) {
+        if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = t;
+      }
     }
+    applyIdleFloat(t);
     controls?.update();
     renderer.render(scene, activeCamera);
     updateCompass();
@@ -1763,9 +1925,19 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
 
         <div class="studio-overlay-tl">
           <div class="studio-view-toggle">
-            <button class="studio-view-btn ${!isTopView && !isCloseView ? "active" : ""}" data-studio-view="3d">${t("3D View", "৩ডি দৃশ্য")}</button>
+            <button class="studio-view-btn ${!isTopView && !isCloseView ? "active" : ""}" data-studio-view="3d">${t("3D field", "৩ডি মাঠ")}</button>
             <button class="studio-view-btn ${isCloseView ? "active" : ""}" data-studio-view="close">${t("Close-up", "কাছের দৃশ্য")}</button>
-            <button class="studio-view-btn ${isTopView ? "active" : ""}" data-studio-view="top">${t("Top View", "উপরের দৃশ্য")}</button>
+            <button class="studio-view-btn ${isTopView ? "active" : ""}" data-studio-view="top">${t("Top view", "উপরের দৃশ্য")}</button>
+          </div>
+          <div class="studio-slice-card">
+            <span class="studio-slice-end studio-slice-end-left">${t("Slice field", "মাঠ কাটুন")}</span>
+            <input type="range" id="studio-cutaway-slider" min="0" max="0.8" step="0.05" value="${currentCutaway}" aria-label="${t("Slice field to full field", "খণ্ডিত থেকে পুরো মাঠ")}">
+            <span class="studio-slice-end studio-slice-end-right">${t("Full field", "পুরো মাঠ")}</span>
+          </div>
+          <span class="studio-crop-chip">● ${t("Illustrative crop preview · not observed plants", "কাল্পনিক ফসল পূর্বদর্শন · পর্যবেক্ষিত উদ্ভিদ নয়")}</span>
+          <div class="studio-caption-copy">
+            <h2>${t("Your field. Brought to life.", "আপনার জমি। জীবন্ত রূপে।")}</h2>
+            <p>${t("Drag to rotate · scroll to zoom · tap to inspect", "ঘোরাতে টানুন · জুম করতে স্ক্রল · পরীক্ষা করতে ট্যাপ")}</p>
           </div>
           <label class="studio-surround-bar">
             <input type="checkbox" id="studio-surroundings-chk" ${showSurroundings ? "checked" : ""}>
@@ -1782,10 +1954,19 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
 
         ${depthTicksHtml()}
 
-        <div class="studio-cutaway-bar">
-          <label for="studio-cutaway-slider">${t("Soil cutaway", "মাটির স্তর খণ্ড")}</label>
-          <input type="range" id="studio-cutaway-slider" min="0" max="0.8" step="0.05" value="${currentCutaway}">
-          <small class="studio-cutaway-note">${t("Soil depth exaggerated", "মাটির গভীরতা বড় করে দেখানো")}</small>
+        <div class="studio-terrain-card">
+          <div class="studio-terrain-head">
+            <label for="studio-height-slider-stage">${t("Terrain height", "ভূমির উচ্চতা")}</label>
+            <output id="studio-height-output-stage">${num(heightExaggeration, 0)}×</output>
+          </div>
+          <input type="range" id="studio-height-slider-stage" min="1" max="4" step="0.5" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
+          <small>${t("True scale · NASADEM ~30 m", "প্রকৃত স্কেল · নাসাডেম ~৩০ মি")}</small>
+        </div>
+
+        <div class="studio-model-caption" aria-hidden="true">
+          <b>${t("FIELD MODEL", "মাঠ মডেল")}</b>
+          <span>${t("Selected boundary + terrain", "নির্বাচিত সীমানা + ভূমি")}</span>
+          <span>${t("Illustrative plants &amp; enlarged soil section", "কাল্পনিক উদ্ভিদ ও বড় করে দেখানো মাটির অংশ")}</span>
         </div>
       </div>
 
@@ -1967,19 +2148,29 @@ function bindEvents(container) {
     };
   }
 
-  const heightSlider = container.querySelector("#studio-height-slider");
-  if (heightSlider) {
-    heightSlider.oninput = async (e) => {
+  const heightSliders = container.querySelectorAll(
+    "#studio-height-slider, #studio-height-slider-stage",
+  );
+  heightSliders.forEach((slider) => {
+    slider.oninput = async (e) => {
       heightExaggeration = parseFloat(e.target.value);
-      const out = container.querySelector("#studio-height-output");
-      if (out) out.textContent = `${num(heightExaggeration, 1)}×`;
+      container.querySelectorAll(
+        "#studio-height-slider, #studio-height-slider-stage",
+      ).forEach((s) => {
+        if (s !== e.target) s.value = String(heightExaggeration);
+      });
+      const outRail = container.querySelector("#studio-height-output");
+      const outStage = container.querySelector("#studio-height-output-stage");
+      const label = `${num(heightExaggeration, heightExaggeration === Math.round(heightExaggeration) ? 0 : 1)}×`;
+      if (outRail) outRail.textContent = label;
+      if (outStage) outStage.textContent = label;
       await buildFieldBlock(currentData, currentCutaway);
       buildPlantsAndRoots(currentData, currentMonthIdx);
       await buildSurroundings(currentData);
       fitCameras(currentData);
       requestRender();
     };
-  }
+  });
 
   const surroundChk = container.querySelector("#studio-surroundings-chk");
   if (surroundChk) {
@@ -2218,4 +2409,6 @@ export function disposeStudio3d() {
   rootsGroup = null;
   surroundingsGroup = null;
   shadowPlane = null;
+  floatGroup = null;
+  isDragging = false;
 }
