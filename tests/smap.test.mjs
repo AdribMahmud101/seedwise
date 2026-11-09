@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { state, loadData } from '../src/legacy/ui.js';
+import { home } from '../src/legacy/fields.js';
 
 const smap = JSON.parse(
   readFileSync(new URL('../public/data/smap.json', import.meta.url))
@@ -171,4 +174,78 @@ test('file size is within limit', () => {
   const data = readFileSync(new URL('../public/data/smap.json', import.meta.url));
   const sizeKB = data.length / 1024;
   assert.ok(sizeKB <= 600, `smap.json is ${sizeKB.toFixed(1)} KB, exceeds 600 KB limit`);
+});
+
+test('#field html contains SMAP tile with m³/m³ for Mithapukur', async () => {
+  globalThis.document = { baseURI: new URL('../public/', import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, 'utf8')),
+  });
+  await loadData();
+
+  state.lang = 'en';
+  state.fieldId = 'mithapukur';
+  state.month = 0;
+
+  const html = home();
+
+  // Check SMAP tile is present
+  assert.ok(html.includes('Soil water (SMAP)') || html.includes('মাটির পানি (SMAP)'), 'SMAP tile title present');
+
+  // Check m³/m³ is shown
+  assert.ok(html.includes('m³/m³'), 'm³/m³ unit shown in SMAP tile');
+
+  // Check truth label is REMOTE_OBSERVED
+  assert.ok(html.includes('REMOTE_OBSERVED'), 'REMOTE_OBSERVED truth label present');
+
+  // Check source is NASA SMAP L4 · 9 km
+  assert.ok(html.includes('NASA SMAP L4'), 'NASA SMAP L4 source present');
+  assert.ok(html.includes('9 km'), '9 km cell size present');
+
+  // For Bengali
+  state.lang = 'bn';
+  const bnHtml = home();
+
+  assert.ok(bnHtml.includes('মাটির পানি (SMAP)'), 'SMAP tile title in Bengali');
+  assert.ok(bnHtml.includes('m³/m³'), 'm³/m³ unit shown in Bengali');
+  assert.ok(bnHtml.includes('9 km') || bnHtml.includes('৯ কিমি'), '9 km or ৯ কিমি in Bengali');
+});
+
+test('#field html shows "Not prepared" for custom fields', async () => {
+  globalThis.document = { baseURI: new URL('../public/', import.meta.url).href };
+  
+  // Create a fetch that returns modified smap data without mithapukur
+  const originalSmap = JSON.parse(await readFile(new URL('../public/data/smap.json', import.meta.url)));
+  const smapWithoutMithapukur = {
+    ...originalSmap,
+    sites: Object.fromEntries(
+      Object.entries(originalSmap.sites).filter(([id]) => id !== 'mithapukur')
+    )
+  };
+  
+  globalThis.fetch = async (url) => {
+    const urlStr = typeof url === 'string' ? url : url.toString();
+    if (urlStr.includes('smap.json')) {
+      return {
+        ok: true,
+        json: async () => smapWithoutMithapukur,
+      };
+    }
+    return {
+      ok: true,
+      json: async () => JSON.parse(await readFile(url, 'utf8')),
+    };
+  };
+  
+  await loadData();
+
+  state.lang = 'en';
+  state.fieldId = 'mithapukur';
+  state.month = 0;
+
+  const html = home();
+
+  // Check SMAP tile shows "Not prepared for this field"
+  assert.ok(html.includes('Not prepared for this field') || html.includes('এই জমির তথ্য প্রস্তুত নেই'), 'Not prepared message shown for custom field');
 });
