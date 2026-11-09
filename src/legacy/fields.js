@@ -36,6 +36,21 @@ import {
   truth,
 } from "./ui.js";
 import { rotationEvidence, polygonValid, mean, areaHa } from "./engine.js";
+import { netArea, polygonPerimeterM, DEFAULT_NET_INPUTS } from "./netarea.js";
+
+function netInputsFor(fieldId = state.fieldId) {
+  const saved = state.netInputs?.[fieldId];
+  return saved ? { ...DEFAULT_NET_INPUTS, ...saved } : { ...DEFAULT_NET_INPUTS };
+}
+function netAreaFor(f = field()) {
+  const pts = state.boundaries[f.id] || polygon();
+  const grossHa = areaHa(pts);
+  const perimM = polygonPerimeterM(pts);
+  return netArea(grossHa, perimM, netInputsFor(f.id));
+}
+function isNetEdited(fieldId = state.fieldId) {
+  return !!state.netInputs?.[fieldId];
+}
 
 function isOnline() {
   return typeof navigator !== "undefined" && "onLine" in navigator ? !!navigator.onLine : true;
@@ -533,7 +548,8 @@ function home() {
      ${button(regional ? t("Satellite", "স্যাটেলাইট") : t("District", "জেলা"), "region", "small", "layers")}${button(drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা"), "draw", `small ${drawMode ? "primary" : ""}`, "draw")}${hasCustomBoundary ? button(t("Reset to demo outline", "নমুনা সীমানায় ফিরুন"), "reset-demo", "small") : ""}
    </div>
  </div><div id="drawing-help"></div></section>
- <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${state.boundaries[f.id] ? truth("FARMER_REPORTED", { source: "Farmer boundary", date: "2024" }) : truth("SCENARIO", { source: "Demo outline", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
+ <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / RG–0${earth.fields.indexOf(f) + 1}</div><h2>${esc(fieldName())}</h2><div class="location">${t("Rangpur District, Bangladesh", "রংপুর জেলা, বাংলাদেশ")}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small>${state.boundaries[f.id] ? truth("FARMER_REPORTED", { source: "Farmer boundary", date: "2024" }) : truth("SCENARIO", { source: "Demo outline", date: "2024" })}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(netAreaFor(f).netHa)}">${num(netAreaFor(f).netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(netAreaFor(f).netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${units(netAreaFor(f).netHa)}</small>${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${state.boundaries[f.id] ? t("Farmer drawn", "কৃষকের আঁকা") : t("Demo outline", "নমুনা সীমানা")}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
+ <p class="note admin-boundary-note">${t("An administrative boundary is not land-ownership documentation.", "প্রশাসনিক সীমানা জমির মালিকানার প্রমাণ নয়।")}</p>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
  <div class="section-label"><div><div class="eyebrow">${t("Historical observations", "পুরনো পর্যবেক্ষণ")}</div><h2>${monthName()} 2024</h2></div>${goButton(t("See past seasons", "পুরনো মৌসুম"), "seasons", "small")}</div>${stats()}
@@ -1259,6 +1275,29 @@ function searchResults(query) {
         .join("")
     : `<div class="empty">${t("No prepared coverage here. Try Mithapukur, Pirganj, or Gangachara.", "এই স্থানের তথ্য প্রস্তুত নেই। মিঠাপুকুর, পীরগঞ্জ বা গঙ্গাচড়া লিখুন।")}${xy ? button(t("Measure an unsupported plot", "অন্য জমি মাপুন"), "measure-new", "small", "draw", xy[1] + "," + xy[2]) : ""}</div>`;
 }
+function editNetArea() {
+  const inputs = netInputsFor();
+  const f = field();
+  const net = netAreaFor(f);
+  modal(
+    t("Cultivable area after bunds & drains", "আল, নালা ও পথ বাদে চাষযোগ্য আয়তন"),
+    `<p class="note">${t(
+      "Enter the typical widths on this plot. Defaults are a scenario; your values are kept per field.",
+      "এই জমির আল, নালা ও পথের প্রস্থ লিখুন। প্রাথমিক মান কাল্পনিক; আপনার মান জমি অনুযায়ী সংরক্ষিত হয়।",
+    )}</p>
+<form id="net-area-form" class="section-space"><div class="form-grid">
+${input(t("Bund width (m)", "আলের প্রস্থ (মিটার)"), "bundWidthM", inputs.bundWidthM, 'min="0" step="0.05" required inputmode="decimal"')}
+${input(t("Drain width (m)", "নালার প্রস্থ (মিটার)"), "drainWidthM", inputs.drainWidthM, 'min="0" step="0.05" required inputmode="decimal"')}
+${input(t("Path width (m)", "পথের প্রস্থ (মিটার)"), "pathWidthM", inputs.pathWidthM, 'min="0" step="0.05" required inputmode="decimal"')}
+${input(t("Other non-cultivable (decimals / shotok)", "অন্য অকৃষি জমি (শতক)"), "otherDecimals", inputs.otherDecimals, 'min="0" step="0.1" required inputmode="decimal"')}
+</div>
+<p class="note">${t("Current estimate", "বর্তমান হিসাব")}: <b>${num(net.netHa, 2)} ha</b> · ${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${units(net.netHa)}</p>
+<div class="spacer"></div>
+<div class="toolbar-inline"><button class="button primary" type="submit">${t("Save", "সংরক্ষণ")}</button>${isNetEdited(f.id) ? button(t("Reset to defaults", "প্রাথমিক মানে ফিরুন"), "reset-net-area", "small") : ""}</div>
+</form>`,
+  );
+  setTimeout(() => document.querySelector('#in-bundWidthM')?.focus(), 0);
+}
 function editProfile() {
   const p = profile();
   modal(
@@ -1325,6 +1364,14 @@ function fieldAction(action, value) {
     setField(value);
   }
   if (action === "profile") editProfile();
+  if (action === "edit-net-area") editNetArea();
+  if (action === "reset-net-area") {
+    delete state.netInputs[state.fieldId];
+    persist();
+    close();
+    repaint();
+    toast(t("Cultivable-area inputs reset", "চাষযোগ্য আয়তনের তথ্য প্রাথমিক মানে ফিরিয়ে আনা হয়েছে"));
+  }
   if (action === "region") {
     regional = !regional;
     repaint();
@@ -1416,6 +1463,23 @@ function fieldSubmit(form) {
     close();
     repaint();
     toast(t("Field assumptions saved", "জমির তথ্য সংরক্ষিত"));
+    return true;
+  }
+  if (form.id === "net-area-form") {
+    const entry = {};
+    for (const key of ["bundWidthM", "drainWidthM", "pathWidthM", "otherDecimals"]) {
+      const v = Number(d.get(key));
+      if (!Number.isFinite(v) || v < 0) {
+        toast(t("Enter a non-negative number for every field.", "প্রতিটি ঘরে শূন্য বা তার বেশি মান দিন।"));
+        return true;
+      }
+      entry[key] = v;
+    }
+    state.netInputs[state.fieldId] = entry;
+    persist();
+    close();
+    repaint();
+    toast(t("Cultivable-area inputs saved", "চাষযোগ্য আয়তনের তথ্য সংরক্ষিত"));
     return true;
   }
   return false;

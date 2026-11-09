@@ -8,6 +8,7 @@ const defaults = {
   weights: { water: 4, soil: 3, cost: 2, risk: 3 },
   profiles: {},
   boundaries: {},
+  netInputs: {},
   records: [],
   plans: [],
   planner: { crop: "rice", usable: 88, angle: 0.62, row: 20, spacing: 20 },
