@@ -51,6 +51,8 @@ let leafletMap = null,
   mapLayersData = null,
   ndviGridData = null,
   osmContextData = null,
+  lowGroundData = null,
+  showLowGround = false,
   activeTileLayer = null,
   activeBaseTileLayer = null,
   activeOsmLayer = null,
@@ -170,6 +172,18 @@ function formatNdvi(val) {
   return num(val, 2);
 }
 
+function queryLowGround(site, lat, lon) {
+  if (!site || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const [w, s, e, n] = site.bounds;
+  if (lon < w || lon > e || lat < s || lat > n) return null;
+  const col = Math.min(site.width - 1, Math.floor((lon - w) / (e - w) * site.width));
+  const row = Math.min(site.height - 1, Math.floor((n - lat) / (n - s) * site.height));
+  const value = site.grid[row]?.[col];
+  return value === "l" ? t("lower than surroundings", "আশেপাশের চেয়ে নিচু")
+    : value === "e" ? t("about level", "প্রায় সমতল")
+    : value === "h" ? t("higher", "উঁচু") : null;
+}
+
 function formatDateLabel(iso) {
   if (!iso || typeof iso !== "string") return "";
   const parts = iso.split("-").map(Number);
@@ -231,6 +245,15 @@ function filterOsmFeature(feature) {
 }
 
 async function loadMapData() {
+  // Optional local overlay must not prevent the imagery or context data from loading.
+  if (!lowGroundData) {
+    try {
+      const response = await fetch("data/low-ground.json");
+      if (response.ok) lowGroundData = await response.json();
+    } catch {
+      // No prepared overlay: keep its control hidden.
+    }
+  }
   if (!mapLayersData || !ndviGridData || !osmContextData) {
     try {
       const [layersRes, gridRes, osmRes] = await Promise.all([
@@ -403,6 +426,7 @@ function home() {
   }
 
   const hasCustomBoundary = !!state.boundaries[f.id];
+  const lowGroundSite = lowGroundData?.sites?.find((site) => site.id === f.id && site.png);
   const currentDateObj = timelineDates.find((d) => d.date === activeDate);
   const isDateReliable = currentDateObj ? currentDateObj.available : false;
 
@@ -476,6 +500,7 @@ function home() {
        <input type="range" id="layer-opacity-slider" name="layerOpacity" min="0.1" max="1.0" step="0.05" value="${layerOpacity}" title="${t("Adjust imagery opacity to view field outline", "জমির সীমানা স্পষ্ট দেখতে ছবির স্বচ্ছতা কমান-বাড়ান")}">
      </div>
      <button type="button" class="button small ${showOsmContext ? "primary" : ""}" data-action="toggle-osm-context">${icon("field", 14)} ${t("Context lines", "রাস্তা ও নদী")}</button>
+     <button type="button" class="button small ${showLowGround ? "primary" : ""}" data-action="toggle-low-ground" aria-pressed="${showLowGround && !!lowGroundSite}" ${lowGroundSite ? "" : "hidden"}>${t("Low ground", "নিচু জমি")}</button>
    </div>
  </div>
  ${showTimeline ? `
@@ -497,6 +522,11 @@ function home() {
    <div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div>
  </div>
  ${legendHtml}
+ ${showLowGround && lowGroundSite ? `<div class="map-legend-bar low-ground-legend">
+   <span class="legend-swatch low-ground-swatch" aria-hidden="true"></span>
+   <span class="low-ground-description">${t("Lower than land around it — water may collect after heavy rain. Approximate (30 m, includes trees)", "আশেপাশের জমির চেয়ে নিচু — ভারী বৃষ্টির পর পানি জমতে পারে। আনুমানিক (৩০ মি, গাছের উচ্চতাও অন্তর্ভুক্ত)")}</span>
+   ${truth("MODELED")}
+ </div>` : ""}
  <div class="map-actions">
    <span class="note">${chipHtml}</span>
    <div class="map-controls">
@@ -653,6 +683,9 @@ async function mountMap() {
   if (!el || !window.L) return;
   await loadMapData();
   const f = field();
+  const lowGroundSite = lowGroundData?.sites?.find((site) => site.id === f.id && site.png);
+  const lowGroundButton = document.querySelector('[data-action="toggle-low-ground"]');
+  if (lowGroundButton) lowGroundButton.hidden = !lowGroundSite;
   const online = isOnline();
 
   if (!online && layerMode === "high-detail") {
@@ -911,6 +944,19 @@ async function mountMap() {
     }).addTo(current);
   }
 
+  if (showLowGround && lowGroundSite) {
+    const [w, s, e, n] = lowGroundSite.bounds;
+    const pane = current.createPane("lowGround");
+    pane.style.zIndex = "350"; // Above tiles (200), below context and boundary paths (400).
+    pane.style.pointerEvents = "none";
+    L.imageOverlay(lowGroundSite.png, [[s, w], [n, e]], {
+      pane: "lowGround",
+      className: "low-ground-overlay",
+      opacity: 1,
+      interactive: false,
+    }).addTo(current);
+  }
+
   // 2. Context lines from public/data/context-osm.geojson (filtered for validity)
   if (showOsmContext && osmContextData) {
     activeOsmLayer = L.geoJSON(osmContextData, {
@@ -1120,6 +1166,7 @@ async function mountMap() {
       probeNdvi = queryNdvi(targetGrid, lat, lng);
     }
     const ndviDisplayStr = formatNdvi(probeNdvi);
+    const ground = queryLowGround(lowGroundSite, lat, lng);
 
     const statusWord = isInside
       ? t("Inside field boundary", "জমির সীমানার ভেতরে")
@@ -1158,6 +1205,7 @@ async function mountMap() {
             <dd>${Number.isFinite(m.tmean) ? num(m.tmean, 1) + " °C" : t("No data", "তথ্য নেই")}</dd>
           </div>
         </dl>
+        ${ground ? `<div class="low-ground-inspect">${t("Ground", "জমি")}: ${esc(ground)}</div>` : ""}
         <div class="inspect-footer">
           ◈ ${t("Estimated", "স্যাটেলাইট অনুমান")} · ${layerMode === "high-detail" ? "Esri World Imagery" : "Sentinel-2 L2A · 10/20 m"} · ${esc(layerMode === "high-detail" ? t("Online", "অনলাইন") : activeDate)}
         </div>
@@ -1257,6 +1305,11 @@ function fieldAction(action, value) {
   }
   if (action === "toggle-osm-context") {
     showOsmContext = !showOsmContext;
+    repaint();
+  }
+  if (action === "toggle-low-ground") {
+    if (!lowGroundData?.sites?.some((site) => site.id === state.fieldId && site.png)) return;
+    showLowGround = !showLowGround;
     repaint();
   }
   if (action === "search") searchModal();
@@ -1390,4 +1443,6 @@ export {
   projectWgs84ToUtm45N,
   getLayerMode,
   setLayerMode,
+  loadMapData,
+  queryLowGround,
 };

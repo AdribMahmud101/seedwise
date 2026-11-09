@@ -1,0 +1,56 @@
+.leaflet-image-layer.low-ground-overlay {
+  image-rendering: auto;
+}
+
+[data-action="toggle-low-ground"] {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+[data-action="toggle-low-ground"][hidden] {
+  display: none;
+}
+
+.low-ground-legend {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.low-ground-swatch {
+  flex: 0 0 12px;
+  margin-top: 3px;
+  background: rgb(47 111 181 / 55%);
+}
+
+.low-ground-description {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.low-ground-inspect {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 480px) {
+  .map-segmented {
+    flex-direction: column;
+  }
+
+  .map-segmented .button {
+    white-space: normal;
+  }
+
+  .map-subcontrols {
+    justify-content: flex-start;
+  }
+
+  .map-opacity-control {
+    flex-basis: 100%;
+  }
+}

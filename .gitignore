@@ -4,3 +4,4 @@ out/
 .wrangler/
 *.log
 .env*
+data-raw/low-ground/

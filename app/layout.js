@@ -1,6 +1,7 @@
 import "./style.css";
 import "./recovery.css";
 import "./labels.css";
+import "./lowground.css";
 
 export const metadata = {
   title: "Ropon Radar · Rangpur Field Lab",
