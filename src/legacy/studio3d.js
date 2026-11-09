@@ -1645,7 +1645,7 @@ function fitPerspective(data, close = false) {
   if (isDesktop3d && canvasHostEl) {
     const w = canvasHostEl.clientWidth || 600;
     const h = canvasHostEl.clientHeight || 400;
-    cameraPersp.setViewOffset(w, h, (0.5 - 0.62) * w, (0.5 - 0.66) * h, w, h);
+    cameraPersp.setViewOffset(w, h, (0.5 - 0.66) * w, (0.5 - 0.56) * h, w, h);
   } else {
     cameraPersp.clearViewOffset();
   }
