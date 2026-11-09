@@ -771,7 +771,7 @@ async function buildFieldBlock(data, cutawayFraction) {
   blockGroup = new THREE.Group();
   blockGroup.add(topMesh, wallMesh, boundary);
   ensureFloatGroup();
-  floatGroup.add(blockGroup);
+  ensureFloatGroup(); floatGroup.add(blockGroup);
 
   currentBlock.depth = depth;
   currentBlock.bottomY = bottomY;
@@ -1003,7 +1003,7 @@ function buildPlantsAndRoots(data, monthIdx) {
     color: stageColor(month.cropId, month.stage),
     flower: month.cropId === "mustard" && month.stage !== "harvest" ? "#e8c93a" : null,
   };
-  floatGroup.add(plantsGroup);
+  ensureFloatGroup(); floatGroup.add(plantsGroup);
 
   if (currentCutaway > 0.04 && month.rootDepthM) {
     buildRoots(data, month, heightAt);
@@ -1065,7 +1065,7 @@ function buildRoots(data, month, heightAt) {
   rootsGroup.userData.lines = lines;
   rootsGroup.userData.rootDepth = rootDepth;
   ensureFloatGroup();
-  floatGroup.add(rootsGroup);
+  ensureFloatGroup(); floatGroup.add(rootsGroup);
 }
 
 /* --------------------------------------------------- surroundings/shadow */
@@ -1435,6 +1435,8 @@ class SoftwareRenderer {
 
 /* --------------------------------------------------- idle float transform */
 
+let floatGroup = null; // idle-float parent for block, plants, roots
+let isDragging = false;
 function ensureFloatGroup() {
   if (!scene) return;
   if (!floatGroup || floatGroup.parent !== scene) {
