@@ -500,7 +500,7 @@ function home() {
        <input type="range" id="layer-opacity-slider" name="layerOpacity" min="0.1" max="1.0" step="0.05" value="${layerOpacity}" title="${t("Adjust imagery opacity to view field outline", "জমির সীমানা স্পষ্ট দেখতে ছবির স্বচ্ছতা কমান-বাড়ান")}">
      </div>
      <button type="button" class="button small ${showOsmContext ? "primary" : ""}" data-action="toggle-osm-context">${icon("field", 14)} ${t("Context lines", "রাস্তা ও নদী")}</button>
-     <button type="button" class="button small ${showLowGround ? "primary" : ""}" data-action="toggle-low-ground" aria-pressed="${showLowGround && !!lowGroundSite}" ${lowGroundSite ? "" : "hidden"}>${t("Low ground", "নিচু জমি")}</button>
+     <button type="button" class="button small ${showLowGround ? "primary" : ""}" data-action="toggle-low-ground" aria-pressed="${showLowGround && !!lowGroundSite}" ${lowGroundSite ? "" : "hidden"}>${icon("water", 14)} ${t("Low ground", "নিচু জমি")}</button>
    </div>
  </div>
  ${showTimeline ? `
