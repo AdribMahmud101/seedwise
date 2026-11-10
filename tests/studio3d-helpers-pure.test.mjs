@@ -10,6 +10,7 @@ import {
   lookupProbePoint,
   pointInPolygon, outlineBounds, clipRing, surfaceGridPositions, pondingPositions,
   sampleS1Water, transectEndpoints, waterTablePositions,
+  usdaTextureClass, computeAutoExaggeration, buildCalloutData,
 } from "../src/legacy/studio3d-helpers.js";
 
 test("computePonding calculates ponding depth from low-ground and rainfall scenario", () => {
@@ -214,4 +215,96 @@ test("crop clumps keep fine tapered leaves and scale with the active month's hei
   const flowering = buildClumpGeometry("mustard", 0.8, 0.3, "mature");
   assert.ok(flowering.attributes.position.count > young.attributes.position.count);
   young.dispose(); flowering.dispose();
+});
+
+test("usdaTextureClass accurately maps sand, silt, and clay percentages to USDA soil classes", () => {
+  // Clay (c >= 40, not high silt/sand)
+  assert.equal(usdaTextureClass(50, 20, 30), "clay");
+  // Silty clay (c >= 40, si >= 40)
+  assert.equal(usdaTextureClass(45, 10, 45), "silty clay");
+  // Sandy clay (c >= 35, sa > 45)
+  assert.equal(usdaTextureClass(40, 50, 10), "sandy clay");
+  // Clay loam (27 <= c < 40, 20 < sa <= 45)
+  assert.equal(usdaTextureClass(32, 35, 33), "clay loam");
+  // Sandy clay loam (20 <= c < 35, si < 28, sa > 45)
+  assert.equal(usdaTextureClass(25, 55, 20), "sandy clay loam");
+  // Silt (si >= 80, c < 12)
+  assert.equal(usdaTextureClass(8, 10, 82), "silt");
+  // Silt loam (si >= 50, c < 27)
+  assert.equal(usdaTextureClass(15, 20, 65), "silt loam");
+  // Sandy loam ((c < 20 && sa > 52) || (c < 7 && si < 50))
+  assert.equal(usdaTextureClass(10, 65, 25), "sandy loam");
+  // Sand (si + 1.5 * c < 15)
+  assert.equal(usdaTextureClass(4, 92, 4), "sand");
+  // Loamy sand (si + 2 * c < 30)
+  assert.equal(usdaTextureClass(8, 80, 12), "loamy sand");
+  // Loam (c < 27, 28 <= si < 50, sa <= 52)
+  assert.equal(usdaTextureClass(20, 40, 40), "loam");
+});
+
+test("computeAutoExaggeration targets ~0.25 * blockWidth / relief snapped to 0.25 within [1.0, 4.5]", () => {
+  // Normal field: width 30 m, relief 2.5 m -> 0.25 * 30 / 2.5 = 3.0
+  assert.equal(computeAutoExaggeration(2.5, 30), 3.0);
+  // Very flat field: width 40 m, relief 0.5 m -> 0.25 * 40 / 0.5 = 20.0 -> clamped to 4.5
+  assert.equal(computeAutoExaggeration(0.5, 40), 4.5);
+  // Very steep relief: width 20 m, relief 10 m -> 0.25 * 20 / 10 = 0.5 -> clamped to 1.0
+  assert.equal(computeAutoExaggeration(10, 20), 1.0);
+  // Edge cases: non-positive or missing relief
+  assert.equal(computeAutoExaggeration(0, 30), 1.0);
+  assert.equal(computeAutoExaggeration(NaN, 30), 1.0);
+  assert.equal(computeAutoExaggeration(2.5, 0), 1.0);
+});
+
+test("buildCalloutData produces bilingual stratigraphic callouts with SoilGrids and POWER/Agronomy", () => {
+  const dummyData = {
+    months: [
+      { month: "2024-01", cropName: "Mustard", cropNameBn: "সরিষা", rootDepthM: 0.6, wetness: 0.48 },
+    ],
+    soil: {
+      layers: [
+        { clayPct: 32, sandPct: 35, siltPct: 33, ph: 5.8, socGkg: 10.6 },
+        { clayPct: 35, sandPct: 35, siltPct: 30, ph: 6.0, socGkg: 6.2 },
+      ],
+    },
+  };
+
+  const callouts = buildCalloutData({
+    data: dummyData,
+    monthIdx: 0,
+    soilOverrides: null,
+    t: (en, bn) => en,
+  });
+
+  assert.ok(callouts.topsoil);
+  assert.equal(callouts.topsoil.eyebrow, "0–15 cm · TOPSOIL");
+  assert.equal(callouts.topsoil.truth, "MODELED");
+  assert.equal(callouts.topsoil.truthLabel, "SoilGrids, Estimated");
+  assert.match(callouts.topsoil.value, /Clay Loam/);
+  assert.match(callouts.topsoil.value, /pH 5.8/);
+  assert.match(callouts.topsoil.value, /OM 1.83%/);
+
+  assert.ok(callouts.rootzone);
+  assert.equal(callouts.rootzone.eyebrow, "15–60 cm · ROOT ZONE");
+  assert.match(callouts.rootzone.value, /GWETROOT 0.48 · Mustard \(0.6 m\)/);
+
+  assert.ok(callouts.aquifer);
+  assert.equal(callouts.aquifer.eyebrow, ">120 cm · SUBSOIL & WATER TABLE");
+  assert.equal(callouts.aquifer.truth, "UNKNOWN");
+  assert.equal(callouts.aquifer.isButton, true);
+  assert.match(callouts.aquifer.value, /Well depth unknown/);
+
+  // With farmer soil overrides
+  const overrides = { ph: 6.5, omPct: 2.1, gwDepthM: 2.8 };
+  const customCallouts = buildCalloutData({
+    data: dummyData,
+    monthIdx: 0,
+    soilOverrides: overrides,
+    t: (en, bn) => en,
+  });
+
+  assert.equal(customCallouts.topsoil.truth, "FARMER_REPORTED");
+  assert.equal(customCallouts.topsoil.truthLabel, "Soil test, Measured");
+  assert.equal(customCallouts.aquifer.truth, "FARMER_REPORTED");
+  assert.equal(customCallouts.aquifer.isButton, false);
+  assert.equal(customCallouts.aquifer.value, "2.8 m (Measured)");
 });

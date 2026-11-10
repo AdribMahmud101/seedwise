@@ -56,6 +56,9 @@ import {
   transectEndpoints,
   sampleTransectProfile,
   lookupProbePoint,
+  buildCalloutData,
+  computeAutoExaggeration,
+  usdaTextureClass,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -125,6 +128,11 @@ let soilNutrientsData = null; // lazy loaded from /data/soil-nutrients.json
 let waterMesh = null;
 let contourLinesGroup = null;
 let transect3dGroup = null;
+let glassFrameGroup = null;
+let edgeTreesGroup = null;
+let probePinMesh = null;
+let cameraEasing = null;
+let hoveredBandId = null;
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -213,14 +221,14 @@ function stageColor(cropId, stage) {
   if (stage === "harvest") return cropId === "potato" ? "#b89a66" : "#c8b273";
   if (stage === "mature") {
     if (cropId === "mustard") return "#e8c93a";
-    if (cropId === "potato") return "#6f8f3d";
+    if (cropId === "potato") return "#4d6b30";
     return "#cfa44e";
   }
   if (stage === "establish") return "#a8d47a";
-  if (cropId === "potato") return "#4f8f3a";
-  if (cropId === "mustard") return "#9fc24b";
+  if (cropId === "potato") return "#3f6e30"; // potato bushy dark green
+  if (cropId === "mustard") return "#b5c938"; // mustard yellow-green
   if (cropId === "mungbean") return "#5fa044";
-  return "#4f9a3d";
+  return "#387c32"; // rice green
 }
 
 /* ------------------------------------------------------------------ sky */
@@ -507,9 +515,9 @@ async function buildTopTexture(data, layer, monthIdx) {
   return tex;
 }
 
-function buildStratigraphicSoilWallTexture(data) {
+function buildStratigraphicSoilWallTexture(data, highlightBand = null) {
   const custom = soilOverrides !== null;
-  const key = `${data.field.id}-soil-${custom ? "custom" : "std"}`;
+  const key = `${data.field.id}-soil-${custom ? "custom" : "std"}-${highlightBand || "none"}`;
   if (sideTextureCache.has(key)) return sideTextureCache.get(key);
 
   const cvs = document.createElement("canvas");
@@ -545,6 +553,20 @@ function buildStratigraphicSoilWallTexture(data) {
     wash.addColorStop(1, `${col}22`);
     ctx.fillStyle = wash;
     ctx.fillRect(0, y0, 1024, h);
+  }
+
+  // Emissive highlight wash for hovered band
+  if (highlightBand) {
+    let y0 = 0, y1 = 512;
+    if (highlightBand === "topsoil") {
+      y0 = 0; y1 = Math.round((15 / lastCm) * 512);
+    } else if (highlightBand === "rootzone") {
+      y0 = Math.round((15 / lastCm) * 512); y1 = Math.round((60 / lastCm) * 512);
+    } else if (highlightBand === "aquifer") {
+      y0 = Math.round((100 / lastCm) * 512); y1 = 512;
+    }
+    ctx.fillStyle = "rgba(255, 235, 180, 0.28)";
+    ctx.fillRect(0, y0, 1024, Math.max(1, y1 - y0));
   }
 
   // Fine sedimentary grain texture
@@ -588,7 +610,7 @@ function buildStratigraphicSoilWallTexture(data) {
 }
 
 function buildSideTexture(data) {
-  return buildStratigraphicSoilWallTexture(data);
+  return buildStratigraphicSoilWallTexture(data, hoveredBandId);
 }
 function blockDepthM(bounds) {
   // ~1/6 of the plot width, with a floor so tiny plots still read as a block.
@@ -827,6 +849,7 @@ async function buildFieldBlock(data, cutawayFraction) {
 
   const sideTex = buildStratigraphicSoilWallTexture(data);
   const sideMat = new THREE.MeshStandardMaterial({
+    name: "side",
     map: sideTex,
     emissive: 0xffffff,
     emissiveMap: sideTex,
@@ -835,6 +858,7 @@ async function buildFieldBlock(data, cutawayFraction) {
     metalness: 0,
     side: THREE.DoubleSide,
   });
+  sideMat.userData.isSide = true;
 
   const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds);
   const topMesh = new THREE.Mesh(topGeom, topMat);
@@ -957,6 +981,8 @@ async function buildFieldBlock(data, cutawayFraction) {
   }
 
   renderTransectSVG();
+  buildGlassFrame(ringM, topMin, bottomY, effectiveMaxX, cutawayFraction);
+  buildEdgeTrees(ringM, heightAt);
 }
 
 /* ------------------------------------------------------------ crop clumps */
@@ -1052,6 +1078,54 @@ export function buildClumpGeometry(cropId, heightM, spreadM, stage = "grow") {
   return g;
 }
 
+export function createBotanicalPlantGeometry() {
+  const geo = new THREE.BufferGeometry();
+  const positions = [];
+  const normals = [];
+  const blades = 7;
+
+  for (let b = 0; b < blades; b++) {
+    const angle = (b / blades) * Math.PI * 2 + (b % 2) * 0.2;
+    const lean = 0.18 + (b % 3) * 0.11;
+    const h = 0.42 + (b % 3) * 0.08;
+    const w = 0.032;
+
+    const dx = Math.cos(angle);
+    const dz = Math.sin(angle);
+    const px = -dz * w;
+    const pz = dx * w;
+
+    // 2-segment arched leaf ribbon
+    const x0 = 0, y0 = 0, z0 = 0;
+    const x1 = dx * lean * 0.45, y1 = h * 0.55, z1 = dz * lean * 0.45;
+    const x2 = dx * lean, y2 = h, z2 = dz * lean;
+
+    // Lower quad (2 triangles)
+    positions.push(
+      x0 - px, y0, z0 - pz,
+      x0 + px, y0, z0 + pz,
+      x1 + px * 0.7, y1, z1 + pz * 0.7,
+      x0 - px, y0, z0 - pz,
+      x1 + px * 0.7, y1, z1 + pz * 0.7,
+      x1 - px * 0.7, y1, z1 - pz * 0.7
+    );
+    // Upper tapering tip triangle
+    positions.push(
+      x1 - px * 0.7, y1, z1 - pz * 0.7,
+      x1 + px * 0.7, y1, z1 + pz * 0.7,
+      x2, y2, z2
+    );
+
+    for (let k = 0; k < 9; k++) {
+      normals.push(dx * 0.3, 0.9, dz * 0.3);
+    }
+  }
+
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geo;
+}
+
 function deterministic(i, seed) {
   const s = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453;
   return s - Math.floor(s);
@@ -1081,7 +1155,7 @@ function buildPlantsAndRoots(data, monthIdx) {
   const outlineM = data.field.outlineM;
   const bounds = currentBlock.bounds || outlineBounds(outlineM);
   const heightAt = makeHeightAt(data);
-  const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 4000 : 18000;
+  const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 4000 : 38000;
   
   // Adapt spacing based on plantingLayout
   const step = cropSpacing(month.cropId);
@@ -1147,7 +1221,10 @@ function buildPlantsAndRoots(data, monthIdx) {
       z + (deterministic(i, 4) - 0.5) * plantSpacing * 0.18,
     );
     dummy.rotation.set(0, yaw, 0);
-    dummy.scale.set(jitter, 0.9 + deterministic(i, 5) * 0.24, jitter);
+    const sx = jitter * (month.cropId === "potato" ? 1.35 : 1.0);
+    const sz = jitter * (month.cropId === "potato" ? 1.35 : 1.0);
+    const sy = 0.9 + deterministic(i, 5) * 0.24;
+    dummy.scale.set(sx, sy, sz);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
     colour.copy(base).multiplyScalar(0.82 + deterministic(i, 6) * 0.32);
@@ -1227,7 +1304,115 @@ function buildRoots(data, month, heightAt) {
   rootsGroup.userData.lines = lines;
   rootsGroup.userData.rootDepth = rootDepth;
   ensureFloatGroup();
-  ensureFloatGroup(); floatGroup.add(rootsGroup);
+  floatGroup.add(rootsGroup);
+}
+
+/* --------------------------------------------------- glass frame & edge trees */
+
+function buildGlassFrame(ringM, topMin, bottomY, effectiveMaxX, cutawayFraction) {
+  disposeGroup(glassFrameGroup);
+  glassFrameGroup = null;
+  if (cutawayFraction <= 0.01) return;
+
+  const bounds = currentBlock.bounds || outlineBounds(ringM);
+  const width = bounds.width;
+  const height = bounds.height;
+  const span = Math.max(width, height);
+  const depth = topMin - bottomY;
+  const midY = (topMin + bottomY) / 2;
+
+  glassFrameGroup = new THREE.Group();
+
+  // Glass slice plane at cut plane
+  const gPlane = new THREE.PlaneGeometry(height * 1.05, depth * 1.05);
+  gPlane.rotateY(Math.PI / 2);
+  const glassMesh = new THREE.Mesh(
+    gPlane,
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.16,
+      roughness: 0.1,
+      metalness: 0.1,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+  );
+  glassMesh.position.set(effectiveMaxX, midY, -bounds.cy);
+  glassFrameGroup.add(glassMesh);
+
+  const border = new THREE.LineSegments(
+    new THREE.EdgesGeometry(gPlane),
+    new THREE.LineBasicMaterial({ color: 0x173e30, transparent: true, opacity: 0.65 })
+  );
+  border.position.copy(glassMesh.position);
+  glassFrameGroup.add(border);
+
+  ensureFloatGroup();
+  floatGroup.add(glassFrameGroup);
+}
+
+function buildEdgeTrees(ringM, heightAt) {
+  disposeGroup(edgeTreesGroup);
+  edgeTreesGroup = null;
+  if (!ringM || ringM.length < 3) return;
+
+  const bounds = outlineBounds(ringM);
+  const treePositions = [];
+  const targetCount = Math.min(12, Math.max(4, Math.floor(ringM.length * 0.75)));
+  const step = Math.max(1, Math.floor(ringM.length / targetCount));
+
+  for (let i = 0; i < ringM.length; i += step) {
+    const pt = ringM[i];
+    const prev = ringM[(i - 1 + ringM.length) % ringM.length];
+    const next = ringM[(i + 1) % ringM.length];
+    const dx = next[0] - prev[0];
+    const dy = next[1] - prev[1];
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-5) continue;
+    // Inset 0.6m inward along normal into polygon
+    let nx = -dy / len;
+    let ny = dx / len;
+    let tx = pt[0] + nx * 0.6;
+    let ty = pt[1] + ny * 0.6;
+    if (!pointInPolygon(tx, ty, ringM)) {
+      nx = -nx;
+      ny = -ny;
+      tx = pt[0] + nx * 0.6;
+      ty = pt[1] + ny * 0.6;
+    }
+    if (pointInPolygon(tx, ty, ringM)) {
+      treePositions.push([tx, ty]);
+    }
+  }
+
+  if (treePositions.length === 0) return;
+
+  const trunkGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.8, 6);
+  trunkGeo.translate(0, 0.4, 0);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3e28, roughness: 0.9 });
+  const crownGeo = new THREE.ConeGeometry(0.45, 1.2, 7);
+  crownGeo.translate(0, 1.2, 0);
+  const crownMat = new THREE.MeshStandardMaterial({ color: 0x2e5c38, roughness: 0.8 });
+
+  edgeTreesGroup = new THREE.Group();
+  edgeTreesGroup.userData.illustrative = true;
+
+  for (let i = 0; i < treePositions.length; i++) {
+    const [x, y] = treePositions[i];
+    const z = -y;
+    const groundY = heightAt(x, z);
+    const treeObj = new THREE.Group();
+    treeObj.position.set(x, groundY, z);
+    const s = 0.85 + (i % 3) * 0.15;
+    treeObj.scale.set(s, s, s);
+    treeObj.add(new THREE.Mesh(trunkGeo, trunkMat));
+    treeObj.add(new THREE.Mesh(crownGeo, crownMat));
+    edgeTreesGroup.add(treeObj);
+  }
+
+  ensureFloatGroup();
+  floatGroup.add(edgeTreesGroup);
 }
 
 /* --------------------------------------------------- surroundings/shadow */
@@ -1901,13 +2086,20 @@ function requestRender() {
 
 /* -------------------------------------------------- STUDIO5A UI overlays */
 
-function placeCallout(x, y, z, id, show) {
+function placeCallout(x, y, z, id, show, checkFacingNormal = false) {
   const el = containerEl?.querySelector(`#${id}`);
   if (!el || !activeCamera || !canvasHostEl) return;
   if (!show) {
     el.style.display = 'none';
     return;
   }
+
+  // If wall callout, hide when active camera is behind the cut wall (wall faces East +X)
+  if (checkFacingNormal && activeCamera.position.x < x) {
+    el.style.display = 'none';
+    return;
+  }
+
   const v = new THREE.Vector3(x, y, z);
   if (floatGroup) floatGroup.localToWorld(v);
   v.project(activeCamera);
@@ -1951,9 +2143,10 @@ function sync3DCallouts() {
   placeCallout(otx, heightAt(otx, otz) + 0.55, otz, 'callout-outlet', isWater && sliceU >= 0.88);
 
   // Soil stratigraphic callouts along cutaway face
-  placeCallout(sx, currentBlock.topMin - 0.2, -b.cy + b.height * 0.25, 'callout-topsoil', isSoil);
-  placeCallout(sx, currentBlock.topMin - 0.65, -b.cy, 'callout-rootzone', isSoil);
-  placeCallout(sx, currentBlock.bottomY + 0.35, -b.cy - b.height * 0.25, 'callout-aquifer', isSoil);
+  const depth = currentBlock.topMin - currentBlock.bottomY;
+  placeCallout(sx, currentBlock.topMin - 0.075 * depth, -b.cy + b.height * 0.22, 'callout-topsoil', isSoil, true);
+  placeCallout(sx, currentBlock.topMin - 0.35 * depth, -b.cy, 'callout-rootzone', isSoil, true);
+  placeCallout(sx, currentBlock.bottomY + 0.25 * depth, -b.cy - b.height * 0.22, 'callout-aquifer', isSoil, true);
 }
 
 function renderTransectSVG() {
@@ -1998,6 +2191,89 @@ function renderTransectSVG() {
   if (reliefLbl) {
     reliefLbl.textContent = `${t("Relief", "ঢাল")}: ${profile.reliefM.toFixed(1)} m · ${t("Exag", "স্কেল")} ${heightExaggeration.toFixed(1)}×`;
   }
+}
+
+function dropProbePin(worldX, groundY, worldZ) {
+  if (!scene) return;
+  if (!probePinMesh) {
+    const pinGroup = new THREE.Group();
+    // Head sphere
+    const headGeo = new THREE.SphereGeometry(0.28, 16, 16);
+    const headMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706,
+      roughness: 0.3,
+      metalness: 0.2,
+      emissive: 0xd97706,
+      emissiveIntensity: 0.3,
+    });
+    const headMesh = new THREE.Mesh(headGeo, headMat);
+    headMesh.position.y = 1.0;
+    pinGroup.add(headMesh);
+
+    // Stem / Needle cone
+    const stemGeo = new THREE.ConeGeometry(0.08, 1.0, 12);
+    stemGeo.translate(0, 0.5, 0);
+    const stemMat = new THREE.MeshStandardMaterial({
+      color: 0xfffdf5,
+      roughness: 0.2,
+      metalness: 0.8,
+    });
+    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
+    pinGroup.add(stemMesh);
+
+    probePinMesh = pinGroup;
+    ensureFloatGroup();
+    floatGroup.add(probePinMesh);
+  }
+
+  probePinMesh.position.set(worldX, groundY, worldZ);
+  probePinMesh.visible = true;
+}
+
+function focusSoilBand(bandId) {
+  if (!currentBlock.bounds || !cameraPersp || !controls) return;
+  const b = currentBlock.bounds;
+  const cutFraction = currentCutaway;
+  const sliceU = 1 - cutFraction;
+  const sx = b.minX + sliceU * b.width;
+  const depth = currentBlock.topMin - currentBlock.bottomY;
+
+  let targetY = currentBlock.topMin - 0.5 * depth;
+  let targetZ = -b.cy;
+  if (bandId === "topsoil") {
+    targetY = currentBlock.topMin - 0.075 * depth;
+    targetZ = -b.cy + b.height * 0.22;
+  } else if (bandId === "rootzone") {
+    targetY = currentBlock.topMin - 0.35 * depth;
+    targetZ = -b.cy;
+  } else if (bandId === "aquifer") {
+    targetY = currentBlock.bottomY + 0.25 * depth;
+    targetZ = -b.cy - b.height * 0.22;
+  }
+
+  const endTarget = new THREE.Vector3(sx, targetY, targetZ);
+  const endCamPos = new THREE.Vector3(
+    sx + Math.max(12, b.width * 0.45),
+    targetY + Math.max(4, depth * 0.5),
+    targetZ + Math.max(8, b.height * 0.35)
+  );
+
+  if (prefersReducedMotion) {
+    controls.target.copy(endTarget);
+    cameraPersp.position.copy(endCamPos);
+    controls.update();
+    requestRender();
+    return;
+  }
+
+  cameraEasing = {
+    startPos: cameraPersp.position.clone(),
+    endPos: endCamPos,
+    startTarget: controls.target.clone(),
+    endTarget,
+    startTime: performance.now(),
+    duration: 650,
+  };
 }
 
 function updateProbeCard() {
@@ -2069,6 +2345,21 @@ function startAnimation() {
       }
     }
     applyIdleFloat(t);
+
+    // Smooth camera easing towards focused band
+    if (cameraEasing && cameraPersp && controls) {
+      const now = performance.now();
+      const elapsed = now - cameraEasing.startTime;
+      const progress = Math.min(1, elapsed / cameraEasing.duration);
+      // Smooth cubic ease out: 1 - Math.pow(1 - progress, 3)
+      const ease = 1 - Math.pow(1 - progress, 3);
+      cameraPersp.position.lerpVectors(cameraEasing.startPos, cameraEasing.endPos, ease);
+      controls.target.lerpVectors(cameraEasing.startTarget, cameraEasing.endTarget, ease);
+      if (progress >= 1) {
+        cameraEasing = null;
+      }
+    }
+
     controls?.update();
     renderer.render(scene, activeCamera);
     updateCompass();
@@ -2180,6 +2471,13 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
   const litresDisplay = num(m.shortfallLitres || 0);
   const chipTextEn = monthChipText(m, "en");
   const chipTextBn = monthChipText(m, "bn");
+
+  const calloutData = buildCalloutData({
+    data,
+    monthIdx: currentMonthIdx,
+    soilOverrides,
+    t,
+  });
 
   const srSummary = t(
     `Month: ${m.month}, Crop: ${m.cropName}, Stage: ${m.stage}, Rain: ${num(m.rainMm, 1)} mm, Need: ${num(m.needMm, 1)} mm, Shortfall: ${num(m.shortfallMm, 1)} mm (${litresDisplay} litres)`,
@@ -2315,24 +2613,63 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div class="callout-line"></div><div class="callout-dot"></div>
           </div>
 
-          <div id="callout-topsoil" class="callout-3d">
-            <div class="callout-box soil">
-              <div style="font-size:10px;text-transform:uppercase;color:var(--text-dim,#536456);">0–15 cm · ${t("Topsoil", "উপরের মাটি")}</div>
-              <div id="callout-topsoil-val">${soilOverrides ? t("Measured · by farmer", "মাপা · কৃষক কর্তৃক") : (data.soil?.layers?.[0]?.textureClass || "Sandy clay loam")}</div>
+          <div id="callout-topsoil" class="callout-3d" data-band="topsoil">
+            <div class="callout-box topsoil" title="${esc(calloutData.topsoil.truthLabel)}">
+              <div class="callout-eyebrow">${esc(calloutData.topsoil.eyebrow)}</div>
+              <div class="callout-val" id="callout-topsoil-val">${esc(calloutData.topsoil.value)}</div>
             </div>
+            <div class="callout-line"></div><div class="callout-dot"></div>
+            <div class="callout-dot-num">①</div>
           </div>
 
-          <div id="callout-rootzone" class="callout-3d">
-            <div class="callout-box soil">
-              <div style="font-size:10px;text-transform:uppercase;color:var(--text-dim,#536456);">15–60 cm · ${t("Root Zone", "শিকড় অঞ্চল")}</div>
-              <div id="callout-rootzone-val">${t("Active roots & N-nodules", "সক্রিয় শিকড় ও নাইট্রোজেন নডিউল")}</div>
+          <div id="callout-rootzone" class="callout-3d" data-band="rootzone">
+            <div class="callout-box rootzone" title="${esc(calloutData.rootzone.truthLabel)}">
+              <div class="callout-eyebrow">${esc(calloutData.rootzone.eyebrow)}</div>
+              <div class="callout-val" id="callout-rootzone-val">${esc(calloutData.rootzone.value)}</div>
             </div>
+            <div class="callout-line"></div><div class="callout-dot"></div>
+            <div class="callout-dot-num">②</div>
           </div>
 
-          <div id="callout-aquifer" class="callout-3d">
-            <div class="callout-box water">
-              <div style="font-size:10px;text-transform:uppercase;color:#234f61;">&gt;120 cm · ${t("Subsoil & Water Table", "গভীর স্তর ও পানির স্তর")}</div>
-              <div id="callout-aquifer-val">${soilOverrides?.gwDepthM ? `${soilOverrides.gwDepthM} m (${t("Measured", "মাপা")})` : t("Regional baseline ~3.4 m", "আঞ্চলিক গড় ~৩.৪ মি")}</div>
+          <div id="callout-aquifer" class="callout-3d" data-band="aquifer">
+            <div class="callout-box aquifer" title="${esc(calloutData.aquifer.truthLabel)}">
+              <div class="callout-eyebrow">${esc(calloutData.aquifer.eyebrow)}</div>
+              <div class="callout-val" id="callout-aquifer-val">
+                ${calloutData.aquifer.isButton
+                  ? `<button type="button" class="callout-btn" id="btn-callout-soil-test">${esc(calloutData.aquifer.value)}</button>`
+                  : esc(calloutData.aquifer.value)}
+              </div>
+            </div>
+            <div class="callout-line"></div><div class="callout-dot"></div>
+            <div class="callout-dot-num">③</div>
+          </div>
+        </div>
+
+        <!-- Mobile 390px Legend List below Canvas -->
+        <div class="studio-callout-legend" id="studio-mobile-legend">
+          <div class="studio-callout-legend-item" data-band="topsoil">
+            <span class="num-badge">①</span>
+            <div>
+              <div class="callout-eyebrow">${esc(calloutData.topsoil.eyebrow)}</div>
+              <div class="callout-val">${esc(calloutData.topsoil.value)}</div>
+            </div>
+          </div>
+          <div class="studio-callout-legend-item" data-band="rootzone">
+            <span class="num-badge">②</span>
+            <div>
+              <div class="callout-eyebrow">${esc(calloutData.rootzone.eyebrow)}</div>
+              <div class="callout-val">${esc(calloutData.rootzone.value)}</div>
+            </div>
+          </div>
+          <div class="studio-callout-legend-item" data-band="aquifer">
+            <span class="num-badge">③</span>
+            <div>
+              <div class="callout-eyebrow">${esc(calloutData.aquifer.eyebrow)}</div>
+              <div class="callout-val">
+                ${calloutData.aquifer.isButton
+                  ? `<button type="button" class="callout-btn" id="btn-legend-soil-test">${esc(calloutData.aquifer.value)}</button>`
+                  : esc(calloutData.aquifer.value)}
+              </div>
             </div>
           </div>
         </div>
@@ -2481,6 +2818,21 @@ export async function mountStudio3d(container, data, opts = {}) {
     if (loader) loader.querySelector(".studio-loading-text").textContent = t("Sampling terrain…", "ভূ-উচ্চতা মাপা হচ্ছে…");
     if (!elevationSampler) elevationSampler = await createElevationSampler(data);
 
+    // Default vertical auto-exaggeration so relief is visible (~0.25 * block width)
+    const b = outlineBounds(data.field.outlineM);
+    const reliefM = Math.max(0.2, (data.field.elevMax || 30) - (data.field.elevMin || 28));
+    heightExaggeration = computeAutoExaggeration(reliefM, b.width);
+    const exagLbl = `${heightExaggeration.toFixed(1)}×`;
+    const outRail = containerEl.querySelector("#studio-height-output");
+    const outStage = containerEl.querySelector("#studio-height-output-stage");
+    const outExag = containerEl.querySelector("#lbl-exag-val");
+    if (outRail) outRail.textContent = exagLbl;
+    if (outStage) outStage.textContent = exagLbl;
+    if (outExag) outExag.textContent = exagLbl;
+    containerEl.querySelectorAll("#studio-height-slider, #studio-height-slider-stage, #slider-exag").forEach((s) => {
+      s.value = String(heightExaggeration);
+    });
+
     if (loader) loader.querySelector(".studio-loading-text").textContent = t("Building your field…", "জমির ৩ডি মডেল তৈরি হচ্ছে…");
     await buildFieldBlock(data, currentCutaway);
 
@@ -2571,6 +2923,20 @@ export async function setStudioMonth(monthIdx) {
       `Month: ${m.month}, Crop: ${m.cropName}, Stage: ${m.stage}, Rain: ${num(m.rainMm, 1)} mm, Need: ${num(m.needMm, 1)} mm, Shortfall: ${num(m.shortfallMm, 1)} mm (${num(m.shortfallLitres || 0)} litres)`,
       `মাস: ${m.month}, ফসল: ${m.cropNameBn}, অবস্থা: ${m.stage}, বৃষ্টি: ${num(m.rainMm, 1)} মিমি, প্রয়োজন: ${num(m.needMm, 1)} মিমি, ঘাটতি: ${num(m.shortfallMm, 1)} মিমি (${num(m.shortfallLitres || 0)} লিটার)`,
     );
+  }
+
+  // Update stratigraphic callouts and mobile legend for active month
+  const calloutData = buildCalloutData({
+    data: currentData,
+    monthIdx: currentMonthIdx,
+    soilOverrides,
+    t,
+  });
+  if (calloutData && containerEl) {
+    const rootzoneVal = containerEl.querySelector('#callout-rootzone-val');
+    if (rootzoneVal) rootzoneVal.textContent = calloutData.rootzone.value;
+    const legendRootVal = containerEl.querySelector('.studio-callout-legend-item[data-band="rootzone"] .callout-val');
+    if (legendRootVal) legendRootVal.textContent = calloutData.rootzone.value;
   }
 
   requestRender();
@@ -2791,11 +3157,78 @@ function bindEvents(container) {
   const playBtn = containerEl.querySelector("[data-studio-action='toggle-play']");
   if (playBtn) playBtn.onclick = () => togglePlay();
 
-  // Raycasting for tap / click probe card
+  // Raycasting for tap / click probe card + drop pin + hover bands
   if (canvas) {
     let downPos = { x: 0, y: 0 };
     canvas.addEventListener("pointerdown", (e) => {
       downPos = { x: e.clientX, y: e.clientY };
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!currentData || !currentBlock.bounds || !activeCamera || isDragging) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, activeCamera);
+      const hits = blockGroup ? raycaster.intersectObjects(blockGroup.children, true) : [];
+      let nextBand = null;
+      if (hits.length > 0) {
+        canvas.style.cursor = "pointer";
+        const hit = hits[0];
+        // Check if hitting cut wall (face normal pointing roughly in +X)
+        if (hit.face && hit.face.normal && hit.face.normal.x > 0.6) {
+          const depth = currentBlock.topMin - currentBlock.bottomY;
+          const relY = currentBlock.topMin - hit.point.y;
+          const frac = depth > 0 ? relY / depth : 0;
+          if (frac <= 0.15) nextBand = "topsoil";
+          else if (frac <= 0.55) nextBand = "rootzone";
+          else nextBand = "aquifer";
+        }
+      } else {
+        canvas.style.cursor = "default";
+      }
+
+      if (nextBand !== hoveredBandId) {
+        hoveredBandId = nextBand;
+        // Highlight corresponding callouts in DOM
+        containerEl.querySelectorAll('.callout-box, .studio-callout-legend-item').forEach((el) => {
+          el.classList.remove('highlight');
+        });
+        if (hoveredBandId) {
+          containerEl.querySelector(`#callout-${hoveredBandId} .callout-box`)?.classList.add('highlight');
+          containerEl.querySelector(`.studio-callout-legend-item[data-band="${hoveredBandId}"]`)?.classList.add('highlight');
+        }
+        // Update side material map
+        if (blockGroup) {
+          const sideTex = buildSideTexture(currentData);
+          blockGroup.traverse((child) => {
+            if (child.isMesh && child.material) {
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              for (const m of mats) {
+                if (m.name === "side" || m.userData?.isSide) {
+                  m.map = sideTex;
+                  m.needsUpdate = true;
+                }
+              }
+            }
+          });
+        }
+        requestRender();
+      }
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      canvas.style.cursor = "default";
+      if (hoveredBandId !== null) {
+        hoveredBandId = null;
+        containerEl.querySelectorAll('.callout-box, .studio-callout-legend-item').forEach((el) => {
+          el.classList.remove('highlight');
+        });
+        requestRender();
+      }
     });
 
     canvas.addEventListener("pointerup", (e) => {
@@ -2816,11 +3249,64 @@ function bindEvents(container) {
           u: Math.max(0, Math.min(1, (pt.x - b.minX) / Math.max(1e-6, b.width))),
           v: Math.max(0, Math.min(1, (-pt.z - b.minY) / Math.max(1e-6, b.height))),
         };
+        // Drop small 3D pin on tapped surface
+        dropProbePin(pt.x, pt.y, pt.z);
         updateProbeCard();
         requestRender();
       }
     });
   }
+
+  // Bind callout and legend click & hover interactions
+  const bindCalloutInteraction = (selector, bandId) => {
+    containerEl.querySelectorAll(selector).forEach((elem) => {
+      elem.addEventListener("mouseenter", () => {
+        hoveredBandId = bandId;
+        containerEl.querySelector(`#callout-${bandId} .callout-box`)?.classList.add('highlight');
+        containerEl.querySelector(`.studio-callout-legend-item[data-band="${bandId}"]`)?.classList.add('highlight');
+        requestRender();
+      });
+      elem.addEventListener("mouseleave", () => {
+        hoveredBandId = null;
+        containerEl.querySelectorAll('.callout-box, .studio-callout-legend-item').forEach((el) => el.classList.remove('highlight'));
+        requestRender();
+      });
+      elem.addEventListener("click", (e) => {
+        if (e.target.closest('#btn-callout-soil-test, #btn-legend-soil-test')) {
+          return; // Let modal handler process button
+        }
+        focusSoilBand(bandId);
+      });
+    });
+  };
+
+  bindCalloutInteraction('.callout-3d[data-band="topsoil"], .studio-callout-legend-item[data-band="topsoil"]', 'topsoil');
+  bindCalloutInteraction('.callout-3d[data-band="rootzone"], .studio-callout-legend-item[data-band="rootzone"]', 'rootzone');
+  bindCalloutInteraction('.callout-3d[data-band="aquifer"], .studio-callout-legend-item[data-band="aquifer"]', 'aquifer');
+
+  // Soil modal triggers for unknown well depth
+  const openSoilModal = () => {
+    const dialog = document.querySelector("#modal-soil-input");
+    if (dialog && typeof dialog.showModal === "function") {
+      try {
+        dialog.showModal();
+      } catch (err) {
+        dialog.setAttribute("open", "true");
+      }
+    } else if (dialog) {
+      dialog.classList.remove("hidden");
+      dialog.style.display = "flex";
+    }
+  };
+
+  containerEl.querySelector("#btn-callout-soil-test")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openSoilModal();
+  });
+  containerEl.querySelector("#btn-legend-soil-test")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openSoilModal();
+  });
 
   // Initial draw of transect and probe
   renderTransectSVG();
