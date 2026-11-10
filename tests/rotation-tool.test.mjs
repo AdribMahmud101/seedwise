@@ -198,4 +198,57 @@ describe('STUDIO5B Rotation Tool', () => {
       assert.strictEqual(rotationTool.studyIndex.legume, 3);
     });
   });
+
+  describe('STUDIO5G Question Panels & Tariff Cost', () => {
+    let rotationsModule;
+
+    before(async () => {
+      rotationsModule = await import('../src/legacy/rotations.js');
+    });
+
+    it('should calculate irrigation cost based on shortfall litres and flow 45,000 L/hr', () => {
+      // 90,000 litres at 45,000 L/hr = 2 hours
+      // Diesel @ 320 Tk/hr => 640 Tk
+      const dieselResult = rotationsModule.calcIrrigationCost(90000, 'diesel');
+      assert.strictEqual(dieselResult.pumpHours, 2);
+      assert.strictEqual(dieselResult.costTk, 640);
+      assert.strictEqual(dieselResult.pumpFlowLph, 45000);
+      assert.strictEqual(dieselResult.tariffRate, 320);
+
+      // Electric @ 160 Tk/hr => 320 Tk
+      const electricResult = rotationsModule.calcIrrigationCost(90000, 'electric');
+      assert.strictEqual(electricResult.pumpHours, 2);
+      assert.strictEqual(electricResult.costTk, 320);
+      assert.strictEqual(electricResult.tariffRate, 160);
+
+      // BMDA @ 110 Tk/hr => 220 Tk
+      const bmdaResult = rotationsModule.calcIrrigationCost(90000, 'bmda');
+      assert.strictEqual(bmdaResult.pumpHours, 2);
+      assert.strictEqual(bmdaResult.costTk, 220);
+      assert.strictEqual(bmdaResult.tariffRate, 110);
+    });
+
+    it('should return 0 cost and 0 hours for 0 or negative shortfall litres', () => {
+      const zeroResult = rotationsModule.calcIrrigationCost(0, 'diesel');
+      assert.strictEqual(zeroResult.pumpHours, 0);
+      assert.strictEqual(zeroResult.costTk, 0);
+
+      const negResult = rotationsModule.calcIrrigationCost(-500, 'diesel');
+      assert.strictEqual(negResult.pumpHours, 0);
+      assert.strictEqual(negResult.costTk, 0);
+    });
+
+    it('should contain "What is under my field?" in rotations.js', () => {
+      const rendered = rotationsModule.rotations();
+      assert.ok(rendered.includes('What is under my field?'));
+      assert.ok(rendered.includes('When is the field bare or stressed?'));
+      assert.ok(rendered.includes('Where will water collect?'));
+    });
+
+    it('should show "Enter soil test" fallback when nutrient is missing or null', () => {
+      const rendered = rotationsModule.rotations();
+      // Should show 'Enter soil test' for nutrient chips without data
+      assert.ok(rendered.includes('Enter soil test'));
+    });
+  });
 });

@@ -87,7 +87,7 @@ function mapPriorityKey(key) {
 }
 
 // Export constants and helper functions
-export { priorityKeys, AREA_CONVERSION, PUMP_TARIFFS, studyIndex, mapPriorityKey };
+export { priorityKeys, AREA_CONVERSION, PUMP_TARIFFS, studyIndex, mapPriorityKey, soilOverrides };
 
 // Load soil profile
 async function loadSoilProfile() {
