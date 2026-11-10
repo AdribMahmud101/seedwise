@@ -1,4 +1,5 @@
 // Pure helpers for the 3D field studio. No three.js, no DOM — safe to unit test.
+import { projectWgs84ToUtm45N } from "./spatial.js";
 
 export function outlineBounds(outlineM) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -15,6 +16,8 @@ export function pointInPolygon(x, y, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    // Include the rim, allowing for Float32 mesh coordinates.
+    if (distToSegment(x, y, xi, yi, xj, yj) <= 1e-5) return true;
     if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
@@ -358,3 +361,107 @@ export function lookupProbePoint({
 }
 
 
+
+// Subdivide the triangulated outline once; terrain and water use these same cells.
+export function surfaceGridPositions(ring, triangles, heightAt, subdivisions = 28) {
+  const positions = [];
+  for (const ids of triangles) {
+    const [a, b, c] = ids.map((i) => ring[i]);
+    const point = (i, j) => {
+      const x = a[0] + ((b[0] - a[0]) * i + (c[0] - a[0]) * j) / subdivisions;
+      const y = a[1] + ((b[1] - a[1]) * i + (c[1] - a[1]) * j) / subdivisions;
+      return [x, heightAt(x, -y), -y];
+    };
+    for (let i = 0; i < subdivisions; i++) {
+      for (let j = 0; j < subdivisions - i; j++) {
+        positions.push(...point(i, j), ...point(i + 1, j), ...point(i, j + 1));
+        if (i + j < subdivisions - 1) {
+          positions.push(...point(i + 1, j), ...point(i + 1, j + 1), ...point(i, j + 1));
+        }
+      }
+    }
+  }
+  return positions;
+}
+
+// Sample the actual UTM radar grid, never the field bounding box or field_mask.
+export function sampleS1Water(site, observation, lon, lat) {
+  if (!site?.transform || site.epsg !== 32645 || !observation?.water) return null;
+  const [x, y] = projectWgs84ToUtm45N(lon, lat);
+  const [dx, , west, , dy, north] = site.transform;
+  const value = observation.water[Math.floor((y - north) / dy)]?.[Math.floor((x - west) / dx)];
+  return value === 0 || value === 1 ? value : null;
+}
+
+// Clip each terrain triangle at the scenario fill level, then drape wet cells
+// just above that same triangle. Interpolated shoreline vertices cannot cross its edges.
+export function pondingPositions(surface, {
+  rainMm = 0, exaggeration = 1, lowGround = false,
+  proposedDrain = false, outletBlocked = false, waterMaskAt = () => null,
+} = {}) {
+  if (!(rainMm > 0) || !surface.length) return [];
+  let min = Infinity;
+  for (let i = 1; i < surface.length; i += 3) min = Math.min(min, surface[i]);
+  const scale = Math.max(0.01, exaggeration);
+  const factor = proposedDrain && !outletBlocked ? 0.45 : outletBlocked ? 1.3 : 1;
+  const fill = min + rainMm / 1000 * factor * (lowGround ? 1.3 : 1) * scale;
+  const positions = [];
+  for (let i = 0; i < surface.length; i += 9) {
+    const triangle = [0, 3, 6].map((j) => Array.from(surface.slice(i + j, i + j + 3)));
+    const x = triangle.reduce((sum, p) => sum + p[0], 0) / 3;
+    const z = triangle.reduce((sum, p) => sum + p[2], 0) / 3;
+    // Radar supplies water presence, not depth. Its contribution remains a rain scenario.
+    const level = fill + (waterMaskAt(x, z) === 1 ? 0.15 * Math.min(1, rainMm / 45) * scale * factor : 0);
+    const clipped = [];
+    triangle.forEach((a, j) => {
+      const b = triangle[(j + 1) % 3];
+      if (a[1] < level) clipped.push(a);
+      if ((a[1] < level) !== (b[1] < level)) {
+        const t = (level - a[1]) / (b[1] - a[1]);
+        clipped.push(a.map((v, k) => v + (b[k] - v) * t));
+      }
+    });
+    for (let j = 1; j < clipped.length - 1; j++) {
+      for (const [px, h, pz] of [clipped[0], clipped[j], clipped[j + 1]]) {
+        positions.push(px, h + 0.02, pz);
+      }
+    }
+  }
+  return positions;
+}
+
+// Keep the longest continuous section of the transect inside the visible field.
+export function transectEndpoints(ring, bounds = outlineBounds(ring)) {
+  if (ring.length < 3) return [];
+  const a = [bounds.minX + 0.12 * bounds.width, bounds.minY + 0.26 * bounds.height];
+  const d = [0.80 * bounds.width, 0.48 * bounds.height];
+  const cross = (u, v) => u[0] * v[1] - u[1] * v[0];
+  const ts = [0, 1];
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length];
+    const edge = [q[0] - p[0], q[1] - p[1]];
+    const delta = [p[0] - a[0], p[1] - a[1]];
+    const den = cross(d, edge);
+    if (Math.abs(den) < 1e-10) return;
+    const t = cross(delta, edge) / den, u = cross(delta, d) / den;
+    if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+  });
+  ts.sort((a, b) => a - b);
+  const point = (t) => [a[0] + d[0] * t, a[1] + d[1] * t];
+  let best = [];
+  let length = 0;
+  for (let i = 1; i < ts.length; i++) {
+    const span = ts[i] - ts[i - 1];
+    if (span > length && pointInPolygon(...point((ts[i] + ts[i - 1]) / 2), ring)) {
+      length = span;
+      best = [point(ts[i - 1]), point(ts[i])];
+    }
+  }
+  return best;
+}
+
+// A horizontal table inherits the exact terrain footprint, including the cutaway.
+export function waterTablePositions(surface, level, bottomY, topMin) {
+  if (!(level > bottomY && level < topMin)) return [];
+  return Array.from(surface, (value, i) => i % 3 === 1 ? level : value);
+}
