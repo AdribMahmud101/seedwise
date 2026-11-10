@@ -1240,6 +1240,8 @@
 /* Legend list below canvas for mobile */
 .studio-callout-legend {
   display: none;
+  position: relative;
+  z-index: 20;
   margin: 8px 12px;
   padding: 10px;
   background: rgba(255, 253, 245, 0.95);
@@ -1471,7 +1473,8 @@
 
 /* Keep controls and translated labels inside the available stage width. */
 .studio-overlay-tl {
-  max-width: min(340px, calc(50% - 80px));
+  max-width: 340px;
+  width: max-content;
   right: 68px;
 }
 
@@ -1512,7 +1515,7 @@
 }
 
 .callout-3d[data-band] {
-  width: min(240px, calc(50% - 24px));
+  width: min(200px, calc(50% - 24px));
 }
 
 .callout-3d[data-band] :is(.callout-line, .callout-dot) {
@@ -1538,7 +1541,7 @@
 @media (max-width: 600px) {
   .studio-stage-canvas-host {
     height: auto;
-    padding-top: max(440px, var(--studio-overlay-bottom, 440px));
+    padding-top: max(500px, calc(var(--studio-overlay-bottom, 280px) + 220px));
     padding-bottom: 0;
   }
   .studio-overlay-tl {
@@ -1557,5 +1560,30 @@
 @media (max-width: 420px) {
   .callout-3d[data-band] {
     width: 44px;
+  }
+}
+
+/* Measure breakpoints against the stage, including the desktop rail. */
+.studio-stage-canvas-host {
+  container-type: inline-size;
+}
+
+@container (min-width: 600px) {
+  .studio-overlay-tl {
+    width: 330px;
+    max-width: none;
+    right: auto;
+  }
+  .studio-view-toggle,
+  .studio-slice-card {
+    flex-wrap: nowrap;
+  }
+  .studio-view-btn,
+  .studio-crop-chip {
+    white-space: nowrap;
+  }
+  .studio-slice-card input[type="range"] {
+    min-width: 60px;
+    width: 120px;
   }
 }

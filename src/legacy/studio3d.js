@@ -2103,6 +2103,38 @@ function hostAspect() {
   return Math.max(0.35, w / Math.max(1, h));
 }
 
+function studioFreeRegion() {
+  const rect = canvasHostEl.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  const overlay = containerEl.querySelector('.studio-overlay-tl')?.getBoundingClientRect();
+  const controls = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
+  const mobile = window.innerWidth <= 420;
+  const labels = [...containerEl.querySelectorAll('.callout-3d[data-band]')];
+  const columnWidth = mobile ? 44 : Math.max(...labels.map((el) => el.offsetWidth), 120);
+  const columnHeight = mobile ? 0 : labels.reduce((sum, el) => sum + el.offsetHeight, 0) + 20;
+  const overlayBottom = (overlay?.bottom || rect.top) - rect.top;
+  const controlsBottom = (controls?.bottom || rect.top) - rect.top;
+  const cards = [...containerEl.querySelectorAll('.studio-probe-card, .studio-transect-card, .studio-callout-legend')]
+    .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
+  const bottom = Math.min(h - 12, ...cards.map((r) => r.top - rect.top - 16));
+  const top = Math.max(overlayBottom, controlsBottom) + 16;
+  // Use the right column only when the field still fits beside the left controls.
+  const leftTop = overlayBottom + 16;
+  const rightTop = controlsBottom + 16;
+  const overlayRight = (overlay?.right || rect.left) - rect.left;
+  const side = !mobile && w - columnWidth - overlayRight - 44 >= w * 0.6 ? 'right' : 'left';
+  const columnTop = side === 'left' ? leftTop : rightTop;
+  if (!mobile) {
+    const bottomHeight = Math.max(0, ...cards.map((r) => r.height)) + 40;
+    canvasHostEl.style.minHeight = `${Math.ceil(columnTop + columnHeight + bottomHeight)}px`;
+  }
+  const left = side === 'left' ? columnWidth + 28 : overlayRight + 16;
+  const right = mobile ? w - 16 : side === 'right' ? w - columnWidth - 28 : w - 16;
+  return { side, columnWidth, columnTop, bottom, region: {
+    left: left / w, right: right / w, top: top / h, bottom: Math.max(top + 40, bottom) / h,
+  } };
+}
+
 function fitPerspective(data, close = false) {
   if (!cameraPersp || !data) return;
   const b = outlineBounds(data.field.outlineM);
@@ -2127,39 +2159,16 @@ function fitPerspective(data, close = false) {
   // on desktop and ~90 % on phone. The solver backs off until the whole block
   // fits, so arbitrary drawn boundaries stay fully visible. Close-up/Top unchanged.
   // Shift target down to center the block in the frame below the UI
-  const isDesktop = !isPhone();
-  let distance;
-  let phoneVox = 0;
-  if (close) {
-    distance = fit.distance * 0.72;
-  } else if (isDesktop) {
-    distance = fit.distance * solveFramingMultiplier({
-      outlineM: data.field.outlineM,
-      depthM: depth,
-      fovDeg: cameraPersp.fov,
-      aspect: hostAspect(),
-      elevationDeg,
-      yawDeg,
-      margin,
-      targetFrac: 0.72,
-      viewOffsetX: 0.5 - 0.66,
-      viewOffsetY: 0.5 - 0.56,
-    }).multiplier;
-  } else {
-    const solved = solveFramingMultiplier({
-      outlineM: data.field.outlineM,
-      depthM: depth,
-      fovDeg: cameraPersp.fov,
-      aspect: hostAspect(),
-      elevationDeg,
-      yawDeg,
-      margin,
-      targetFrac: 0.9,
-      centerX: true,
-    });
-    distance = fit.distance * solved.multiplier;
-    phoneVox = solved.viewOffsetX;
-  }
+  // STUDIO5Q: overlay clearance now caps that zoom, including terrain and sway.
+  const space = studioFreeRegion();
+  const canopy = canopyVisualHeight(data.months[currentMonthIdx], Math.max(b.width, b.height));
+  const solved = close ? null : solveFramingMultiplier({
+    outlineM: data.field.outlineM, depthM: depth, fovDeg: cameraPersp.fov,
+    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: 0.6,
+    region: space.region, topM: currentBlock.topMax + Math.max(canopy, Math.max(b.width, b.height) * 0.08),
+    bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
+  });
+  const distance = fit.distance * (close ? 0.72 : solved.multiplier);
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
   const target = [fit.target[0], -depth * 0.45, fit.target[2]];
@@ -2170,15 +2179,14 @@ function fitPerspective(data, close = false) {
   );
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
-  if (isDesktop && canvasHostEl) {
+  if (!close && canvasHostEl) {
+    const w = canvasHostEl.clientWidth || 600;
+    const h = canvasHostEl.clientHeight || 400;
+    cameraPersp.setViewOffset(w, h, solved.viewOffsetX * w, solved.viewOffsetY * h, w, h);
+  } else if (close && !isPhone() && canvasHostEl) {
     const w = canvasHostEl.clientWidth || 600;
     const h = canvasHostEl.clientHeight || 400;
     cameraPersp.setViewOffset(w, h, (0.5 - 0.66) * w, (0.5 - 0.56) * h, w, h);
-  } else if (!isDesktop && !close && canvasHostEl) {
-    // Small bounded horizontal shift keeps the ~90 % phone framing centred.
-    const w = canvasHostEl.clientWidth || 600;
-    const h = canvasHostEl.clientHeight || 400;
-    cameraPersp.setViewOffset(w, h, phoneVox * w, 0, w, h);
   } else {
     cameraPersp.clearViewOffset();
   }
@@ -2186,7 +2194,7 @@ function fitPerspective(data, close = false) {
 
   controls.target.set(target[0], target[1], target[2]);
   controls.minDistance = close ? Math.max(2, fit.distance * 0.18) : Math.max(3, fit.distance * 0.4);
-  controls.maxDistance = fit.distance * 2.8;
+  controls.maxDistance = Math.max(fit.distance * 2.8, distance * 1.5);
   controls.maxPolarAngle = Math.PI / 2 - 0.04;
   controls.update();
 
@@ -2230,7 +2238,11 @@ function fitCameras(data) {
   if (isTopView) fitOrtho(data);
   else {
     fillPerspectiveAspect();
-    fitPerspective(data, isCloseView);
+    const fit = fitPerspective(data, isCloseView);
+    if (introAnim && fit) {
+      introAnim.finalDistance = fit.distance;
+      introAnim.finalTarget = fit.target;
+    }
   }
 }
 
@@ -2469,19 +2481,24 @@ function sync3DCallouts() {
   if (isMobile) {
     canvasHostEl.style.minHeight = '';
     if (svgLeaders) svgLeaders.innerHTML = '';
-    const placeMobileDot = (el, scr) => {
+    const space = studioFreeRegion();
+    const dots = deoverlapLabels([
+      { el: topsoilEl, anchor: scrTop, anchorY: scrTop.y, height: 44, order: 1 },
+      { el: rootzoneEl, anchor: scrRoot, anchorY: scrRoot.y, height: 44, order: 2 },
+      { el: aquiferEl, anchor: scrAqui, anchorY: scrAqui.y, height: 44, order: 3 },
+    ], canvasHostEl.clientHeight, 10, space.region.top * canvasHostEl.clientHeight,
+    canvasHostEl.clientHeight - space.bottom);
+    const placeMobileDot = (el, scr, y) => {
       if (!el) return;
       if (!scr.visible) {
         el.style.display = 'none';
         return;
       }
       el.style.display = 'block';
-      el.style.left = `${Math.max(22, Math.min(canvasHostEl.clientWidth - 22, scr.x))}px`;
-      el.style.top = `${scr.y}px`;
+      el.style.left = '34px';
+      el.style.top = `${y + 22}px`;
     };
-    placeMobileDot(topsoilEl, scrTop);
-    placeMobileDot(rootzoneEl, scrRoot);
-    placeMobileDot(aquiferEl, scrAqui);
+    for (const dot of dots) placeMobileDot(dot.el, dot.anchor, dot.y);
     return;
   }
 
@@ -2511,22 +2528,24 @@ function sync3DCallouts() {
   }));
 
   // Determine column X
-  const columnWidth = Math.max(topRect?.width || 0, rootRect?.width || 0, aquiRect?.width || 0, 120);
-  const columnX = canvasW - columnWidth - 12;
+  const space = studioFreeRegion();
+  const columnWidth = space.columnWidth;
+  const projected = currentBlock.ring.flatMap(([x, z]) => [
+    projectToScreen(new THREE.Vector3(x, currentBlock.topMax, z)),
+    projectToScreen(new THREE.Vector3(x, currentBlock.bottomY, z)),
+  ]);
+  const blockLeft = Math.min(...projected.map((p) => p.x));
+  const blockRight = Math.max(...projected.map((p) => p.x));
+  const leftClear = blockLeft >= columnWidth + 28;
+  const rightClear = blockRight <= canvasW - columnWidth - 28;
+  const side = space.side === 'left' ? (leftClear || !rightClear ? 'left' : 'right')
+    : (rightClear || !leftClear ? 'right' : 'left');
+  const columnX = side === 'left' ? 12 : canvasW - columnWidth - 12;
 
   // Min top and bottom padding to avoid title stack and bottom probe cards
-  const overlapsColumn = (rect) => rect && rect.width > 0 &&
-    rect.right > canvasRect.left + columnX - 8 && rect.left < canvasRect.left + columnX + columnWidth + 8;
-  let topPad = 16;
-  for (const rect of [overlayRect, controlsRect]) {
-    if (overlapsColumn(rect)) topPad = Math.max(topPad, rect.bottom - canvasRect.top + 8);
-  }
-  let bottomPad = 12;
-  for (const selector of ['.studio-probe-card', '.studio-transect-card']) {
-    const rect = containerEl.querySelector(selector)?.getBoundingClientRect();
-    if (overlapsColumn(rect)) bottomPad = Math.max(bottomPad, canvasRect.bottom - rect.top + 8);
-  }
-  canvasHostEl.style.minHeight = `${topPad + bottomPad + hTop + hRoot + hAqui + 20}px`;
+  const topPad = side === 'left' ? (overlayRect?.bottom || canvasRect.top) - canvasRect.top + 16
+    : (controlsRect?.bottom || canvasRect.top) - canvasRect.top + 16;
+  const bottomPad = canvasH - space.bottom;
   const positioned = deoverlapLabels(layoutItems, canvasH, 10, topPad, bottomPad);
   const posMap = new Map();
   for (const p of positioned) {
@@ -2545,7 +2564,7 @@ function sync3DCallouts() {
     lbl.el.style.top = `${boxY}px`;
 
     // Leader line from label card edge to 3D anchor dot
-    const cardEdgeX = columnX;
+    const cardEdgeX = side === 'left' ? columnX + columnWidth : columnX;
     const cardEdgeY = boxY + lbl.height / 2;
 
     svgLines += `
