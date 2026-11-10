@@ -2504,7 +2504,13 @@ function studioFreeRegion() {
   if (w < 600) {
     const top = overlayBottom + 16;
     const viewportHeight = window.visualViewport?.height || document.documentElement.clientHeight;
-    const bottom = Math.min(h, viewportHeight) - 16;
+    // PHONEFIT: the leader-label row sits below the block, so reserve the pill
+    // height plus its leader gap; the block + label row then centre together
+    // in the free area between the top bar and the stage bottom.
+    const pinH = Math.max(28, ...[...containerEl.querySelectorAll('.studio-soil-pin')]
+      .map((el) => el.getBoundingClientRect().height || 0));
+    const labelAllow = pinH + 20;
+    const bottom = Math.min(h, viewportHeight) - 16 - labelAllow;
     return { region: { left: 0.03, right: 0.97, top: top / h, bottom: Math.max(top + 80, bottom) / h },
       preferredCentreY: (top + bottom) / (2 * h) };
   }
@@ -2570,10 +2576,11 @@ function fitPerspective(data, close = false) {
   const topSlack = compact
     ? Math.max(canopy, Math.max(b.width, b.height) * 0.01)
     : Math.max(canopy, Math.max(b.width, b.height) * 0.08);
-  // A 0.86 sway envelope gives 75–80% visible width at the resting phone camera.
+  // PHONEFIT: a 0.92 sway envelope gives ~85% visible width at the resting
+  // phone camera. Compact (~70%) and desktop (~60%) targets are unchanged.
   const solved = close && !compact ? null : solveFramingMultiplier({
     outlineM, depthM: depth, fovDeg: cameraPersp.fov,
-    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.86 : compact ? 0.78 : 0.6,
+    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.92 : compact ? 0.78 : 0.6,
     region: space.region, topM: currentBlock.topMax + topSlack,
     bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
   });
