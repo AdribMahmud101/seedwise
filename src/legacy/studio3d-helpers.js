@@ -285,7 +285,8 @@ function norm3(v) {
 export function solveFramingMultiplier({ outlineM, depthM = 1.5, fovDeg = 38, aspect = 1.5,
   elevationDeg = 14, yawDeg = 10, margin = 0.18, targetFrac = 0.72,
   viewOffsetX = 0, viewOffsetY = 0, centerX = false, maxCenterX = 0.1,
-  minMult = 0.45, maxMult = 1.0, edgeMargin = 0.02 }) {
+  minMult = 0.45, maxMult = 1.0, edgeMargin = 0.02,
+  region = null, topM = 0, bottomM = -depthM, swayDeg = 0 }) {
   const fallback = { multiplier: 1, viewOffsetX, widthFrac: 0, heightFrac: 0, fits: true };
   if (!Array.isArray(outlineM) || outlineM.length < 3) return fallback;
   const fit = fitCameraToBlock({ outlineM, depthM, fovDeg, aspect, elevationDeg, yawDeg, margin });
@@ -296,7 +297,39 @@ export function solveFramingMultiplier({ outlineM, depthM = 1.5, fovDeg = 38, as
   const dir = [Math.cos(el) * Math.sin(yaw), Math.sin(el), Math.cos(el) * Math.cos(yaw)];
   const corners = [];
   for (const [x, y] of outlineM) {
-    corners.push([x, 0, -y], [x, -depthM, -y]);
+    corners.push([x, topM, -y], [x, bottomM, -y]);
+  }
+  if (region) {
+    // Fit the whole sway envelope, including canopy and relief, between overlays.
+    const measureRegion = (mult) => {
+      const boxes = [-swayDeg, 0, swayDeg].map((sway) => {
+        const a = yaw + sway * Math.PI / 180;
+        const d = fit.distance * mult * 0.99;
+        const position = [target[0] + Math.cos(el) * Math.sin(a) * d,
+          target[1] + Math.sin(el) * d, target[2] + Math.cos(el) * Math.cos(a) * d];
+        return projectFramingBox(corners, { position, target, fovDeg, aspect });
+      });
+      const minX = Math.min(...boxes.map((b) => b.minX));
+      const maxX = Math.max(...boxes.map((b) => b.maxX));
+      const minY = Math.min(...boxes.map((b) => b.minY));
+      const maxY = Math.max(...boxes.map((b) => b.maxY));
+      const widthFrac = (maxX - minX) / 2;
+      const heightFrac = (maxY - minY) / 2;
+      return {
+        multiplier: mult, widthFrac, heightFrac,
+        viewOffsetX: (minX + maxX) / 4 - (region.left + region.right - 1) / 2,
+        viewOffsetY: (1 - region.top - region.bottom) / 2 - (minY + maxY) / 4,
+        fits: widthFrac <= Math.min(targetFrac, region.right - region.left) &&
+          heightFrac <= region.bottom - region.top,
+      };
+    };
+    let lo = minMult, hi = maxMult;
+    for (let i = 0; i < 32; i++) {
+      const mid = (lo + hi) / 2;
+      if (measureRegion(mid).fits) hi = mid;
+      else lo = mid;
+    }
+    return measureRegion(hi);
   }
   const measure = (mult, vox) => {
     const d = fit.distance * mult;
