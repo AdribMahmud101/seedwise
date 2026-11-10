@@ -60,6 +60,10 @@ import {
   computeAutoExaggeration,
   usdaTextureClass,
   deoverlapLabels,
+  easeOutCubic,
+  introCameraParams,
+  shouldSkipIntro,
+  sampleRowCropScale,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -134,6 +138,7 @@ let edgeTreesGroup = null;
 let probePinMesh = null;
 let cameraEasing = null;
 let hoveredBandId = null;
+let introAnim = null; // STUDIO5M first load intro animation state
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -1233,6 +1238,11 @@ function buildPlantsAndRoots(data, monthIdx) {
   }
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.userData.baseMatrices = new Float32Array(mesh.instanceMatrix.array);
+  const boundsY = bounds.maxY - bounds.minY;
+  mesh.userData.rowProgress = new Float32Array(positions.map(([, y]) => {
+    return boundsY > 1e-4 ? Math.max(0, Math.min(1, (y - bounds.minY) / boundsY)) : 0;
+  }));
 
   plantsGroup = new THREE.Group();
   plantsGroup.add(mesh);
@@ -1872,6 +1882,7 @@ function setupControls() {
   controls.addEventListener("change", requestRender);
   controls.addEventListener("start", () => {
     isDragging = true;
+    stopIntroAnimation(true);
     if (floatGroup) {
       // Settle the group back to rest while the user is dragging.
       floatGroup.position.set(0, 0, 0);
@@ -1976,14 +1987,14 @@ function fitPerspective(data, close = false) {
     margin: close ? 0.14 : margin,
   });
 
-  // Block fills ~70 % of the frame on 3D view; close-up pushes in closer.
+  // Block fills ~55-60 % of canvas width on desktop; ~85 % on phone.
   // Shift target down to center the block in the frame below the UI
   const isDesktop = !isPhone();
   const distance = close
     ? fit.distance * 0.72
     : isDesktop
-      ? fit.distance * 0.92 * 1.3
-      : fit.distance * 0.92;
+      ? fit.distance * 1.0
+      : fit.distance * 0.75;
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
   const target = [fit.target[0], -depth * 0.45, fit.target[2]];
@@ -2008,6 +2019,13 @@ function fitPerspective(data, close = false) {
   controls.maxDistance = fit.distance * 2.8;
   controls.maxPolarAngle = Math.PI / 2 - 0.04;
   controls.update();
+
+  return {
+    target,
+    distance,
+    elevationDeg,
+    yawDeg,
+  };
 }
 
 function fitOrtho(data) {
@@ -2536,12 +2554,235 @@ function updateProbeCard() {
   } catch (e) {}
 }
 
+/* --------------------------------------------------- STUDIO5M intro animation */
+
+function triggerIntroAnimation(force = false) {
+  if (!force && shouldSkipIntro({ prefersReducedMotion, isHidden: document.hidden || !isVisible })) return;
+  if (!force) {
+    try {
+      const key = `ropon_studio_intro_${currentViewMode}`;
+      if (sessionStorage.getItem(key) === "1") return;
+      sessionStorage.setItem(key, "1");
+    } catch (e) {}
+  }
+
+  if (isTopView || !currentData) return;
+
+  const b = outlineBounds(currentData.field.outlineM);
+  const depth = currentBlock.depth || blockDepthM(b);
+  const elevationDeg = isCloseView ? 22 : 14;
+  const yawDeg = isCloseView ? 26 : 10;
+  const fit = fitPerspective(currentData, isCloseView);
+  if (!fit) return;
+
+  introAnim = {
+    startTime: performance.now(),
+    duration: 3500, // 3.5s total
+    finalDistance: fit.distance,
+    finalTarget: fit.target,
+    finalElevationDeg: fit.elevationDeg,
+    finalYawDeg: fit.yawDeg,
+    depth,
+  };
+
+  // Immediate start state: land low, crops 0, callouts hidden
+  if (blockGroup) {
+    blockGroup.position.y = -depth;
+  }
+  if (plantsGroup) {
+    const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
+    if (mesh && mesh.userData.baseMatrices) {
+      const arr = mesh.instanceMatrix.array;
+      for (let i = 0; i < arr.length; i += 16) {
+        for (let c = 0; c < 12; c++) arr[i + c] = 0;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // Callouts & SVG leaders hidden initially
+  const topsoilEl = containerEl?.querySelector("#callout-topsoil");
+  const rootzoneEl = containerEl?.querySelector("#callout-rootzone");
+  const aquiferEl = containerEl?.querySelector("#callout-aquifer");
+  const svgLeaders = containerEl?.querySelector("#svg-callout-leaders");
+  const nodeA = containerEl?.querySelector("#node-a");
+  const nodeAp = containerEl?.querySelector("#node-ap");
+
+  if (topsoilEl) topsoilEl.style.opacity = "0";
+  if (rootzoneEl) rootzoneEl.style.opacity = "0";
+  if (aquiferEl) aquiferEl.style.opacity = "0";
+  if (svgLeaders) svgLeaders.style.opacity = "0";
+  if (nodeA) nodeA.style.opacity = "0";
+  if (nodeAp) nodeAp.style.opacity = "0";
+
+  updateIntroFrame(0);
+}
+
+function stopIntroAnimation(snapToEnd = true) {
+  if (!introAnim) return;
+  const anim = introAnim;
+  introAnim = null;
+
+  if (snapToEnd) {
+    if (blockGroup) {
+      blockGroup.position.y = 0;
+    }
+    if (waterMesh) {
+      waterMesh.position.y = 0;
+    }
+    if (plantsGroup) {
+      const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
+      if (mesh && mesh.userData.baseMatrices) {
+        mesh.instanceMatrix.array.set(mesh.userData.baseMatrices);
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+    const topsoilEl = containerEl?.querySelector("#callout-topsoil");
+    const rootzoneEl = containerEl?.querySelector("#callout-rootzone");
+    const aquiferEl = containerEl?.querySelector("#callout-aquifer");
+    const svgLeaders = containerEl?.querySelector("#svg-callout-leaders");
+    const nodeA = containerEl?.querySelector("#node-a");
+    const nodeAp = containerEl?.querySelector("#node-ap");
+
+    if (topsoilEl) { topsoilEl.style.opacity = "1"; topsoilEl.style.transform = ""; }
+    if (rootzoneEl) { rootzoneEl.style.opacity = "1"; rootzoneEl.style.transform = ""; }
+    if (aquiferEl) { aquiferEl.style.opacity = "1"; aquiferEl.style.transform = ""; }
+    if (svgLeaders) { svgLeaders.style.opacity = "1"; }
+    if (nodeA) { nodeA.style.opacity = "1"; nodeA.style.transform = ""; }
+    if (nodeAp) { nodeAp.style.opacity = "1"; nodeAp.style.transform = ""; }
+
+    const finalParams = introCameraParams({
+      progress: 1.0,
+      finalDistance: anim.finalDistance,
+      finalTarget: anim.finalTarget,
+      finalElevationDeg: anim.finalElevationDeg,
+      finalYawDeg: anim.finalYawDeg,
+    });
+    if (cameraPersp && controls) {
+      cameraPersp.position.set(finalParams.position[0], finalParams.position[1], finalParams.position[2]);
+      controls.target.set(finalParams.target[0], finalParams.target[1], finalParams.target[2]);
+      controls.update();
+    }
+    sync3DCallouts();
+    requestRender();
+  }
+}
+
+function updateIntroFrame(elapsedMs) {
+  if (!introAnim) return;
+  const tSec = elapsedMs / 1000;
+  const progress = Math.min(1, elapsedMs / introAnim.duration);
+
+  // 1. Camera params: swing 70-90° (default 80°) while descending
+  const cam = introCameraParams({
+    progress,
+    finalDistance: introAnim.finalDistance,
+    finalTarget: introAnim.finalTarget,
+    finalElevationDeg: introAnim.finalElevationDeg,
+    finalYawDeg: introAnim.finalYawDeg,
+  });
+  if (cameraPersp && controls) {
+    cameraPersp.position.set(cam.position[0], cam.position[1], cam.position[2]);
+    controls.target.set(cam.target[0], cam.target[1], cam.target[2]);
+    controls.update();
+  }
+
+  // 2. Land rises in: translate-y from below over the first 1 s
+  if (blockGroup) {
+    const landP = Math.min(1, tSec / 1.0);
+    const landEase = easeOutCubic(landP);
+    blockGroup.position.y = -introAnim.depth * (1 - landEase);
+  }
+
+  // 3. Crops grow up (instance scale 0->1, staggered by row) during 0.6-2.2 s
+  if (plantsGroup) {
+    const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
+    if (mesh && mesh.userData.baseMatrices && mesh.userData.rowProgress) {
+      const base = mesh.userData.baseMatrices;
+      const rows = mesh.userData.rowProgress;
+      const arr = mesh.instanceMatrix.array;
+      const count = rows.length;
+      for (let i = 0; i < count; i++) {
+        const offset = i * 16;
+        const scale = sampleRowCropScale(tSec, rows[i], 0.6, 2.2);
+        for (let c = 0; c < 12; c++) {
+          arr[offset + c] = base[offset + c] * scale;
+        }
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // 4. Soil bands/water table reveal top->bottom during 1.0-2.6 s
+  if (waterMesh) {
+    const waterP = Math.max(0, Math.min(1, (tSec - 1.0) / 1.6));
+    waterMesh.position.y = -introAnim.depth * 0.4 * (1 - easeOutCubic(waterP));
+  }
+
+  // 5. Soil callouts + leader lines fade/slide in after 2.6 s (2.6-3.2 s)
+  const topsoilEl = containerEl?.querySelector("#callout-topsoil");
+  const rootzoneEl = containerEl?.querySelector("#callout-rootzone");
+  const aquiferEl = containerEl?.querySelector("#callout-aquifer");
+  const svgLeaders = containerEl?.querySelector("#svg-callout-leaders");
+  const nodeA = containerEl?.querySelector("#node-a");
+  const nodeAp = containerEl?.querySelector("#node-ap");
+
+  if (tSec < 2.6) {
+    if (topsoilEl) topsoilEl.style.opacity = "0";
+    if (rootzoneEl) rootzoneEl.style.opacity = "0";
+    if (aquiferEl) aquiferEl.style.opacity = "0";
+    if (svgLeaders) svgLeaders.style.opacity = "0";
+  } else {
+    const calloutP = Math.min(1, (tSec - 2.6) / 0.6);
+    const easeCallout = easeOutCubic(calloutP);
+    const slideOffset = (1 - easeCallout) * 16;
+    if (topsoilEl) {
+      topsoilEl.style.opacity = String(easeCallout);
+      topsoilEl.style.transform = `translateX(${slideOffset}px)`;
+    }
+    if (rootzoneEl) {
+      rootzoneEl.style.opacity = String(easeCallout);
+      rootzoneEl.style.transform = `translateX(${slideOffset}px)`;
+    }
+    if (aquiferEl) {
+      aquiferEl.style.opacity = String(easeCallout);
+      aquiferEl.style.transform = `translateX(${slideOffset}px)`;
+    }
+    if (svgLeaders) {
+      svgLeaders.style.opacity = String(easeCallout);
+    }
+  }
+
+  // A/A' pins pop in last (3.0-3.5 s)
+  if (tSec < 3.0) {
+    if (nodeA) nodeA.style.opacity = "0";
+    if (nodeAp) nodeAp.style.opacity = "0";
+  } else {
+    const pinP = Math.min(1, (tSec - 3.0) / 0.5);
+    const easePin = easeOutCubic(pinP);
+    if (nodeA) {
+      nodeA.style.opacity = String(easePin);
+      nodeA.style.transform = `scale(${0.5 + 0.5 * easePin})`;
+    }
+    if (nodeAp) {
+      nodeAp.style.opacity = String(easePin);
+      nodeAp.style.transform = `scale(${0.5 + 0.5 * easePin})`;
+    }
+  }
+
+  sync3DCallouts();
+
+  if (progress >= 1.0) {
+    stopIntroAnimation(true);
+  }
+}
+
 function startAnimation() {
   // Idle float animates the block even when there is no wind sway; wind sway
   // only runs when there are crops and the user has not asked for reduced motion.
   const needsFloat = !isSoftwareRenderer && !prefersReducedMotion;
   const needsWind = needsFloat && !!plantsGroup;
-  if (!needsFloat && !needsWind) {
+  if (!needsFloat && !needsWind && !introAnim) {
     stopAnimation();
     requestRender();
     return;
@@ -2556,7 +2797,13 @@ function startAnimation() {
         if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = t;
       }
     }
-    applyIdleFloat(t);
+
+    if (introAnim) {
+      const now = performance.now();
+      updateIntroFrame(now - introAnim.startTime);
+    } else {
+      applyIdleFloat(t);
+    }
 
     // Smooth camera easing towards focused band
     if (cameraEasing && cameraPersp && controls) {
@@ -3063,6 +3310,7 @@ export async function mountStudio3d(container, data, opts = {}) {
     bindEvents(container);
     setupVisibilityObserver(container);
     startAnimation();
+    triggerIntroAnimation();
   } catch (err) {
     console.error("Studio3D initialization error:", err);
     showFallbackMessage(t("Failed to initialize 3D Studio.", "৩ডি স্টুডিও চালু করা যায়নি।"));
@@ -3357,6 +3605,7 @@ function bindEvents(container) {
         }
       } else if (act === "reset") {
         fitCameras(currentData);
+        triggerIntroAnimation(true);
       } else if (act === "fullscreen") {
         const stage = containerEl.querySelector(".studio-stage-wrap");
         if (!document.fullscreenElement) stage?.requestFullscreen().catch(() => {});
@@ -3385,7 +3634,11 @@ function bindEvents(container) {
     let downPos = { x: 0, y: 0 };
     canvas.addEventListener("pointerdown", (e) => {
       downPos = { x: e.clientX, y: e.clientY };
+      stopIntroAnimation(true);
     });
+    canvas.addEventListener("wheel", () => {
+      stopIntroAnimation(true);
+    }, { passive: true });
 
     canvas.addEventListener("pointermove", (e) => {
       if (!currentData || !currentBlock.bounds || !activeCamera || isDragging) return;
@@ -3534,6 +3787,16 @@ function bindEvents(container) {
   // Initial draw of transect and probe
   renderTransectSVG();
   updateProbeCard();
+
+  // Dismiss intro on any user keydown or control click within container
+  containerEl.addEventListener("keydown", () => stopIntroAnimation(true));
+  containerEl.addEventListener("click", (e) => {
+    if (e.target.closest("button, input, select, label, .studio-ctrl-btn, .studio-view-btn")) {
+      if (!e.target.closest("[data-studio-ctrl='reset']")) {
+        stopIntroAnimation(true);
+      }
+    }
+  });
 }
 
 /* ------------------------------------------------------------- STUDIO5A APIs */
@@ -3647,12 +3910,14 @@ function onVisibilityChange() {
     startAnimation();
     requestRender();
   } else {
+    stopIntroAnimation(true);
     stopAnimation();
   }
 }
 
 export function disposeStudio3d() {
   isDisposed = true;
+  stopIntroAnimation(true);
   stopAnimation();
   if (playTimer) clearInterval(playTimer);
   playTimer = null;

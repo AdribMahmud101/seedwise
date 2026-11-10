@@ -11,6 +11,7 @@ import {
   pointInPolygon, outlineBounds, clipRing, surfaceGridPositions, pondingPositions,
   sampleS1Water, transectEndpoints, waterTablePositions,
   usdaTextureClass, computeAutoExaggeration, buildCalloutData, deoverlapLabels,
+  easeOutCubic, introCameraParams, shouldSkipIntro, sampleRowCropScale,
 } from "../src/legacy/studio3d-helpers.js";
 
 test("computePonding calculates ponding depth from low-ground and rainfall scenario", () => {
@@ -352,4 +353,91 @@ test("deoverlapLabels arranges labels vertically with minGap and without overlap
   // Empty list
   assert.deepEqual(deoverlapLabels([], 600), []);
 });
+
+test("easeOutCubic produces smooth 0->1 curve with standard easing behavior", () => {
+  assert.equal(easeOutCubic(0), 0);
+  assert.equal(easeOutCubic(1), 1);
+  assert.equal(easeOutCubic(-0.5), 0);
+  assert.equal(easeOutCubic(1.5), 1);
+  assert.equal(easeOutCubic(NaN), 0);
+
+  // Eases out faster early, decelerating towards end
+  const mid = easeOutCubic(0.5);
+  assert.ok(mid > 0.5, "easeOutCubic(0.5) must be > 0.5");
+  assert.equal(mid, 0.875);
+});
+
+test("introCameraParams smoothly swings camera around target while descending", () => {
+  const finalDistance = 80;
+  const finalTarget = [10, -1.5, -20];
+  const finalElevationDeg = 14;
+  const finalYawDeg = 10;
+
+  // Start (progress = 0)
+  const start = introCameraParams({
+    progress: 0,
+    finalDistance,
+    finalTarget,
+    finalElevationDeg,
+    finalYawDeg,
+    swingDeg: 80,
+  });
+
+  assert.deepEqual(start.target, finalTarget);
+  assert.ok(start.elevationDeg > finalElevationDeg, "camera starts higher");
+  assert.ok(start.distance > finalDistance, "camera starts farther");
+  assert.ok(Math.abs(start.yawDeg - (finalYawDeg + 80)) < 1e-6, "camera starts swung by 80 deg");
+
+  // End (progress = 1)
+  const end = introCameraParams({
+    progress: 1,
+    finalDistance,
+    finalTarget,
+    finalElevationDeg,
+    finalYawDeg,
+  });
+
+  assert.deepEqual(end.target, finalTarget);
+  assert.ok(Math.abs(end.elevationDeg - finalElevationDeg) < 1e-6);
+  assert.ok(Math.abs(end.distance - finalDistance) < 1e-6);
+  assert.ok(Math.abs(end.yawDeg - finalYawDeg) < 1e-6);
+
+  // Mid progress moves smoothly
+  const mid = introCameraParams({
+    progress: 0.5,
+    finalDistance,
+    finalTarget,
+    finalElevationDeg,
+    finalYawDeg,
+  });
+  assert.ok(mid.distance < start.distance && mid.distance > end.distance);
+  assert.ok(mid.elevationDeg < start.elevationDeg && mid.elevationDeg > end.elevationDeg);
+});
+
+test("shouldSkipIntro obeys prefersReducedMotion, hidden tab, and already played state", () => {
+  assert.equal(shouldSkipIntro(), false);
+  assert.equal(shouldSkipIntro({ prefersReducedMotion: false, isHidden: false, hasPlayed: false }), false);
+
+  assert.equal(shouldSkipIntro({ prefersReducedMotion: true, isHidden: false, hasPlayed: false }), true);
+  assert.equal(shouldSkipIntro({ prefersReducedMotion: false, isHidden: true, hasPlayed: false }), true);
+  assert.equal(shouldSkipIntro({ prefersReducedMotion: false, isHidden: false, hasPlayed: true }), true);
+});
+
+test("sampleRowCropScale staggers growth across row positions", () => {
+  // Before start time
+  assert.equal(sampleRowCropScale(0.3, 0.0, 0.6, 2.2), 0);
+  assert.equal(sampleRowCropScale(0.3, 1.0, 0.6, 2.2), 0);
+
+  // After end time
+  assert.equal(sampleRowCropScale(2.5, 0.0, 0.6, 2.2), 1);
+  assert.equal(sampleRowCropScale(2.5, 1.0, 0.6, 2.2), 1);
+
+  // In between: front row (row = 0) grows earlier than back row (row = 1)
+  const midT = 1.3;
+  const frontScale = sampleRowCropScale(midT, 0.0, 0.6, 2.2);
+  const backScale = sampleRowCropScale(midT, 1.0, 0.6, 2.2);
+  assert.ok(frontScale > 0);
+  assert.ok(frontScale > backScale, "front row must grow before back row");
+});
+
 
