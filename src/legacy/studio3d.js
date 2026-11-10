@@ -4204,6 +4204,7 @@ function bindEvents(container) {
   const btn3d = containerEl.querySelector("#btn-view-3d");
   if (btn3d) {
     btn3d.onclick = () => {
+      if (currentViewMode === "cutaway") resetSliceToFull();
       currentViewMode = "3d";
       isTopView = false;
       isCloseView = false;
@@ -4250,6 +4251,7 @@ function bindEvents(container) {
   const btn2d = containerEl.querySelector("#btn-view-2d");
   if (btn2d) {
     btn2d.onclick = () => {
+      if (currentViewMode === "cutaway") resetSliceToFull();
       currentViewMode = "top";
       isTopView = true;
       isCloseView = false;
@@ -4377,6 +4379,8 @@ function bindEvents(container) {
           cameraPersp.position.copy(controls.target).add(offset);
         }
       } else if (act === "reset") {
+        if (currentViewMode !== "3d") containerEl.querySelector("#btn-view-3d")?.click();
+        if (currentCutaway > 0) resetSliceToFull();
         fitCameras(currentData);
         triggerIntroAnimation(true);
       }
@@ -4786,4 +4790,22 @@ export function disposeStudio3d() {
   shadowPlane = null;
   floatGroup = null;
   isDragging = false;
+}
+
+// Leaving Slice view (or Reset) must close the cut and hide the depth ruler (owner bug, 11 Nov).
+async function resetSliceToFull() {
+  if (!containerEl) return;
+  currentCutaway = 0;
+  const cut = containerEl.querySelector("#studio-cutaway-slider");
+  if (cut) cut.value = "0";
+  const deck = containerEl.querySelector("#slider-slice");
+  if (deck) deck.value = "0";
+  const lbl = containerEl.querySelector("#lbl-slice-pct");
+  if (lbl) lbl.textContent = "100%";
+  updateDepthTicks();
+  if (currentData) {
+    await buildFieldBlock(currentData, 0);
+    buildPlantsAndRoots(currentData, currentMonthIdx);
+  }
+  requestRender();
 }
