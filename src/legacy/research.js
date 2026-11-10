@@ -76,7 +76,7 @@ function research() {
   );
 }
 function indicator(title, value, foot) {
-  return `<article class="research-stat"><div class="eyebrow">${esc(title)}</div><strong>${esc(value)}</strong><span>${esc(foot)}</span></article>`;
+  return `<article class="research-stat"><div class="eyebrow">${esc(title)}</div><strong>${esc(value)}</strong><span>${esc(foot)}</span>${truth('MODELED', { source: 'Paired daily QA' })}</article>`;
 }
 function qaView() {
   const f = field(),
@@ -133,7 +133,7 @@ function qaView() {
     : Number.isFinite(im?.cloudMaskLoss)
       ? im.cloudMaskLoss
       : null;
-  return `<div class="research-stats">${indicator(t('Matched daily pairs', 'একই দিনের জোড়া'), num(q.pairedDays), '2024 · UTC')} ${truth('MODELED', { source: 'Paired daily QA' })}${indicator(t('Mean difference', 'গড় পার্থক্য'), `${num(q.meanDifferenceMm, 2)} mm ${truth('MODELED')}`, t('POWER minus IMERG per day', 'দৈনিক POWER থেকে IMERG বাদ'))}${indicator(t('Mean absolute gap', 'গড় পরম ব্যবধান'), `${num(q.maeMm, 2)} mm ${truth('MODELED')}`, t('Paired days only', 'শুধু একই দিনের যুগল'))}</div>
+  return `<div class="research-stats">${indicator(t('Matched daily pairs', 'একই দিনের জোড়া'), num(q.pairedDays), '2024 · UTC')}${indicator(t('Mean difference', 'গড় পার্থক্য'), `${num(q.meanDifferenceMm, 2)} mm`, t('POWER minus IMERG per day', 'দৈনিক POWER থেকে IMERG বাদ'))}${indicator(t('Mean absolute gap', 'গড় পরম ব্যবধান'), `${num(q.maeMm, 2)} mm`, t('Paired days only', 'শুধু একই দিনের যুগল'))}</div>
  <div class="grid-two">${panel(
    t('Rainfall comparison', 'বৃষ্টির তুলনা'),
    `<div class="segmented">${[

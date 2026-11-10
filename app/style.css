@@ -44,6 +44,7 @@ body {
     16px/1.5 Plex,
     Bangla,
     sans-serif;
+  overflow-x: hidden;
 }
 button,
 input,
@@ -190,7 +191,7 @@ small {
   text-transform: uppercase;
 }
 .nav-label {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   letter-spacing: 1.7px;
   margin: 5px 13px 12px;
   color: var(--muted);
@@ -219,7 +220,7 @@ small {
 }
 .nav-item .number {
   margin-left: auto;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   opacity: 0.55;
 }
 .nav-divider {
@@ -258,7 +259,7 @@ small {
 .sidebar-foot span {
   border: 1px solid #c9cfbc;
   border-radius: 3px;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   padding: 4px 6px;
 }
 .workspace {
@@ -291,7 +292,7 @@ small {
   align-items: center;
 }
 .top-actions .snapshot {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--muted);
 }
 .lang-toggle {
@@ -328,7 +329,7 @@ small {
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   border-radius: 50%;
 }
 .main {
@@ -571,7 +572,7 @@ small {
   background: rgba(255, 254, 249, 0.92);
   color: var(--ink);
   padding: 6px 10px;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   border: 1px solid var(--line);
   border-radius: 4px;
   max-width: 60%;
@@ -586,7 +587,7 @@ small {
   background: rgba(36, 57, 44, 0.92);
   color: var(--light);
   padding: 6px 10px;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   border: 1px solid #789062;
   border-radius: 4px;
   pointer-events: none;
@@ -720,7 +721,7 @@ small {
   font-size: 13px;
 }
 .inspect-coords {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--muted);
   margin-bottom: 8px;
 }
@@ -774,7 +775,7 @@ small {
   min-height: calc(100dvh - 54px) !important;
 }
 .leaflet-tooltip {
-  font: 12px Mono !important;
+  font: 12px Mono, Bangla, monospace !important;
   border-radius: 2px !important;
   background: #eff4dedc !important;
   border-color: #aab98b !important;
@@ -820,11 +821,11 @@ small {
   font-size: 13px;
 }
 .field-meta dd.large {
-  font: 24px Fraunces;
+  font: 24px Fraunces, Bangla, serif;
 }
 .admin-boundary-note {
   padding: 10px 0 2px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
 }
@@ -842,7 +843,7 @@ small {
   padding: 18px 0;
 }
 .field-recommend h3 {
-  font: 21px Fraunces;
+  font: 21px Fraunces, Bangla, serif;
   margin: 7px 0;
 }
 .field-recommend p {
@@ -914,7 +915,7 @@ small {
   overflow: visible;
 }
 .chart text {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   fill: #78806e;
 }
 .chart .grid {
@@ -946,7 +947,7 @@ small {
   height: 32px;
   flex: 1;
   text-align: center;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   padding-top: 9px;
   border-radius: 2px;
   color: #53614b;
@@ -975,7 +976,7 @@ small {
 .month-labels span {
   flex: 1;
   text-align: center;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--muted);
 }
 .text-link {
@@ -1127,7 +1128,7 @@ input[type='checkbox'] {
 }
 .rank-num {
   color: #9aab85;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   margin-right: 8px;
 }
 .rotation-sequence {
@@ -1152,7 +1153,7 @@ input[type='checkbox'] {
   min-width: 60px;
 }
 .score strong {
-  font: 35px Fraunces;
+  font: 35px Fraunces, Bangla, serif;
   display: block;
 }
 .score small {
@@ -1242,7 +1243,7 @@ input[type='checkbox'] {
 }
 .timeline-controls .month-name {
   min-width: 125px;
-  font: 18px Fraunces;
+  font: 18px Fraunces, Bangla, serif;
 }
 .timeline-controls input {
   flex: 1;
@@ -1318,7 +1319,7 @@ input[type='checkbox'] {
   cursor: grab;
 }
 .planner-hint {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--muted);
   text-align: center;
   padding: 8px;
@@ -1340,7 +1341,7 @@ input[type='checkbox'] {
   padding: 14px 12px;
 }
 .plan-result .value {
-  font: 24px Fraunces;
+  font: 24px Fraunces, Bangla, serif;
 }
 .plan-result small {
   font-size: 12px;
@@ -1480,7 +1481,7 @@ input[type='checkbox'] {
   color: var(--muted);
 }
 .step-indicator {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--green);
   margin-bottom: 6px;
 }
@@ -1500,7 +1501,7 @@ input[type='checkbox'] {
 .fertilizer-output dd {
   margin: 0;
   text-align: right;
-  font-family: Mono;
+  font-family: Mono, Bangla, monospace;
 }
 .table-wrap {
   overflow: auto;
@@ -1511,7 +1512,7 @@ input[type='checkbox'] {
   font-size: 12px;
 }
 .data-table th {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   text-transform: uppercase;
   letter-spacing: 0.7px;
   color: var(--muted);
@@ -1528,7 +1529,7 @@ input[type='checkbox'] {
   border: 0;
 }
 .data-table .num {
-  font-family: Mono;
+  font-family: Mono, Bangla, monospace;
   text-align: right;
 }
 .tabbar {
@@ -1564,7 +1565,7 @@ input[type='checkbox'] {
   border-radius: 4px;
 }
 .research-stat strong {
-  font: 28px Fraunces;
+  font: 28px Fraunces, Bangla, serif;
   display: block;
   margin: 7px 0 3px;
 }
@@ -1576,7 +1577,7 @@ input[type='checkbox'] {
   background: #e3ead7;
   padding: 2px 7px;
   border-radius: 9px;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   margin-left: 5px;
 }
 .progress-line {
@@ -1626,7 +1627,7 @@ input[type='checkbox'] {
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
-  font: 13px Mono;
+  font: 13px Mono, Bangla, monospace;
   padding-bottom: 8px;
 }
 .hazard-choices {
@@ -1667,7 +1668,7 @@ input[type='checkbox'] {
   margin-top: 4px;
 }
 .source-no {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: #8b997d;
 }
 .workspace-foot {
@@ -1677,7 +1678,7 @@ input[type='checkbox'] {
   margin-top: 26px;
   padding-top: 15px;
   border-top: 1px solid var(--line);
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1788,7 +1789,7 @@ dialog .modal-body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   border-radius: 3px;
   cursor: pointer;
 }
@@ -2432,7 +2433,7 @@ dialog .modal-body {
   font-size: 12px;
 }
 .score small {
-  font: 12px Mono;
+  font: 12px Mono, Bangla, monospace;
   color: var(--muted);
 }
 .mini-contributions {
@@ -2569,7 +2570,7 @@ dialog .modal-body {
 }
 .plan-result strong {
   display: block;
-  font: 34px Fraunces;
+  font: 34px Fraunces, Bangla, serif;
 }
 .plan-result span {
   font-size: 12px;
@@ -3302,4 +3303,307 @@ dialog .modal-body {
   font: inherit;
   font-size: 14px;
   box-shadow: 0 6px 20px rgba(36, 57, 44, 0.3);
+}
+
+/* Workspace polish follows content width; the 3D studio keeps its own layout. */
+@media screen {
+  .main {
+    container: workspace / inline-size;
+    max-width: 1240px;
+    padding: clamp(20px, 2.4vw, 32px) clamp(16px, 2vw, 28px);
+  }
+  .sidebar {
+    overflow-y: auto;
+  }
+  .topbar {
+    min-height: 60px;
+    height: auto;
+    padding-block: 4px;
+  }
+  .crumb, .crumb b {
+    min-width: 0;
+  }
+  .crumb b {
+    font-size: 13px;
+  }
+  .top-actions {
+    flex-shrink: 0;
+  }
+  .page-head h1 {
+    font-size: clamp(28px, 3.2vw, 42px);
+  }
+  .lang-bn .page-head h1 {
+    font-size: clamp(27px, 2.8vw, 36px);
+  }
+  .lang-bn {
+    line-height: 1.6;
+  }
+  .lang-bn :is(.truth, .tag, .stamp, .stat-value):not(#studio-3d-host *) {
+    line-height: 1.4;
+  }
+  .lang-bn :is(.note, .notice, .form-help, .panel-sub, .symptom-option) {
+    line-height: 1.7;
+  }
+  .main :is(p, li):not(#studio-3d-host *) {
+    font-size: 15px;
+  }
+  .main :is(.note, .notice, .form-help, .stat-foot, .panel-sub, .eyebrow, .stat-top, .step-indicator):not(#studio-3d-host *),
+  .main :is(label, dt):not(#studio-3d-host *) {
+    font-size: 13px;
+  }
+  .workspace :is(input, select, textarea):not(#studio-3d-host *),
+  #modal :is(input, select, textarea) {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .workspace :is(button, summary, .source-link, .sources a):not(#studio-3d-host *),
+  #modal :is(button, a) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .source-link, .sources a, #modal a {
+    display: inline-flex;
+    align-items: center;
+    padding-block: 8px;
+  }
+  .button:not(#studio-3d-host *),
+  .tag:not(#studio-3d-host *),
+  .truth:not(#studio-3d-host *) {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  .grid-two, .grid-equal, .work-actions, .research-stats {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 16px;
+  }
+  .grid-two > *, .grid-equal > *, .data-row > *, .form-grid > * {
+    min-width: 0;
+  }
+  .grid-two, .grid-equal {
+    align-items: start;
+  }
+  .panel-header:not(#studio-3d-host *) {
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 10px;
+  }
+  .panel-body:not(#studio-3d-host *) {
+    padding: 16px;
+  }
+  .panel-header h2:not(#studio-3d-host *) {
+    font-size: clamp(19px, 2vw, 23px);
+  }
+  .section-label {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .field-card {
+    display: block;
+    padding: 16px;
+  }
+  .field-card .field-recommend {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 16px 0 0;
+    margin-top: 16px;
+  }
+  .field-meta, .field-card .field-meta {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+    gap: 12px;
+  }
+  .field-meta dd {
+    margin-left: 0;
+  }
+  .form-grid, .symptom-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 12px;
+  }
+  .research-stat {
+    padding: 16px;
+  }
+  .research-stat .truth {
+    display: inline-flex;
+    margin-top: 8px;
+  }
+  .clinic-provenance {
+    margin-bottom: 12px;
+  }
+  .clinic-layout > .panel:first-child {
+    overflow: visible;
+  }
+  .clinic-action {
+    background: var(--surface);
+    padding-block: 12px;
+  }
+  .table-wrap, .timeline-scroll, .month-strip-scroll, .tabbar, .image-strip {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    /* Local covers reveal the edge shadows only while more content remains. */
+    background:
+      linear-gradient(to right, var(--surface) 30%, transparent) left / 28px 100% local,
+      linear-gradient(to left, var(--surface) 30%, transparent) right / 28px 100% local,
+      linear-gradient(to right, #24392c35, transparent) left / 14px 100% scroll,
+      linear-gradient(to left, #24392c35, transparent) right / 14px 100% scroll;
+    background-repeat: no-repeat;
+    scrollbar-width: thin;
+    scrollbar-color: #849668 var(--light);
+  }
+  .data-table {
+    min-width: 560px;
+    font-size: 15px;
+  }
+  .timeline-strip, .month-labels {
+    min-width: 720px;
+  }
+  .timeline-strip div {
+    height: auto;
+    min-height: 36px;
+    padding: 8px 2px;
+  }
+  .tabbar {
+    gap: 12px;
+  }
+  .tabbar button {
+    flex-shrink: 0;
+  }
+  .chart {
+    min-width: 0;
+  }
+  .chart-frame {
+    container: chart / inline-size;
+  }
+  .chart text {
+    font-size: clamp(16px, calc(56px - 8cqi), 28px);
+  }
+  @container chart (max-width: 30rem) {
+    .chart text:nth-of-type(n + 5):nth-of-type(even) {
+      display: none;
+    }
+  }
+  .map-overline .map-chip-text {
+    white-space: normal;
+    text-overflow: clip;
+    overflow: visible;
+  }
+  dialog .modal-head, dialog .modal-body {
+    padding: 16px;
+  }
+  #modal p {
+    font-size: 15px;
+  }
+  .modal-head h2, .source-row > div {
+    min-width: 0;
+  }
+  .source-row a, .source-row p {
+    overflow-wrap: anywhere;
+  }
+  @container workspace (min-width: 60rem) {
+    .grid-two {
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+    }
+  }
+  @container workspace (max-width: 40rem) {
+    .page-head {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+    .page-head-actions, .page-head-actions .button {
+      width: 100%;
+    }
+    .grid-two, .grid-equal, .form-grid, .symptom-grid, .work-actions, .research-stats {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .main .data-row:has(> .data-stat) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .data-row > .data-stat {
+      grid-column: auto;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      padding: 16px;
+    }
+    .data-row > .data-stat:last-child {
+      border-bottom: 0;
+    }
+    .field-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .field-chip, .chip-wrapper {
+      width: 100%;
+    }
+    .field-chip {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .map-segmented, .map-subcontrols {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+      overflow: visible;
+    }
+    .map-segmented {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .map-segmented .button {
+      justify-content: center;
+      padding: 8px 4px;
+    }
+    .map-opacity-control {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+    .map-opacity-control input[type='range'] {
+      width: 100%;
+    }
+    .timeline-controls {
+      flex-wrap: wrap;
+    }
+    .field-selector ~ .panel .form-field select {
+      max-width: none;
+    }
+    .timeline-controls input[type='range'] {
+      flex-basis: 100%;
+      order: 1;
+    }
+    .map-controls, .segmented {
+      flex-wrap: wrap;
+    }
+    .clinic-action {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--line);
+    }
+  }
+  @media (max-width: 700px) {
+    .main {
+      padding-inline: 16px;
+    }
+    .topbar {
+      padding-inline: 8px;
+      gap: 4px;
+    }
+    .crumb {
+      gap: 2px;
+    }
+    .lang-toggle {
+      padding: 2px;
+    }
+    .lang-toggle button {
+      padding-inline: 8px;
+    }
+    .sidebar.open {
+      z-index: 1100;
+      width: min(300px, calc(100vw - 44px));
+    }
+  }
 }

@@ -59,7 +59,7 @@ function clinic() {
   );
 }
 function symptomView() {
-  return `<div class="grid-equal">${truth('FARMER_REPORTED', { source: 'Symptom checklist' })}${panel(
+  return `<div class="clinic-provenance">${truth('FARMER_REPORTED', { source: 'Symptom checklist' })}</div><div class="grid-equal clinic-layout">${panel(
     t('What do you see?', 'কী লক্ষণ দেখছেন?'),
     `<div class="step-indicator">01 / ${t('Choose crop', 'ফসল বাছুন')}</div>${select(
       t('Affected crop', 'আক্রান্ত ফসল'),
@@ -74,7 +74,7 @@ function symptomView() {
    )
    .join('')}</div>
  <label class="photo-drop">${photo ? `<img src="${photo}" alt="${t('Your crop photograph', 'আপনার ফসলের ছবি')}">` : icon('camera', 26)}<span id="clinic-photo-label">${photo ? esc(previewName) : t('Attach a field photo (optional)', 'জমির ছবি দিন (ঐচ্ছিক)')}</span><small id="clinic-photo-help">${t('Photo for the field note. Symptoms determine the suggestions.', 'ছবিটি নোটের জন্য। সম্ভাব্য কারণগুলো নির্বাচিত লক্ষণ থেকে আসে।')}</small><input type="file" class="file-native" id="clinic-photo" aria-labelledby="clinic-photo-label" aria-describedby="clinic-photo-help" accept="image/jpeg,image/png,image/webp"></label>
- ${photo ? button(t('Remove photo', 'ছবি বাদ দিন'), 'clear-photo', 'ghost small') : ''}<div class="spacer"></div>${button(t('Check possible causes', 'সম্ভাব্য কারণ দেখুন'), 'clinic-check', 'primary full', 'bug')}`
+ ${photo ? button(t('Remove photo', 'ছবি বাদ দিন'), 'clear-photo', 'ghost small') : ''}<div class="spacer"></div><div class="clinic-action">${button(t('Check possible causes', 'সম্ভাব্য কারণ দেখুন'), 'clinic-check', 'primary full', 'bug')}</div>`
   )}
  <section class="panel" id="clinic-result">${result()}</section></div>`;
 }
