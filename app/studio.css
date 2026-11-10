@@ -1549,7 +1549,7 @@
 
 /* STUDIO5R: disclose details without competing with orbit gestures. */
 .studio-stage-canvas-host {
-  height: clamp(560px, 68vh, 720px);
+  height: clamp(440px, calc(100svh - var(--stage-top, 96px) - 16px), 820px); /* fit the visible window */
   padding: 0;
   overflow: hidden;
 }

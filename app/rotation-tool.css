@@ -430,10 +430,7 @@
  * Responsive Design - Phone (390px)
  * ============================================ */
 @media (max-width: 1023px) {
-  /* Stack panels below the 3D view */
-  .studio-poster {
-    display: none;
-  }
+  /* (STUDIO5B hid .studio-poster here, which removed the only way into the 3D on phones — removed) */
 
   /* Mobile layout for panels */
   .panel-card {
