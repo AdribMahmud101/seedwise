@@ -61,7 +61,6 @@ import {
   buildCalloutData,
   computeAutoExaggeration,
   usdaTextureClass,
-  deoverlapLabels,
   easeOutCubic,
   introCameraParams,
   shouldSkipIntro,
@@ -147,6 +146,13 @@ let probePinMesh = null;
 let cameraEasing = null;
 let hoveredBandId = null;
 let introAnim = null; // STUDIO5M first load intro animation state
+let openSoilBand = null;
+let popoverTrigger = null;
+let restoringPopoverFocus = false;
+let suppressSoilHover = false;
+let overlayEvents = null;
+let hintShown = false;
+let wideLayersOpen = false;
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -2108,30 +2114,14 @@ function studioFreeRegion() {
   const w = rect.width, h = rect.height;
   const overlay = containerEl.querySelector('.studio-overlay-tl')?.getBoundingClientRect();
   const controls = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
-  const mobile = window.innerWidth <= 420;
-  const labels = [...containerEl.querySelectorAll('.callout-3d[data-band]')];
-  const columnWidth = mobile ? 44 : Math.max(...labels.map((el) => el.offsetWidth), 120);
-  const columnHeight = mobile ? 0 : labels.reduce((sum, el) => sum + el.offsetHeight, 0) + 20;
   const overlayBottom = (overlay?.bottom || rect.top) - rect.top;
   const controlsBottom = (controls?.bottom || rect.top) - rect.top;
-  const cards = [...containerEl.querySelectorAll('.studio-probe-card, .studio-transect-card, .studio-callout-legend')]
+  const cards = [...canvasHostEl.querySelectorAll('.studio-probe-card, .studio-transect-card')]
     .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
-  const bottom = Math.min(h - 12, ...cards.map((r) => r.top - rect.top - 16));
+  const bottom = Math.min(h - 16, ...cards.map((r) => r.top - rect.top - 16));
   const top = Math.max(overlayBottom, controlsBottom) + 16;
-  // Use the right column only when the field still fits beside the left controls.
-  const leftTop = overlayBottom + 16;
-  const rightTop = controlsBottom + 16;
-  const overlayRight = (overlay?.right || rect.left) - rect.left;
-  const side = !mobile && w - columnWidth - overlayRight - 44 >= w * 0.6 ? 'right' : 'left';
-  const columnTop = side === 'left' ? leftTop : rightTop;
-  if (!mobile) {
-    const bottomHeight = Math.max(0, ...cards.map((r) => r.height)) + 40;
-    canvasHostEl.style.minHeight = `${Math.ceil(columnTop + columnHeight + bottomHeight)}px`;
-  }
-  const left = side === 'left' ? columnWidth + 28 : overlayRight + 16;
-  const right = mobile ? w - 16 : side === 'right' ? w - columnWidth - 28 : w - 16;
-  return { side, columnWidth, columnTop, bottom, region: {
-    left: left / w, right: right / w, top: top / h, bottom: Math.max(top + 40, bottom) / h,
+  return { region: {
+    left: 16 / w, right: (w - 16) / w, top: top / h, bottom: Math.max(top + 40, bottom) / h,
   } };
 }
 
@@ -2254,6 +2244,7 @@ function fillPerspectiveAspect() {
 
 function onResize() {
   if (!renderer || !canvasHostEl) return;
+  updateOverlayLayout();
   const w = Math.max(1, canvasHostEl.clientWidth || 600);
   const h = Math.max(1, canvasHostEl.clientHeight || 400);
   renderer.setSize(w, h);
@@ -2391,7 +2382,6 @@ function sync3DCallouts() {
   if (!currentData || !currentBlock.bounds || !containerEl || !activeCamera || !canvasHostEl) return;
   const canvasRect = canvasHostEl.getBoundingClientRect();
   const overlayRect = containerEl.querySelector('.studio-overlay-tl')?.getBoundingClientRect();
-  const controlsRect = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
   const depthTicks = containerEl.querySelector('.studio-depth-ticks');
   if (overlayRect) {
     canvasHostEl.style.setProperty('--studio-overlay-bottom', `${overlayRect.bottom - canvasRect.top + 16}px`);
@@ -2458,9 +2448,9 @@ function sync3DCallouts() {
     return new THREE.Vector3(x, yVal, z);
   };
 
-  const pTop = anchorAt(0.35, yTopsoil);
+  const pTop = anchorAt(0.15, yTopsoil);
   const pRoot = anchorAt(0.50, yRootzone);
-  const pAqui = anchorAt(0.65, yAquifer);
+  const pAqui = anchorAt(0.85, yAquifer);
 
   const projectToScreen = (v3) => {
     const v = v3.clone();
@@ -2477,105 +2467,17 @@ function sync3DCallouts() {
   const scrRoot = projectToScreen(pRoot);
   const scrAqui = projectToScreen(pAqui);
 
-  const isMobile = window.innerWidth <= 420;
-  if (isMobile) {
-    canvasHostEl.style.minHeight = '';
-    if (svgLeaders) svgLeaders.innerHTML = '';
-    const space = studioFreeRegion();
-    const dots = deoverlapLabels([
-      { el: topsoilEl, anchor: scrTop, anchorY: scrTop.y, height: 44, order: 1 },
-      { el: rootzoneEl, anchor: scrRoot, anchorY: scrRoot.y, height: 44, order: 2 },
-      { el: aquiferEl, anchor: scrAqui, anchorY: scrAqui.y, height: 44, order: 3 },
-    ], canvasHostEl.clientHeight, 10, space.region.top * canvasHostEl.clientHeight,
-    canvasHostEl.clientHeight - space.bottom);
-    const placeMobileDot = (el, scr, y) => {
-      if (!el) return;
-      if (!scr.visible) {
-        el.style.display = 'none';
-        return;
-      }
-      el.style.display = 'block';
-      el.style.left = '34px';
-      el.style.top = `${y + 22}px`;
-    };
-    for (const dot of dots) placeMobileDot(dot.el, dot.anchor, dot.y);
-    return;
+  // Keep the numbered buttons on the cut wall, rather than reserving a card column.
+  const anchors = [scrTop, scrRoot, scrAqui];
+  for (const [i, el] of [topsoilEl, rootzoneEl, aquiferEl].entries()) {
+    if (!el) continue;
+    const scr = anchors[i];
+    el.style.display = scr.visible && !isTopView ? 'block' : 'none';
+    el.style.left = `${Math.max(22, Math.min(canvasRect.width - 22, scr.x)) - 22}px`;
+    el.style.top = `${Math.max(22, Math.min(canvasRect.height - 22, scr.y)) - 22}px`;
   }
-
-  // Desktop / tablet: Layout labels in column beside the block
-  const canvasW = canvasHostEl.clientWidth;
-  const canvasH = canvasHostEl.clientHeight;
-
-  const topRect = topsoilEl?.querySelector('.callout-box')?.getBoundingClientRect();
-  const rootRect = rootzoneEl?.querySelector('.callout-box')?.getBoundingClientRect();
-  const aquiRect = aquiferEl?.querySelector('.callout-box')?.getBoundingClientRect();
-
-  const hTop = topRect?.height || 42;
-  const hRoot = rootRect?.height || 42;
-  const hAqui = aquiRect?.height || 42;
-
-  const rawLabels = [
-    { id: 'topsoil', el: topsoilEl, anchor: scrTop, height: hTop, order: 1 },
-    { id: 'rootzone', el: rootzoneEl, anchor: scrRoot, height: hRoot, order: 2 },
-    { id: 'aquifer', el: aquiferEl, anchor: scrAqui, height: hAqui, order: 3 },
-  ];
-
-  const layoutItems = rawLabels.map((lbl) => ({
-    id: lbl.id,
-    anchorY: lbl.anchor.y,
-    height: lbl.height,
-    order: lbl.order,
-  }));
-
-  // Determine column X
-  const space = studioFreeRegion();
-  const columnWidth = space.columnWidth;
-  const projected = currentBlock.ring.flatMap(([x, z]) => [
-    projectToScreen(new THREE.Vector3(x, currentBlock.topMax, z)),
-    projectToScreen(new THREE.Vector3(x, currentBlock.bottomY, z)),
-  ]);
-  const blockLeft = Math.min(...projected.map((p) => p.x));
-  const blockRight = Math.max(...projected.map((p) => p.x));
-  const leftClear = blockLeft >= columnWidth + 28;
-  const rightClear = blockRight <= canvasW - columnWidth - 28;
-  const side = space.side === 'left' ? (leftClear || !rightClear ? 'left' : 'right')
-    : (rightClear || !leftClear ? 'right' : 'left');
-  const columnX = side === 'left' ? 12 : canvasW - columnWidth - 12;
-
-  // Min top and bottom padding to avoid title stack and bottom probe cards
-  const topPad = side === 'left' ? (overlayRect?.bottom || canvasRect.top) - canvasRect.top + 16
-    : (controlsRect?.bottom || canvasRect.top) - canvasRect.top + 16;
-  const bottomPad = canvasH - space.bottom;
-  const positioned = deoverlapLabels(layoutItems, canvasH, 10, topPad, bottomPad);
-  const posMap = new Map();
-  for (const p of positioned) {
-    posMap.set(p.id, p.y);
-  }
-
-  let svgLines = '';
-  for (const lbl of rawLabels) {
-    if (!lbl.el || !lbl.anchor.visible) {
-      if (lbl.el) lbl.el.style.display = 'none';
-      continue;
-    }
-    const boxY = posMap.get(lbl.id) ?? lbl.anchor.y;
-    lbl.el.style.display = 'block';
-    lbl.el.style.left = `${columnX}px`;
-    lbl.el.style.top = `${boxY}px`;
-
-    // Leader line from label card edge to 3D anchor dot
-    const cardEdgeX = side === 'left' ? columnX + columnWidth : columnX;
-    const cardEdgeY = boxY + lbl.height / 2;
-
-    svgLines += `
-      <circle cx="${lbl.anchor.x.toFixed(1)}" cy="${lbl.anchor.y.toFixed(1)}" r="3.5" fill="#173e30" stroke="#fffdf5" stroke-width="1.5" />
-      <path d="M ${cardEdgeX.toFixed(1)},${cardEdgeY.toFixed(1)} L ${lbl.anchor.x.toFixed(1)},${lbl.anchor.y.toFixed(1)}" class="callout-leader-line" />
-    `;
-  }
-
-  if (svgLeaders) {
-    svgLeaders.innerHTML = svgLines;
-  }
+  if (svgLeaders) svgLeaders.innerHTML = '';
+  positionSoilPopover();
 }
 
 function renderTransectSVG() {
@@ -2657,53 +2559,6 @@ function dropProbePin(worldX, groundY, worldZ) {
 
   probePinMesh.position.set(worldX, groundY, worldZ);
   probePinMesh.visible = true;
-}
-
-function focusSoilBand(bandId) {
-  if (!currentBlock.bounds || !cameraPersp || !controls) return;
-  const b = currentBlock.bounds;
-  const cutFraction = currentCutaway;
-  const sx = b.minX + (1 - cutFraction) * b.width;
-  const depth = Math.max(0.2, currentBlock.topMin - currentBlock.bottomY);
-  const ringM = (currentBlock.ring || []).map(([x, negZ]) => [x, -negZ]);
-  const camPos = activeCamera.position;
-  const wallFace = findFrontFacingWallFace(ringM, camPos, cutFraction, currentBlock.effectiveMaxX ?? sx);
-
-  let targetY = currentBlock.topMin - 0.5 * depth;
-  if (bandId === "topsoil") {
-    targetY = currentBlock.topMin - (7.5 / 150) * depth;
-  } else if (bandId === "rootzone") {
-    targetY = currentBlock.topMin - (37.5 / 150) * depth;
-  } else if (bandId === "aquifer") {
-    targetY = currentBlock.topMin - (135 / 150) * depth;
-  }
-
-  const focusX = wallFace ? wallFace.midX : sx;
-  const focusZ = wallFace ? wallFace.midZ : -b.cy;
-
-  const endTarget = new THREE.Vector3(focusX, targetY, focusZ);
-  const endCamPos = new THREE.Vector3(
-    focusX + (wallFace ? wallFace.normalX * Math.max(12, b.width * 0.45) : Math.max(12, b.width * 0.45)),
-    targetY + Math.max(4, depth * 0.5),
-    focusZ + (wallFace ? wallFace.normalZ * Math.max(12, b.height * 0.45) : Math.max(8, b.height * 0.35))
-  );
-
-  if (prefersReducedMotion) {
-    controls.target.copy(endTarget);
-    cameraPersp.position.copy(endCamPos);
-    controls.update();
-    requestRender();
-    return;
-  }
-
-  cameraEasing = {
-    startPos: cameraPersp.position.clone(),
-    endPos: endCamPos,
-    startTarget: controls.target.clone(),
-    endTarget,
-    startTime: performance.now(),
-    duration: 650,
-  };
 }
 
 function updateProbeCard() {
@@ -3108,6 +2963,231 @@ function rotationPickerHtml() {
 
 /* ------------------------------------------------------------ HTML template */
 
+export function studioOverlayBreakpoint(width) {
+  return width >= 900 ? "wide" : width >= 600 ? "medium" : "narrow";
+}
+
+export function clampStudioPopover({ anchorX, anchorY, width, height, bounds }) {
+  const w = Math.min(width, Math.max(0, bounds.right - bounds.left));
+  const h = Math.min(height, Math.max(0, bounds.bottom - bounds.top));
+  const x = anchorX + 30 + w <= bounds.right ? anchorX + 30 : anchorX - w - 30;
+  return {
+    left: Math.max(bounds.left, Math.min(bounds.right - w, x)),
+    top: Math.max(bounds.top, Math.min(bounds.bottom - h, anchorY - h / 2)),
+    width: w, height: h,
+  };
+}
+
+function soilPinLabel(band, detail) {
+  const name = band === "topsoil" ? t("Topsoil", "উপরের মাটি")
+    : band === "rootzone" ? t("Root zone", "শিকড় অঞ্চল") : t("Subsoil", "নিচের মাটি");
+  const value = band === "rootzone" ? detail.value.split(": ").pop().split(" (")[0]
+    : band === "aquifer" ? detail.value.split(" (")[0] : detail.value.split(" · ")[0];
+  return `${name} · ${value}`;
+}
+
+function soilDetailHtml(band, detail) {
+  const truthLabel = band === "aquifer" ? (detail.isButton
+    ? t("Unknown — add local reading", "অজানা — স্থানীয় তথ্য দিন")
+    : t("Tubewell depth, Measured", "নলকূপের গভীরতা, মাপা")) : detail.truthLabel;
+  return `<div class="callout-box ${band}" title="${esc(truthLabel)}">
+    <div class="callout-eyebrow">${esc(detail.eyebrow)}</div>
+    <div class="callout-val">${detail.isButton
+      ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
+      : esc(detail.value)}</div>
+    <small>${esc(truthLabel)}</small>
+    ${detail.cropValue ? `<div class="callout-val callout-crop">${esc(detail.cropValue)}</div><small>${esc(detail.cropTruthLabel)}</small>` : ""}
+  </div>`;
+}
+
+function updateSoilDetails(data) {
+  for (const band of ["topsoil", "rootzone", "aquifer"]) {
+    containerEl.querySelectorAll(`[data-soil-detail="${band}"], [data-soil-row="${band}"]`).forEach((el) => {
+      el.innerHTML = soilDetailHtml(band, data[band]);
+    });
+    const label = containerEl.querySelector(`[data-pin-label="${band}"]`);
+    if (label) label.textContent = soilPinLabel(band, data[band]);
+  }
+  positionSoilPopover();
+}
+
+function updateOverlayLayout() {
+  if (!canvasHostEl || !containerEl) return;
+  const width = canvasHostEl.clientWidth;
+  const breakpoint = studioOverlayBreakpoint(width);
+  const changed = canvasHostEl.dataset.overlaySize !== breakpoint;
+  canvasHostEl.dataset.overlaySize = breakpoint;
+  canvasHostEl.dataset.showCaption = String(width >= 700);
+  const layers = containerEl.querySelector('.studio-soil-layers');
+  const inspection = containerEl.querySelector('.studio-inspection');
+  if (changed) {
+    if (layers) {
+      layers.open = breakpoint === 'wide' ? wideLayersOpen : true;
+      const summary = layers.querySelector('summary');
+      summary.tabIndex = breakpoint === 'wide' ? 0 : -1;
+      summary.setAttribute('aria-disabled', String(breakpoint !== 'wide'));
+    }
+    for (const id of ['probe', 'transect']) {
+      const card = containerEl.querySelector(`#${id}-card`);
+      if (!card || !inspection) continue;
+      (breakpoint === 'wide' ? canvasHostEl : inspection).appendChild(card);
+      card.hidden = breakpoint !== 'wide' && containerEl.querySelector(`#tab-${id}`)?.getAttribute('aria-selected') !== 'true';
+      if (breakpoint === 'wide') {
+        card.removeAttribute('role');
+        card.removeAttribute('aria-labelledby');
+        card.removeAttribute('tabindex');
+      } else {
+        card.setAttribute('role', 'tabpanel');
+        card.setAttribute('aria-labelledby', `tab-${id}`);
+        card.tabIndex = 0;
+      }
+    }
+  }
+  const hint = containerEl.querySelector('.studio-interaction-hint');
+  if (width >= 700 && !hintShown && hint) {
+    hintShown = true;
+    try {
+      hint.hidden = sessionStorage.getItem('ropon_studio_overlay_hint') === '1';
+      sessionStorage.setItem('ropon_studio_overlay_hint', '1');
+    } catch { hint.hidden = false; }
+  }
+}
+
+function highlightSoilBand(band) {
+  hoveredBandId = band;
+  containerEl.querySelectorAll('.studio-soil-pin, .studio-callout-legend-item').forEach((el) => {
+    el.classList.toggle('highlight', (el.dataset.soilPin || el.dataset.band) === band);
+  });
+  requestRender();
+}
+
+function closeSoilPopover(returnFocus = true) {
+  if (!openSoilBand) return;
+  suppressSoilHover = true;
+  openSoilBand = null;
+  containerEl.querySelector('#studio-soil-popover').hidden = true;
+  containerEl.querySelectorAll('[data-soil-pin]').forEach((el) => el.setAttribute('aria-expanded', 'false'));
+  highlightSoilBand(null);
+  if (returnFocus && popoverTrigger?.isConnected) {
+    restoringPopoverFocus = true;
+    popoverTrigger.focus({ preventScroll: true });
+    restoringPopoverFocus = false;
+  }
+  popoverTrigger = null;
+}
+
+function openSoilPopover(band, trigger) {
+  suppressSoilHover = false;
+  openSoilBand = band;
+  popoverTrigger = trigger;
+  containerEl.querySelector('#studio-soil-popover').hidden = false;
+  containerEl.querySelectorAll('[data-soil-detail]').forEach((el) => { el.hidden = el.dataset.soilDetail !== band; });
+  containerEl.querySelectorAll('[data-soil-pin]').forEach((el) => {
+    el.setAttribute('aria-expanded', String(el.dataset.soilPin === band));
+  });
+  highlightSoilBand(band);
+  positionSoilPopover();
+}
+
+function positionSoilPopover() {
+  if (!openSoilBand || !canvasHostEl) return;
+  const popover = containerEl.querySelector('#studio-soil-popover');
+  const pin = containerEl.querySelector(`#soil-pin-${openSoilBand}`);
+  const rect = canvasHostEl.getBoundingClientRect();
+  const anchor = pin.getBoundingClientRect();
+  // Use the clear region below the controls, including the title and one-time hint.
+  const controlsBottom = Math.max(...[...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-compass')]
+    .map((el) => el.getBoundingClientRect().bottom - rect.top));
+  const bounds = { left: 8, top: controlsBottom + 8, right: rect.width - 8, bottom: rect.height - 8 };
+  popover.style.width = `${Math.min(320, bounds.right - bounds.left)}px`;
+  popover.style.maxHeight = `${Math.max(0, bounds.bottom - bounds.top)}px`;
+  const placed = clampStudioPopover({ anchorX: anchor.left - rect.left + anchor.width / 2,
+    anchorY: anchor.top - rect.top + anchor.height / 2, width: popover.offsetWidth, height: popover.offsetHeight, bounds });
+  popover.style.left = `${placed.left}px`;
+  popover.style.top = `${placed.top}px`;
+}
+
+function bindOverlayEvents() {
+  overlayEvents?.abort();
+  overlayEvents = new AbortController();
+  const options = { signal: overlayEvents.signal };
+  containerEl.addEventListener('focusin', (e) => {
+    const pin = e.target.closest('[data-soil-pin]');
+    if (pin && !restoringPopoverFocus) openSoilPopover(pin.dataset.soilPin, pin);
+    const row = e.target.closest('.studio-callout-legend-item');
+    if (row) highlightSoilBand(row.dataset.band);
+  }, options);
+  containerEl.addEventListener('pointerover', (e) => {
+    const pin = e.target.closest('[data-soil-pin]');
+    if (pin && e.pointerType !== 'touch' && !suppressSoilHover) openSoilPopover(pin.dataset.soilPin, pin);
+    const row = e.target.closest('.studio-callout-legend-item');
+    if (row) highlightSoilBand(row.dataset.band);
+  }, options);
+  document.addEventListener('pointermove', (e) => {
+    // Closing a card can expose a pin under the stationary pointer.
+    if (!e.target.closest('[data-soil-pin]')) suppressSoilHover = false;
+  }, options);
+  containerEl.addEventListener('pointerout', (e) => {
+    const row = e.target.closest('.studio-callout-legend-item');
+    if (row && !row.contains(e.relatedTarget)) highlightSoilBand(openSoilBand);
+  }, options);
+  containerEl.addEventListener('focusout', () => {
+    if (!openSoilBand) highlightSoilBand(null);
+  }, options);
+  document.addEventListener('pointerdown', (e) => {
+    if (document.querySelector('#modal-soil-input[open]')) return;
+    if (!e.target.closest('#studio-soil-popover, [data-soil-pin]')) closeSoilPopover();
+  }, options);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && openSoilBand && !document.querySelector('#modal-soil-input[open]')) {
+      e.preventDefault();
+      closeSoilPopover();
+    }
+  }, options);
+  containerEl.addEventListener('click', (e) => {
+    const pin = e.target.closest('[data-soil-pin]');
+    if (pin) openSoilPopover(pin.dataset.soilPin, pin);
+    if (e.target.closest('[data-close-soil]')) closeSoilPopover();
+    if (e.target.closest('[data-dismiss-hint]')) {
+      containerEl.querySelector('.studio-interaction-hint').hidden = true;
+      onResize();
+    }
+    if (e.target.closest('[data-soil-test]')) {
+      const dialog = document.querySelector('#modal-soil-input');
+      if (dialog && typeof dialog.showModal === 'function') {
+        try { dialog.showModal(); } catch { dialog.setAttribute('open', 'true'); }
+      } else if (dialog) {
+        dialog.classList.remove('hidden');
+        dialog.style.display = 'flex';
+      }
+    }
+    const tab = e.target.closest('[data-inspection-tab]');
+    if (tab) selectInspectionTab(tab);
+  }, options);
+  containerEl.querySelector('.studio-inspection-tabs')?.addEventListener('keydown', (e) => {
+    const tabs = [...e.currentTarget.querySelectorAll('[role="tab"]')];
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const index = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1
+      : (tabs.indexOf(e.target) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    selectInspectionTab(tabs[index]);
+    tabs[index].focus();
+  }, options);
+  containerEl.querySelector('.studio-soil-layers')?.addEventListener('toggle', (e) => {
+    if (canvasHostEl.dataset.overlaySize === 'wide') wideLayersOpen = e.target.open;
+    else if (!e.target.open) e.target.open = true;
+  }, options);
+}
+
+function selectInspectionTab(tab) {
+  containerEl.querySelectorAll('[data-inspection-tab]').forEach((el) => {
+    const selected = el === tab;
+    el.setAttribute('aria-selected', String(selected));
+    el.tabIndex = selected ? 0 : -1;
+    containerEl.querySelector(`#${el.dataset.inspectionTab}-card`).hidden = !selected;
+  });
+}
+
 function fallowOverlayChipHtml(data, monthIdx) {
   if (!data?.months) return "";
   const m = data.months[monthIdx];
@@ -3290,7 +3370,10 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <span class="studio-crop-chip">● ${t("Illustrative crop preview · not observed plants", "কাল্পনিক ফসল পূর্বদর্শন · পর্যবেক্ষিত উদ্ভিদ নয়")}</span>
           <div class="studio-caption-copy" ${currentViewMode === "cutaway" ? 'style="display:none;"' : ""}>
             <h2>${t("Your field. Brought to life.", "আপনার জমি। জীবন্ত রূপে।")}</h2>
-            <p>${t("Drag to rotate · scroll to zoom · tap to inspect", "ঘোরাতে টানুন · জুম করতে স্ক্রল · পরীক্ষা করতে ট্যাপ")}</p>
+            <div class="studio-interaction-hint" hidden>
+              <span role="tooltip">${t("Drag to rotate · scroll to zoom · tap to inspect", "ঘোরাতে টানুন · জুম করতে স্ক্রল · পরীক্ষা করতে ট্যাপ")}</span>
+              <button type="button" data-dismiss-hint aria-label="${t("Dismiss hint", "ইঙ্গিত বন্ধ করুন")}">×</button>
+            </div>
           </div>
         </div>
 
@@ -3324,75 +3407,42 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div class="callout-line"></div><div class="callout-dot"></div>
           </div>
 
-          <div id="callout-topsoil" class="callout-3d" data-band="topsoil">
-            <div class="callout-box topsoil" title="${esc(calloutData.topsoil.truthLabel)}">
-              <div class="callout-eyebrow">${esc(calloutData.topsoil.eyebrow)}</div>
-              <div class="callout-val" id="callout-topsoil-val">${esc(calloutData.topsoil.value)}</div>
-              <small>${esc(calloutData.topsoil.truthLabel)}</small>
-            </div>
-            <div class="callout-line"></div><div class="callout-dot"></div>
-            <div class="callout-dot-num">①</div>
-          </div>
-
-          <div id="callout-rootzone" class="callout-3d" data-band="rootzone">
-            <div class="callout-box rootzone" title="${esc(calloutData.rootzone.truthLabel)}">
-              <div class="callout-eyebrow">${esc(calloutData.rootzone.eyebrow)}</div>
-              <div class="callout-val" id="callout-rootzone-val">${esc(calloutData.rootzone.value)}</div>
-              <small>${esc(calloutData.rootzone.truthLabel)}</small>
-              <div class="callout-val callout-crop">${esc(calloutData.rootzone.cropValue)}</div>
-              <small>${esc(calloutData.rootzone.cropTruthLabel)}</small>
-            </div>
-            <div class="callout-line"></div><div class="callout-dot"></div>
-            <div class="callout-dot-num">②</div>
-          </div>
-
-          <div id="callout-aquifer" class="callout-3d" data-band="aquifer">
-            <div class="callout-box aquifer" title="${esc(calloutData.aquifer.truthLabel)}">
-              <div class="callout-eyebrow">${esc(calloutData.aquifer.eyebrow)}</div>
-              <div class="callout-val" id="callout-aquifer-val">
-                ${calloutData.aquifer.isButton
-                  ? `<button type="button" class="callout-btn" id="btn-callout-soil-test">${esc(calloutData.aquifer.value)}</button>`
-                  : esc(calloutData.aquifer.value)}
-              </div>
-            </div>
-            <div class="callout-line"></div><div class="callout-dot"></div>
-            <div class="callout-dot-num">③</div>
-          </div>
+          ${["topsoil", "rootzone", "aquifer"].map((band, i) => `
+            <div id="callout-${band}" class="callout-3d" data-band="${band}">
+              <button type="button" class="studio-soil-pin" id="soil-pin-${band}" data-soil-pin="${band}"
+                aria-label="${esc(calloutData[band].eyebrow)}" aria-expanded="false" aria-controls="studio-soil-popover">
+                ${["①", "②", "③"][i]}
+              </button>
+              <span class="studio-pin-label" data-pin-label="${band}">${esc(soilPinLabel(band, calloutData[band]))}</span>
+            </div>`).join("")}
+        </div>
+        <div id="studio-soil-popover" class="studio-soil-popover" role="dialog" aria-label="${t("Soil layer details", "মাটির স্তরের বিবরণ")}" hidden>
+          <button type="button" data-close-soil class="studio-popover-close" aria-label="${t("Close", "বন্ধ করুন")}">×</button>
+          ${["topsoil", "rootzone", "aquifer"].map((band) => `<div data-soil-detail="${band}" hidden>${soilDetailHtml(band, calloutData[band])}</div>`).join("")}
         </div>
 
-        <!-- Mobile 390px Legend List below Canvas -->
+        <div class="studio-model-caption" aria-hidden="true">
+          <b>${t("FIELD MODEL", "মাঠ মডেল")}</b>
+          <span>${t("Selected boundary + terrain", "নির্বাচিত সীমানা + ভূমি")}</span>
+          <span>${t("Illustrative plants &amp; enlarged soil section", "কাল্পনিক উদ্ভিদ ও বড় করে দেখানো মাটির অংশ")}</span>
+        </div>
+      </div>
+
+      <details class="studio-soil-layers" open>
+        <summary>${t("Soil layers", "মাটির স্তরসমূহ")}</summary>
         <div class="studio-callout-legend" id="studio-mobile-legend">
-          <div class="studio-callout-legend-item" data-band="topsoil">
-            <span class="num-badge">①</span>
-            <div>
-              <div class="callout-eyebrow">${esc(calloutData.topsoil.eyebrow)}</div>
-              <div class="callout-val">${esc(calloutData.topsoil.value)}</div>
-              <small>${esc(calloutData.topsoil.truthLabel)}</small>
-            </div>
-          </div>
-          <div class="studio-callout-legend-item" data-band="rootzone">
-            <span class="num-badge">②</span>
-            <div>
-              <div class="callout-eyebrow">${esc(calloutData.rootzone.eyebrow)}</div>
-              <div class="callout-val">${esc(calloutData.rootzone.value)}</div>
-              <small>${esc(calloutData.rootzone.truthLabel)}</small>
-              <div class="callout-val callout-crop">${esc(calloutData.rootzone.cropValue)}</div>
-              <small>${esc(calloutData.rootzone.cropTruthLabel)}</small>
-            </div>
-          </div>
-          <div class="studio-callout-legend-item" data-band="aquifer">
-            <span class="num-badge">③</span>
-            <div>
-              <div class="callout-eyebrow">${esc(calloutData.aquifer.eyebrow)}</div>
-              <div class="callout-val">
-                ${calloutData.aquifer.isButton
-                  ? `<button type="button" class="callout-btn" id="btn-legend-soil-test">${esc(calloutData.aquifer.value)}</button>`
-                  : esc(calloutData.aquifer.value)}
-              </div>
-            </div>
-          </div>
+          ${["topsoil", "rootzone", "aquifer"].map((band, i) => `
+            <div class="studio-callout-legend-item" data-band="${band}" tabindex="0" aria-label="${esc(calloutData[band].eyebrow)}">
+              <span class="num-badge">${["①", "②", "③"][i]}</span>
+              <div data-soil-row="${band}">${soilDetailHtml(band, calloutData[band])}</div>
+            </div>`).join("")}
         </div>
-
+      </details>
+      <div class="studio-inspection">
+        <div class="studio-inspection-tabs" role="tablist" aria-label="${t("Field inspection", "মাঠ পরিদর্শন")}">
+          <button type="button" id="tab-probe" role="tab" aria-selected="true" aria-controls="probe-card" data-inspection-tab="probe">${t("Point probe", "পয়েন্ট প্রোব")}</button>
+          <button type="button" id="tab-transect" role="tab" aria-selected="false" aria-controls="transect-card" tabindex="-1" data-inspection-tab="transect">${t("Cross-section A–A′", "আড়াআড়ি ছেদ A–A′")}</button>
+        </div>
         <!-- Tap Point Probe Card -->
         <div class="studio-probe-card" id="probe-card">
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e4d8;padding-bottom:3px;margin-bottom:4px;">
@@ -3415,11 +3465,6 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <svg id="svg-transect" viewBox="0 0 290 68" style="width:100%;height:64px;display:block;"></svg>
         </div>
 
-        <div class="studio-model-caption" aria-hidden="true">
-          <b>${t("FIELD MODEL", "মাঠ মডেল")}</b>
-          <span>${t("Selected boundary + terrain", "নির্বাচিত সীমানা + ভূমি")}</span>
-          <span>${t("Illustrative plants &amp; enlarged soil section", "কাল্পনিক উদ্ভিদ ও বড় করে দেখানো মাটির অংশ")}</span>
-        </div>
       </div>
 
       <!-- Interaction deck below viewport: Slice slider, Rain scenario slider, Relief scale slider + Roots & Bunds toggles -->
@@ -3522,6 +3567,9 @@ export async function mountStudio3d(container, data, opts = {}) {
   const host = containerEl.querySelector(".studio-stage-canvas-host");
   if (!host) return;
   canvasHostEl = host;
+  openSoilBand = null;
+  suppressSoilHover = false;
+  updateOverlayLayout();
 
   let loader = host.querySelector(".studio-loading-overlay");
   if (!loader) {
@@ -3655,15 +3703,7 @@ export async function setStudioMonth(monthIdx) {
     soilOverrides,
     t,
   });
-  if (calloutData && containerEl) {
-    const rootzoneVal = containerEl.querySelector('#callout-rootzone-val');
-    if (rootzoneVal) rootzoneVal.textContent = calloutData.rootzone.value;
-    const legendRootVal = containerEl.querySelector('.studio-callout-legend-item[data-band="rootzone"] .callout-val');
-    if (legendRootVal) legendRootVal.textContent = calloutData.rootzone.value;
-    containerEl.querySelectorAll('.callout-crop').forEach((el) => {
-      el.textContent = calloutData.rootzone.cropValue;
-    });
-  }
+  if (calloutData && containerEl) updateSoilDetails(calloutData);
 
   // Update fallow / harvested top-centre notification chip
   const fallowHost = containerEl?.querySelector("#studio-overlay-fallow-host");
@@ -3941,11 +3981,11 @@ function bindEvents(container) {
       if (nextBand !== hoveredBandId) {
         hoveredBandId = nextBand;
         // Highlight corresponding callouts in DOM
-        containerEl.querySelectorAll('.callout-box, .studio-callout-legend-item').forEach((el) => {
+        containerEl.querySelectorAll('.studio-soil-pin, .studio-callout-legend-item').forEach((el) => {
           el.classList.remove('highlight');
         });
         if (hoveredBandId) {
-          containerEl.querySelector(`#callout-${hoveredBandId} .callout-box`)?.classList.add('highlight');
+          containerEl.querySelector(`#soil-pin-${hoveredBandId}`)?.classList.add('highlight');
           containerEl.querySelector(`.studio-callout-legend-item[data-band="${hoveredBandId}"]`)?.classList.add('highlight');
         }
         // Update side material map
@@ -3971,7 +4011,7 @@ function bindEvents(container) {
       canvas.style.cursor = "default";
       if (hoveredBandId !== null) {
         hoveredBandId = null;
-        containerEl.querySelectorAll('.callout-box, .studio-callout-legend-item').forEach((el) => {
+        containerEl.querySelectorAll('.studio-soil-pin, .studio-callout-legend-item').forEach((el) => {
           el.classList.remove('highlight');
         });
         requestRender();
@@ -4004,56 +4044,7 @@ function bindEvents(container) {
     });
   }
 
-  // Bind callout and legend click & hover interactions
-  const bindCalloutInteraction = (selector, bandId) => {
-    containerEl.querySelectorAll(selector).forEach((elem) => {
-      elem.addEventListener("mouseenter", () => {
-        hoveredBandId = bandId;
-        containerEl.querySelector(`#callout-${bandId} .callout-box`)?.classList.add('highlight');
-        containerEl.querySelector(`.studio-callout-legend-item[data-band="${bandId}"]`)?.classList.add('highlight');
-        requestRender();
-      });
-      elem.addEventListener("mouseleave", () => {
-        hoveredBandId = null;
-        containerEl.querySelectorAll('.callout-box, .studio-callout-legend-item').forEach((el) => el.classList.remove('highlight'));
-        requestRender();
-      });
-      elem.addEventListener("click", (e) => {
-        if (e.target.closest('#btn-callout-soil-test, #btn-legend-soil-test')) {
-          return; // Let modal handler process button
-        }
-        focusSoilBand(bandId);
-      });
-    });
-  };
-
-  bindCalloutInteraction('.callout-3d[data-band="topsoil"], .studio-callout-legend-item[data-band="topsoil"]', 'topsoil');
-  bindCalloutInteraction('.callout-3d[data-band="rootzone"], .studio-callout-legend-item[data-band="rootzone"]', 'rootzone');
-  bindCalloutInteraction('.callout-3d[data-band="aquifer"], .studio-callout-legend-item[data-band="aquifer"]', 'aquifer');
-
-  // Soil modal triggers for unknown well depth
-  const openSoilModal = () => {
-    const dialog = document.querySelector("#modal-soil-input");
-    if (dialog && typeof dialog.showModal === "function") {
-      try {
-        dialog.showModal();
-      } catch (err) {
-        dialog.setAttribute("open", "true");
-      }
-    } else if (dialog) {
-      dialog.classList.remove("hidden");
-      dialog.style.display = "flex";
-    }
-  };
-
-  containerEl.querySelector("#btn-callout-soil-test")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    openSoilModal();
-  });
-  containerEl.querySelector("#btn-legend-soil-test")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    openSoilModal();
-  });
+  bindOverlayEvents();
 
   // Initial draw of transect and probe
   renderTransectSVG();
@@ -4092,14 +4083,7 @@ export function setSoilOverrides(overrides) {
   soilOverrides = overrides ? { ...overrides } : null;
   sideTextureCache.clear();
   if (containerEl && currentData) {
-    const topsoilVal = containerEl.querySelector('#callout-topsoil-val');
-    if (topsoilVal) {
-      topsoilVal.textContent = soilOverrides ? t("Measured · by farmer", "মাপা · কৃষক কর্তৃক") : "Sandy clay loam";
-    }
-    const aquiferVal = containerEl.querySelector('#callout-aquifer-val');
-    if (aquiferVal) {
-      aquiferVal.textContent = soilOverrides?.gwDepthM ? `${soilOverrides.gwDepthM} m (${t("Measured", "মাপা")})` : t("Regional baseline ~3.4 m", "আঞ্চলিক গড় ~৩.৪ মি");
-    }
+    updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, t }));
     buildFieldBlock(currentData, currentCutaway).then(() => {
       updateProbeCard();
       requestRender();
@@ -4219,6 +4203,10 @@ export function disposeStudio3d() {
     resizeObserver = null;
   }
   document.removeEventListener("visibilitychange", onVisibilityChange);
+  overlayEvents?.abort();
+  overlayEvents = null;
+  openSoilBand = null;
+  popoverTrigger = null;
   unbindIdleListeners();
   idleHasOffset = false;
   idleBasePos = null;

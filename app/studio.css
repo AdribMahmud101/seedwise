@@ -1284,25 +1284,6 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 420px) {
-  .studio-callout-svg {
-    display: none !important;
-  }
-  .callout-3d[data-band] {
-    transform: translate(-50%, -50%) !important;
-  }
-  .callout-3d[data-band] .callout-box,
-  .callout-3d[data-band] .callout-line,
-  .callout-3d[data-band] .callout-dot {
-    display: none !important;
-  }
-  .callout-3d[data-band] .callout-dot-num {
-    display: flex;
-  }
-  .studio-callout-legend {
-    display: block;
-  }
-}
 
 .callout-line {
   width: 1px;
@@ -1439,26 +1420,6 @@
 }
 
 @media (max-width: 600px) {
-  .studio-stage-canvas-host {
-    height: 380px;
-    overflow: visible;
-  }
-  .studio-transect-card,
-  .studio-probe-card {
-    position: static;
-    margin: 8px auto;
-    width: calc(100% - 16px);
-    max-width: 100%;
-    box-sizing: border-box;
-    display: block;
-  }
-  .studio-transect-card {
-    display: block;
-  }
-  .studio-probe-card {
-    font-size: 12px;
-    min-width: 0;
-  }
   .studio-dock-deck {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -1539,11 +1500,6 @@
 }
 
 @media (max-width: 600px) {
-  .studio-stage-canvas-host {
-    height: auto;
-    padding-top: max(500px, calc(var(--studio-overlay-bottom, 280px) + 220px));
-    padding-bottom: 0;
-  }
   .studio-overlay-tl {
     left: 64px;
     max-width: calc(100% - 132px);
@@ -1586,4 +1542,241 @@
     min-width: 60px;
     width: 120px;
   }
+}
+
+/* STUDIO5R: disclose details without competing with orbit gestures. */
+.studio-stage-canvas-host {
+  height: clamp(560px, 68vh, 720px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.studio-stage-canvas-host [hidden],
+.studio-stage-wrap [hidden] {
+  display: none !important;
+}
+
+.studio-stage-controls {
+  top: 12px;
+}
+
+.studio-stage-canvas-host[data-show-caption="false"] .studio-caption-copy {
+  display: none !important;
+}
+
+.studio-stage-canvas-host[data-show-caption="true"] .studio-caption-copy {
+  display: block;
+}
+
+.studio-interaction-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin-top: 6px;
+  background: #fffdf5;
+  border: 1px solid var(--line, #cdcfc0);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.studio-interaction-hint button,
+.studio-popover-close {
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.callout-3d[data-band] {
+  width: 44px;
+  height: 44px;
+  transform: none;
+}
+
+.studio-soil-pin {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #173e30;
+  font-size: 24px;
+  text-shadow: 0 0 3px #fffdf5, 0 0 3px #fffdf5;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.studio-soil-pin.highlight,
+.studio-soil-pin[aria-expanded="true"] {
+  background: #fffdf5;
+  border-radius: 50%;
+}
+
+.studio-soil-pin:focus-visible,
+.studio-callout-legend-item:focus-visible,
+.studio-inspection-tabs button:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+}
+
+.studio-pin-label {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 42px;
+  max-width: 180px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #fffdf5e6;
+  color: #173e30;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-overlay-size="wide"] .studio-pin-label {
+  display: block;
+}
+
+#callout-topsoil .studio-pin-label {
+  left: auto;
+  right: 42px;
+}
+
+.studio-soil-popover {
+  position: absolute;
+  box-sizing: border-box;
+  z-index: 25;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 44px 8px 8px;
+  background: #fffdf5;
+  border: 1px solid var(--line, #cdcfc0);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px #173e3040;
+}
+
+.studio-popover-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+}
+
+.studio-soil-popover .callout-box,
+.studio-callout-legend .callout-box {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: none;
+  cursor: default;
+  user-select: text;
+}
+
+.studio-soil-popover .callout-box:hover,
+.studio-callout-legend .callout-box:hover {
+  transform: none;
+}
+
+.studio-soil-layers {
+  margin-top: 12px;
+  border: 1px solid var(--line, #cdcfc0);
+  border-radius: 6px;
+  background: #fffdf5;
+}
+
+.studio-soil-layers summary {
+  padding: 12px;
+  min-height: 44px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.studio-callout-legend {
+  display: block;
+  margin: 0;
+  border: 0;
+  z-index: auto;
+}
+
+.studio-callout-legend-item > [data-soil-row] {
+  flex: 1;
+  min-width: 0;
+}
+
+.studio-stage-wrap:has([data-overlay-size="medium"]) .studio-soil-layers summary,
+.studio-stage-wrap:has([data-overlay-size="narrow"]) .studio-soil-layers summary {
+  pointer-events: none;
+  list-style: none;
+}
+
+.studio-inspection-tabs {
+  display: flex;
+  margin-top: 12px;
+}
+
+.studio-inspection-tabs button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--line, #cdcfc0);
+  padding: 6px;
+  cursor: pointer;
+  background: #fffdf5;
+  color: #173e30;
+}
+
+.studio-inspection-tabs [aria-selected="true"] {
+  background: #173e30;
+  color: #fffdf5;
+}
+
+.studio-inspection > :is(.studio-probe-card, .studio-transect-card) {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.studio-inspection .studio-probe-card > div:first-child,
+.studio-inspection .studio-transect-card > div:first-child {
+  flex-wrap: wrap;
+}
+
+.studio-stage-wrap:has([data-overlay-size="wide"]) .studio-inspection {
+  display: none;
+}
+
+.studio-stage-canvas-host > :is(.studio-probe-card, .studio-transect-card) {
+  position: absolute;
+  display: block;
+  margin: 0;
+}
+
+[data-overlay-size="narrow"] .studio-overlay-tl {
+  left: 64px;
+  right: 68px;
+  width: calc(100% - 132px);
+  max-width: calc(100% - 132px);
+  gap: 6px;
+}
+
+[data-overlay-size="narrow"] :is(.studio-view-toggle, .studio-slice-card) {
+  flex-wrap: wrap;
+}
+
+[data-overlay-size="narrow"] :is(.studio-crop-chip, .studio-slice-end) {
+  white-space: normal;
+}
+
+[data-overlay-size="narrow"] .studio-slice-card input[type="range"] {
+  min-width: 44px;
+  width: 100%;
 }
