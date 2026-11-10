@@ -2680,7 +2680,7 @@ function fillPerspectiveAspect() {
 function onResize() {
   if (!renderer || !canvasHostEl) return;
   const pageTop = canvasHostEl.getBoundingClientRect().top + window.scrollY;
-  canvasHostEl.style.setProperty('--stage-top', `${Math.max(0, Math.min(pageTop, window.innerHeight * 0.45))}px`);
+  canvasHostEl.style.setProperty('--stage-top', `${Math.max(0, Math.min(pageTop, window.innerHeight * 0.5))}px`);
   updateOverlayLayout();
   applyTouchMode();
   const rect = canvasHostEl.getBoundingClientRect();
@@ -4387,7 +4387,7 @@ export async function mountStudio3d(container, data, opts = {}) {
   canvasHostEl = host;
   // Fit the stage into the visible window below where it starts (owner: 3D must not be cut off on first view).
   const pageTop = host.getBoundingClientRect().top + window.scrollY;
-  host.style.setProperty('--stage-top', `${Math.max(0, Math.min(pageTop, window.innerHeight * 0.45))}px`);
+  host.style.setProperty('--stage-top', `${Math.max(0, Math.min(pageTop, window.innerHeight * 0.5))}px`);
   openSoilBand = null;
   suppressSoilHover = false;
   updateOverlayLayout();

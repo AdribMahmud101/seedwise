@@ -292,7 +292,7 @@
 .studio-stage-canvas-host {
   flex: none;
   /* fit the whole 3D inside the browser window (owner: "keep it in focus") */
-  height: clamp(440px, calc(100svh - var(--stage-top, 96px) - 16px), 820px);
+  height: clamp(400px, calc(100svh - var(--stage-top, 96px) - 16px), 820px);
   scroll-margin-top: 16px;
   min-height: 0;
   position: relative;
@@ -1464,7 +1464,7 @@
 
 /* STUDIO5R: disclose details without competing with orbit gestures. */
 .studio-stage-canvas-host {
-  height: clamp(440px, calc(100svh - var(--stage-top, 96px) - 16px), 820px); /* fit the visible window */
+  height: clamp(400px, calc(100svh - var(--stage-top, 96px) - 16px), 820px); /* fit the visible window */
   padding: 0;
   overflow: hidden;
 }
@@ -2015,7 +2015,7 @@
   border-radius: 8px;
   overflow: hidden;
   /* Same box as the stage so the reveal does not move the page. */
-  height: clamp(440px, calc(100svh - var(--stage-top, 96px) - 16px), 820px);
+  height: clamp(400px, calc(100svh - var(--stage-top, 96px) - 16px), 820px);
   background:
     radial-gradient(ellipse 120% 70% at 50% 100%, rgba(195,208,180,0.55) 0%, rgba(195,208,180,0) 60%),
     linear-gradient(180deg, #eef2e5 0%, #e6ecdc 55%, #dae2cc 100%);
