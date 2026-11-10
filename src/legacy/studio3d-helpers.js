@@ -695,6 +695,82 @@ export function fitTopView({ outlineM, aspect = 1.5, margin = 0.12, altitude = 6
   return { halfWidth, halfHeight, y: altitude, target: [b.cx, 0, -b.cy] };
 }
 
+/** CSS-pixel label rectangles and dot-to-label polylines, in input band order.
+ * bounds.block is the projected block envelope; obstacles use left/top/right/bottom.
+ */
+export function layoutLeaderLabels(anchors, labelSizes, bounds, obstacles = []) {
+  if (!anchors.length) return [];
+  const gap = 8, gutter = 16;
+  const block = bounds.block || { left: Math.min(...anchors.map(a => a.x)),
+    right: Math.max(...anchors.map(a => a.x)), top: Math.min(...anchors.map(a => a.y)),
+    bottom: Math.max(...anchors.map(a => a.y)) };
+  const rect = p => ({ left:p.x, top:p.y, right:p.x+p.width, bottom:p.y+p.height });
+  const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  const segmentHits = (a, b, r) => {
+    let lo = 0, hi = 1;
+    for (const [axis, min, max] of [[0,r.left,r.right],[1,r.top,r.bottom]]) {
+      const d = b[axis] - a[axis];
+      if (Math.abs(d) < 1e-9) { if (a[axis] <= min || a[axis] >= max) return false; }
+      else {
+        const t0 = (min-a[axis])/d, t1 = (max-a[axis])/d;
+        lo = Math.max(lo, Math.min(t0,t1)); hi = Math.min(hi, Math.max(t0,t1));
+        if (lo >= hi) return false;
+      }
+    }
+    return lo < hi;
+  };
+  const valid = labels => labels.every((p, i) => {
+    const r = rect(p);
+    if (p.points.some(([x,y]) => x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom)) return false;
+    if (r.left < bounds.left || r.right > bounds.right || r.top < bounds.top || r.bottom > bounds.bottom
+      || intersects(r, block) || obstacles.some(o => intersects(r,o))) return false;
+    const blockers = [...obstacles, ...labels.filter((_, j) => i !== j).map(rect)];
+    return blockers.every(o => p.points.slice(1).every((end, j) => !segmentHits(p.points[j],end,o)));
+  });
+  const maxWidth = Math.max(...labelSizes.map(s => s.width));
+  const totalHeight = labelSizes.reduce((sum,s) => sum+s.height, 0) + gap*(anchors.length-1);
+  const clamp = (value, min, max) => Math.max(min, Math.min(max,value));
+  for (const side of ['right','left']) {
+    const x = side === 'right' ? block.right+gutter : block.left-gutter-maxWidth;
+    if (x < bounds.left || x+maxWidth > bounds.right) continue;
+    const preferred = anchors.reduce((sum,a) => sum+a.y,0)/anchors.length-totalHeight/2;
+    const candidates = [clamp(preferred,bounds.top,bounds.bottom-totalHeight), bounds.top, bounds.bottom-totalHeight];
+    let offset = 0;
+    for (const size of labelSizes) {
+      for (const o of obstacles) candidates.push(o.bottom+gap-offset, o.top-gap-offset-size.height);
+      offset += size.height+gap;
+    }
+    for (const top of candidates) {
+      let y = top;
+      const labels = anchors.map((a,i) => {
+        const size = labelSizes[i], edge = side === 'right' ? x : x+maxWidth;
+        const p = { id:a.id, x:side === 'right' ? x : edge-size.width, y, ...size, side,
+          points:[[a.x,a.y],[edge+(side === 'right' ? -8 : 8),a.y],[edge,y+size.height/2]] };
+        y += size.height+gap;
+        return p;
+      });
+      if (valid(labels)) return labels;
+    }
+  }
+  const rowWidth = labelSizes.reduce((sum,s) => sum+s.width,0)+gap*(anchors.length-1);
+  const rowHeight = Math.max(...labelSizes.map(s => s.height));
+  if (rowWidth > bounds.right-bounds.left) return [];
+  const startX = clamp((block.left+block.right-rowWidth)/2,bounds.left,bounds.right-rowWidth);
+  for (const y of [Math.max(bounds.top,block.bottom+gutter), ...obstacles.map(o => Math.max(block.bottom+gutter,o.bottom+gap)), bounds.bottom-rowHeight]) {
+    if (y < block.bottom+gutter) continue;
+    let x = startX;
+    const labels = anchors.map((a,i) => {
+      const size = labelSizes[i];
+      const p = {id:a.id,x,y,...size,side:'below',
+        points:[[a.x,a.y],[a.x+8,a.y],[x+size.width/2,y]]};
+      x += size.width+gap;
+      return p;
+    });
+    if (valid(labels)) return labels;
+  }
+  return [];
+}
+
 // Project block corners to NDC with the same math as THREE.PerspectiveCamera
 // (camera up +Y, optional setViewOffset shift as fractions of the full size).
 // Returns the NDC bounding box plus the canvas width/height fractions.
