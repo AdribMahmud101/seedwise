@@ -230,7 +230,7 @@
   font-size: 13px;
   cursor: pointer;
   padding: 4px 0;
-  min-height: 32px;
+  min-height: 44px;
 }
 
 .studio-layer-radio-item input {
@@ -548,6 +548,7 @@
   align-items: flex-start;
   pointer-events: none;
   max-width: 340px;
+  right: 68px;
 }
 
 .studio-overlay-tl > * {
@@ -563,6 +564,7 @@
   border: 1px solid #ffffff;
   box-shadow: 0 4px 14px rgba(20, 55, 20, 0.08);
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .studio-view-btn {
@@ -627,16 +629,13 @@
 }
 
 .studio-overlay-tc {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 6;
   pointer-events: none;
   display: flex;
   justify-content: center;
   align-items: center;
-  max-width: 90%;
+  max-width: 100%;
 }
 
 .studio-overlay-tc > * {
@@ -655,7 +654,8 @@
   border-radius: 20px;
   border: 1px solid rgba(184, 154, 102, 0.45);
   box-shadow: 0 4px 14px rgba(60, 45, 25, 0.12);
-  white-space: nowrap;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
 }
 
 .studio-fallow-chip-btn {
@@ -663,10 +663,11 @@
   color: #ffffff;
   border: none;
   border-radius: 14px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
-  min-height: 28px;
+  min-height: 44px;
+  min-width: 44px;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
@@ -1163,7 +1164,7 @@
 
 .callout-eyebrow {
   font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-dim, #536456);
@@ -1202,6 +1203,8 @@
 }
 
 .callout-btn {
+  min-height: 44px;
+  min-width: 44px;
   background: none;
   border: none;
   padding: 0;
@@ -1220,13 +1223,13 @@
 /* Callout mobile dot */
 .callout-dot-num {
   display: none;
-  width: 22px;
-  height: 22px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #173e30;
   color: #fffdf5;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
@@ -1246,6 +1249,7 @@
 }
 
 .studio-callout-legend-item {
+  min-height: 44px;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -1271,7 +1275,7 @@
   border-radius: 50%;
   background: #173e30;
   color: #fffdf5;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   align-items: center;
   justify-content: center;
@@ -1463,4 +1467,95 @@
 /* Transect pins anchor their centre to the projected surface point. */
 #node-a, #node-ap {
   transform: translate(-50%, -50%);
+}
+
+/* Keep controls and translated labels inside the available stage width. */
+.studio-overlay-tl {
+  max-width: min(340px, calc(50% - 80px));
+  right: 68px;
+}
+
+.studio-overlay-tl > *,
+.studio-surface-selector select,
+.studio-dock-item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.studio-slice-card,
+.studio-dock-sub,
+.studio-dock-toggles {
+  flex-wrap: wrap;
+}
+
+.studio-surface-selector {
+  width: 100%;
+}
+
+.studio-surface-selector select {
+  flex: 1;
+}
+
+.studio-dock-deck {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+.studio-ctrl-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.studio-callout-overlay .callout-box {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+}
+
+.callout-3d[data-band] {
+  width: min(240px, calc(50% - 24px));
+}
+
+.callout-3d[data-band] :is(.callout-line, .callout-dot) {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .studio-container {
+    flex-direction: column;
+  }
+  .studio-stage-wrap {
+    order: 1;
+  }
+  .studio-rail {
+    order: 2;
+    width: 100%;
+    max-height: none;
+    border-right: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 600px) {
+  .studio-stage-canvas-host {
+    height: auto;
+    padding-top: max(440px, var(--studio-overlay-bottom, 440px));
+    padding-bottom: 0;
+  }
+  .studio-overlay-tl {
+    left: 64px;
+    max-width: calc(100% - 132px);
+  }
+  .studio-slice-card input[type="range"] {
+    min-width: 44px;
+    width: 100%;
+  }
+  .studio-calendar-bar input[type="range"] {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .callout-3d[data-band] {
+    width: 44px;
+  }
 }

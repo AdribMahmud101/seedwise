@@ -1398,6 +1398,7 @@ a:hover {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .pump-tariff-select-wrap {
@@ -1405,9 +1406,13 @@ a:hover {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pump-tariff-select-wrap select {
+  min-width: 0;
+  max-width: 100%;
   min-height: 44px;
   padding: 6px 10px;
   border-radius: 4px;
@@ -1417,6 +1422,82 @@ a:hover {
   font-size: 12px;
   font-weight: 600;
   color: #173e30;
+}
+
+/* Let ranking content shrink inside the sidebar layout, including Bengali copy. */
+.priority-layout {
+  grid-template-columns: 255px minmax(0, 1fr);
+}
+
+.priority-layout > *,
+#rotation-list,
+#rotation-list .rotation-card,
+#rotation-list .rotation-card > *,
+#rotation-list .rotation-top > *,
+#rotation-list .rotation-info > * {
+  min-width: 0;
+}
+
+#rotation-list .rotation-card {
+  overflow-wrap: anywhere;
+}
+
+#rotation-list .score {
+  width: 80px;
+  flex-shrink: 0;
+  white-space: normal;
+}
+
+#rotation-list .score .truth {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+}
+
+#rotation-list .rotation-info,
+.priority-box .panel-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#rotation-list .rotation-bottom,
+#rotation-list .toolbar-inline,
+#rotation-list .mini-contributions {
+  flex-wrap: wrap;
+}
+
+.main:has(#rotation-list) :is(.note, .eyebrow, .mono),
+.main:has(#rotation-list) [style*="font-size:9px"],
+.main:has(#rotation-list) [style*="font-size:10px"],
+.main:has(#rotation-list) [style*="font-size:11px"] {
+  font-size: 12px !important; /* Inline legacy labels also need the readable minimum. */
+}
+
+.main:has(#rotation-list) .text-link {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+body:has(#rotation-list) :is(.nav-item, .brand) {
+  min-width: 44px;
+}
+
+@media (max-width: 1200px) {
+  .priority-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .ranking-header-bar > *,
+  .pump-tariff-select-wrap select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .priority-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Rotation card cost badge */
