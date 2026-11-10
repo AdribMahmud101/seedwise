@@ -582,7 +582,7 @@ test("buildCalloutData includes fallow residue description for fallow months", (
     soilOverrides: null,
     t: (en, bn) => bn || en,
   });
-  assert.match(bnCallouts.rootzone.value, /পতিত · সরিষা-এর অবশেষ/);
+  assert.match(bnCallouts.rootzone.cropValue, /পতিত · সরিষা-এর অবশেষ/);
 });
 
 
