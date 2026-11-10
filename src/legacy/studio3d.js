@@ -62,6 +62,10 @@ import {
   computeAutoExaggeration,
   usdaTextureClass,
   easeOutCubic,
+  easeInOutCubic,
+  tweenValue,
+  interpolateDonutArcs,
+  createTween,
   introCameraParams,
   shouldSkipIntro,
   sampleRowCropScale,
@@ -165,6 +169,18 @@ let wideLayersOpen = false;
 let stageOverlayCleanup = null;
 let currentSurface = null;
 const surfacePacks = new Map();
+
+/* --- SMOOTH animated surface-layer switching --- */
+const SURFACE_FADE_MS = 450; // top-texture cross-fade, ease-in-out
+const LEGEND_DONUT_MS = 500; // donut arc + percentage count tween
+const LEGEND_ROW_OUT_MS = 150; // old class rows fade/slide out
+const LEGEND_ROW_IN_MS = 250; // new class rows fade/slide in
+const LEGEND_ROW_STAGGER_MS = 30; // per-row enter stagger
+const LEGEND_HEIGHT_MS = 300; // legend body height ease
+const WATER_MODES = ["water", "ponding"];
+let surfaceSwitchToken = 0; // invalidates in-flight fast surface switches
+let legendSwitchToken = 0; // invalidates in-flight legend transitions
+let surfaceFade = null; // { tween, overlay, oldTexture, fadingOut, waterMats }
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -899,8 +915,81 @@ function makeElevationMaterial() {
   return mat;
 }
 
+// Ponding + runoff overlays are built standalone so a surface-mode change can
+// fade them in/out without rebuilding the field block.
+function buildPondingMesh(surfacePositions, model) {
+  const waterPositions = pondingPositions(surfacePositions, model.ponding);
+  if (!waterPositions.length) return null;
+  const wGeo = new THREE.BufferGeometry();
+  wGeo.setAttribute("position", new THREE.Float32BufferAttribute(waterPositions, 3));
+  wGeo.computeVertexNormals();
+  const waterLegend = surfaceLegend('water', model.context);
+  const colors = [];
+  for (let i = 0; i < waterPositions.length; i += 9) {
+    const x = (waterPositions[i] + waterPositions[i + 3] + waterPositions[i + 6]) / 3;
+    const z = (waterPositions[i + 2] + waterPositions[i + 5] + waterPositions[i + 8]) / 3;
+    const depthCm = (model.pond?.depthAt(x, -z) || 0) * 100;
+    const color = new THREE.Color(surfaceClass(waterLegend, Math.max(0.001, depthCm)).color);
+    for (let j = 0; j < 3; j++) colors.push(color.r, color.g, color.b);
+  }
+  wGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const mesh = new THREE.Mesh(wGeo, new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.88,
+    roughness: 0.16,
+    metalness: 0.08,
+    clearcoat: 1,
+    clearcoatRoughness: 0.12,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  }));
+  mesh.userData.water = true;
+  // Only unshared wet-triangle edges form the white waterline, never the triangulation.
+  const shoreline = new THREE.BufferGeometry();
+  shoreline.setAttribute('position', new THREE.Float32BufferAttribute(pondingWaterline(waterPositions), 3));
+  const line = new THREE.LineSegments(shoreline, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1.5 }));
+  line.userData.waterline = true;
+  mesh.add(line);
+  return mesh;
+}
+
+function buildRunoffLines(ringM, heightAt, model) {
+  if (!(rainScenarioMm > 0) || !model.flow) return null;
+  const positions = [], phases = [], { cells, direction, accumulation } = model.flow;
+  const threshold = Math.max(4, cells.length * 0.012);
+  for (let i = 0; i < cells.length; i++) {
+    const next = direction[i];
+    if (next < 0 || accumulation[i] < threshold) continue;
+    const a = cells[i], b = cells[next];
+    if (![a, b].every((c) => pointInPolygon(c.x, c.y, ringM))) continue;
+    // Interpolate terrain along each D8 segment so the line cannot tunnel through the surface.
+    const count = 6;
+    for (let j = 0; j < count; j++) for (const f of [j / count, (j + 1) / count]) {
+      const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+      positions.push(x, heightAt(x, -y) + 0.045, -y);
+      phases.push((accumulation[i] + f) * 0.23);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('flowPhase', new THREE.Float32BufferAttribute(phases, 1));
+  const material = new THREE.LineBasicMaterial({ color: 0x249aff, transparent: true, opacity: 0.9 });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.flowTime = { value: 0 };
+    shader.vertexShader = 'attribute float flowPhase; varying float vFlowPhase;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFlowPhase = flowPhase;');
+    shader.fragmentShader = 'uniform float flowTime; varying float vFlowPhase;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.85 + 0.15 * sin(vFlowPhase - flowTime * 2.0);');
+    material.userData.flowShader = shader;
+  };
+  const runoff = new THREE.LineSegments(geometry, material);
+  runoff.userData.runoff = true;
+  return runoff;
+}
+
 async function buildFieldBlock(data, cutawayFraction) {
   const token = ++buildToken;
+  surfaceSwitchToken++; // an in-flight fast surface switch must not swap into a rebuilt block
+  cancelSurfaceFade(); // tear down any running cross-fade before its meshes are disposed
   disposeGroup(blockGroup);
   blockGroup = null;
   disposeGroup(waterMesh);
@@ -929,8 +1018,9 @@ async function buildFieldBlock(data, cutawayFraction) {
     textureCache.delete(topTex.uuid);
     return;
   }
+  const prevLegend = currentSurface?.legend || null;
   currentSurface = model;
-  const legendResized = updateSurfaceLegend();
+  const legendResized = updateSurfaceLegend(prevLegend);
 
   const topMat = model.mode === 'elevation' || model.mode === 'hypso' ? makeElevationMaterial() : new THREE.MeshStandardMaterial({
     map: topTex,
@@ -1001,73 +1091,15 @@ async function buildFieldBlock(data, cutawayFraction) {
     blockGroup.add(gwSlab);
   }
 
-  // Water Ponding layer
-  const waterPositions = ['water', 'ponding'].includes(model.mode) // simulated water only in the Water view (crop view must not look flooded)
-    ? pondingPositions(pos.array, model.ponding) : [];
-  if (waterPositions.length) {
-    const wGeo = new THREE.BufferGeometry();
-    wGeo.setAttribute("position", new THREE.Float32BufferAttribute(waterPositions, 3));
-    wGeo.computeVertexNormals();
-    const waterLegend = surfaceLegend('water', model.context);
-    const colors = [];
-    for (let i = 0; i < waterPositions.length; i += 9) {
-      const x = (waterPositions[i] + waterPositions[i + 3] + waterPositions[i + 6]) / 3;
-      const z = (waterPositions[i + 2] + waterPositions[i + 5] + waterPositions[i + 8]) / 3;
-      const depthCm = (model.pond?.depthAt(x, -z) || 0) * 100;
-      const color = new THREE.Color(surfaceClass(waterLegend, Math.max(0.001, depthCm)).color);
-      for (let j = 0; j < 3; j++) colors.push(color.r, color.g, color.b);
+  // Water Ponding layer: simulated water only in the Water view (crop view must not look flooded).
+  if (WATER_MODES.includes(model.mode)) {
+    const ponding = buildPondingMesh(pos.array, model);
+    if (ponding) {
+      waterMesh = ponding;
+      blockGroup.add(waterMesh);
     }
-    wGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    waterMesh = new THREE.Mesh(wGeo, new THREE.MeshPhysicalMaterial({
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.88,
-      roughness: 0.16,
-      metalness: 0.08,
-      clearcoat: 1,
-      clearcoatRoughness: 0.12,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }));
-    waterMesh.userData.water = true;
-    // Only unshared wet-triangle edges form the white waterline, never the triangulation.
-    const shoreline = new THREE.BufferGeometry();
-    shoreline.setAttribute('position', new THREE.Float32BufferAttribute(pondingWaterline(waterPositions), 3));
-    const line = new THREE.LineSegments(shoreline, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1.5 }));
-    line.userData.waterline = true;
-    waterMesh.add(line);
-    blockGroup.add(waterMesh);
-  }
-
-  if (['water', 'ponding'].includes(model.mode) && rainScenarioMm > 0 && model.flow) {
-    const positions = [], phases = [], { cells, direction, accumulation } = model.flow;
-    const threshold = Math.max(4, cells.length * 0.012);
-    for (let i = 0; i < cells.length; i++) {
-      const next = direction[i];
-      if (next < 0 || accumulation[i] < threshold) continue;
-      const a = cells[i], b = cells[next];
-      if (![a, b].every((c) => pointInPolygon(c.x, c.y, ringM))) continue;
-      // Interpolate terrain along each D8 segment so the line cannot tunnel through the surface.
-      const count = 6;
-      for (let j = 0; j < count; j++) for (const f of [j / count, (j + 1) / count]) {
-        const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
-        positions.push(x, heightAt(x, -y) + 0.045, -y);
-        phases.push((accumulation[i] + f) * 0.23);
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('flowPhase', new THREE.Float32BufferAttribute(phases, 1));
-    const material = new THREE.LineBasicMaterial({ color: 0x249aff, transparent: true, opacity: 0.9 });
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.flowTime = { value: 0 };
-      shader.vertexShader = 'attribute float flowPhase; varying float vFlowPhase;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFlowPhase = flowPhase;');
-      shader.fragmentShader = 'uniform float flowTime; varying float vFlowPhase;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.85 + 0.15 * sin(vFlowPhase - flowTime * 2.0);');
-      material.userData.flowShader = shader;
-    };
-    const runoff = new THREE.LineSegments(geometry, material);
-    runoff.userData.runoff = true;
-    blockGroup.add(runoff);
+    const runoff = buildRunoffLines(ringM, heightAt, model);
+    if (runoff) blockGroup.add(runoff);
   }
 
   // Bunds follow the actual boundary at terrain height; no tree features are supplied.
@@ -1117,6 +1149,218 @@ async function buildFieldBlock(data, cutawayFraction) {
   buildGlassFrame(ringM, topMin, bottomY, effectiveMaxX, cutawayFraction);
   buildEdgeTrees(ringM, heightAt);
   if (legendResized) onResize();
+}
+
+/* ------------------------------------------- SMOOTH surface cross-fade */
+
+function findTopMesh() {
+  return blockGroup?.children.find((c) => c.userData.terrain && !c.userData.fadeOverlay) || null;
+}
+
+// Tear down a running cross-fade: stop its tween, remove the overlay mesh and
+// dispose the stale overlay material + old texture (the overlay shares the
+// top mesh geometry, so the geometry itself is never disposed here).
+// Fading-out water is stale and disposed; fading-in water keeps its target
+// opacity as the current on-screen state, so a rapid re-switch starts from
+// what is visible. Never leaves more than one overlay behind.
+function cancelSurfaceFade() {
+  const fade = surfaceFade;
+  surfaceFade = null;
+  if (!fade) return;
+  fade.tween?.cancel();
+  if (fade.overlay) {
+    if (fade.overlay.parent) fade.overlay.parent.remove(fade.overlay);
+    if (fade.overlay.material) fade.overlay.material.dispose();
+    if (fade.oldTexture) {
+      textureCache.delete(fade.oldTexture.uuid);
+      fade.oldTexture.dispose();
+    }
+  }
+  for (const obj of fade.fadingOut || []) disposeGroup(obj);
+  if (!fade.fadingOut?.length) {
+    for (const { mat, to } of fade.waterMats || []) mat.opacity = to;
+  }
+}
+
+// Fast surface-mode switch: the new texture goes live underneath while the
+// previous one fades out on a temporary overlay copy of the top mesh
+// (same geometry, polygonOffset, transparent, 450 ms ease-in-out), then the
+// overlay + old texture are disposed. Water overlays fade in/out with the
+// same timing. No geometry is rebuilt. Returns true when handled (swapped,
+// swapped instantly, or superseded by a newer switch); false when the caller
+// must fall back to a full buildFieldBlock.
+async function runSurfaceCrossfade(prevMode) {
+  const myToken = ++surfaceSwitchToken;
+  cancelSurfaceFade();
+  const data = currentData;
+  if (!data || !blockGroup || !findTopMesh()) return false;
+  const mode = currentSurfaceMode;
+  let model = null;
+  let topTex = null;
+  try {
+    model = await prepareSurface(data, mode, currentMonthIdx);
+  } catch {
+    return false;
+  }
+  if (myToken !== surfaceSwitchToken || !containerEl || !currentData) return true;
+  try {
+    topTex = await buildTopTexture(data, mode, currentMonthIdx, model);
+  } catch {
+    return false;
+  }
+  if (myToken !== surfaceSwitchToken || !containerEl) {
+    textureCache.delete(topTex.uuid);
+    topTex.dispose();
+    return true;
+  }
+  const mesh = findTopMesh();
+  if (!mesh || !blockGroup) {
+    textureCache.delete(topTex.uuid);
+    topTex.dispose();
+    return false;
+  }
+  const oldMat = mesh.material;
+  const oldTex = oldMat?.map || null;
+  const prevLegend = currentSurface?.legend || null;
+  const newMat = (mode === 'elevation' || mode === 'hypso') ? makeElevationMaterial() : new THREE.MeshStandardMaterial({
+    map: topTex,
+    roughness: 0.88,
+    metalness: 0.02,
+    side: THREE.DoubleSide,
+  });
+  newMat.map = topTex;
+  mesh.material = newMat;
+  mesh.userData.contours = (mode === 'elevation' || mode === 'hypso') && Number.isFinite(model.context.elevationMin);
+  currentSurface = model;
+
+  // Water overlays follow the same timing: old ones fade out, new ones fade in.
+  const wasWater = WATER_MODES.includes(prevMode);
+  const isWater = WATER_MODES.includes(mode);
+  const fadingOut = [];
+  const waterMats = []; // { mat, from, to }
+  const trackMats = (obj, from, to) => {
+    obj.traverse((child) => {
+      if (!child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        if (!mat.transparent) {
+          mat.transparent = true;
+          mat.needsUpdate = true;
+        }
+        waterMats.push({ mat, from: from === null ? mat.opacity : from, to: to === null ? mat.opacity : to });
+      }
+    });
+  };
+  if (wasWater && !isWater) {
+    if (waterMesh) fadingOut.push(waterMesh);
+    for (const child of blockGroup.children) {
+      if (child.userData.runoff && !fadingOut.includes(child)) fadingOut.push(child);
+    }
+    waterMesh = null;
+    for (const obj of fadingOut) trackMats(obj, null, 0);
+  } else if (isWater && !wasWater) {
+    const heightAt = makeHeightAt(data);
+    const ringM = (currentBlock.ring || []).map(([x, z]) => [x, -z]);
+    const posAttr = mesh.geometry.getAttribute("position");
+    const ponding = buildPondingMesh(posAttr.array, model);
+    if (ponding) {
+      waterMesh = ponding;
+      blockGroup.add(ponding);
+    }
+    const runoff = buildRunoffLines(ringM, heightAt, model);
+    if (runoff) blockGroup.add(runoff);
+    for (const obj of [ponding, runoff]) {
+      if (!obj) continue;
+      trackMats(obj, 0, null);
+    }
+    for (const { mat } of waterMats) mat.opacity = 0;
+  }
+
+  // Reduced motion (and the canvas fallback, which cannot blend) switch instantly.
+  if (prefersReducedMotion || isSoftwareRenderer) {
+    if (oldMat) oldMat.dispose();
+    if (oldTex) {
+      textureCache.delete(oldTex.uuid);
+      oldTex.dispose();
+    }
+    for (const obj of fadingOut) disposeGroup(obj);
+    for (const { mat, to } of waterMats) mat.opacity = to;
+    updateSurfaceLegend(prevLegend);
+    buildPlantsAndRoots(data, currentMonthIdx);
+    updateProbeCard();
+    requestRender();
+    return true;
+  }
+
+  const overlayMat = oldMat;
+  overlayMat.transparent = true;
+  overlayMat.opacity = 1;
+  overlayMat.depthWrite = false;
+  overlayMat.polygonOffset = true;
+  overlayMat.polygonOffsetFactor = -2;
+  overlayMat.polygonOffsetUnits = -2;
+  overlayMat.needsUpdate = true;
+  const overlay = new THREE.Mesh(mesh.geometry, overlayMat);
+  overlay.userData.terrain = true;
+  overlay.userData.fadeOverlay = true;
+  overlay.castShadow = false;
+  overlay.receiveShadow = false;
+  blockGroup.add(overlay);
+  const fade = { tween: null, overlay, oldTexture: oldTex, fadingOut, waterMats };
+  surfaceFade = fade;
+  startAnimation(); // keep frames flowing for the fade even when idle
+  fade.tween = createTween({
+    duration: SURFACE_FADE_MS,
+    ease: easeInOutCubic,
+    onUpdate: (eased) => {
+      if (surfaceFade !== fade) return;
+      overlayMat.opacity = 1 - eased;
+      for (const { mat, from, to } of waterMats) mat.opacity = from + (to - from) * eased;
+      requestRender();
+    },
+    onDone: () => {
+      if (surfaceFade !== fade) return;
+      surfaceFade = null;
+      if (overlay.parent) overlay.parent.remove(overlay);
+      overlayMat.dispose();
+      if (oldTex) {
+        textureCache.delete(oldTex.uuid);
+        oldTex.dispose();
+      }
+      for (const obj of fadingOut) disposeGroup(obj);
+      for (const { mat, to } of waterMats) mat.opacity = to;
+      requestRender();
+    },
+  });
+  fade.tween.start();
+  updateSurfaceLegend(prevLegend);
+  buildPlantsAndRoots(data, currentMonthIdx);
+  updateProbeCard();
+  requestRender();
+  return true;
+}
+
+// Route a surface-mode change: fast texture cross-fade when the block exists,
+// otherwise a full rebuild (first build, or a rebuild already in flight).
+function switchSurfaceMode(prevMode) {
+  const afterBuild = () => {
+    if (!currentData) return;
+    buildPlantsAndRoots(currentData, currentMonthIdx);
+    updateProbeCard();
+    requestRender();
+  };
+  if (!currentData || !blockGroup || !findTopMesh()) {
+    buildFieldBlock(currentData, currentCutaway).then(afterBuild);
+    return;
+  }
+  runSurfaceCrossfade(prevMode).then((handled) => {
+    if (!handled && containerEl && currentData) {
+      buildFieldBlock(currentData, currentCutaway).then(afterBuild);
+    }
+  }).catch(() => {
+    // The fast path never leaves a half-swapped block: rebuild from scratch.
+    if (containerEl && currentData) buildFieldBlock(currentData, currentCutaway).then(afterBuild);
+  });
 }
 
 /* ------------------------------------------------------------ crop clumps */
@@ -3165,8 +3409,8 @@ function rotationPickerHtml() {
 export function surfaceLegendHtml(legend) {
   const rows = legend.classes.filter((c) => !c.unknown || c.pct > 0);
   let offset = 0;
-  const arcs = rows.filter((c) => c.pct > 0).map((c) => {
-    const arc = `<circle cx="36" cy="36" r="26" fill="none" stroke="${c.color}" stroke-width="10" pathLength="100" stroke-dasharray="${c.pct} ${100 - c.pct}" stroke-dashoffset="${-offset}" transform="rotate(-90 36 36)"/>`;
+  const arcs = rows.filter((c) => c.pct > 0).map((c, i) => {
+    const arc = `<circle data-arc="${i}" cx="36" cy="36" r="26" fill="none" stroke="${c.color}" stroke-width="10" pathLength="100" stroke-dasharray="${c.pct} ${100 - c.pct}" stroke-dashoffset="${-offset}" transform="rotate(-90 36 36)"/>`;
     offset += c.pct;
     return arc;
   }).join('');
@@ -3186,7 +3430,7 @@ export function surfaceLegendHtml(legend) {
           <title>${esc(rows.map((c) => `${c.label}: ${c.pct.toFixed(1)} %`).join('; '))}</title>
           ${arcs}<text x="36" y="40" text-anchor="middle">100%</text>
         </svg>
-        <ul>${rows.map((c) => `<li><i style="background:${c.color}" aria-hidden="true"></i><span>${esc(c.label)}</span><b>${c.pct.toFixed(1)} %</b></li>`).join('')}</ul>
+        <ul>${rows.map((c) => `<li><i style="background:${c.color}" aria-hidden="true"></i><span>${esc(c.label)}</span><b data-pct="${c.pct.toFixed(1)}">${c.pct.toFixed(1)} %</b></li>`).join('')}</ul>
       </div>
       ${callout}
       ${legend.flowRows ? `<ul class="studio-flow-key">${legend.flowRows.map((row) => `<li><i style="background:${row.color}" aria-hidden="true"></i>${esc(row.label)}</li>`).join('')}</ul>` : ''}
@@ -3196,21 +3440,127 @@ export function surfaceLegendHtml(legend) {
     </div>`;
 }
 
-function updateSurfaceLegend() {
-  if (!containerEl || !currentSurface) return;
+function updateSurfaceLegend(prevLegend = null) {
+  if (!containerEl || !currentSurface) return false;
   const legend = currentSurface.legend;
   const card = containerEl.querySelector('.studio-surface-legend');
-  const previousHeight = card?.offsetHeight;
-  if (card) {
-    card.innerHTML = surfaceLegendHtml(legend);
-    card.dataset.mode = currentSurface.mode;
-    card.dataset.month = currentSurface.context.month.month;
-  }
   const mini = containerEl.querySelector('.studio-surface-mini');
   if (mini) mini.innerHTML = `<b>${esc(legend.title)}</b>${legend.classes.filter((c) => c.pct > 0).map((c) =>
     `<span><i style="background:${c.color}" aria-hidden="true"></i>${esc(c.label)} ${c.pct.toFixed(1)} %</span>`).join('')}${truth(legend.truth)}<span>${esc(legend.source)} · ${esc(legend.date)}</span>`;
+  const myToken = ++legendSwitchToken;
+  const animate = !prefersReducedMotion && card && prevLegend && prevLegend !== legend
+    && card.querySelector('.studio-surface-shares li');
+  if (!animate) {
+    const previousHeight = card?.offsetHeight;
+    if (card) {
+      card.innerHTML = surfaceLegendHtml(legend);
+      card.dataset.mode = currentSurface.mode;
+      card.dataset.month = currentSurface.context.month.month;
+    }
+    layoutSurfaceLegend();
+    return card?.dataset.size === 'wide' && previousHeight !== card.offsetHeight;
+  }
+  // Animated handoff, phase 1: old rows fade/slide out, then the swap runs.
+  for (const li of card.querySelectorAll('.studio-surface-shares li')) li.classList.add('legend-row-leave');
+  card.querySelector('summary span:first-child')?.classList.add('legend-text-leave');
+  setTimeout(() => {
+    if (myToken !== legendSwitchToken || !card.isConnected || !containerEl || !currentSurface) return;
+    swapLegendHtml(card, legend, prevLegend, myToken);
+  }, LEGEND_ROW_OUT_MS);
+  return false;
+}
+
+// Animated handoff, phase 2: swap the markup, ease the body height from the
+// old to the new size (no layout jump), stagger the new rows in, and tween
+// the donut arcs + percentage counts from the previous shares.
+function swapLegendHtml(card, legend, prevLegend, myToken) {
+  const body = card.querySelector('.studio-surface-legend-body');
+  if (body) {
+    // A superseded swap may have left a frozen max-height behind; clear it so
+    // the old height measures true.
+    body.classList.remove('legend-height-anim');
+    body.style.maxHeight = '';
+  }
+  const oldHeight = body ? body.offsetHeight : 0;
+  card.innerHTML = surfaceLegendHtml(legend);
+  card.dataset.mode = currentSurface.mode;
+  card.dataset.month = currentSurface.context.month.month;
+  const newBody = card.querySelector('.studio-surface-legend-body');
+  const newHeight = newBody ? newBody.offsetHeight : 0;
+  // The summary bar is constant height, so a body change is a card change.
+  const heightChanged = oldHeight > 0 && newHeight > 0 && Math.abs(newHeight - oldHeight) > 4;
+  if (newBody && heightChanged) {
+    newBody.classList.add('legend-height-anim');
+    newBody.style.maxHeight = `${oldHeight}px`;
+    void newBody.offsetHeight;
+    newBody.style.maxHeight = `${newHeight}px`;
+    setTimeout(() => {
+      if (myToken !== legendSwitchToken) return;
+      newBody.classList.remove('legend-height-anim');
+      newBody.style.maxHeight = '';
+    }, LEGEND_HEIGHT_MS + 60);
+  }
+  for (const el of card.querySelectorAll('summary span:first-child, .studio-surface-headline, .studio-surface-note, .studio-surface-source, .studio-scale-toggle, .studio-surface-callout, .studio-flow-key, .studio-surface-observed')) {
+    el.classList.add('legend-fade-in');
+  }
+  card.querySelectorAll('.studio-surface-shares li').forEach((li, i) => {
+    li.classList.add('legend-row-enter');
+    li.style.animationDelay = `${i * LEGEND_ROW_STAGGER_MS}ms`;
+  });
+  startLegendCountTween(card, prevLegend, legend, myToken);
   layoutSurfaceLegend();
-  return card?.dataset.size === 'wide' && previousHeight !== card.offsetHeight;
+  if (heightChanged && card.dataset.size === 'wide') onResize();
+}
+
+// Row lists exactly as surfaceLegendHtml renders them: arcs skip zero-share
+// classes, count rows keep them, so each tween stays index-aligned with the DOM.
+function legendArcRows(legend) {
+  if (!legend) return [];
+  return legend.classes.filter((c) => (!c.unknown || c.pct > 0) && c.pct > 0)
+    .map((c) => ({ pct: c.pct, color: c.color }));
+}
+
+function legendCountRows(legend) {
+  if (!legend) return [];
+  return legend.classes.filter((c) => !c.unknown || c.pct > 0).map((c) => c.pct);
+}
+
+// Tween donut arcs (stroke-dasharray/offset) and row percentages from the
+// previous legend's shares to the new ones over 500 ms.
+function startLegendCountTween(card, prevLegend, legend, myToken) {
+  const svg = card.querySelector('.studio-surface-donut');
+  const circles = svg ? [...svg.querySelectorAll('circle[data-arc]')] : [];
+  const counts = [...card.querySelectorAll('.studio-surface-shares li b[data-pct]')];
+  if (!circles.length && !counts.length) return;
+  const fromArcs = legendArcRows(prevLegend);
+  const toArcs = legendArcRows(legend);
+  const fromCounts = legendCountRows(prevLegend);
+  const toCounts = legendCountRows(legend);
+  const applyFrame = (raw) => {
+    const frames = interpolateDonutArcs(fromArcs, toArcs, raw);
+    circles.forEach((circle, i) => {
+      const frame = frames[i] || { pct: 0, offset: 0, color: toArcs[i]?.color || '#a5a9a5' };
+      circle.setAttribute('stroke-dasharray', `${frame.pct} ${100 - frame.pct}`);
+      circle.setAttribute('stroke-dashoffset', `${-frame.offset}`);
+      if (circle.getAttribute('stroke') !== frame.color) circle.setAttribute('stroke', frame.color);
+    });
+    counts.forEach((el, i) => {
+      el.textContent = `${tweenValue(fromCounts[i] ?? 0, toCounts[i] ?? 0, raw).toFixed(1)} %`;
+    });
+  };
+  applyFrame(0); // paint the previous shares synchronously: no one-frame flash
+  const tween = createTween({
+    duration: LEGEND_DONUT_MS,
+    ease: easeInOutCubic,
+    onUpdate: (_eased, raw) => {
+      if (myToken !== legendSwitchToken) {
+        tween.cancel();
+        return;
+      }
+      applyFrame(raw);
+    },
+  });
+  tween.start();
 }
 
 function layoutSurfaceLegend() {
@@ -4631,7 +4981,10 @@ export function setPlantingLayout(layout) {
 }
 
 export function setSurfaceMode(mode) {
-  currentSurfaceMode = mode || "crops";
+  const next = mode || "crops";
+  const prevMode = currentSurface?.mode || currentSurfaceMode;
+  const sameTarget = next === currentSurfaceMode && !!currentSurface;
+  currentSurfaceMode = next;
   currentLayer = currentSurfaceMode;
   if (containerEl) {
     const select = containerEl.querySelector("#select-surface-mode");
@@ -4643,12 +4996,9 @@ export function setSurfaceMode(mode) {
     if (illustrative) {
       illustrative.textContent = currentSurfaceMode === "crops" ? t("Illustrative crops · not observed", "কাল্পনিক ফসল · সরাসরি দেখা নয়") : "";
     }
-    if (currentData) {
-      buildFieldBlock(currentData, currentCutaway).then(() => {
-        buildPlantsAndRoots(currentData, currentMonthIdx);
-        updateProbeCard();
-        requestRender();
-      });
+    // Re-selecting the active target is a no-op (an in-flight switch already owns it).
+    if (currentData && !sameTarget) {
+      switchSurfaceMode(prevMode);
     }
   }
 }
@@ -4739,6 +5089,9 @@ export function disposeStudio3d() {
   unbindIdleListeners();
   idleHasOffset = false;
   idleBasePos = null;
+  surfaceSwitchToken++;
+  legendSwitchToken++;
+  cancelSurfaceFade();
 
   if (scene) {
     scene.traverse((obj) => {

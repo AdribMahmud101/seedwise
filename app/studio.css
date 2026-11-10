@@ -1941,6 +1941,24 @@
 }
 .studio-surface-mini span { display: inline-flex; align-items: center; gap: 4px; }
 .studio-surface-bar[hidden], .studio-surface-mini[hidden] { display: none; }
+/* SMOOTH · animated colour-key handoff (opacity/transform only). */
+.studio-surface-shares li { transition: opacity 150ms ease-in, transform 150ms ease-in; }
+.studio-surface-shares li.legend-row-leave { opacity: 0; transform: translateX(10px); }
+@keyframes studioLegendRowIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+.studio-surface-shares li.legend-row-enter { animation: studioLegendRowIn 250ms ease-out both; }
+.studio-surface-shares i, .studio-surface-mini i { transition: background-color 250ms ease; }
+@keyframes studioLegendFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.studio-surface-legend .legend-fade-in { animation: studioLegendFadeIn 250ms ease-out both; }
+.studio-surface-legend summary span:first-child.legend-text-leave { opacity: 0; transition: opacity 150ms ease-in; }
+.studio-surface-legend-body.legend-height-anim { overflow: hidden; transition: max-height 300ms ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .studio-surface-shares li,
+  .studio-surface-shares i,
+  .studio-surface-mini i,
+  .studio-surface-legend .legend-fade-in,
+  .studio-surface-legend summary span:first-child,
+  .studio-surface-legend-body.legend-height-anim { transition: none !important; animation: none !important; }
+}
 .studio-layers-sheet .studio-surface-selector { font-size: 12px; }
 .studio-layers-sheet .studio-surface-selector .eyebrow { font-size: 12px !important; }
 /* STUDIO5T · skeleton auto-load + phone touch hint */

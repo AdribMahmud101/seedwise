@@ -1515,4 +1515,108 @@ export function sampleRowCropScale(t, rowProgress = 0, startT = 0.6, endT = 2.2)
   return easeOutCubic((t - rowStart) / (rowEnd - rowStart));
 }
 
+// ------------------------------------------------------------- SMOOTH layer-switch tweens
+//
+// Pure transition helpers for animated surface-layer switching. The frame
+// driver (clock + scheduler) is injected so unit tests drive tweens with a
+// manual clock while the studio passes requestAnimationFrame.
+
+export function easeInOutCubic(t) {
+  const p = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
+  return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+}
+
+// Map 0..1 progress to a value between from and to through an easing curve.
+export function tweenValue(from, to, progress, ease = easeInOutCubic) {
+  const a = Number.isFinite(from) ? from : 0;
+  const b = Number.isFinite(to) ? to : 0;
+  const p = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  const fn = typeof ease === "function" ? ease : (x) => x;
+  return a + (b - a) * fn(p);
+}
+
+// Interpolate donut shares between two class lists ({ pct, color }), aligned
+// by index with the shorter side zero-padded. Returns [{ pct, offset, color }]
+// with cumulative offsets; shares sum to 100 whenever both inputs do, so the
+// ring never shows a gap mid-transition. Colours flip at the midpoint.
+export function interpolateDonutArcs(fromClasses, toClasses, progress, ease = easeInOutCubic) {
+  const from = Array.isArray(fromClasses) ? fromClasses : [];
+  const to = Array.isArray(toClasses) ? toClasses : [];
+  const p = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  const fn = typeof ease === "function" ? ease : (x) => x;
+  const eased = fn(p);
+  const arcs = [];
+  let offset = 0;
+  for (let i = 0, n = Math.max(from.length, to.length); i < n; i++) {
+    const a = Number.isFinite(from[i]?.pct) ? from[i].pct : 0;
+    const b = Number.isFinite(to[i]?.pct) ? to[i].pct : 0;
+    const pct = Math.max(0, a + (b - a) * eased);
+    const color = (eased < 0.5 ? from[i]?.color : to[i]?.color)
+      ?? to[i]?.color ?? from[i]?.color ?? "#a5a9a5";
+    arcs.push({ pct, offset, color });
+    offset += pct;
+  }
+  return arcs;
+}
+
+// Minimal tween runner: start() begins (restarting a running tween),
+// cancel() drops it without firing onDone, restart() is cancel + start.
+// onUpdate(easedProgress, rawProgress) runs per frame; onDone() once at the end.
+export function createTween({
+  duration = 450,
+  ease = easeInOutCubic,
+  onUpdate = null,
+  onDone = null,
+  now = null,
+  schedule = null,
+  cancelFrame = null,
+} = {}) {
+  const clock = typeof now === "function"
+    ? now
+    : () => (typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now() : Date.now());
+  const raf = typeof schedule === "function"
+    ? schedule
+    : (cb) => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(cb) : setTimeout(cb, 16));
+  const caf = typeof cancelFrame === "function"
+    ? cancelFrame
+    : (id) => (typeof cancelAnimationFrame === "function" ? cancelAnimationFrame(id) : clearTimeout(id));
+  const easeFn = typeof ease === "function" ? ease : (x) => x;
+  const dur = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  let running = false;
+  let frameId = null;
+  let startTime = 0;
+  function tick() {
+    if (!running) return;
+    const raw = dur <= 0 ? 1 : Math.max(0, Math.min(1, (clock() - startTime) / dur));
+    if (typeof onUpdate === "function") onUpdate(easeFn(raw), raw);
+    if (raw >= 1) {
+      running = false;
+      frameId = null;
+      if (typeof onDone === "function") onDone();
+      return;
+    }
+    frameId = raf(tick);
+  }
+  function cancel() {
+    running = false;
+    if (frameId !== null) {
+      try { caf(frameId); } catch { /* Already fired; the running flag guards the tick. */ }
+      frameId = null;
+    }
+  }
+  function start() {
+    cancel();
+    running = true;
+    startTime = clock();
+    frameId = raf(tick);
+  }
+  return {
+    start,
+    cancel,
+    restart() { start(); },
+    get running() { return running; },
+  };
+}
+
 
