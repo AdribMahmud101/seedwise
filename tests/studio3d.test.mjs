@@ -98,3 +98,26 @@ test("contract fixture satisfies required contract schema", () => {
   assert.ok(data.truth.soil);
   assert.ok(data.truth.vegetation);
 });
+
+test("desktop and mobile soil callouts show translated estimates and a separate crop scenario", () => {
+  const data = structuredClone(fixture);
+  data.rotation = { id: "potato", label: "Rotation 01", bn: "ফসলচক্র 01" };
+  data.months[0] = { ...data.months[0], cropName: "Potato", cropNameBn: "আলু", rootDepthM: 0.1, wetness: 0.8 };
+  try {
+    for (const lang of ["en", "bn"]) {
+      state.lang = lang;
+      const html = studio3dHtml(data);
+      const rootValue = lang === "en" ? "Root zone: wet (80 % of saturation)" : "শিকড় অঞ্চল: ভেজা (সম্পৃক্ততার 80 %)";
+      const cropValue = lang === "en" ? "Planned: Potato (Rotation 01) · roots ~0.1 m" : "পরিকল্পিত: আলু (ফসলচক্র 01) · শিকড় ~0.1 মি";
+      const soilTag = lang === "en" ? "Estimated · SoilGrids 250 m" : "আনুমানিক · SoilGrids 250 মি";
+      const rootTag = lang === "en" ? "Estimated · NASA POWER ~50 km, top ~1 m" : "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি";
+      const cropTag = lang === "en" ? "Scenario" : "কাল্পনিক পরিকল্পনা";
+      for (const value of [rootValue, cropValue, `<small>${soilTag}</small>`, `<small>${rootTag}</small>`, `<small>${cropTag}</small>`]) {
+        assert.equal(html.split(value).length - 1, 2, `${lang}: desktop and mobile both show ${value}`);
+      }
+      assert.doesNotMatch(html, /GWETROOT/);
+    }
+  } finally {
+    state.lang = "en";
+  }
+});

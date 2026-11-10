@@ -602,7 +602,14 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
     : (topLayer.textureClass || 'clay loam');
   
   // Format texture nicely (capitalize words)
-  const textureTitle = texture.replace(/\b\w/g, (c) => c.toUpperCase());
+  const textureBn = {
+    sand: "বেলে", 'loamy sand': "দোআঁশ বেলে", 'sandy loam': "বেলে দোআঁশ",
+    loam: "দোআঁশ", silt: "পলি", 'silt loam': "পলি দোআঁশ",
+    'sandy clay loam': "বেলে এঁটেল দোআঁশ", 'clay loam': "এঁটেল দোআঁশ",
+    'silty clay loam': "পলি এঁটেল দোআঁশ", 'sandy clay': "বেলে এঁটেল",
+    'silty clay': "পলি এঁটেল", clay: "এঁটেল",
+  };
+  const textureTitle = t(texture.replace(/\b\w/g, (c) => c.toUpperCase()), textureBn[texture.toLowerCase()] || texture);
   const ph = topLayer.ph != null ? Number(topLayer.ph).toFixed(1) : (soilOverrides?.ph != null ? Number(soilOverrides.ph).toFixed(1) : null);
   // Organic Matter (OM %) = SOC (g/kg) / 10 * 1.724 (van Bemmelen factor) or socGkg * 0.1724
   let omPct = null;
@@ -619,18 +626,26 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
   } else {
     topsoilValParts.push(textureTitle);
     if (ph != null) topsoilValParts.push(`pH ${ph}`);
-    if (omPct != null) topsoilValParts.push(`OM ${omPct}%`);
+    if (omPct != null) topsoilValParts.push(`${t("OM", "জৈব পদার্থ")} ${omPct}%`);
   }
   const topsoilVal = topsoilValParts.join(" · ");
   const topsoilTruth = soilOverrides ? "FARMER_REPORTED" : "MODELED";
-  const topsoilTruthLabel = soilOverrides ? "Soil test, Measured" : "SoilGrids, Estimated";
+  const topsoilTruthLabel = soilOverrides
+    ? t("Soil test, Measured", "মাটি পরীক্ষা, মাপা")
+    : t("Estimated · SoilGrids 250 m", "আনুমানিক · SoilGrids 250 মি");
 
   // Band 2: 15-60 cm Root Zone
   // POWER GWETROOT for the selected month (fallback to month.rootWetness or month.wetness)
-  const rootWetness = month.rootWetness != null ? Number(month.rootWetness).toFixed(2) : (month.wetness != null ? Number(month.wetness).toFixed(2) : "0.50");
-  const isFallow = month.stage === "fallow" || month.cropId === "fallow" || month.cropName === "Fallow" || (!month.cropId && !month.cropName);
+  const wetness = month.rootWetness ?? month.wetness;
+  const fraction = wetness != null && wetness !== "" ? Number(wetness) : NaN;
+  const hasWetness = Number.isFinite(fraction) && fraction >= 0 && fraction <= 1;
+  const rootWetness = hasWetness ? fraction.toFixed(2) : null;
+  const wetnessWord = fraction < 0.3 ? t("dry", "শুষ্ক")
+    : fraction < 0.6 ? t("moist", "আর্দ্র")
+      : fraction <= 0.85 ? t("wet", "ভেজা") : t("saturated", "সম্পৃক্ত");
   let cropName = t(month.cropName || "Crop", month.cropNameBn || "ফসল");
-
+  const isFallow = month.stage === "fallow" || month.cropId === "fallow" || month.cropName === "Fallow";
+  
   if (isFallow) {
     let prevCrop = null;
     const months = data.months || [];
@@ -648,14 +663,16 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
       : t("Fallow", "পতিত");
   }
 
-  const rootDepthM = month.rootDepthM != null ? `${Number(month.rootDepthM).toFixed(1)} m` : null;
+  const rootDepthM = month.rootDepthM != null ? `${Number(month.rootDepthM).toFixed(1)} ${t("m", "মি")}` : null;
+  const rotationName = t(data.rotation?.label || "", data.rotation?.bn || data.rotation?.label || "");
 
   const rootzoneEyebrow = `15–60 cm · ${t("ROOT ZONE", "শিকড় অঞ্চল")}`;
-  const rootzoneVal = isFallow
-    ? `GWETROOT ${rootWetness} · ${cropName}`
-    : `GWETROOT ${rootWetness} · ${cropName}${rootDepthM ? ` (${rootDepthM})` : ""}`;
+  const rootzoneVal = hasWetness
+    ? t(`Root zone: ${wetnessWord} (${Math.round(fraction * 100)} % of saturation)`, `শিকড় অঞ্চল: ${wetnessWord} (সম্পৃক্ততার ${Math.round(fraction * 100)} %)`)
+    : t("Root zone: unknown", "শিকড় অঞ্চল: অজানা");
+  const cropVal = isFallow ? cropName : `${t("Planned", "পরিকল্পিত")}: ${cropName}${rotationName ? ` (${rotationName})` : ""}${rootDepthM ? ` · ${t("roots", "শিকড়")} ~${rootDepthM}` : ""}`;
   const rootzoneTruth = "MODELED";
-  const rootzoneTruthLabel = "NASA POWER · Agronomy, Estimated";
+  const rootzoneTruthLabel = t("Estimated · NASA POWER ~50 km, top ~1 m", "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি");
 
   // Band 3: >120 cm Subsoil & Water Table
   const aquiferEyebrow = `>120 cm · ${t("SUBSOIL & WATER TABLE", "গভীর স্তর ও পানির স্তর")}`;
@@ -681,6 +698,9 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
       value: rootzoneVal,
       truth: rootzoneTruth,
       truthLabel: rootzoneTruthLabel,
+      cropValue: cropVal,
+      cropTruth: "SCENARIO",
+      cropTruthLabel: t("Scenario", "কাল্পনিক পরিকল্পনা"),
       gwetroot: rootWetness,
       cropName,
       rootDepthM,

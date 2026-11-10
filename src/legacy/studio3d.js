@@ -3187,6 +3187,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div class="callout-box topsoil" title="${esc(calloutData.topsoil.truthLabel)}">
               <div class="callout-eyebrow">${esc(calloutData.topsoil.eyebrow)}</div>
               <div class="callout-val" id="callout-topsoil-val">${esc(calloutData.topsoil.value)}</div>
+              <small>${esc(calloutData.topsoil.truthLabel)}</small>
             </div>
             <div class="callout-line"></div><div class="callout-dot"></div>
             <div class="callout-dot-num">①</div>
@@ -3196,6 +3197,9 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div class="callout-box rootzone" title="${esc(calloutData.rootzone.truthLabel)}">
               <div class="callout-eyebrow">${esc(calloutData.rootzone.eyebrow)}</div>
               <div class="callout-val" id="callout-rootzone-val">${esc(calloutData.rootzone.value)}</div>
+              <small>${esc(calloutData.rootzone.truthLabel)}</small>
+              <div class="callout-val callout-crop">${esc(calloutData.rootzone.cropValue)}</div>
+              <small>${esc(calloutData.rootzone.cropTruthLabel)}</small>
             </div>
             <div class="callout-line"></div><div class="callout-dot"></div>
             <div class="callout-dot-num">②</div>
@@ -3222,6 +3226,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div>
               <div class="callout-eyebrow">${esc(calloutData.topsoil.eyebrow)}</div>
               <div class="callout-val">${esc(calloutData.topsoil.value)}</div>
+              <small>${esc(calloutData.topsoil.truthLabel)}</small>
             </div>
           </div>
           <div class="studio-callout-legend-item" data-band="rootzone">
@@ -3229,6 +3234,9 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div>
               <div class="callout-eyebrow">${esc(calloutData.rootzone.eyebrow)}</div>
               <div class="callout-val">${esc(calloutData.rootzone.value)}</div>
+              <small>${esc(calloutData.rootzone.truthLabel)}</small>
+              <div class="callout-val callout-crop">${esc(calloutData.rootzone.cropValue)}</div>
+              <small>${esc(calloutData.rootzone.cropTruthLabel)}</small>
             </div>
           </div>
           <div class="studio-callout-legend-item" data-band="aquifer">
@@ -3508,6 +3516,9 @@ export async function setStudioMonth(monthIdx) {
     if (rootzoneVal) rootzoneVal.textContent = calloutData.rootzone.value;
     const legendRootVal = containerEl.querySelector('.studio-callout-legend-item[data-band="rootzone"] .callout-val');
     if (legendRootVal) legendRootVal.textContent = calloutData.rootzone.value;
+    containerEl.querySelectorAll('.callout-crop').forEach((el) => {
+      el.textContent = calloutData.rootzone.cropValue;
+    });
   }
 
   // Update fallow / harvested top-centre notification chip

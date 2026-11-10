@@ -257,8 +257,9 @@ test("computeAutoExaggeration targets ~0.25 * blockWidth / relief snapped to 0.2
   assert.equal(computeAutoExaggeration(2.5, 0), 1.0);
 });
 
-test("buildCalloutData produces bilingual stratigraphic callouts with SoilGrids and POWER/Agronomy", () => {
+test("buildCalloutData separates estimated soil conditions from the planned crop", () => {
   const dummyData = {
+    rotation: { label: "Rotation 01", bn: "ফসলচক্র 01" },
     months: [
       { month: "2024-01", cropName: "Mustard", cropNameBn: "সরিষা", rootDepthM: 0.6, wetness: 0.48 },
     ],
@@ -280,14 +281,19 @@ test("buildCalloutData produces bilingual stratigraphic callouts with SoilGrids 
   assert.ok(callouts.topsoil);
   assert.equal(callouts.topsoil.eyebrow, "0–15 cm · TOPSOIL");
   assert.equal(callouts.topsoil.truth, "MODELED");
-  assert.equal(callouts.topsoil.truthLabel, "SoilGrids, Estimated");
+  assert.equal(callouts.topsoil.truthLabel, "Estimated · SoilGrids 250 m");
   assert.match(callouts.topsoil.value, /Clay Loam/);
   assert.match(callouts.topsoil.value, /pH 5.8/);
   assert.match(callouts.topsoil.value, /OM 1.83%/);
 
   assert.ok(callouts.rootzone);
   assert.equal(callouts.rootzone.eyebrow, "15–60 cm · ROOT ZONE");
-  assert.match(callouts.rootzone.value, /GWETROOT 0.48 · Mustard \(0.6 m\)/);
+  assert.equal(callouts.rootzone.value, "Root zone: moist (48 % of saturation)");
+  assert.equal(callouts.rootzone.truth, "MODELED");
+  assert.equal(callouts.rootzone.truthLabel, "Estimated · NASA POWER ~50 km, top ~1 m");
+  assert.equal(callouts.rootzone.cropValue, "Planned: Mustard (Rotation 01) · roots ~0.6 m");
+  assert.equal(callouts.rootzone.cropTruth, "SCENARIO");
+  assert.equal(callouts.rootzone.cropTruthLabel, "Scenario");
 
   assert.ok(callouts.aquifer);
   assert.equal(callouts.aquifer.eyebrow, ">120 cm · SUBSOIL & WATER TABLE");
@@ -309,6 +315,58 @@ test("buildCalloutData produces bilingual stratigraphic callouts with SoilGrids 
   assert.equal(customCallouts.aquifer.truth, "FARMER_REPORTED");
   assert.equal(customCallouts.aquifer.isButton, false);
   assert.equal(customCallouts.aquifer.value, "2.8 m (Measured)");
+});
+
+test("buildCalloutData classifies unrounded root wetness at every threshold", () => {
+  for (const [rootWetness, word] of [
+    [0, "dry"], [0.2999, "dry"], [0.3, "moist"], [0.5999, "moist"],
+    [0.6, "wet"], [0.8, "wet"], [0.85, "wet"], [0.8501, "saturated"], [1, "saturated"],
+  ]) {
+    const { rootzone } = buildCalloutData({ data: { months: [{ rootWetness, wetness: 0.5 }] } });
+    assert.equal(rootzone.value, `Root zone: ${word} (${Math.round(rootWetness * 100)} % of saturation)`);
+    assert.doesNotMatch(rootzone.value, /GWETROOT/);
+  }
+});
+
+test("buildCalloutData leaves missing or invalid wetness unknown", () => {
+  assert.equal(buildCalloutData({ data: null }), null);
+  for (const wetness of [undefined, null, "", NaN, Infinity, -0.1, 1.1, "bad"]) {
+    const { rootzone } = buildCalloutData({ data: { months: [{ wetness }] } });
+    assert.equal(rootzone.value, "Root zone: unknown");
+    assert.equal(rootzone.gwetroot, null);
+    assert.equal(rootzone.cropValue, "Planned: Crop");
+  }
+  const { rootzone } = buildCalloutData({ data: { months: [{ rootWetness: null, wetness: 0 }] } });
+  assert.equal(rootzone.value, "Root zone: dry (0 % of saturation)");
+});
+
+test("buildCalloutData uses the previewed rotation and selected month's crop and roots", () => {
+  const data = {
+    rotation: { label: "Rotation 01", bn: "ফসলচক্র 01" },
+    months: [
+      { cropName: "Mustard", cropNameBn: "সরিষা", rootDepthM: 0.6, wetness: 0.48 },
+      { cropName: "Potato", cropNameBn: "আলু", rootDepthM: 0.1, rootWetness: 0.8 },
+    ],
+    soil: { layers: [{ clayPct: 32, sandPct: 35, siltPct: 33, ph: 5.8, socGkg: 10.6 }] },
+  };
+  const callouts = buildCalloutData({ data, monthIdx: 1 });
+  assert.equal(callouts.rootzone.value, "Root zone: wet (80 % of saturation)");
+  assert.equal(callouts.rootzone.cropValue, "Planned: Potato (Rotation 01) · roots ~0.1 m");
+
+  const bn = buildCalloutData({ data, monthIdx: 1, t: (en, bn) => bn });
+  assert.equal(bn.topsoil.eyebrow, "0–15 cm · উপরের মাটি");
+  assert.equal(bn.topsoil.value, "এঁটেল দোআঁশ · pH 5.8 · জৈব পদার্থ 1.83%");
+  assert.equal(bn.topsoil.truthLabel, "আনুমানিক · SoilGrids 250 মি");
+  assert.equal(bn.rootzone.eyebrow, "15–60 cm · শিকড় অঞ্চল");
+  assert.equal(bn.rootzone.value, "শিকড় অঞ্চল: ভেজা (সম্পৃক্ততার 80 %)");
+  assert.equal(bn.rootzone.truthLabel, "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি");
+  assert.equal(bn.rootzone.cropValue, "পরিকল্পিত: আলু (ফসলচক্র 01) · শিকড় ~0.1 মি");
+  assert.equal(bn.rootzone.cropTruthLabel, "কাল্পনিক পরিকল্পনা");
+
+  for (const [wetness, word] of [[0.2, "শুষ্ক"], [0.4, "আর্দ্র"], [0.9, "সম্পৃক্ত"], [null, "অজানা"]]) {
+    const { rootzone } = buildCalloutData({ data: { months: [{ wetness }] }, t: (en, bn) => bn });
+    assert.ok(rootzone.value.includes(word));
+  }
 });
 
 test("deoverlapLabels arranges labels vertically with minGap and without overlaps", () => {
@@ -516,7 +574,7 @@ test("buildCalloutData includes fallow residue description for fallow months", (
     soilOverrides: null,
     t: (en, bn) => en,
   });
-  assert.match(enCallouts.rootzone.value, /Fallow · residue of Mustard/);
+  assert.match(enCallouts.rootzone.cropValue, /Fallow · residue of Mustard/);  // crop line moved to cropValue (LABELS)
 
   const bnCallouts = buildCalloutData({
     data: dummyData,
