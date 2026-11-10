@@ -153,6 +153,7 @@ let suppressSoilHover = false;
 let overlayEvents = null;
 let hintShown = false;
 let wideLayersOpen = false;
+let stageOverlayCleanup = null;
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -2116,6 +2117,13 @@ function studioFreeRegion() {
   const controls = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
   const overlayBottom = (overlay?.bottom || rect.top) - rect.top;
   const controlsBottom = (controls?.bottom || rect.top) - rect.top;
+  if (canvasHostEl.dataset.overlaySize === 'narrow') {
+    // Prefer the stage centre, keeping the entire sway clear of the camera pill.
+    // In narrow mode, controls are on the right, so only overlayBottom matters for top.
+    const top = overlayBottom + 12;
+    return { region: { left: 0.015, right: 0.985, top: top / h, bottom: (h - 16) / h },
+      preferredCentreY: (overlayBottom + h - 16) / (2 * h) };
+  }
   const cards = [...canvasHostEl.querySelectorAll('.studio-probe-card, .studio-transect-card')]
     .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
   const bottom = Math.min(h - 16, ...cards.map((r) => r.top - rect.top - 16));
@@ -2134,7 +2142,8 @@ function fitPerspective(data, close = false) {
   // Close-up still swings in tighter and higher.
   const elevationDeg = close ? 22 : 14;
   const yawDeg = close ? 26 : 10;
-  const margin = isPhone() ? 0.22 : 0.18;
+  const phone = canvasHostEl.dataset.overlaySize === 'narrow';
+  const margin = close && phone ? 0.14 : isPhone() ? 0.22 : 0.18;
   const fit = fitCameraToBlock({
     outlineM: data.field.outlineM,
     depthM: depth,
@@ -2146,19 +2155,23 @@ function fitPerspective(data, close = false) {
   });
 
   // STUDIO5P: the default 3D-field framing fills ~70-75 % of the canvas width
-  // on desktop and ~90 % on phone. The solver backs off until the whole block
+  // on desktop and ~85-90 % on phone. The solver backs off until the whole block
   // fits, so arbitrary drawn boundaries stay fully visible. Close-up/Top unchanged.
   // Shift target down to center the block in the frame below the UI
   // STUDIO5Q: overlay clearance now caps that zoom, including terrain and sway.
   const space = studioFreeRegion();
   const canopy = canopyVisualHeight(data.months[currentMonthIdx], Math.max(b.width, b.height));
-  const solved = close ? null : solveFramingMultiplier({
+  const solved = close && !phone ? null : solveFramingMultiplier({
     outlineM: data.field.outlineM, depthM: depth, fovDeg: cameraPersp.fov,
-    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: 0.6,
+    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.88 : 0.6,
     region: space.region, topM: currentBlock.topMax + Math.max(canopy, Math.max(b.width, b.height) * 0.08),
     bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
   });
-  const distance = fit.distance * (close ? 0.72 : solved.multiplier);
+  if (phone) {
+    const centreY = Math.max(space.preferredCentreY, space.region.top + solved.heightFrac / 2);
+    solved.viewOffsetY += (space.region.top + space.region.bottom) / 2 - centreY;
+  }
+  const distance = fit.distance * (solved ? solved.multiplier : 0.72);
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
   const target = [fit.target[0], -depth * 0.45, fit.target[2]];
@@ -2169,7 +2182,7 @@ function fitPerspective(data, close = false) {
   );
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
-  if (!close && canvasHostEl) {
+  if (solved && canvasHostEl) {
     const w = canvasHostEl.clientWidth || 600;
     const h = canvasHostEl.clientHeight || 400;
     cameraPersp.setViewOffset(w, h, solved.viewOffsetX * w, solved.viewOffsetY * h, w, h);
@@ -2212,6 +2225,17 @@ function fitOrtho(data) {
   cameraOrtho.up.set(0, 0, -1);
   cameraOrtho.lookAt(fit.target[0], 0, fit.target[2]);
   cameraOrtho.zoom = 1;
+  if (canvasHostEl.dataset.overlaySize === 'narrow') {
+    const { region } = studioFreeRegion();
+    const b = outlineBounds(data.field.outlineM);
+    const halfWidth = Math.max(b.width / 0.88, b.height * hostAspect() / (region.bottom - region.top)) / 2;
+    const halfHeight = halfWidth / hostAspect();
+    const centreY = ((region.top + region.bottom) / 2 - 0.5) * 2 * halfHeight;
+    cameraOrtho.left = -halfWidth;
+    cameraOrtho.right = halfWidth;
+    cameraOrtho.top = halfHeight + centreY;
+    cameraOrtho.bottom = -halfHeight + centreY;
+  }
   cameraOrtho.near = 0.1;
   cameraOrtho.far = 600;
   cameraOrtho.updateProjectionMatrix();
@@ -3023,6 +3047,15 @@ function updateOverlayLayout() {
   const layers = containerEl.querySelector('.studio-soil-layers');
   const inspection = containerEl.querySelector('.studio-inspection');
   if (changed) {
+    const sheet = containerEl.querySelector('#studio-layers-sheet');
+    const overlay = containerEl.querySelector('.studio-overlay-tl');
+    const caption = overlay.querySelector('.studio-caption-copy');
+    if (breakpoint !== 'narrow' && sheet.open) sheet.dispatchEvent(new Event('cancel', { cancelable: true }));
+    for (const selector of ['.studio-overlay-tc', '.studio-surface-selector', '.studio-slice-card', '.studio-crop-chip']) {
+      const el = containerEl.querySelector(selector);
+      if (breakpoint === 'narrow') sheet.querySelector('.studio-layers-content').appendChild(el);
+      else overlay.insertBefore(el, caption);
+    }
     if (layers) {
       layers.open = breakpoint === 'wide' ? wideLayersOpen : true;
       const summary = layers.querySelector('summary');
@@ -3109,10 +3142,120 @@ function positionSoilPopover() {
   popover.style.top = `${placed.top}px`;
 }
 
+function bindStageOverlays(options) {
+  const stage = canvasHostEl;
+  const sheet = containerEl.querySelector('#studio-layers-sheet');
+  const layersButton = containerEl.querySelector('[data-studio-layers]');
+  const fullscreenButton = containerEl.querySelector('[data-studio-ctrl="fullscreen"]');
+  let fullscreen = false;
+  let previousOverflow = '';
+  const pushOverlay = (kind) => history.pushState({ ...history.state, studioOverlay: kind }, '');
+  const backFrom = (kind) => {
+    if (history.state?.studioOverlay === kind) history.back();
+  };
+  const closeLayers = (fromHistory = false) => {
+    if (!sheet.open) return;
+    sheet.close();
+    layersButton.setAttribute('aria-expanded', 'false');
+    layersButton.focus({ preventScroll: true });
+    if (!fromHistory) backFrom('layers');
+  };
+  const closeFullscreen = (fromHistory = false) => {
+    if (!fullscreen) return;
+    fullscreen = false;
+    if (document.fullscreenElement === stage) document.exitFullscreen().catch(() => {});
+    if (stage.classList.contains('studio-fullscreen-fallback')) {
+      stage.classList.remove('studio-fullscreen-fallback');
+      document.documentElement.style.overflow = previousOverflow;
+    }
+    fullscreenButton.setAttribute('aria-pressed', 'false');
+    fullscreenButton.focus({ preventScroll: true });
+    onResize();
+    if (!fromHistory) backFrom('fullscreen');
+  };
+  layersButton.addEventListener('click', () => {
+    closeSoilPopover(false);
+    sheet.showModal();
+    layersButton.setAttribute('aria-expanded', 'true');
+    pushOverlay('layers');
+  }, options);
+  sheet.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeLayers();
+  }, options);
+  sheet.querySelector('[data-close-layers]').addEventListener('click', () => closeLayers(), options);
+  sheet.addEventListener('click', (e) => {
+    const rect = sheet.getBoundingClientRect();
+    if (e.target === sheet && (e.clientY < rect.top || e.clientX < rect.left || e.clientX > rect.right)) closeLayers();
+  }, options);
+  const handle = sheet.querySelector('.studio-sheet-handle');
+  let dragY = null;
+  handle.addEventListener('pointerdown', (e) => {
+    dragY = e.clientY;
+    handle.setPointerCapture(e.pointerId);
+  }, options);
+  handle.addEventListener('pointerup', (e) => {
+    if (dragY !== null && e.clientY - dragY > 48) closeLayers();
+    dragY = null;
+  }, options);
+  handle.addEventListener('pointercancel', () => { dragY = null; }, options);
+  fullscreenButton.onclick = async () => {
+    if (fullscreen) { closeFullscreen(); return; }
+    closeSoilPopover(false);
+    fullscreen = true;
+    pushOverlay('fullscreen');
+    fullscreenButton.setAttribute('aria-pressed', 'true');
+    try {
+      await stage.requestFullscreen();
+      if (!fullscreen || isDisposed) {
+        if (document.fullscreenElement === stage) document.exitFullscreen().catch(() => {});
+        return;
+      }
+    } catch {
+      if (!fullscreen || isDisposed) return;
+      previousOverflow = document.documentElement.style.overflow;
+      document.documentElement.style.overflow = 'hidden';
+      stage.classList.add('studio-fullscreen-fallback');
+      fullscreenButton.focus({ preventScroll: true });
+    }
+    onResize();
+  };
+  document.addEventListener('fullscreenchange', () => {
+    if (fullscreen && document.fullscreenElement !== stage) closeFullscreen();
+    else onResize();
+  }, options);
+  window.addEventListener('popstate', (e) => {
+    if (sheet.open && e.state?.studioOverlay !== 'layers') closeLayers(true);
+    if (fullscreen && !['layers', 'fullscreen'].includes(e.state?.studioOverlay)) closeFullscreen(true);
+  }, options);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (sheet.open) { e.preventDefault(); closeLayers(); }
+      else if (fullscreen) { e.preventDefault(); closeFullscreen(); }
+    }
+    const modal = sheet.open ? sheet : stage.classList.contains('studio-fullscreen-fallback') ? stage : null;
+    if (e.key !== 'Tab' || !modal) return;
+    const targets = [...modal.querySelectorAll('button, select, input, [tabindex="0"]')]
+      .filter((el) => !el.disabled && el.getClientRects().length);
+    const first = targets[0], last = targets[targets.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }, options);
+  stageOverlayCleanup = () => {
+    closeLayers(true);
+    closeFullscreen(true);
+    if (history.state?.studioOverlay) {
+      const { studioOverlay, ...rest } = history.state;
+      history.replaceState(rest, '');
+    }
+  };
+}
+
 function bindOverlayEvents() {
   overlayEvents?.abort();
   overlayEvents = new AbortController();
   const options = { signal: overlayEvents.signal };
+  bindStageOverlays(options);
   containerEl.addEventListener('focusin', (e) => {
     const pin = e.target.closest('[data-soil-pin]');
     if (pin && !restoringPopoverFocus) openSoilPopover(pin.dataset.soilPin, pin);
@@ -3342,10 +3485,13 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         <!-- Top-Left Surface Layer Switcher & Preset Views -->
         <div class="studio-overlay-tl">
           <div class="studio-view-toggle">
-            <button id="btn-view-3d" type="button" class="studio-view-btn ${currentViewMode === "3d" ? "active" : ""}" data-studio-view="3d">${t("3D field", "৩ডি মাঠ")}</button>
-            <button id="btn-view-cutaway" type="button" class="studio-view-btn ${currentViewMode === "cutaway" ? "active" : ""}" data-studio-view="cutaway">${t("Root Slice", "মাটির স্তর ও শিকড়")}</button>
-            <button id="btn-view-2d" type="button" class="studio-view-btn ${currentViewMode === "top" ? "active" : ""}" data-studio-view="top">${t("Top view", "উপরের দৃশ্য")}</button>
+            <button id="btn-view-3d" type="button" class="studio-view-btn ${currentViewMode === "3d" ? "active" : ""}" data-studio-view="3d"><span class="studio-view-long">${t("3D field", "৩ডি মাঠ")}</span><span class="studio-view-short">${t("3D", "৩ডি")}</span></button>
+            <button id="btn-view-cutaway" type="button" class="studio-view-btn ${currentViewMode === "cutaway" ? "active" : ""}" data-studio-view="cutaway"><span class="studio-view-long">${t("Root Slice", "মাটির স্তর ও শিকড়")}</span><span class="studio-view-short">${t("Slice", "ছেদ")}</span></button>
+            <button id="btn-view-2d" type="button" class="studio-view-btn ${currentViewMode === "top" ? "active" : ""}" data-studio-view="top"><span class="studio-view-long">${t("Top view", "উপরের দৃশ্য")}</span><span class="studio-view-short">${t("Top", "উপর")}</span></button>
           </div>
+          <button type="button" class="studio-layers-button" data-studio-layers aria-label="${t("Layers", "লেয়ার")}" aria-haspopup="dialog" aria-expanded="false" aria-controls="studio-layers-sheet">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 7 9-4 9 4-9 4Z M3 12l9 4 9-4 M3 17l9 4 9-4"/></svg>
+          </button>
 
           <!-- Top-Centre Fallow / Harvested Notification Chip -->
           <div id="studio-overlay-fallow-host" class="studio-overlay-tc">
@@ -3378,6 +3524,15 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             </div>
           </div>
         </div>
+
+        <dialog id="studio-layers-sheet" class="studio-layers-sheet" aria-labelledby="studio-layers-title">
+          <div class="studio-sheet-handle" aria-hidden="true"><span></span></div>
+          <div class="studio-sheet-heading">
+            <h2 id="studio-layers-title">${t("Layers", "লেয়ার")}</h2>
+            <button type="button" data-close-layers aria-label="${t("Close layers", "লেয়ার বন্ধ করুন")}">×</button>
+          </div>
+          <div class="studio-layers-content"></div>
+        </dialog>
 
         <div class="studio-stage-controls">
           <button class="studio-ctrl-btn" data-studio-ctrl="zoom-in" title="${t("Zoom In", "কাছে আনুন")}" aria-label="${t("Zoom In", "কাছে আনুন")}">+</button>
@@ -3922,10 +4077,6 @@ function bindEvents(container) {
       } else if (act === "reset") {
         fitCameras(currentData);
         triggerIntroAnimation(true);
-      } else if (act === "fullscreen") {
-        const stage = containerEl.querySelector(".studio-stage-wrap");
-        if (!document.fullscreenElement) stage?.requestFullscreen().catch(() => {});
-        else document.exitFullscreen().catch(() => {});
       }
       requestRender();
     };
@@ -4208,6 +4359,8 @@ export function disposeStudio3d() {
     resizeObserver = null;
   }
   document.removeEventListener("visibilitychange", onVisibilityChange);
+  stageOverlayCleanup?.();
+  stageOverlayCleanup = null;
   overlayEvents?.abort();
   overlayEvents = null;
   openSoilBand = null;
