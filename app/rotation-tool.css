@@ -168,7 +168,7 @@
 }
 
 .nutrient-chip.active,
-.nutrient-chip:bg-[#173e30] {
+.nutrient-chip.bg-\[\#173e30\] {
   background: #173e30;
   color: var(--text-inverse);
   border-color: #173e30;
@@ -608,11 +608,11 @@
   font-size: 0.75rem;
 }
 
-.text-[11px] {
+.text-\[11px\] {
   font-size: 0.6875rem;
 }
 
-.text-[10px] {
+.text-\[10px\] {
   font-size: 0.625rem;
 }
 
@@ -824,135 +824,135 @@ a:hover {
 /* ============================================
  * Background colors
  * ============================================ */
-.bg-[#fffdf5] {
+.bg-\[\#fffdf5\] {
   background-color: #fffdf5;
 }
 
-.bg-[#f4f6ea] {
+.bg-\[\#f4f6ea\] {
   background-color: #f4f6ea;
 }
 
-.bg-[#f6f3e9] {
+.bg-\[\#f6f3e9\] {
   background-color: #f6f3e9;
 }
 
-.bg-[#173e30] {
+.bg-\[\#173e30\] {
   background-color: #173e30;
 }
 
-.bg-[#225441] {
+.bg-\[\#225441\] {
   background-color: #225441;
 }
 
-.bg-[#fffdf5] {
+.bg-\[\#fffdf5\] {
   background-color: #fffdf5;
 }
 
-.bg-[#b0452b] {
+.bg-\[\#b0452b\] {
   background-color: #b0452b;
 }
 
-.bg-[#f8edd6] {
+.bg-\[\#f8edd6\] {
   background-color: #f8edd6;
 }
 
-.bg-[#f8f6f2] {
+.bg-\[\#f8f6f2\] {
   background-color: #f8f6f2;
 }
 
 /* ============================================
  * Text colors
  * ============================================ */
-.text-[#fffdf5] {
+.text-\[\#fffdf5\] {
   color: #fffdf5;
 }
 
-.text-[#173e30] {
+.text-\[\#173e30\] {
   color: #173e30;
 }
 
-.text-[#1b382e] {
+.text-\[\#1b382e\] {
   color: #1b382e;
 }
 
-.text-[#3a4d3f] {
+.text-\[\#3a4d3f\] {
   color: #3a4d3f;
 }
 
-.text-[#536456] {
+.text-\[\#536456\] {
   color: #536456;
 }
 
-.text-[#575c58] {
+.text-\[\#575c58\] {
   color: #575c58;
 }
 
-.text-[#234f61] {
+.text-\[\#234f61\] {
   color: #234f61;
 }
 
-.text-[#315d42] {
+.text-\[\#315d42\] {
   color: #315d42;
 }
 
-.text-[#b9822d] {
+.text-\[\#b9822d\] {
   color: #b9822d;
 }
 
-.text-[#cdcfc0] {
+.text-\[\#cdcfc0\] {
   color: #cdcfc0;
 }
 
-.text-[#2563eb] {
+.text-\[\#2563eb\] {
   color: #2563eb;
 }
 
-.text-[#4b3412] {
+.text-\[\#4b3412\] {
   color: #4b3412;
 }
 
 /* ============================================
  * Border colors
  * ============================================ */
-.border-[#cdcfc0] {
+.border-\[\#cdcfc0\] {
   border-color: #cdcfc0;
 }
 
-.border-[#173e30] {
+.border-\[\#173e30\] {
   border-color: #173e30;
 }
 
-.border-[#e2e4d8] {
+.border-\[\#e2e4d8\] {
   border-color: #e2e4d8;
 }
 
-.border-[#d5dac7] {
+.border-\[\#d5dac7\] {
   border-color: #d5dac7;
 }
 
-.border-[#e8e8e8] {
+.border-\[\#e8e8e8\] {
   border-color: #e8e8e8;
 }
 
 /* ============================================
  * Background gradients for stamp colors
  * ============================================ */
-.bg-[#dbe9cf] {
+.bg-\[\#dbe9cf\] {
   background-color: #dbe9cf;
 }
 
-.bg-[#ece8d9] {
+.bg-\[\#ece8d9\] {
   background-color: #ece8d9;
 }
 
-.bg-[#d4e6f1] {
+.bg-\[\#d4e6f1\] {
   background-color: #d4e6f1;
 }
 
-.bg-[#f5e7d3] {
+.bg-\[\#f5e7d3\] {
   background-color: #f5e7d3;
 }
 
-.bg-[#c8e6c9] {
+.bg-\[\#c8e6c9\] {
   background-color: #c8e6c9;
 }

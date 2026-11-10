@@ -77,6 +77,7 @@ const NUTRIENT_GUIDES = {
 // State for new panels
 let soilOverrides = null;
 let plantingLayoutState = null;
+let cachedSoilNutrients = null;
 
 // Engine key mapping
 function mapPriorityKey(key) {
@@ -96,6 +97,19 @@ async function loadSoilProfile() {
     if (resp.ok) soilOverrides = await resp.json();
   } catch (_) {}
   return soilOverrides;
+}
+
+// Load soil nutrients safely (silent check)
+async function loadNutrients() {
+  if (cachedSoilNutrients !== null) return cachedSoilNutrients;
+  try {
+    const resp = await fetch('data/soil-nutrients.json');
+    if (resp.ok) cachedSoilNutrients = await resp.json();
+    else cachedSoilNutrients = false;
+  } catch (_) {
+    cachedSoilNutrients = false;
+  }
+  return cachedSoilNutrients;
 }
 
 // Load low ground data
@@ -323,7 +337,17 @@ export async function panelWhereWillWaterCollect() {
 export async function panelWhatIsUnderMyField() {
   const profile = await loadSoilProfile();
   const f = field();
-  const soilData = getSoilDataForField(f?.id || state.fieldId);
+  const fieldId = f?.id || state.fieldId;
+  const soilData = getSoilDataForField(fieldId);
+  const nutrientsData = await loadNutrients();
+  const siteNutrients = nutrientsData?.sites?.[fieldId] || nutrientsData?.[fieldId] || null;
+
+  const awaitingText = t('Awaiting soil data', 'মাটির তথ্যের অপেক্ষায়');
+  const pLabel = siteNutrients?.p ? `P: ${siteNutrients.p}` : `P (${awaitingText})`;
+  const kLabel = siteNutrients?.k ? `K: ${siteNutrients.k}` : `K (${awaitingText})`;
+  const znLabel = siteNutrients?.zn ? `Zn: ${siteNutrients.zn}` : `Zn (${awaitingText})`;
+  const bLabel = siteNutrients?.b ? `B: ${siteNutrients.b}` : `B (${awaitingText})`;
+
   return `
     <section id="panel-left-soil" class="panel-card p-4 flex flex-col gap-4">
       <div class="border-b border-[#e2e4d8] pb-2.5 flex justify-between items-start">
@@ -348,16 +372,16 @@ export async function panelWhatIsUnderMyField() {
         </div>
       </div>
       <div class="rotation-panel-tint p-3 flex flex-col gap-2">
-        <div class="flex justify-between items-center"><span class="eyebrow text-[#173e30]">${t('Soil Fertility Lens', 'মাটির উর্বরতা লেন্স')}</span><span class="stamp stamp-measured" id="nutri-source-stamp">RARS ${t('Table', 'টেবিল')} 1</span></div>
+        <div class="flex justify-between items-center"><span class="eyebrow text-[#173e30]">${t('Soil Fertility Lens', 'মাটির উর্বরতা লেন্স')}</span><span class="stamp stamp-measured" id="nutri-source-stamp">SoilGrids 2.0</span></div>
         <div class="nutrient-chip-group text-[11px] mono font-semibold">
           <button type="button" data-nutrient="moisture" class="nutrient-chip py-1.5 rounded bg-[#173e30] text-[#fffdf5]">${t('Moisture', 'আর্দ্রতা')}</button>
           <button type="button" data-nutrient="ph" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">pH ${soilData?.ph ? soilData.ph.toFixed(2) : '?'}</button>
           <button type="button" data-nutrient="om" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">OM ${soilData?.om ? soilData.om.toFixed(2) : '?'}%</button>
-          <button type="button" data-nutrient="N" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${t('N', 'N')}</button>
-          <button type="button" data-nutrient="P" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${t('P', 'P')}</button>
-          <button type="button" data-nutrient="K" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${t('K', 'K')}</button>
-          <button type="button" data-nutrient="Zn" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${t('Zinc', 'জিংক')}</button>
-          <button type="button" data-nutrient="B" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${t('Boron', 'বোরন')}</button>
+          <button type="button" data-nutrient="N" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">N</button>
+          <button type="button" data-nutrient="P" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${pLabel}</button>
+          <button type="button" data-nutrient="K" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${kLabel}</button>
+          <button type="button" data-nutrient="Zn" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${znLabel}</button>
+          <button type="button" data-nutrient="B" class="nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]">${bLabel}</button>
         </div>
         <div id="nutrient-explanation" class="text-xs text-[#1b382e] bg-[#fffdf5] p-2.5 rounded border border-[#cdcfc0] leading-relaxed">${t('Surface wetness from NASA POWER/SMAP. Regional estimates may not match after heavy local rain or irrigation.', 'NASA POWER/SMAP থেকে পৃষ্ঠের আর্দ্রতা। আঞ্চলিক অনুমান স্থানীয় ভারী বৃষ্টি বা সেচের পরে মেলাতে পারে না।')}</div>
       </div>
@@ -393,7 +417,7 @@ export function panelCompareRotations() {
     <section class="panel-card p-4 flex flex-col gap-3">
       <div class="border-b border-[#e2e4d8] pb-2.5 flex justify-between items-start">
         <div>
-          <p class="eyebrow">Sarker et al. (2026) · NASA POWER</p>
+          <p class="eyebrow">NASA POWER · GPM IMERG · FAO-56</p>
           <h2 class="serif-head text-xl font-semibold text-[#173e30] mt-0.5">${t('Compare 4 Rotation Strategies', '৪টি ফসলচক্র তুলনা করুন')}</h2>
         </div>
         <span class="stamp stamp-measured">RARS ${t('Trial', 'পরীক্ষা')}</span>
@@ -402,7 +426,7 @@ export function panelCompareRotations() {
       <div id="selected-rotation-detail" class="rotation-panel-tint p-3.5 flex flex-col gap-2.5 text-xs">
         <div class="flex justify-between border-b border-[#d5dac7] pb-1.5"><strong class="serif-head text-base text-[#173e30]">${selected.id === 'baseline' ? t('Keep the familiar rhythm', 'পরিচিত ছন্দ বজায় রাখুন') : selected.id === 'mustard' ? t('Make the winter gap count', 'শীতের ফাঁকে ফসল চাষ') : selected.id === 'potato' ? t('Plan for a potato harvest', 'আলুর ফলনের পরিকল্পনা') : t('Bring a pulse into the cycle', 'চক্রে ডাল যোগ করুন')}</strong></div>
         <div><span class="eyebrow text-[10px] text-[#315d42] block">${t('Why Suggested', 'কেন পরামর্শ')}</span><p class="mt-0.5 text-[#1b382e]">${t(whyBn[selected.id] || selected.why || '', whyBn[selected.id] || '')}</p></div>
-        <div><span class="eyebrow text-[10px] text-[#315d42] block">${t('RARS Evidence', 'RARS প্রমাণ')}</span><p class="mt-0.5 text-[#1b382e]">${t('Field trials at RARS Burirhat under similar conditions.', 'বারিরহাটে অনুরূপ পরিস্থিতিতে মাঠ পরীক্ষা।')}</p></div>
+        <div><span class="eyebrow text-[10px] text-[#315d42] block">${t('Trial Evidence', 'গবেষণার প্রমাণ')}</span><p class="mt-0.5 text-[#1b382e]">${t('Agronomic field trials under regional conditions.', 'আঞ্চলিক পরিস্থিতিতে মাঠ পরীক্ষা।')}</p></div>
         <div><span class="eyebrow text-[10px] text-[#315d42] block">${t('Soil & Water Benefits', 'মাটি ও পানির সুবিধা')}</span><p class="mt-0.5 text-[#1b382e]">${t('Improves soil structure and reduces irrigation.', 'মাটির গঠন উন্নত করে এবং সেচ কমায়।')}</p></div>
         <div class="grid grid-cols-1 gap-1.5 pt-1 border-t border-[#d5dac7]">
           <div><span class="eyebrow text-[10px] text-[#b9822d] block">${t('Information Gaps', 'তথ্যের ঘাটতি')}</span><p class="text-[11px] text-[#536456]">${t('Local soil test required for precise nutrients.', 'সঠিক পুষ্টির জন্য স্থানীয় মাটি পরীক্ষা প্রয়োজন।')}</p></div>
@@ -430,35 +454,54 @@ export function panelCompareRotations() {
 // NASA Sources Modal
 export function sourcesModal() {
   return `
-    <div id="modal-sources" class="rotation-modal hidden">
+    <dialog id="modal-sources" class="rotation-modal">
       <div class="rotation-modal-content">
-        <div class="rotation-modal-header"><div><p class="eyebrow">${t('Data Fusion & Citations', 'ডেটা ফিউশন ও উদ্ধৃতি')}</p><h3 class="serif-head text-xl font-semibold text-[#173e30]">${t('NASA & Local Data Sources', 'NASA ও স্থানীয় তথ্যের উৎস')}</h3></div><button id="btn-close-sources" type="button" class="rotation-modal-close">✕</button></div>
-        <div class="overflow-x-auto"><table class="sources-table"><thead><tr><th>${t('Dataset', 'ডেটাসেট')}</th><th>${t('Resolution', 'রেজোলিউশন')}</th><th>${t('Role', 'ভূমিকা')}</th><th>${t('Limitation', 'সীমাবদ্ধতা')}</th></tr></thead><tbody>
-          <tr><td class="font-semibold"><a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener" class="text-[#315d42] underline">NASA POWER (MERRA-2) ↗</a></td><td class="mono">0.5° · ${t('Daily', 'দৈনিক')}</td><td>${t('Rain, Tmax/Tmin, FAO-56 ET₀, wetness', 'বৃষ্টি, সর্বোচ্চ/নিম্ন তাপমাত্রা, FAO-56 ইটিও, আর্দ্রতা')}</td><td class="text-[#536456]">${t('Regional grid; no sub-parcel resolution', 'আঞ্চলিক গ্রিড; জমির ভাগের প্রতিনিধিত্ব করে না')}</td></tr>
-          <tr><td class="font-semibold"><a href="https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a" target="_blank" class="text-[#315d42] underline">Sentinel-2 L2A ↗</a></td><td class="mono">10 m · 307 dates</td><td>${t('True-color, NDVI, bare-field calendar', 'সত্য রং, এনডিভিআই, খালি জমির ক্যালেন্ডার')}</td><td class="text-[#536456]">${t('Monsoon cloud blocks optical views', 'মনসুন মেঘ অপটিক্যাল ভিউ ব্লক করে')}</td></tr>
-          <tr><td class="font-semibold"><a href="https://planetarycomputer.microsoft.com/dataset/sentinel-1-rtc" target="_blank" class="text-[#315d42] underline">Sentinel-1 SAR ↗</a></td><td class="mono">10 m · 538 scenes</td><td>${t('Rice transplanting & water ponding', 'ধান রোপণ ও পানি জমা')}</td><td class="text-[#536456]">${t('Requires speckle filter & all orbits', 'স্পেকল ফিল্টার ও সকল অরবিট প্রয়োজন')}</td></tr>
-          <tr><td class="font-semibold"><a href="https://planetarycomputer.microsoft.com/dataset/nasadem" target="_blank" class="text-[#315d42] underline">NASADEM ↗</a></td><td class="mono">30 m</td><td>${t('3D elevation, slope%, flood exposure', '3D উচ্চতা, ঢাল%, বন্যা ঝুঁকি')}</td><td class="text-[#536456]">${t('Cannot see 15 cm earthen bunds', '15 সেমি মাটির বাঁধ দেখতে পারে না')}</td></tr>
-          <tr><td class="font-semibold"><a href="https://doi.org/10.1155/ioa/9089088" target="_blank" class="text-[#315d42] underline">Sarker et al. (2026) ↗</a></td><td class="mono">Burirhat 2021-23</td><td>${t('Soil baseline & 4 cropping patterns', 'মাটির বেসলাইন ও 4টি চক্র')}</td><td class="text-[#536456]">${t('2 seasons at 1 station', '1 স্টেশনে 2 মৌসুম')}</td></tr>
-          <tr><td class="font-semibold"><a href="https://apps.barc.gov.bd/fertilizer_recommendation/FRG%20English%2030.10.2024.pdf" target="_blank" class="text-[#315d42] underline">BARC FRG 2024 ↗</a></td><td class="mono">AEZ-3</td><td>${t('Crop-specific NPK & micronutrients', 'ফসল-নির্দিষ্ট এনপিকে ও সূক্ষ্ম পুষ্টি')}</td><td class="text-[#536456]">${t('Regional; verify with soil test', 'আঞ্চলিক; মাটি পরীক্ষার সাথে যাচাই করুন')}</td></tr>
+        <div class="rotation-modal-header">
+          <div>
+            <p class="eyebrow">${t('Data Fusion & Citations', 'ডেটা ফিউশন ও উদ্ধৃতি')}</p>
+            <h3 class="serif-head text-xl font-semibold text-[#173e30]">${t('NASA & Local Data Sources', 'NASA ও স্থানীয় তথ্যের উৎস')}</h3>
+          </div>
+          <button id="btn-close-sources" type="button" class="rotation-modal-close" aria-label="${t('Close', 'বন্ধ')}">✕</button>
+        </div>
+        <div class="overflow-x-auto"><table class="sources-table"><thead><tr><th>${t('Dataset', 'ডেটাসেট')}</th><th>${t('Resolution & Dates', 'রেজোলিউশন ও তারিখ')}</th><th>${t('Role', 'ভূমিকা')}</th><th>${t('Truth & Limitation', 'সত্যতা ও সীমাবদ্ধতা')}</th></tr></thead><tbody>
+          <tr><td class="font-semibold"><a href="https://www.esri.com/" target="_blank" rel="noopener" class="text-[#315d42] underline">Esri World Imagery (Wayback) ↗</a></td><td class="mono">0.31 m · 2022-11-28</td><td>${t('High-detail basemap & parcel boundary reference', 'উচ্চ বিস্তারিত বেসম্যাপ ও জমির সীমানা')}</td><td class="text-[#536456]"><span class="stamp stamp-estimated">${t('Estimated', 'অনুমান')}</span> ${t('Dry season snapshot; static aerial', 'শুকনো মৌসুমের স্থির দৃশ্য')}</td></tr>
+          <tr><td class="font-semibold"><a href="https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a" target="_blank" rel="noopener" class="text-[#315d42] underline">Copernicus Sentinel-2 L2A ↗</a></td><td class="mono">10 m · 2024-03-09, 2024-11-09</td><td>${t('True-colour canopy, NDVI, bare-field window', 'সত্য রং ক্যানোপি, এনডিভিআই, খালি জমি')}</td><td class="text-[#536456]"><span class="stamp stamp-estimated">${t('Estimated', 'অনুমান')}</span> ${t('Monsoon cloud blocks optical scenes', 'বর্ষার মেঘে অপটিক্যাল দৃশ্য ব্যাহত')}</td></tr>
+          <tr><td class="font-semibold"><a href="https://planetarycomputer.microsoft.com/dataset/nasadem" target="_blank" rel="noopener" class="text-[#315d42] underline">NASADEM ↗</a></td><td class="mono">30 m · 2000</td><td>${t('3D surface topography, slope %, flood exposure', '3D ভূ-উচ্চতা, ঢাল %, বন্যা ঝুঁকি')}</td><td class="text-[#536456]"><span class="stamp stamp-estimated">${t('Estimated', 'অনুমান')}</span> ${t('Cannot see 15 cm earthen bunds (aal)', '১৫ সেমি মাটির আইল দেখা যায় না')}</td></tr>
+          <tr><td class="font-semibold"><a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener" class="text-[#315d42] underline">NASA POWER / GPM IMERG ↗</a></td><td class="mono">~10 km / ~50 km · 2024 ${t('monthly', 'মাসিক')}</td><td>${t('Rainfall, FAO-56 ETo, temperature, water deficit', 'বৃষ্টিপাত, FAO-56 ETo, তাপমাত্রা, পানির ঘাটতি')}</td><td class="text-[#536456]"><span class="stamp stamp-estimated">${t('Estimated', 'অনুমান')}</span> ${t('Regional grid; no sub-parcel variation', 'আঞ্চলিক গ্রিড; উপ-প্লট বৈচিত্র্য নেই')}</td></tr>
+          <tr><td class="font-semibold"><a href="https://smap.jpl.nasa.gov/" target="_blank" rel="noopener" class="text-[#315d42] underline">NASA SMAP L4 ↗</a></td><td class="mono">9 km · 2024 ${t('monthly', 'মাসিক')}</td><td>${t('Surface & root-zone soil wetness index', 'মাটির পৃষ্ঠ ও মূল অঞ্চলের আর্দ্রতা')}</td><td class="text-[#536456]"><span class="stamp stamp-estimated">${t('Estimated', 'অনুমান')}</span> ${t('Coarse microwave cell; integrates wider basin', 'বৃহৎ মাইক্রোওয়েভ সেল')}</td></tr>
+          <tr><td class="font-semibold"><a href="https://soilgrids.org/" target="_blank" rel="noopener" class="text-[#315d42] underline">ISRIC SoilGrids 2.0 ↗</a></td><td class="mono">250 m · 2024</td><td>${t('Standardized pH, SOC/OM, texture across 5 depths', '৫টি গভীরতায় প্রমিত pH, জৈব কার্বন ও গঠন')}</td><td class="text-[#536456]"><span class="stamp stamp-estimated">${t('Estimated', 'অনুমান')}</span> ${t('Regional machine learning; verify with soil test', 'আঞ্চলিক এমএল অনুমান; পরীক্ষা দিয়ে যাচাই করুন')}</td></tr>
         </tbody></table></div>
       </div>
-    </div>
+    </dialog>
   `;
 }
 
 // Soil Input Modal
 export function soilModal() {
+  const f = field();
+  const defaultSoil = getSoilDataForField(f?.id || state.fieldId);
+  const curPh = soilOverrides?.ph ?? (defaultSoil?.ph ? defaultSoil.ph.toFixed(2) : '');
+  const curOm = soilOverrides?.om ?? (defaultSoil?.om ? defaultSoil.om.toFixed(2) : '');
+  const curGw = soilOverrides?.gwDepth ?? '';
+  const curP = soilOverrides?.p ?? '';
+
   return `
-    <div id="modal-soil-input" class="rotation-modal hidden">
+    <dialog id="modal-soil-input" class="rotation-modal">
       <div class="rotation-modal-content">
-        <div class="rotation-modal-header"><div><p class="eyebrow">${t('Ground Calibration', 'ভূমি ক্যালিব্রেশন')}</p><h3 class="serif-head text-xl font-semibold text-[#173e30]">${t('Enter Local Well or Soil Test', 'স্থানীয় কূপ বা মাটি পরীক্ষা লিখুন')}</h3></div><button id="btn-close-soil-modal" type="button" class="rotation-modal-close">✕</button></div>
+        <div class="rotation-modal-header">
+          <div>
+            <p class="eyebrow">${t('Ground Calibration', 'ভূমি ক্যালিব্রেশন')}</p>
+            <h3 class="serif-head text-xl font-semibold text-[#173e30]">${t('Enter Local Well or Soil Test', 'স্থানীয় কূপ বা মাটি পরীক্ষা লিখুন')}</h3>
+          </div>
+          <button id="btn-close-soil-modal" type="button" class="rotation-modal-close" aria-label="${t('Close', 'বন্ধ')}">✕</button>
+        </div>
         <p class="text-xs text-[#536456] mb-4">${t('Satellites estimate moisture but cannot see tubewell depth or lab NPK. Enter local measurements to calibrate 3D.', 'উপগ্রহ আর্দ্রতা অনুমান করে কিন্তু টিউবওয়েল গভীরতা বা ল্যাব এনপিকে দেখতে পারে না। 3D ক্যালিব্রেট করতে স্থানীয় পরিমাপ লিখুন।')}</p>
         <form id="form-soil-input" class="rotation-form">
           <div class="rotation-form-grid">
-            <div class="rotation-form-row"><label class="rotation-form-label">${t('Tubewell Depth (m)', 'টিউবওয়েল গভীরতা (মি)')}</label><input id="inp-gw-depth" type="number" step="0.1" min="0.5" max="25" value="3.6" class="rotation-form-input mono"></div>
-            <div class="rotation-form-row"><label class="rotation-form-label">${t('Soil pH', 'মাটির pH')}</label><input id="inp-ph-val" type="number" step="0.05" min="3.5" max="8.5" value="5.85" class="rotation-form-input mono"></div>
-            <div class="rotation-form-row"><label class="rotation-form-label">${t('Organic Matter (%)', 'জৈব পদার্থ (%)')}</label><input id="inp-om-val" type="number" step="0.05" min="0.3" max="5.0" value="2.05" class="rotation-form-input mono"></div>
-            <div class="rotation-form-row"><label class="rotation-form-label">${t('Available P (mg/kg)', 'প্রাপ্য P (মিগ্রা/কেজি)')}</label><input id="inp-p-val" type="number" step="0.5" min="1" max="80" value="14.2" class="rotation-form-input mono"></div>
+            <div class="rotation-form-row"><label class="rotation-form-label" for="inp-gw-depth">${t('Tubewell Depth (m)', 'টিউবওয়েল গভীরতা (মি)')}</label><input id="inp-gw-depth" type="number" step="0.1" min="0.5" max="25" placeholder="—" value="${curGw !== '' ? curGw : ''}" class="rotation-form-input mono"></div>
+            <div class="rotation-form-row"><label class="rotation-form-label" for="inp-ph-val">${t('Soil pH', 'মাটির pH')}</label><input id="inp-ph-val" type="number" step="0.05" min="3.5" max="8.5" placeholder="—" value="${curPh !== '' ? curPh : ''}" class="rotation-form-input mono"></div>
+            <div class="rotation-form-row"><label class="rotation-form-label" for="inp-om-val">${t('Organic Matter (%)', 'জৈব পদার্থ (%)')}</label><input id="inp-om-val" type="number" step="0.05" min="0.3" max="5.0" placeholder="—" value="${curOm !== '' ? curOm : ''}" class="rotation-form-input mono"></div>
+            <div class="rotation-form-row"><label class="rotation-form-label" for="inp-p-val">${t('Available P (mg/kg)', 'প্রাপ্য P (মিগ্রা/কেজি)')}</label><input id="inp-p-val" type="number" step="0.5" min="1" max="80" placeholder="—" value="${curP !== '' ? curP : ''}" class="rotation-form-input mono"></div>
           </div>
           <div class="rotation-form-actions">
             <button id="btn-reset-soil" type="button" class="rotation-btn secondary">${t('Reset to Regional', 'আঞ্চলিক ডিফল্ট')}</button>
@@ -466,7 +509,7 @@ export function soilModal() {
           </div>
         </form>
       </div>
-    </div>
+    </dialog>
   `;
 }
 
@@ -548,6 +591,54 @@ export function initRotationPanels() {
     });
   });
 
+  // Setup dialog focus trap and esc key listener
+  const setupDialog = (dialogEl, openBtn, closeBtn) => {
+    if (!dialogEl) return;
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        if (typeof dialogEl.showModal === 'function') {
+          dialogEl.showModal();
+        } else {
+          dialogEl.setAttribute('open', '');
+        }
+        const focusable = dialogEl.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (focusable) focusable.focus();
+      });
+    }
+    const closeDialog = () => {
+      if (typeof dialogEl.close === 'function') {
+        dialogEl.close();
+      } else {
+        dialogEl.removeAttribute('open');
+      }
+      if (openBtn) openBtn.focus();
+    };
+    if (closeBtn) closeBtn.addEventListener('click', closeDialog);
+    dialogEl.addEventListener('click', (e) => {
+      if (e.target === dialogEl) closeDialog();
+    });
+    dialogEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeDialog();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = Array.from(dialogEl.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+  };
+
   // Soil modal
   const soilModalEl = document.getElementById('modal-soil-input');
   const openSoilBtn = document.getElementById('btn-open-soil-modal');
@@ -555,29 +646,45 @@ export function initRotationPanels() {
   const resetSoilBtn = document.getElementById('btn-reset-soil');
   const soilForm = document.getElementById('form-soil-input');
 
-  if (openSoilBtn && soilModalEl) openSoilBtn.addEventListener('click', () => { soilModalEl.classList.remove('hidden'); soilModalEl.classList.add('flex'); });
-  if (closeSoilBtn && soilModalEl) closeSoilBtn.addEventListener('click', () => { soilModalEl.classList.add('hidden'); soilModalEl.classList.remove('flex'); });
+  setupDialog(soilModalEl, openSoilBtn, closeSoilBtn);
+
   if (resetSoilBtn) resetSoilBtn.addEventListener('click', () => {
-    document.getElementById('inp-gw-depth').value = '3.6';
-    document.getElementById('inp-ph-val').value = '5.85';
-    document.getElementById('inp-om-val').value = '2.05';
-    document.getElementById('inp-p-val').value = '14.2';
+    const f = field();
+    const defaultSoil = getSoilDataForField(f?.id || state.fieldId);
+    const gwInp = document.getElementById('inp-gw-depth');
+    const phInp = document.getElementById('inp-ph-val');
+    const omInp = document.getElementById('inp-om-val');
+    const pInp = document.getElementById('inp-p-val');
+    if (gwInp) gwInp.value = '';
+    if (phInp) phInp.value = defaultSoil?.ph ? defaultSoil.ph.toFixed(2) : '';
+    if (omInp) omInp.value = defaultSoil?.om ? defaultSoil.om.toFixed(2) : '';
+    if (pInp) pInp.value = '';
     resetSoilOverrides();
     updateSoilDisplay();
-    soilModalEl.classList.add('hidden');
-    soilModalEl.classList.remove('flex');
+    if (typeof soilModalEl.close === 'function') soilModalEl.close();
+    else soilModalEl.removeAttribute('open');
   });
+
   if (soilForm) soilForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    saveSoilOverrides({
-      gwDepth: parseFloat(document.getElementById('inp-gw-depth').value) || 3.6,
-      ph: parseFloat(document.getElementById('inp-ph-val').value) || 5.85,
-      om: parseFloat(document.getElementById('inp-om-val').value) || 2.05,
-      p: parseFloat(document.getElementById('inp-p-val').value) || 14.2,
-    });
+    const gwVal = document.getElementById('inp-gw-depth')?.value;
+    const phVal = document.getElementById('inp-ph-val')?.value;
+    const omVal = document.getElementById('inp-om-val')?.value;
+    const pVal = document.getElementById('inp-p-val')?.value;
+
+    const f = field();
+    const defaultSoil = getSoilDataForField(f?.id || state.fieldId);
+
+    const overrides = {
+      gwDepth: gwVal !== '' && !isNaN(parseFloat(gwVal)) ? parseFloat(gwVal) : null,
+      ph: phVal !== '' && !isNaN(parseFloat(phVal)) ? parseFloat(phVal) : (defaultSoil?.ph ?? null),
+      om: omVal !== '' && !isNaN(parseFloat(omVal)) ? parseFloat(omVal) : (defaultSoil?.om ?? null),
+      p: pVal !== '' && !isNaN(parseFloat(pVal)) ? parseFloat(pVal) : null,
+    };
+    saveSoilOverrides(overrides);
     updateSoilDisplay();
-    soilModalEl.classList.add('hidden');
-    soilModalEl.classList.remove('flex');
+    if (typeof soilModalEl.close === 'function') soilModalEl.close();
+    else soilModalEl.removeAttribute('open');
     toast(t('Local soil test applied', 'স্থানীয় মাটি পরীক্ষা প্রয়োগ করা হয়েছে'));
   });
 
@@ -585,8 +692,7 @@ export function initRotationPanels() {
   const sourcesModalEl = document.getElementById('modal-sources');
   const openSourcesBtn = document.getElementById('btn-open-sources');
   const closeSourcesBtn = document.getElementById('btn-close-sources');
-  if (openSourcesBtn && sourcesModalEl) openSourcesBtn.addEventListener('click', () => { sourcesModalEl.classList.remove('hidden'); sourcesModalEl.classList.add('flex'); });
-  if (closeSourcesBtn && sourcesModalEl) closeSourcesBtn.addEventListener('click', () => { sourcesModalEl.classList.add('hidden'); sourcesModalEl.classList.remove('flex'); });
+  setupDialog(sourcesModalEl, openSourcesBtn, closeSourcesBtn);
 
   // Tariff selector
   const tariffSelect = document.getElementById('select-pump-tariff');

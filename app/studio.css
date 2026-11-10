@@ -712,8 +712,9 @@
   cursor: pointer;
 }
 
-/* Centred small caption under the block. */
+/* Centred small caption under the block. Hidden when cards are present */
 .studio-model-caption {
+  display: none !important;
   position: absolute;
   bottom: 22px;
   left: 50%;
@@ -1225,14 +1226,25 @@
 }
 
 @media (max-width: 600px) {
+  .studio-stage-canvas-host {
+    height: 380px;
+    overflow: visible;
+  }
+  .studio-transect-card,
+  .studio-probe-card {
+    position: static;
+    margin: 8px auto;
+    width: calc(100% - 16px);
+    max-width: 100%;
+    box-sizing: border-box;
+    display: block;
+  }
   .studio-transect-card {
-    display: none;
+    display: block;
   }
   .studio-probe-card {
-    left: 8px;
-    bottom: 8px;
-    font-size: 10px;
-    min-width: 190px;
+    font-size: 11px;
+    min-width: 0;
   }
   .studio-dock-deck {
     grid-template-columns: 1fr;
