@@ -1878,6 +1878,7 @@ let isDragging = false;
 // block keeps only a residual vertical float. The camera part is a transient
 // offset applied after controls.update() and restored right after the frame
 // renders, so it never fights OrbitControls.
+let idleHover = false, idleFrozenT = null, idleFrozenNow = 0, idleShift = 0;
 let idleLastInputMs = -1e13; // last user input; sway resumes 6 s after, easing in over 1.5 s
 let idleBasePos = null; // camera position saved before the transient sway offset
 let idleHasOffset = false;
@@ -1914,6 +1915,13 @@ function bindIdleListeners() {
   containerEl.addEventListener("pointerdown", markIdleInput, { capture: true, passive: true });
   containerEl.addEventListener("wheel", markIdleInput, { capture: true, passive: true });
   window.addEventListener("keydown", markIdleInput);
+  containerEl.addEventListener("pointerover", (e) => {
+    if (e.pointerType !== "touch" && e.target.closest?.(".studio-stage-canvas-host")) idleHover = true;
+  });
+  containerEl.addEventListener("pointerout", (e) => {
+    const host = e.target.closest?.(".studio-stage-canvas-host");
+    if (host && !host.contains(e.relatedTarget)) idleHover = false;
+  });
 }
 
 function unbindIdleListeners() {
@@ -1942,6 +1950,14 @@ function applyIdleFloat(timeS, nowMs = performance.now()) {
     floatGroup.position.set(0, 0, 0);
     floatGroup.rotation.set(0, 0, 0);
     return;
+  }
+  // Freeze (not reset) the sway while a mouse hovers the stage, so pins don't drift under the cursor.
+  if (idleHover) {
+    if (idleFrozenT === null) { idleFrozenT = timeS - idleShift; idleFrozenNow = nowMs; }
+    timeS = idleFrozenT; nowMs = idleFrozenNow;
+  } else {
+    if (idleFrozenT !== null) { idleShift = timeS - idleFrozenT; idleFrozenT = null; }
+    timeS -= idleShift;
   }
   const span = currentBlock.bounds
     ? Math.max(currentBlock.bounds.width, currentBlock.bounds.height)

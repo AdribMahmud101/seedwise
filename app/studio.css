@@ -1160,7 +1160,7 @@
 
 .callout-box:hover,
 .callout-box.highlight {
-  transform: translateY(-2px);
+  transform: none;
   box-shadow: 0 6px 18px rgba(23, 62, 48, 0.25);
   border-color: rgba(23, 62, 48, 0.5);
 }
