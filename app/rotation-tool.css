@@ -956,3 +956,432 @@ a:hover {
 .bg-\[\#c8e6c9\] {
   background-color: #c8e6c9;
 }
+
+/* ============================================
+ * STUDIO5G Question Panels & Tariff Header
+ * ============================================ */
+.priority-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.question-panel {
+  background: var(--bg-card, #fffdf5);
+  border: 1px solid var(--border-light, #cdcfc0);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-width: 0;
+}
+
+.question-panel h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary, #173e30);
+  margin: 0.2rem 0 0.4rem;
+  line-height: 1.25;
+}
+
+.question-panel .panel-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #536456);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* 12-month strip */
+.month-strip-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.month-strip {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2px;
+  background: #f0efe8;
+  padding: 4px;
+  border-radius: 4px;
+  border: 1px solid #cdcfc0;
+}
+
+.month-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 1px;
+  background: #fffdf5;
+  border-radius: 2px;
+  font-size: 10px;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.month-name {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  color: #536456;
+}
+
+.month-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.month-indicator.month-crop {
+  background: #315d42;
+}
+
+.month-indicator.month-stressed {
+  background: #b9822d;
+}
+
+.month-indicator.month-bare {
+  background: #cdcfc0;
+}
+
+.month-tag {
+  font-size: 8px;
+  color: #173e30;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.month-strip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #536456;
+  margin-top: 4px;
+}
+
+.month-strip-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Planting layout buttons */
+.layout-switch-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.planting-layout-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.btn-layout {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 6px;
+  border-radius: 4px;
+  border: 1px solid #cdcfc0;
+  background: #fffdf5;
+  color: #1b382e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.btn-layout.active {
+  background: #173e30;
+  color: #fffdf5;
+  border-color: #173e30;
+}
+
+/* Low ground stat box */
+.low-ground-stat-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: #f8f6f2;
+  border: 1px solid #e2e4d8;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-lbl {
+  font-size: 11px;
+  color: #536456;
+}
+
+.stat-val {
+  font-size: 14px;
+  color: #173e30;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Drain toggle row */
+.drain-toggle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drain-control-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.toggle-lbl {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1b382e;
+}
+
+.btn-drain-toggle,
+.btn-block-toggle {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-drain-toggle.active {
+  background: #173e30;
+  color: #fffdf5;
+  border: 1px solid #173e30;
+}
+
+.btn-drain-toggle:not(.active) {
+  background: #fffdf5;
+  color: #536456;
+  border: 1px solid #cdcfc0;
+}
+
+.btn-block-toggle.open {
+  background: #fffdf5;
+  color: #1b382e;
+  border: 1px solid #cdcfc0;
+}
+
+.btn-block-toggle.blocked {
+  background: #b0452b;
+  color: #fffdf5;
+  border: 1px solid #b0452b;
+}
+
+.show-3d-action .button {
+  min-height: 44px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* S1 water flood grid */
+.s1-flood-table-wrap {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.s1-flood-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  background: #f4f6ea;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e4d8;
+}
+
+.s1-flood-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+}
+
+.s1-flood-date {
+  color: #536456;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+}
+
+.s1-flood-pct {
+  color: #2563eb;
+  font-family: ui-monospace, monospace;
+}
+
+/* Nutrient chips */
+.nutrient-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.nutrient-chip {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #cdcfc0;
+  background: #fffdf5;
+  color: #1b382e;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.nutrient-chip.active {
+  border-color: #173e30;
+  box-shadow: 0 0 0 1px #173e30;
+}
+
+.nutrient-chip .chip-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #173e30;
+}
+
+.nutrient-chip .chip-val {
+  font-size: 11px;
+  color: #315d42;
+  font-family: ui-monospace, monospace;
+}
+
+.nutrient-chip .chip-val.chip-enter {
+  color: #b9822d;
+  font-weight: 500;
+  font-style: italic;
+  font-family: inherit;
+}
+
+.nutrient-chip .chip-class {
+  font-size: 10px;
+  color: #536456;
+}
+
+.groundwater-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #f8f6f2;
+  border: 1px solid #e2e4d8;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1b382e;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.soil-test-action .button {
+  min-height: 44px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tariff header bar */
+.ranking-header-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pump-tariff-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pump-tariff-select-wrap select {
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #cdcfc0;
+  background: #fffdf5;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #173e30;
+}
+
+/* Rotation card cost badge */
+.rotation-cost-badge {
+  background: #f4f6ea;
+  border-left: 3px solid #315d42;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+  color: #1b382e;
+}
+
+.rotation-cost-badge strong {
+  color: #173e30;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .month-strip {
+    gap: 1px;
+    padding: 2px;
+  }
+  .month-cell {
+    padding: 3px 0;
+  }
+  .nutrient-chips-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
