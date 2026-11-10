@@ -18,7 +18,7 @@ test("poster renders without importing three.js", () => {
   assert.match(html, /3D · ~180 KB · then works offline/);
 });
 
-test("no static import of three outside studio3d.js across src/ and app/", async () => {
+test("three stays behind the two lazy 3D entry modules", async () => {
   async function scanDir(dir) {
     const entries = await readdir(dir, { withFileTypes: true });
     const files = [];
@@ -39,7 +39,7 @@ test("no static import of three outside studio3d.js across src/ and app/", async
   ];
 
   for (const file of jsFiles) {
-    if (file.includes("studio3d.js")) continue;
+    if (file.endsWith("/studio3d.js") || file.endsWith("/planner3d.js")) continue;
     const content = await readFile(file, "utf8");
     assert.doesNotMatch(
       content,

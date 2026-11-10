@@ -1,0 +1,156 @@
+/* Planner styles forked from planner-3d-base:app/studio.css. */
+.planner3d-stage-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+
+.planner3d-stage-canvas-host {
+  flex: none;
+  height: clamp(360px, 52vh, 560px);
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  /* Soft studio ground — a quiet light-sage haze that matches the sky texture
+     drawn inside the WebGL scene, so the DOM layer never shows a seam. */
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 100%, rgba(195,208,180,0.55) 0%, rgba(195,208,180,0) 60%),
+    linear-gradient(180deg, #eef2e5 0%, #e6ecdc 55%, #dae2cc 100%);
+  outline: none;
+  touch-action: none;
+}
+
+.planner3d-stage-canvas-host canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.planner3d-ctrl-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  transition: background 0.15s;
+}
+
+.planner3d-ctrl-btn:hover {
+  background: #ffffff;
+}
+
+.planner3d-view-toggle {
+  display: flex;
+  gap: 4px;
+  background: #fffff6f2;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(20, 55, 20, 0.08);
+  flex-wrap: wrap;
+}
+
+.planner3d-view-btn {
+  padding: 8px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #596b50;
+  cursor: pointer;
+}
+
+.planner3d-view-btn.active {
+  background: #28523e;
+  color: #f6f9ed;
+}
+
+.planner3d-crop-chip {
+  display: inline-block;
+  background: #faffefeb;
+  color: #52693f;
+  font-size: 11px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 2px 8px rgba(20, 55, 20, 0.06);
+}
+
+
+.planner3d-panel,
+.planner3d-stage-wrap {
+  min-width: 0;
+}
+
+.planner3d-stage-canvas-host:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+.planner3d-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #eef2e5;
+}
+
+.planner3d-zoom-controls {
+  display: none;
+  gap: 6px;
+}
+
+.planner3d-ready .planner3d-zoom-controls {
+  display: flex;
+}
+
+.planner3d-stage-canvas-host .planner3d-webgl-canvas,
+.planner3d-ready #plant-model,
+.planner3d-ready .planner3d-fallback-note {
+  display: none;
+}
+
+.planner3d-ready .planner3d-stage-canvas-host .planner3d-webgl-canvas {
+  display: block;
+}
+
+.planner3d-footer {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.planner3d-layout input,
+.planner3d-layout select {
+  min-height: 44px;
+}
+
+@media (max-width: 600px) {
+  .planner3d-stage-canvas-host {
+    height: 360px;
+  }
+  .planner3d-view-btn {
+    padding: 8px 10px;
+  }
+}
