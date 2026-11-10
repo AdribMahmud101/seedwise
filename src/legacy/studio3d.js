@@ -49,7 +49,11 @@ import {
   ringSignedArea,
   canopyVisualHeight,
   idleFloatOffset,
-  computePonding,
+  surfaceGridPositions,
+  pondingPositions,
+  waterTablePositions,
+  sampleS1Water,
+  transectEndpoints,
   sampleTransectProfile,
   lookupProbePoint,
 } from "./studio3d-helpers.js";
@@ -112,12 +116,7 @@ let soilOverrides = null; // { ph, om, p, gwDepthM }
 let probeUV = { u: 0.5, v: 0.5 };
 let s1WaterData = null; // lazy loaded from /data/s1-water.json
 let soilNutrientsData = null; // lazy loaded from /data/soil-nutrients.json
-let sharedPlantGeo = null;
 let waterMesh = null;
-let canalMesh = null;
-let flowVectorsGroup = null;
-let drainTubeGroup = null;
-let bundTreesGroup = null;
 let contourLinesGroup = null;
 let transect3dGroup = null;
 
@@ -135,6 +134,7 @@ const currentBlock = {
   effectiveMaxX: Infinity,
   bounds: null,
   ring: [],
+  transect: [],
 };
 
 const textureCache = new Map();
@@ -393,11 +393,7 @@ async function buildTopTexture(data, layer, monthIdx) {
   const d = imgData.data;
 
   // Check if Sentinel-1 water or soil nutrient data is loaded
-  const s1Data = await loadS1WaterData();
   const nutrientsData = await loadSoilNutrientsData();
-
-  const siteId = data.field.id;
-  const s1Site = s1Data?.sites?.[siteId] || s1Data?.[siteId] || null;
 
   for (let py = 0; py < H; py += 2) {
     const v = py / H;
@@ -593,42 +589,15 @@ function disposeGroup(group) {
 function buildSurfaceGeometry(ringM, heightAt, bounds) {
   const ring = ringM.map(([x, y]) => new THREE.Vector2(x, y));
   const triangles = THREE.ShapeUtils.triangulateShape(ring, []);
-  const positions = [];
+  const positions = surfaceGridPositions(ringM, triangles, heightAt, isSoftwareRenderer ? 14 : 28);
   const uvs = [];
   const elevations = [];
-  const n = isSoftwareRenderer ? 14 : 28;
   const width = Math.max(1e-6, bounds.width);
   const depth = Math.max(1e-6, bounds.height);
-
-  const pushPoint = (p) => {
-    const x = p.x;
-    const z = -p.y;
-    const h = heightAt(x, z);
-    positions.push(x, h, z);
+  for (let i = 0; i < positions.length; i += 3) {
+    const [x, h, z] = positions.slice(i, i + 3);
     uvs.push((x - bounds.minX) / width, (-z - bounds.minY) / depth);
     elevations.push(h / Math.max(0.01, heightExaggeration));
-  };
-
-  for (const ids of triangles) {
-    const [a, b, c] = ids.map((i) => ring[i]);
-    if (!a || !b || !c) continue;
-    const point = (i, j) =>
-      new THREE.Vector2(
-        a.x + ((b.x - a.x) * i) / n + ((c.x - a.x) * j) / n,
-        a.y + ((b.y - a.y) * i) / n + ((c.y - a.y) * j) / n,
-      );
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n - i; j++) {
-        pushPoint(point(i, j));
-        pushPoint(point(i + 1, j));
-        pushPoint(point(i, j + 1));
-        if (i + j < n - 1) {
-          pushPoint(point(i + 1, j));
-          pushPoint(point(i + 1, j + 1));
-          pushPoint(point(i, j + 1));
-        }
-      }
-    }
   }
 
   const geom = new THREE.BufferGeometry();
@@ -779,14 +748,6 @@ async function buildFieldBlock(data, cutawayFraction) {
   blockGroup = null;
   disposeGroup(waterMesh);
   waterMesh = null;
-  disposeGroup(canalMesh);
-  canalMesh = null;
-  disposeGroup(flowVectorsGroup);
-  flowVectorsGroup = null;
-  disposeGroup(drainTubeGroup);
-  drainTubeGroup = null;
-  disposeGroup(bundTreesGroup);
-  bundTreesGroup = null;
   disposeGroup(contourLinesGroup);
   contourLinesGroup = null;
   disposeGroup(transect3dGroup);
@@ -802,6 +763,7 @@ async function buildFieldBlock(data, cutawayFraction) {
 
   const heightAt = makeHeightAt(data);
   const topTex = await buildTopTexture(data, currentSurfaceMode, currentMonthIdx);
+  const s1Data = await loadS1WaterData();
   if (token !== buildToken) return;
 
   const topMat = new THREE.MeshStandardMaterial({
@@ -851,143 +813,74 @@ async function buildFieldBlock(data, cutawayFraction) {
   const gwDepth = soilOverrides?.gwDepthM ?? 3.4;
   const gwTopY = Math.max(bottomY + 0.2, topMin - (gwDepth / 5.0) * (depth * 0.8));
   if (cutawayFraction > 0.05) {
-    const gwGeom = new THREE.BoxGeometry(
-      Math.max(1, (bounds.width) * (1 - cutawayFraction)),
-      Math.max(0.1, gwTopY - bottomY),
-      Math.max(1, bounds.height * 0.96)
-    );
+    const gwGeom = new THREE.BufferGeometry();
+    gwGeom.setAttribute("position", new THREE.Float32BufferAttribute(
+      waterTablePositions(pos.array, gwTopY, bottomY, topMin), 3,
+    ));
+    gwGeom.computeVertexNormals();
     const gwMat = new THREE.MeshStandardMaterial({
       color: soilOverrides ? 0x1d6fa5 : 0x526575,
       transparent: true,
       opacity: 0.65,
       roughness: 0.25,
+      side: THREE.DoubleSide,
     });
     const gwSlab = new THREE.Mesh(gwGeom, gwMat);
-    const midX = bounds.minX + (bounds.width * (1 - cutawayFraction)) / 2;
-    gwSlab.position.set(midX, bottomY + (gwTopY - bottomY) / 2, -bounds.cy);
+    gwSlab.userData.water = true;
     blockGroup.add(gwSlab);
   }
 
   // Water Ponding layer
-  if (rainScenarioMm > 5 || currentSurfaceMode === "water" || currentSurfaceMode === "ponding") {
-    const rainRatio = Math.min(1.0, rainScenarioMm / 240);
-    const drainFactor = proposedDrain && !outletBlocked ? 0.45 : outletBlocked ? 1.3 : 0.9;
-    const waterY = topMin + rainRatio * drainFactor * 0.45 * Math.max(1, heightExaggeration * 0.4);
-
-    const wGeo = new THREE.PlaneGeometry(
-      Math.max(1, bounds.width * 0.95),
-      Math.max(1, bounds.height * 0.95)
-    );
-    wGeo.rotateX(-Math.PI / 2);
-    waterMesh = new THREE.Mesh(wGeo, new THREE.MeshPhysicalMaterial({
-      color: 0x2563eb,
+  const site = s1Data?.[data.field.id];
+  const observation = nearestForMonth(site?.dates, currentMonthIdx)?.observation;
+  const [lat, lon] = data.field.centroid;
+  const scaleX = 111195.08 * Math.cos(lat * Math.PI / 180);
+  const waterPositions = pondingPositions(pos.array, {
+    rainMm: rainScenarioMm,
+    exaggeration: heightExaggeration,
+    lowGround: data.ground?.class === "low",
+    proposedDrain,
+    outletBlocked,
+    waterMaskAt: (x, z) => sampleS1Water(site, observation, lon + x / scaleX, lat - z / 111195.08),
+  });
+  if (waterPositions.length) {
+    const wGeo = new THREE.BufferGeometry();
+    wGeo.setAttribute("position", new THREE.Float32BufferAttribute(waterPositions, 3));
+    wGeo.computeVertexNormals();
+    waterMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
+      color: 0x368fab,
       transparent: true,
-      opacity: rainScenarioMm > 5 ? 0.65 : 0.2,
-      roughness: 0.15,
-    }));
-    waterMesh.position.set(bounds.cx, waterY, -bounds.cy);
-    blockGroup.add(waterMesh);
-
-    // Canal along east edge
-    const cGeo = new THREE.PlaneGeometry(Math.max(0.5, bounds.width * 0.08), Math.max(1, bounds.height));
-    cGeo.rotateX(-Math.PI / 2);
-    canalMesh = new THREE.Mesh(cGeo, new THREE.MeshStandardMaterial({
-      color: 0x1e4e68,
-      transparent: true,
-      opacity: 0.82,
+      opacity: 0.48,
       roughness: 0.2,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     }));
-    canalMesh.position.set(bounds.maxX + 1.2, topMin + rainRatio * 0.25, -bounds.cy);
-    blockGroup.add(canalMesh);
-
-    // 3D Runoff flow vectors
-    flowVectorsGroup = new THREE.Group();
-    const arrowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const uvsList = [
-      [[0.2, 0.25], [0.45, 0.45], [0.65, 0.65]],
-      [[0.5, 0.2], [0.6, 0.45], [0.72, 0.65]],
-      [[0.25, 0.6], [0.48, 0.7], [0.65, 0.75]]
-    ];
-    uvsList.forEach((pts) => {
-      const vecs = pts.map(([u, v]) => {
-        const x = bounds.minX + u * bounds.width;
-        const z = -(bounds.minY + v * bounds.height);
-        return new THREE.Vector3(x, heightAt(x, z) + 0.12, z);
-      });
-      const curve = new THREE.CatmullRomCurve3(vecs);
-      flowVectorsGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.06, 6, false), arrowMat));
-      const end = vecs[2], prev = vecs[1];
-      const dir = new THREE.Vector3().subVectors(end, prev).normalize();
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.38, 8), arrowMat);
-      cone.position.copy(end);
-      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      flowVectorsGroup.add(cone);
-    });
-    blockGroup.add(flowVectorsGroup);
+    waterMesh.userData.water = true;
+    blockGroup.add(waterMesh);
   }
 
-  // Proposed Drain Tube Line
-  if (proposedDrain) {
-    drainTubeGroup = new THREE.Group();
-    const dMat = new THREE.MeshBasicMaterial({ color: outletBlocked ? 0xdc2626 : 0xfacc15 });
-    for (let i = 0; i < 10; i += 2) {
-      const u0 = 0.6 + (i / 10) * 0.3;
-      const u1 = 0.6 + ((i + 1) / 10) * 0.3;
-      const v0 = 0.75, v1 = 0.75;
-      const p0x = bounds.minX + u0 * bounds.width;
-      const p0z = -(bounds.minY + v0 * bounds.height);
-      const p1x = bounds.minX + u1 * bounds.width;
-      const p1z = -(bounds.minY + v1 * bounds.height);
-      const p0 = new THREE.Vector3(p0x, heightAt(p0x, p0z) + 0.1, p0z);
-      const p1 = new THREE.Vector3(p1x, heightAt(p1x, p1z) + 0.1, p1z);
-      drainTubeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(p0, p1), 2, 0.08, 6, false), dMat));
-    }
-    blockGroup.add(drainTubeGroup);
-  }
-
-  // Bund Agroforestry Trees
+  // Bunds follow the actual boundary at terrain height; no tree features are supplied.
   if (showBunds) {
-    bundTreesGroup = new THREE.Group();
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x543b24, roughness: 0.9 });
-    const crownMat = new THREE.MeshStandardMaterial({ color: 0x2b5938, roughness: 0.78 });
-    const bundSpots = [
-      [0.05, 0.2], [0.05, 0.5], [0.05, 0.8],
-      [0.25, 0.05], [0.55, 0.05]
-    ];
-    bundSpots.forEach(([u, v]) => {
-      const x = bounds.minX + u * bounds.width;
-      const z = -(bounds.minY + v * bounds.height);
-      if (x > effectiveMaxX) return;
-      const y = heightAt(x, z);
-      const tGrp = new THREE.Group();
-      tGrp.position.set(x, y, z);
-      const trk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.4, 7), trunkMat);
-      trk.position.y = 0.7;
-      tGrp.add(trk);
-      [[0, 1.5, 0, 0.45], [0.18, 1.4, 0.12, 0.32], [-0.16, 1.45, -0.12, 0.34]].forEach(([ox, oy, oz, rad]) => {
-        const cMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), crownMat);
-        cMesh.position.set(ox, oy, oz);
-        tGrp.add(cMesh);
-      });
-      bundTreesGroup.add(tGrp);
-    });
-    blockGroup.add(bundTreesGroup);
+    const bund = buildBoundaryLine(ringM, heightAt);
+    bund.material.color.set(0x8b784b);
+    blockGroup.add(bund);
   }
 
   // 3D Transect Line A -> A'
+  const transect = transectEndpoints(ringM, bounds);
   transect3dGroup = new THREE.Group();
-  const tMat = new THREE.MeshBasicMaterial({ color: 0xfffdf5 });
-  for (let i = 0; i < 18; i += 2) {
-    const t0 = i / 18, t1 = (i + 1) / 18;
-    const u0 = 0.12 + 0.80 * t0, v0 = 0.26 + 0.48 * t0;
-    const u1 = 0.12 + 0.80 * t1, v1 = 0.26 + 0.48 * t1;
-    const x0 = bounds.minX + u0 * bounds.width;
-    const z0 = -(bounds.minY + v0 * bounds.height);
-    const x1 = bounds.minX + u1 * bounds.width;
-    const z1 = -(bounds.minY + v1 * bounds.height);
-    const p0 = new THREE.Vector3(x0, heightAt(x0, z0) + 0.14, z0);
-    const p1 = new THREE.Vector3(x1, heightAt(x1, z1) + 0.14, z1);
-    transect3dGroup.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(p0, p1), 2, 0.05, 6, false), tMat));
+  if (transect.length === 2) {
+    const [a, b] = transect;
+    const points = [];
+    for (let i = 0; i <= 36; i++) {
+      const x = a[0] + (b[0] - a[0]) * i / 36;
+      const y = a[1] + (b[1] - a[1]) * i / 36;
+      points.push(new THREE.Vector3(x, heightAt(x, -y) + 0.025, -y));
+    }
+    transect3dGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      new THREE.LineBasicMaterial({ color: 0xfffdf5, transparent: true, opacity: 0.7 }),
+    ));
   }
   blockGroup.add(transect3dGroup);
 
@@ -1001,6 +894,7 @@ async function buildFieldBlock(data, cutawayFraction) {
   currentBlock.effectiveMaxX = effectiveMaxX;
   currentBlock.bounds = bounds;
   currentBlock.ring = ringM.map(([x, y]) => [x, -y]);
+  currentBlock.transect = transect;
 
   if (scene) {
     scene.userData.fieldMode = true;
@@ -1032,63 +926,21 @@ function mergeClumpParts(parts) {
 
 // Low-poly crop geometry shared by every instance of a clump.
 
-function createBotanicalPlantGeometry() {
-  const geo = new THREE.BufferGeometry();
-  const positions = [];
-  const normals = [];
-  const blades = 7;
-
-  for (let b = 0; b < blades; b++) {
-    const angle = (b / blades) * Math.PI * 2 + (b % 2) * 0.2;
-    const lean = 0.18 + (b % 3) * 0.11;
-    const h = 0.42 + (b % 3) * 0.08;
-    const w = 0.032;
-
-    const dx = Math.cos(angle) * lean;
-    const dz = Math.sin(angle) * lean;
-    const px = -Math.sin(angle) * w;
-    const pz = Math.cos(angle) * w;
-
-    positions.push(
-      -px * 0.5, 0, -pz * 0.5,
-      px * 0.5, 0, pz * 0.5,
-      dx * 0.5 - px * 0.3, h * 0.5, dz * 0.5 - pz * 0.3,
-
-      px * 0.5, 0, pz * 0.5,
-      dx * 0.5 + px * 0.3, h * 0.5, dz * 0.5 + pz * 0.3,
-      dx * 0.5 - px * 0.3, h * 0.5, dz * 0.5 - pz * 0.3,
-
-      dx * 0.5 - px * 0.3, h * 0.5, dz * 0.5 - pz * 0.3,
-      dx * 0.5 + px * 0.3, h * 0.5, dz * 0.5 + pz * 0.3,
-      dx, h, dz
-    );
-
-    const nx = Math.cos(angle) * 0.6;
-    const nz = Math.sin(angle) * 0.6;
-    for (let k = 0; k < 9; k++) {
-      normals.push(nx, 0.7, nz);
-    }
-  }
-
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  return geo;
-}
-
-function buildClumpGeometry(cropId, heightM, spreadM) {
+export function buildClumpGeometry(cropId, heightM, spreadM, stage = "grow") {
   const h = Math.max(0.06, heightM);
   // Clumps are a little wider than the grid gap so the canopy closes over the
   // soil, while their centres remain inset inside the field boundary.
   const r = Math.max(0.08, spreadM * 0.46);
 
-  if (cropId === "aman" || cropId === "boro") {
+  if (["aman", "boro", "mustard", "potato", "mungbean"].includes(cropId)) {
+    const leafy = cropId === "potato" || cropId === "mungbean";
     // Rice/grass family: a dense tuft of fine tapered blades. Each blade is a
     // narrow quad that leans gently outward from the base to make a soft fuzzy
     // top silhouette without silhouetting any single blade. Eight blades are
     // already in-geometry; InstancedMesh reuses this tuft across the field so
     // the entire crop still renders in one draw call.
     const parts = [];
-    const blades = 8;
+    const blades = leafy ? 6 : 8;
     for (let k = 0; k < blades; k++) {
       // Spread the blades around and give each a tiny deterministic jitter so
       // the tuft reads as hand-sown, not as a star.
@@ -1096,10 +948,10 @@ function buildClumpGeometry(cropId, heightM, spreadM) {
       const c = Math.cos(angle);
       const s = Math.sin(angle);
       const bladeH = h * (0.82 + Math.abs(Math.sin(k * 3.7)) * 0.3);
-      const baseW = Math.max(0.012, r * 0.055);
+      const baseW = Math.max(0.012, r * (leafy ? 0.16 : 0.055));
       const midW = baseW * 0.65;
       const tipW = baseW * 0.18;
-      const lean = r * (0.38 + Math.abs(Math.cos(k * 2.1)) * 0.22);
+      const lean = r * ((leafy ? 0.55 : 0.38) + Math.abs(Math.cos(k * 2.1)) * 0.22);
       // Two-strip quad: base → mid → tip for a soft taper.
       const bx0 = -baseW * s;
       const bz0 = baseW * c;
@@ -1132,27 +984,13 @@ function buildClumpGeometry(cropId, heightM, spreadM) {
     const base = new THREE.ConeGeometry(r * 0.26, h * 0.55, 5);
     base.translate(0, h * 0.28, 0);
     parts.push(base);
+    if (cropId === "mustard" && stage === "mature") {
+      const bloom = new THREE.IcosahedronGeometry(r * 0.18, 0);
+      bloom.scale(1, 0.55, 1);
+      bloom.translate(0, h, 0);
+      parts.push(bloom);
+    }
     return mergeClumpParts(parts);
-  }
-
-  if (cropId === "mustard") {
-    const stem = new THREE.ConeGeometry(r * 0.16, h * 0.9, 4);
-    stem.translate(0, h * 0.45, 0);
-    const bloom = new THREE.IcosahedronGeometry(r * 0.66, 0);
-    bloom.scale(1, 0.55, 1);
-    bloom.translate(0, h * 0.92, 0);
-    return mergeClumpParts([stem, bloom]);
-  }
-
-  if (cropId === "potato" || cropId === "mungbean") {
-    // Leafy mound built from two overlapping low-poly lobes.
-    const a = new THREE.IcosahedronGeometry(r * 0.78, 0);
-    a.scale(1, 0.55, 1);
-    a.translate(0, h * 0.42, 0);
-    const b = new THREE.IcosahedronGeometry(r * 0.52, 0);
-    b.scale(1, 0.6, 1);
-    b.translate(r * 0.28, h * 0.55, -r * 0.18);
-    return mergeClumpParts([a, b]);
   }
 
   const g = new THREE.ConeGeometry(r * 0.4, h, 5);
@@ -1189,13 +1027,14 @@ function buildPlantsAndRoots(data, monthIdx) {
   const outlineM = data.field.outlineM;
   const bounds = currentBlock.bounds || outlineBounds(outlineM);
   const heightAt = makeHeightAt(data);
-  const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 3000 : 12000;
+  const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 4000 : 18000;
   
   // Adapt spacing based on plantingLayout
   const step = cropSpacing(month.cropId);
   const layout = plantingLayout || "rows";
-  let rowSpacing = layout === "beds" ? step.row * 1.5 : layout === "bund-drains" ? step.row * 1.25 : step.row;
-  let plantSpacing = layout === "beds" ? step.plant * 0.8 : step.plant;
+  const rowsAlongX = bounds.width >= bounds.height;
+  let rowSpacing = (rowsAlongX ? step.row : step.plant) * (layout === "beds" ? 1.5 : layout === "bund-drains" ? 1.25 : 1);
+  let plantSpacing = (rowsAlongX ? step.plant : step.row) * (layout === "beds" ? 0.8 : 1);
 
   let positions = plantPositionsInPolygon(
     outlineM,
@@ -1214,13 +1053,12 @@ function buildPlantsAndRoots(data, monthIdx) {
   const h = canopyVisualHeight(month, fieldSpan);
   if (!(h > 0)) return;
 
-  if (!sharedPlantGeo) sharedPlantGeo = createBotanicalPlantGeometry();
-  const geom = buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing));
+  const geom = buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing), month.stage);
   
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    roughness: 0.82,
-    metalness: 0.05,
+    roughness: 0.9,
+    metalness: 0,
     flatShading: true,
     side: THREE.DoubleSide,
   });
@@ -1266,6 +1104,12 @@ function buildPlantsAndRoots(data, monthIdx) {
 
   plantsGroup = new THREE.Group();
   plantsGroup.add(mesh);
+  plantsGroup.userData.plants = {
+    positions: positions.map(([x, y]) => [x, heightAt(x, -y) + 0.02, -y]),
+    height: h,
+    color: stageColor(month.cropId, month.stage),
+    flower: month.cropId === "mustard" && month.stage !== "harvest" ? "#e8c93a" : null,
+  };
   ensureFloatGroup();
   floatGroup.add(plantsGroup);
 
@@ -1510,7 +1354,9 @@ class SoftwareRenderer {
 
     const matrix = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     const project = (x, y, z) => {
-      const v = new THREE.Vector3(x, y, z).applyMatrix4(matrix);
+      const v = new THREE.Vector3(x, y, z);
+      if (floatGroup) floatGroup.localToWorld(v);
+      v.applyMatrix4(matrix);
       return { x: (v.x * 0.5 + 0.5) * w, y: (-0.5 * v.y + 0.5) * h, z: v.z };
     };
     const path = (vertices) => {
@@ -1533,7 +1379,7 @@ class SoftwareRenderer {
 
     const faces = [];
     scene.traverse((mesh) => {
-      if (!mesh.visible || !(mesh.userData.terrain || mesh.userData.soil || mesh.userData.ground)) return;
+      if (!mesh.visible || !(mesh.userData.terrain || mesh.userData.soil || mesh.userData.ground || mesh.userData.water)) return;
       const g = mesh.geometry;
       const p = g?.attributes?.position;
       if (!p) return;
@@ -1590,12 +1436,14 @@ class SoftwareRenderer {
         } else {
           col.copy(mesh.material?.color || new THREE.Color("#8c9a75"));
         }
+        ctx.globalAlpha = mesh.material?.opacity ?? 1;
         ctx.fillStyle = `#${col.getHexString()}`;
         path(v);
         ctx.fill();
         ctx.strokeStyle = ctx.fillStyle;
         ctx.lineWidth = 0.5;
         ctx.stroke();
+        ctx.globalAlpha = 1;
       }
 
       if (elevation && mesh.userData.contours) {
@@ -2006,7 +1854,9 @@ function placeCallout(x, y, z, id, show) {
     el.style.display = 'none';
     return;
   }
-  const v = new THREE.Vector3(x, y, z).project(activeCamera);
+  const v = new THREE.Vector3(x, y, z);
+  if (floatGroup) floatGroup.localToWorld(v);
+  v.project(activeCamera);
   if (v.z > 1 || v.z < -1) {
     el.style.display = 'none';
     return;
@@ -2028,13 +1878,10 @@ function sync3DCallouts() {
   const heightAt = makeHeightAt(currentData);
 
   // Transect Nodes A and A'
-  const ax = b.minX + 0.12 * b.width;
-  const az = -(b.minY + 0.26 * b.height);
-  const apx = b.minX + 0.92 * b.width;
-  const apz = -(b.minY + 0.74 * b.height);
-
-  placeCallout(ax, heightAt(ax, az) + 0.4, az, 'node-a', true);
-  placeCallout(apx, heightAt(apx, apz) + 0.4, apz, 'node-ap', sliceU >= 0.88);
+  for (const [i, id] of ["node-a", "node-ap"].entries()) {
+    const p = currentBlock.transect[i];
+    placeCallout(p?.[0] ?? 0, p ? heightAt(p[0], -p[1]) + 0.025 : 0, p ? -p[1] : 0, id, !!p);
+  }
 
   // Hydrology callouts
   const lcx = b.minX + 0.62 * b.width;
@@ -2061,11 +1908,13 @@ function renderTransectSVG() {
   const b = currentBlock.bounds;
   const heightAt = makeHeightAt(currentData);
 
+  const [a, end] = currentBlock.transect;
+  if (!a || !end) { svg.innerHTML = ""; return; }
   const profile = sampleTransectProfile({
-    u0: 0.12,
-    v0: 0.26,
-    u1: 0.92,
-    v1: 0.74,
+    u0: (a[0] - b.minX) / b.width,
+    v0: (a[1] - b.minY) / b.height,
+    u1: (end[0] - b.minX) / b.width,
+    v1: (end[1] - b.minY) / b.height,
     steps: 36,
     sampleElevationFn: (u, v) => {
       const x = b.minX + u * b.width;
@@ -2605,8 +2454,8 @@ export async function setStudioMonth(monthIdx) {
   currentMonthIdx = monthIdx;
   if (!currentData) return;
 
+  await buildFieldBlock(currentData, currentCutaway);
   buildPlantsAndRoots(currentData, currentMonthIdx);
-  if (currentLayer !== "crops") await buildFieldBlock(currentData, currentCutaway);
 
   const m = currentData.months[currentMonthIdx];
   if (!m) return;
@@ -2844,15 +2693,6 @@ function bindEvents(container) {
   }
 
   // View toggle & camera buttons
-  containerEl.querySelectorAll("[data-studio-view]").forEach((btn) => {
-    btn.onclick = () => {
-      const mode = btn.dataset.studioView;
-      if (mode === "3d" && btn3d) btn3d.click();
-      else if (mode === "cutaway" && btnCut) btnCut.click();
-      else if (mode === "top" && btn2d) btn2d.click();
-    };
-  });
-
   containerEl.querySelectorAll("[data-studio-ctrl]").forEach((btn) => {
     btn.onclick = () => {
       const act = btn.dataset.studioCtrl;
