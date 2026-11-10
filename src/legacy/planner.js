@@ -64,7 +64,14 @@ function planner() {
       button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
     ) +
     chips() +
-    `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${p.view === 'top' ? t('Field from above', 'উপর থেকে জমি') : t('Field in 3D', 'জমির ত্রিমাত্রিক নকশা')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div><canvas id="plant-model" class="planner-canvas" aria-label="${t('Rotatable schematic of planting rows within the field boundary', 'জমির সীমানায় ঘোরানো যায় এমন সারির নকশা')}"></canvas><div class="map-actions"><span class="note">${t('Drag to rotate · Rows are drawn at a readable scale.', 'ঘোরাতে টানুন · বোঝার সুবিধায় সারি বড় করে দেখানো।')}</span><div class="map-controls">${button(p.view === 'top' ? '3D' : t('Overhead', 'উপর থেকে'), 'plan-view', 'small', 'layers')}${button('↺ 30°', 'turn-plan', 'small', '', '-1')}${button('↻ 30°', 'turn-plan', 'small', '', '1')}</div></div><div class="status-strip">${t('Schematic, flat ground · Uses your boundary and spacing', 'সমতল জমির নমুনা নকশা · আপনার সীমানা ও দূরত্ব দিয়ে হিসাব')}</div></section>
+    `<div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
+ <div class="planner3d-stage-wrap">
+ <div class="planner3d-toolbar"><div class="planner3d-view-toggle" role="group" aria-label="${t('Field view', 'জমির দৃশ্য')}">
+ <button type="button" class="planner3d-view-btn ${p.view !== 'top' ? 'active' : ''}" data-action="plan-view" data-value="3d" aria-pressed="${p.view !== 'top'}">${t('3D', '৩ডি')}</button>
+ <button type="button" class="planner3d-view-btn ${p.view === 'top' ? 'active' : ''}" data-action="plan-view" data-value="top" aria-pressed="${p.view === 'top'}">${t('Top', 'উপর থেকে')}</button></div>
+ <div class="planner3d-zoom-controls"><button type="button" class="planner3d-ctrl-btn" data-action="plan-zoom" data-value="1" aria-label="${t('Zoom in', 'কাছে আনুন')}">+</button><button type="button" class="planner3d-ctrl-btn" data-action="plan-zoom" data-value="-1" aria-label="${t('Zoom out', 'দূরে নিন')}">−</button></div></div>
+ <div class="planner3d-stage-canvas-host" tabindex="0" role="region" aria-label="${t('Field model. Drag or use arrow keys to rotate; scroll, pinch or use zoom buttons to zoom.', 'জমির মডেল। ঘোরাতে টানুন বা তীরচিহ্নের কী ব্যবহার করুন; জুম করতে স্ক্রল, দুই আঙুল বা জুম বোতাম ব্যবহার করুন।')}"><canvas id="plant-model" class="planner-canvas" aria-label="${t('Schematic of planting rows within the field boundary', 'জমির সীমানায় সারির নমুনা নকশা')}"></canvas></div>
+ <div class="planner3d-footer"><span class="planner3d-crop-chip">${t('Illustrative · rows drawn at readable scale', 'কাল্পনিক · বোঝার সুবিধায় সারি বড় করে দেখানো')}</span><span class="note planner3d-fallback-note">${t('2D fallback · flat ground · drag to rotate', '২ডি বিকল্প · সমতল জমি · ঘোরাতে টানুন')}</span></div></div></section>
  ${panel(
    t('Planting settings', 'বপনের মাপ'),
    `<form id="plant-controls" class="form-grid">${select(
@@ -80,7 +87,7 @@ function planner() {
 }
 function drawPlanner() {
   const canvas = document.querySelector('#plant-model');
-  if (!canvas) return;
+  if (!canvas || canvas.closest('.planner3d-ready')) return;
   const bounds = canvas.getBoundingClientRect(),
     width = bounds.width,
     height = bounds.height,
@@ -88,6 +95,7 @@ function drawPlanner() {
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
   const ctx = canvas.getContext('2d');
+  if (!ctx || !width || !height) return;
   ctx.scale(dpr, dpr);
   ctx.fillStyle = '#e9eee3';
   ctx.fillRect(0, 0, width, height);
@@ -239,10 +247,74 @@ function drawPlanner() {
   ctx.strokeStyle = '#445a42';
   ctx.stroke();
 }
+let planner3dModule = null;
+let planner3dPromise = null;
+let soilProfilePromise = null;
+let plannerTimer = null;
+let plannerHost = null;
+let plannerVersion = 0;
+
+function hasPlannerWebGL() {
+  try {
+    const probe = document.createElement('canvas');
+    const context = window.WebGLRenderingContext && (probe.getContext('webgl2') || probe.getContext('webgl'));
+    context?.getExtension('WEBGL_lose_context')?.loseContext();
+    return Boolean(context);
+  } catch {
+    return false;
+  }
+}
+
+function schedulePlanner3d() {
+  clearTimeout(plannerTimer);
+  const version = ++plannerVersion;
+  const host = plannerHost;
+  if (!host || (!planner3dModule && !hasPlannerWebGL())) return;
+  plannerTimer = setTimeout(async () => {
+    try {
+      planner3dPromise ||= import('./planner3d.js').catch((error) => {
+        planner3dPromise = null;
+        throw error;
+      });
+      soilProfilePromise ||= fetch('data/soil-profile.json')
+        .then((response) => response.ok ? response.json() : null).catch(() => null);
+      const [mod, soilProfile] = await Promise.all([planner3dPromise, soilProfilePromise]);
+      planner3dModule = mod;
+      if (version !== plannerVersion || !host.isConnected || host !== plannerHost) return;
+      await mod.mountPlanner3d(host, {
+        field: field(), polygon: polygon(), agronomy, soilProfile,
+        planner: { ...state.planner },
+      });
+    } catch (error) {
+      if (version !== plannerVersion) return;
+      planner3dModule?.disposePlanner3d();
+      drawPlanner();
+      console.warn('Planner 3D unavailable; using schematic:', error);
+    }
+  }, 120);
+}
+
+function disposePlanner() {
+  ++plannerVersion;
+  clearTimeout(plannerTimer);
+  plannerTimer = null;
+  plannerHost = null;
+  planner3dModule?.disposePlanner3d();
+}
+
 function mountPlanner() {
   const cv = document.querySelector('#plant-model');
   if (!cv) return;
+  plannerHost = cv.parentElement;
   drawPlanner();
+  schedulePlanner3d();
+  plannerHost.addEventListener('keydown', (event) => {
+    if (cv.closest('.planner3d-ready') || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    state.planner.angle += (event.key === 'ArrowLeft' ? -1 : 1) * Math.PI / 6;
+    persist();
+    drawPlanner();
+  });
   let drag = null;
   cv.onpointerdown = (e) => {
     drag = e.clientX;
@@ -261,15 +333,18 @@ function mountPlanner() {
 }
 function plannerAction(action, value) {
   if (action === 'plan-view') {
-    state.planner.view = state.planner.view === 'top' ? '3d' : 'top';
+    state.planner.view = value === 'top' ? 'top' : '3d';
     persist();
-    repaint();
-  }
-  if (action === 'turn-plan') {
-    state.planner.angle += (Math.PI / 6) * Number(value);
-    persist();
+    document.querySelectorAll('[data-action="plan-view"]').forEach((control) => {
+      const active = control.dataset.value === state.planner.view;
+      control.classList.toggle('active', active);
+      control.setAttribute('aria-pressed', String(active));
+    });
+    planner3dModule?.setPlanner3dView(state.planner.view);
     drawPlanner();
+    schedulePlanner3d();
   }
+  if (action === 'plan-zoom') planner3dModule?.zoomPlanner3d(Number(value));
 }
 function plannerInput(el) {
   if (
@@ -282,6 +357,7 @@ function plannerInput(el) {
     persist();
     document.querySelector('#plan-estimate').innerHTML = plannerResult();
     drawPlanner();
+    schedulePlanner3d();
   }
 }
 function plannerChange(el) {
@@ -296,6 +372,7 @@ export {
   planner,
   drawPlanner,
   mountPlanner,
+  disposePlanner,
   plannerAction,
   plannerInput,
   plannerChange,
