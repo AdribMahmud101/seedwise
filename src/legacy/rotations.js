@@ -686,7 +686,7 @@ function rotations() {
 
   return (
     header(
-      t('Decision studio  /  03', 'সিদ্ধান্তের ঘর  /  ০৩'),
+      t('Decision studio  /  02', 'সিদ্ধান্তের ঘর  /  ০২'),
       t('Rotation studio', 'ফসলচক্র বাছাই'),
       t(
         'Set what matters to you. Compare a whole year of crops, including the familiar rotation.',

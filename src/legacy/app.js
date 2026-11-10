@@ -61,8 +61,8 @@ import {
 
 const pages = [
   ["field", "My field", "আমার জমি", home],
-  ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
   ["rotations", "Rotation studio", "ফসলচক্র বাছাই", rotations],
+  ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
   ["planner", "Planting planner", "বপনের পরিকল্পনা", planner],
   ["clinic", "Crop clinic", "ফসলের চিকিৎসাঘর", clinic],
   ["water", "Water & resilience", "পানি ও সহনশীলতা", water],

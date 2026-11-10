@@ -793,7 +793,7 @@ function seasonView() {
   if (f.custom || !archive?.fields?.[f.id]?.monthly) {
     return (
       header(
-        t("Season archive  /  02", "মৌসুমের খাতা  /  ০২"),
+        t("Season archive  /  03", "মৌসুমের খাতা  /  ০৩"),
         t("Past seasons", "পুরনো মৌসুম"),
         t(
           "Replay five years. Choose a year and a month to read the regional record.",
@@ -832,7 +832,7 @@ function seasonView() {
   );
   return (
     header(
-      t("Season archive  /  02", "মৌসুমের খাতা  /  ০২"),
+      t("Season archive  /  03", "মৌসুমের খাতা  /  ০৩"),
       t("Past seasons", "পুরনো মৌসুম"),
       t(
         "Replay five years. Choose a year and a month to read the regional record.",
