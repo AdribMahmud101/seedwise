@@ -73,7 +73,7 @@
   padding: 0.125rem 0.5rem;
   border-radius: 0.25rem;
   font-family: 'Courier New', monospace;
-  font-size: 0.625rem;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   text-transform: uppercase;
@@ -199,7 +199,7 @@
 }
 
 .econ-cell-label {
-  font-size: 0.625rem;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -587,7 +587,7 @@
  * Truth Labels
  * ============================================ */
 .truth-label {
-  font-size: 0.625rem;
+  font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
   white-space: nowrap;
@@ -605,15 +605,15 @@
  * Small text adjustments
  * ============================================ */
 .text-xs {
-  font-size: 0.75rem;
+  font-size: 12px;
 }
 
 .text-\[11px\] {
-  font-size: 0.6875rem;
+  font-size: 12px;
 }
 
 .text-\[10px\] {
-  font-size: 0.625rem;
+  font-size: 12px;
 }
 
 /* ============================================
@@ -958,8 +958,35 @@ a:hover {
 }
 
 /* ============================================
- * STUDIO5G Question Panels & Tariff Header
+ * STUDIO5J Question Panels Row Layout
  * ============================================ */
+.rotation-question-panels-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 20px 0 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) and (max-width: 1099px) {
+  .rotation-question-panels-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .rotation-question-panels-row > *:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  .rotation-question-panels-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin: 16px 0 20px;
+  }
+}
+
 .priority-left-column {
   display: flex;
   flex-direction: column;
@@ -969,15 +996,30 @@ a:hover {
 }
 
 .question-panel {
-  background: var(--bg-card, #fffdf5);
-  border: 1px solid var(--border-light, #cdcfc0);
-  border-radius: 0.5rem;
-  padding: 1.25rem;
+  background: var(--surface, #fffef9);
+  border: 1px solid var(--line, #d8dcd0);
+  border-radius: 5px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   min-width: 0;
+  overflow: hidden;
+}
+
+.question-panel .panel-header {
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--line, #d8dcd0);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.question-panel .panel-header .eyebrow {
+  font-size: 12px;
+  color: var(--muted, #6b7168);
+  margin-bottom: 2px;
 }
 
 .question-panel h3 {
@@ -990,10 +1032,26 @@ a:hover {
 }
 
 .question-panel .panel-sub {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--text-secondary, #536456);
   line-height: 1.4;
   margin: 0;
+}
+
+.question-panel .panel-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (max-width: 700px) {
+  .question-panel .panel-header {
+    padding: 14px 16px;
+  }
+  .question-panel .panel-body {
+    padding: 17px;
+  }
 }
 
 /* 12-month strip */
@@ -1019,11 +1077,11 @@ a:hover {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 4px 1px;
+  gap: 3px;
+  padding: 6px 2px;
   background: #fffdf5;
   border-radius: 2px;
-  font-size: 10px;
+  font-size: 12px;
   text-align: center;
   min-width: 0;
   overflow: hidden;
@@ -1031,7 +1089,7 @@ a:hover {
 
 .month-name {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   color: #536456;
 }
@@ -1056,7 +1114,7 @@ a:hover {
 }
 
 .month-tag {
-  font-size: 8px;
+  font-size: 12px;
   color: #173e30;
   white-space: nowrap;
   overflow: hidden;
@@ -1069,7 +1127,7 @@ a:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12px;
   color: #536456;
   margin-top: 4px;
 }
@@ -1136,7 +1194,7 @@ a:hover {
 }
 
 .stat-lbl {
-  font-size: 11px;
+  font-size: 12px;
   color: #536456;
 }
 
@@ -1176,7 +1234,7 @@ a:hover {
   padding: 8px 12px;
   border-radius: 4px;
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1237,13 +1295,13 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .s1-flood-date {
   color: #536456;
   font-family: ui-monospace, monospace;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .s1-flood-pct {
@@ -1254,8 +1312,8 @@ a:hover {
 /* Nutrient chips */
 .nutrient-chips-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
 }
 
 .nutrient-chip {
@@ -1274,6 +1332,7 @@ a:hover {
   gap: 2px;
   text-align: left;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .nutrient-chip.active {
@@ -1282,13 +1341,13 @@ a:hover {
 }
 
 .nutrient-chip .chip-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #173e30;
 }
 
 .nutrient-chip .chip-val {
-  font-size: 11px;
+  font-size: 12px;
   color: #315d42;
   font-family: ui-monospace, monospace;
 }
@@ -1301,8 +1360,12 @@ a:hover {
 }
 
 .nutrient-chip .chip-class {
-  font-size: 10px;
+  font-size: 12px;
   color: #536456;
+}
+
+.nutrient-chip .truth {
+  font-size: 12px;
 }
 
 .groundwater-row {
@@ -1378,7 +1441,11 @@ a:hover {
     padding: 2px;
   }
   .month-cell {
-    padding: 3px 0;
+    padding: 4px 1px;
+    font-size: 12px;
+  }
+  .month-name {
+    font-size: 12px;
   }
   .nutrient-chips-grid {
     grid-template-columns: 1fr;

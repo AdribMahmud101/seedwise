@@ -602,41 +602,39 @@ function rotations() {
     ) +
     chips() +
     `<div id="studio-3d-host">${posterCard()}</div>` +
+    `<div id="rotation-question-panels" class="rotation-question-panels-row">` +
+      panelWhenBareOrStressed(null) +
+      panelWhereWillWaterCollect() +
+      panelWhatIsUnderMyField() +
+    `</div>` +
     `<div class="priority-layout">` +
-      `<div class="priority-left-column">` +
-        `<section class="panel priority-box">` +
-          `<div class="panel-header">` +
-            `<h2>${t('My priorities', 'আমার অগ্রাধিকার')}</h2>` +
-          `</div>` +
-          `<div class="panel-body">` +
-            `${rotationTool.priorityKeys.map(({ key, labelEn, labelBn, icon: iconKey }) => `
-              <div class="priority-item">
-                <label for="weight-${key}">${iconKey ? icon(iconKey, 15) : ''} ${t(labelEn, labelBn)} 
-                  <span class="count" id="value-${key}">${num(state.weights[mapPriorityKey(key)] || 0)}</span>
-                </label>
-                <input id="weight-${key}" data-weight="${key}" type="range" min="0" max="5" value="${state.weights[mapPriorityKey(key)] || 0}">
-              </div>
-            `).join('')}` +
-            `<div class="preset-row">` +
-              `${button(t('Balanced', 'সমান'), 'preset', 'small', '', 'balanced')}` +
-              `${button(t('Save water', 'পানি বাঁচাই'), 'preset', 'small', '', 'water')}` +
-            `</div>` +
-            `<p class="priority-note note">${t('0 means ignore. 5 gives a goal the greatest weight. If all are zero, scores stay blank.', '০ মানে এই লক্ষ্য বাদ। ৫ সবচেয়ে বেশি গুরুত্ব। সব ০ হলে স্কোর ফাঁকা থাকে।')}</p>` +
-          `</div>` +
-          `<div class="panel-body priority-context">` +
-            `<div class="eyebrow">${t('Field assumptions', 'জমির অনুমান')}</div>` +
-            `<p>${t('Aman harvest', 'আমন কাটা')} <strong>${esc(p.harvest)}</strong></p>` +
-            `<p>${t('Flood delay', 'বন্যায় দেরি')} <strong>${num(p.floodDays)} d ${truth('FARMER_REPORTED')}</strong></p>` +
-            `<p>${t('Unit', 'একক')} <strong>${esc(t(rotationTool.AREA_CONVERSION[state.unit || 'ha']?.labelEn, rotationTool.AREA_CONVERSION[state.unit || 'ha']?.labelBn))}</strong></p>` +
-            `<button class="text-link" data-action="score-method">${t('How scoring works', 'স্কোরের পদ্ধতি')}</button>` +
-          `</div>` +
-        `</section>` +
-        `<div id="rotation-question-panels">` +
-          panelWhenBareOrStressed(null) +
-          panelWhereWillWaterCollect() +
-          panelWhatIsUnderMyField() +
+      `<section class="panel priority-box">` +
+        `<div class="panel-header">` +
+          `<h2>${t('My priorities', 'আমার অগ্রাধিকার')}</h2>` +
         `</div>` +
-      `</div>` +
+        `<div class="panel-body">` +
+          `${rotationTool.priorityKeys.map(({ key, labelEn, labelBn, icon: iconKey }) => `
+            <div class="priority-item">
+              <label for="weight-${key}">${iconKey ? icon(iconKey, 15) : ''} ${t(labelEn, labelBn)} 
+                <span class="count" id="value-${key}">${num(state.weights[mapPriorityKey(key)] || 0)}</span>
+              </label>
+              <input id="weight-${key}" data-weight="${key}" type="range" min="0" max="5" value="${state.weights[mapPriorityKey(key)] || 0}">
+            </div>
+          `).join('')}` +
+          `<div class="preset-row">` +
+            `${button(t('Balanced', 'সমান'), 'preset', 'small', '', 'balanced')}` +
+            `${button(t('Save water', 'পানি বাঁচাই'), 'preset', 'small', '', 'water')}` +
+          `</div>` +
+          `<p class="priority-note note">${t('0 means ignore. 5 gives a goal the greatest weight. If all are zero, scores stay blank.', '০ মানে এই লক্ষ্য বাদ। ৫ সবচেয়ে বেশি গুরুত্ব। সব ০ হলে স্কোর ফাঁকা থাকে।')}</p>` +
+        `</div>` +
+        `<div class="panel-body priority-context">` +
+          `<div class="eyebrow">${t('Field assumptions', 'জমির অনুমান')}</div>` +
+          `<p>${t('Aman harvest', 'আমন কাটা')} <strong>${esc(p.harvest)}</strong></p>` +
+          `<p>${t('Flood delay', 'বন্যায় দেরি')} <strong>${num(p.floodDays)} d ${truth('FARMER_REPORTED')}</strong></p>` +
+          `<p>${t('Unit', 'একক')} <strong>${esc(t(rotationTool.AREA_CONVERSION[state.unit || 'ha']?.labelEn, rotationTool.AREA_CONVERSION[state.unit || 'ha']?.labelBn))}</strong></p>` +
+          `<button class="text-link" data-action="score-method">${t('How scoring works', 'স্কোরের পদ্ধতি')}</button>` +
+        `</div>` +
+      `</section>` +
       `<div>` +
         `<div class="ranking-label ranking-header-bar">` +
           `<div>` +

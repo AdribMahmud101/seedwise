@@ -23,7 +23,7 @@
   padding: 4px 10px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.15);
-  font: 11px Mono, monospace;
+  font: 12px Mono, monospace;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 12px;
@@ -187,7 +187,7 @@
 }
 
 .studio-rot-rank {
-  font: 11px Mono, monospace;
+  font: 12px Mono, monospace;
   color: var(--text-dim);
   text-align: right;
 }
@@ -205,14 +205,14 @@
 }
 
 .studio-rot-label .note {
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--green);
 }
 
 .studio-rot-score {
-  font: 11px Mono, monospace;
+  font: 12px Mono, monospace;
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -270,7 +270,7 @@
 }
 
 .studio-terrain-tools small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
@@ -288,7 +288,7 @@
 }
 
 .studio-obs-date {
-  font: 11px Mono, monospace;
+  font: 12px Mono, monospace;
   color: var(--text-dim);
 }
 
@@ -330,7 +330,7 @@
 .sparkline-dates {
   display: flex;
   justify-content: space-between;
-  font: 10px Mono, monospace;
+  font: 12px Mono, monospace;
   color: var(--text-dim);
   margin-top: 2px;
 }
@@ -346,7 +346,7 @@
 }
 
 .studio-soil-summary small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   line-height: 1.35;
 }
@@ -367,7 +367,7 @@
 }
 
 .studio-weather-item dt {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
@@ -449,7 +449,7 @@
   align-items: center;
   column-gap: 2px;
   color: #4b3624;
-  font: 10px Mono, monospace;
+  font: 12px Mono, monospace;
   line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
 }
@@ -465,7 +465,7 @@
 }
 
 .studio-depth-tick small {
-  font-size: 8px;
+  font-size: 12px;
   color: #6b5138;
 }
 
@@ -597,7 +597,7 @@
 }
 
 .studio-slice-end {
-  font-size: 11px;
+  font-size: 12px;
   color: #5a6b4d;
   white-space: nowrap;
 }
@@ -619,7 +619,7 @@
   display: inline-block;
   background: #faffefeb;
   color: #52693f;
-  font-size: 11px;
+  font-size: 12px;
   padding: 7px 12px;
   border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.8);
@@ -642,7 +642,7 @@
 
 .studio-caption-copy p {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #68806a;
 }
 
@@ -672,7 +672,7 @@
 }
 
 .studio-terrain-card output {
-  font: 11px/1 'DM Sans', Mono, monospace;
+  font: 12px/1 'DM Sans', Mono, monospace;
   background: #ecf2e1;
   color: #35563f;
   padding: 3px 8px;
@@ -688,7 +688,7 @@
 
 .studio-terrain-card small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: #7c8972;
 }
 
@@ -729,7 +729,7 @@
 
 .studio-model-caption b {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 2.2px;
   color: #475f3f;
   font-weight: 700;
@@ -738,7 +738,7 @@
 
 .studio-model-caption span {
   display: block;
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .studio-model-caption span:nth-child(n+3) {
@@ -857,7 +857,7 @@
 .studio-month-slider-labels {
   display: flex;
   justify-content: space-between;
-  font: 11px Mono, monospace;
+  font: 12px Mono, monospace;
   color: var(--text-dim);
 }
 
@@ -902,7 +902,7 @@
   .studio-view-btn {
     min-height: 44px;
     padding: 6px 8px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .studio-slice-card {
     padding: 2px 6px;
@@ -913,7 +913,7 @@
     min-width: 50px;
   }
   .studio-crop-chip {
-    font-size: 9px;
+    font-size: 12px;
     padding: 3px 6px;
   }
   .studio-caption-copy {
@@ -926,7 +926,7 @@
     padding: 6px 8px;
   }
   .studio-terrain-head {
-    font-size: 11px;
+    font-size: 12px;
   }
   .studio-terrain-card input[type="range"] {
     margin: 4px 0 2px;
@@ -1004,7 +1004,7 @@
     display: none;
   }
   .studio-crop-chip {
-    font-size: 10px;
+    font-size: 12px;
     padding: 4px 8px;
   }
   .studio-model-caption {
@@ -1026,7 +1026,7 @@
   .studio-view-btn {
     min-height: 44px;
     padding: 4px 10px;
-    font-size: 11px;
+    font-size: 12px;
     white-space: nowrap;
   }
   .studio-depth-ticks {
@@ -1071,7 +1071,7 @@
   border-radius: 3px;
   padding: 4px 8px;
   box-shadow: 0 3px 10px rgba(23, 62, 48, 0.14);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink, #1b382e);
   white-space: nowrap;
@@ -1114,7 +1114,7 @@
   color: #fffdf5;
   border: 1.5px solid #fffdf5;
   font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1133,7 +1133,7 @@
   border-radius: 6px;
   padding: 8px 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  font-size: 11px;
+  font-size: 12px;
   min-width: 220px;
   max-width: calc(100% - 24px);
 }
@@ -1182,7 +1182,7 @@
 .studio-dock-sub {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-dim, #536456);
 }
 
@@ -1192,7 +1192,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .studio-dock-toggles label {
@@ -1212,7 +1212,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .studio-surface-selector select {
@@ -1242,7 +1242,7 @@
     display: block;
   }
   .studio-probe-card {
-    font-size: 11px;
+    font-size: 12px;
     min-width: 0;
   }
   .studio-dock-deck {
