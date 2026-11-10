@@ -3021,7 +3021,7 @@ function soilDetailHtml(band, detail) {
     <div class="callout-val">${detail.isButton
       ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
       : esc(detail.value)}</div>
-    <small>${esc(truthLabel)}</small>
+    ${detail.isButton ? "" : `<small>${esc(truthLabel)}</small>`}
     ${detail.cropValue ? `<div class="callout-val callout-crop">${esc(detail.cropValue)}</div><small>${esc(detail.cropTruthLabel)}</small>` : ""}
   </div>`;
 }
@@ -3568,7 +3568,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <div id="callout-${band}" class="callout-3d" data-band="${band}">
               <button type="button" class="studio-soil-pin" id="soil-pin-${band}" data-soil-pin="${band}"
                 aria-label="${esc(calloutData[band].eyebrow)}" aria-expanded="false" aria-controls="studio-soil-popover">
-                ${["①", "②", "③"][i]}
+                ${[t("Topsoil", "উপরের মাটি"), t("Root zone", "শিকড় স্তর"), t("Deep soil", "গভীর মাটি")][i]}
               </button>
               <span class="studio-pin-label" data-pin-label="${band}">${esc(soilPinLabel(band, calloutData[band]))}</span>
             </div>`).join("")}
@@ -3590,7 +3590,6 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         <div class="studio-callout-legend" id="studio-mobile-legend">
           ${["topsoil", "rootzone", "aquifer"].map((band, i) => `
             <div class="studio-callout-legend-item" data-band="${band}" tabindex="0" aria-label="${esc(calloutData[band].eyebrow)}">
-              <span class="num-badge">${["①", "②", "③"][i]}</span>
               <div data-soil-row="${band}">${soilDetailHtml(band, calloutData[band])}</div>
             </div>`).join("")}
         </div>

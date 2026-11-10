@@ -1966,3 +1966,16 @@
   inset: 0;
   z-index: 10000;
 }
+
+/* Soil pins: readable name tags instead of circled digits (owner, 11 Nov) */
+.studio-soil-pin {
+  width: auto; min-width: 44px; height: auto; min-height: 32px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+  color: #fff; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(23, 62, 48, 0.25);
+}
+.studio-soil-pin[data-soil-pin="topsoil"] { background: #5c3d24; }
+.studio-soil-pin[data-soil-pin="rootzone"] { background: #8a5a35; }
+.studio-soil-pin[data-soil-pin="aquifer"] { background: #2563eb; }
+.studio-soil-pin::after { content: ""; position: absolute; inset: -6px; } /* 44px hit area */
+.studio-soil-pin { position: relative; }
