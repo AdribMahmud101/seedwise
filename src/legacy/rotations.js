@@ -778,7 +778,7 @@ function setupQuestionPanelEvents() {
         await openStudio3d();
       }
       studioModule?.setSurfaceMode?.('ponding');
-      document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth' });
+      document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
@@ -852,7 +852,7 @@ function rotationAction(action, value) {
   if (action === 'preview-3d') {
     activeRotationId = value;
     openStudio3d();
-    document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth' });
+    document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   if (action === 'preset') {
     const weights = { water: 0, soil: 0, cost: 0, risk: 0 };

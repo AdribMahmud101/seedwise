@@ -401,7 +401,9 @@
 
 .studio-stage-canvas-host {
   flex: none;
-  height: clamp(520px, 68vh, 720px);
+  /* fit the whole 3D inside the browser window (owner: "keep it in focus") */
+  height: clamp(460px, calc(100svh - 96px), 820px);
+  scroll-margin-top: 16px;
   min-height: 0;
   position: relative;
   overflow: hidden;
@@ -1021,7 +1023,8 @@
     /* Grow the stage a little and reserve space on the bottom for the cutaway bar
        so the view toggle, surroundings chip and cutaway all stay clear of the
        field itself. */
-    height: clamp(420px, 68svh, 620px);
+    height: clamp(420px, calc(100svh - 120px), 640px);
+    scroll-margin-top: 8px;
     min-height: 420px;
     padding-bottom: 64px;
   }
