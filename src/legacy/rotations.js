@@ -34,6 +34,7 @@ import * as rotationTool from './rotation-tool.js';
 let studioOpened = false;
 let studioModule = null;
 let activeRotationId = null;
+let previewedRotationId = null;
 let studioDataModule = null;
 let activePlantingLayout = 'rows';
 let drainTrenchActive = true;
@@ -636,10 +637,12 @@ export async function openStudio3d() {
       boundary: state.boundaries[f.id] ? 'farmer' : 'traced',
     });
 
-    const initialMonth = (typeof mod.nearestCropMonth === 'function')
-      ? mod.nearestCropMonth(studioData, (state.month != null) ? state.month : new Date().getMonth())
-      : (state.month || 0);
+    if (buildToken !== studioBuildToken) return; // superseded by a newer open
+    const initialMonth = previewedRotationId === rotId
+      ? state.month
+      : mod.nearestCropMonth(studioData, new Date().getMonth());
     state.month = initialMonth;
+    previewedRotationId = rotId;
 
     const opts = {
       rotations: rotationOptionsFor(rotId),
@@ -915,6 +918,7 @@ function setupQuestionPanelEvents() {
 export function disposeRotations() {
   studioOpened = false;
   activeRotationId = null;
+  previewedRotationId = null;
   if (studioModule?.disposeStudio3d) {
     studioModule.disposeStudio3d();
   }

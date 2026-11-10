@@ -12,7 +12,7 @@ import {
   sampleS1Water, transectEndpoints, waterTablePositions,
   usdaTextureClass, computeAutoExaggeration, buildCalloutData, deoverlapLabels,
   easeOutCubic, introCameraParams, shouldSkipIntro, sampleRowCropScale,
-  nearestCropMonth, cropStageAt,
+  nearestCropMonth, cropStageAt, monthChipText,
 } from "../src/legacy/studio3d-helpers.js";
 
 test("computePonding calculates ponding depth from low-ground and rainfall scenario", () => {
@@ -557,6 +557,28 @@ test("cropStageAt calculates stage and metadata for a month", () => {
   const fallowStrCrop = cropStageAt(rotation, 2);
   assert.equal(fallowStrCrop.cropId, null);
   assert.equal(fallowStrCrop.stage, "fallow");
+});
+
+test('nearestCropMonth skips ripening and harvest, wraps years, and keeps ties forward', () => {
+  const months = Array.from({ length: 12 }, () => ({ stage: 'fallow' }));
+  months[0] = { cropId: 'potato', stage: 'grow' };
+  months[9] = { cropId: 'aman', stage: 'grow' };
+  months[10] = { cropId: 'aman', stage: 'mature' };
+  months[11] = { cropId: 'aman', stage: 'harvest' };
+  assert.equal(nearestCropMonth(months, 10), 9);
+  assert.equal(nearestCropMonth(months, 11), 0);
+  months[0].stage = 'establish';
+  assert.equal(nearestCropMonth(months, 0), 0);
+  months[9].stage = 'harvest';
+  months[0].stage = 'mature';
+  assert.equal(nearestCropMonth(months, 10), 10);
+});
+
+test('month chips retain stage details and provide short translated phone labels', () => {
+  const month = { month: '2024-10', cropName: 'Aman rice', cropNameBn: 'আমন ধান', stage: 'grow' };
+  assert.equal(monthChipText(month), 'Oct · Aman rice · growing');
+  assert.equal(monthChipText(month, 'en', true), 'Oct · Aman');
+  assert.equal(monthChipText(month, 'bn', true), 'অক্টো · আমন');
 });
 
 test("buildCalloutData includes fallow residue description for fallow months", () => {

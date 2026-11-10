@@ -7,6 +7,7 @@ import { monthlyRotationWater, rotationEvidence, STRATEGIES } from '../src/legac
 import { projectWgs84ToUtm45N } from '../src/legacy/spatial.js';
 import { basePolygon } from '../src/legacy/ui.js';
 import { getCachedPower, setCachedPower } from '../src/legacy/powerlive.js';
+import { nearestCropMonth, cropStageAt } from '../src/legacy/studio3d-helpers.js';
 
 const read = (name) => {
   const bytes = readFileSync(new URL(`../public/data/${name}.json`, import.meta.url));
@@ -16,6 +17,21 @@ const earth = read('earth-data');
 const packs = { agronomy: read('agronomy'), ndviGrid: read('ndvi-grid'), moistureGrid: read('moisture-grid'),
   lowGround: read('low-ground'), soilProfile: read('soil-profile') };
 const inputFor = (field, rotationId = 'baseline') => ({ ...packs, field, polygon: basePolygon(field), rotationId });
+
+test('November previews open on the nearest growing month for all four rotations', () => {
+  for (const [id, month, cropId] of [
+    ['baseline', 9, 'aman'], ['mustard', 10, 'mustard'],
+    ['potato', 10, 'potato'], ['legume', 10, 'potato'],
+  ]) {
+    const data = buildStudioData(inputFor(earth.fields[0], id));
+    assert.equal(nearestCropMonth(data, 10), month, id);
+    assert.equal(data.months[month].cropId, cropId);
+    assert.equal(data.months[month].stage, 'grow');
+    const strategy = STRATEGIES.find((s) => s.id === id);
+    assert.equal(nearestCropMonth(strategy, 10, packs.agronomy), month, id);
+    assert.equal(cropStageAt(strategy, month, packs.agronomy).stage, 'grow');
+  }
+});
 const keys = (object, names) => assert.deepEqual(Object.keys(object).sort(), names.split(' ').sort());
 const nullableNumber = (value) => assert.ok(value === null || Number.isFinite(value), `Invalid numeric value: ${value}`);
 const areaM2 = (ring) => Math.abs(ring.reduce((sum, [x, y], i) => {

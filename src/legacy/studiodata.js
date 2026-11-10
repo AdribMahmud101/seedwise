@@ -1,5 +1,6 @@
 import { areaHa, finite, mean, monthlyRotationWater, polygonValid, STRATEGIES } from './engine.js';
 import { pointInPoly, projectWgs84ToUtm45N } from './spatial.js';
+import { cropStageForFraction } from './studio3d-helpers.js';
 
 // FAO-56 Table 12: maximum height; Table 22: upper end of effective rooting depth.
 // Mustard uses rapeseed/canola; mungbean uses green gram/cowpeas. These are scenario limits, not measurements.
@@ -97,7 +98,7 @@ function growth(strategy, index, year, crop) {
   const duration = mean(crop.durationDays ?? []);
   if (!(duration > 0)) throw new RangeError(`Missing crop duration: ${crop.id}`);
   const stageFraction = Math.min(1, Math.max(0, day / duration));
-  const stage = stageFraction < 0.15 ? 'establish' : stageFraction < 0.65 ? 'grow' : stageFraction < 0.9 ? 'mature' : 'harvest';
+  const stage = cropStageForFraction(crop.id, stageFraction);
   // Scenario interpolation reaches the cited maximum at maturity; no growth observations are implied.
   const size = Math.min(1, stageFraction / 0.65);
   const limits = FAO56_CROP_LIMITS[crop.id];

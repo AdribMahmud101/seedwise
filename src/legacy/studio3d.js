@@ -36,7 +36,7 @@ async function loadSoilNutrientsData() {
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
+import { state, t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
 import {
   outlineBounds,
   plantPositionsInPolygon,
@@ -2679,6 +2679,8 @@ function fillPerspectiveAspect() {
 
 function onResize() {
   if (!renderer || !canvasHostEl) return;
+  const pageTop = canvasHostEl.getBoundingClientRect().top + window.scrollY;
+  canvasHostEl.style.setProperty('--stage-top', `${Math.max(0, Math.min(pageTop, window.innerHeight * 0.45))}px`);
   updateOverlayLayout();
   applyTouchMode();
   const rect = canvasHostEl.getBoundingClientRect();
@@ -4023,6 +4025,10 @@ function depthTicksHtml() {
     .join("")}</div>`;
 }
 
+function monthPillHtml(month) {
+  return `<span class="studio-month-full">${esc(t(monthChipText(month, "en"), monthChipText(month, "bn")))}</span><span class="studio-month-short" aria-hidden="true">${esc(t(monthChipText(month, "en", true), monthChipText(month, "bn", true)))}</span>`;
+}
+
 export function studio3dHtml(data, activeMonth = 0, opts = {}) {
   currentData = data;
   currentMonthIdx = activeMonth;
@@ -4119,6 +4125,20 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
     </aside>
 
     <div class="studio-stage-wrap">
+      <div class="studio-calendar-bar">
+        <button type="button" class="studio-play-btn" data-studio-action="toggle-play" aria-label="${isPlaying ? t("Pause", "থামান") : t("Play", "চালান")}">
+          ${isPlaying ? "⏸" : "▶"}
+        </button>
+        <div class="studio-month-slider-wrap">
+          <input type="range" id="studio-month-slider" min="0" max="11" step="1" value="${currentMonthIdx}" aria-label="${t("Month selection", "মাস নির্বাচন")}" aria-valuetext="${esc(t(chipTextEn, chipTextBn))}">
+          <div class="studio-month-slider-labels" aria-hidden="true">
+            ${t(MONTHS_EN, MONTHS_BN).map((label) => `<span>${label}</span>`).join("")}
+          </div>
+        </div>
+        <div class="studio-month-current-pill" title="${esc(t(chipTextEn, chipTextBn))}" data-chip-en="${esc(chipTextEn)}" data-chip-bn="${esc(chipTextBn)}">
+          ${monthPillHtml(m)}
+        </div>
+      </div>
       <div class="studio-stage-canvas-host" tabindex="0" role="region" aria-label="${t("3D Field Studio Stage", "৩ডি মাঠ স্টুডিও মঞ্চ")}">
         <button class="studio-compass" title="${t("Click to face North", "উত্তরমুখী হতে চাপুন")}" aria-label="${t("North Arrow", "উত্তর নির্দেশক")}">
           <div class="studio-compass-arrow"></div>
@@ -4341,20 +4361,6 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
 
       <div class="studio-sr-only" aria-live="polite" id="studio-sr-summary">${esc(srSummary)}</div>
 
-      <div class="studio-calendar-bar">
-        <button class="studio-play-btn" data-studio-action="toggle-play" aria-label="${isPlaying ? t("Pause", "থামান") : t("Play", "চালান")}">
-          ${isPlaying ? "⏸" : "▶"}
-        </button>
-        <div class="studio-month-slider-wrap">
-          <input type="range" id="studio-month-slider" min="0" max="11" step="1" value="${currentMonthIdx}" aria-label="${t("Month selection", "মাস নির্বাচন")}">
-          <div class="studio-month-slider-labels">
-            <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
-          </div>
-        </div>
-        <div class="studio-month-current-pill" data-chip-en="${esc(chipTextEn)}" data-chip-bn="${esc(chipTextBn)}">
-          ${esc(t(chipTextEn, chipTextBn))}
-        </div>
-      </div>
     </div>
   </div>`;
 }
@@ -4455,6 +4461,7 @@ export async function mountStudio3d(container, data, opts = {}) {
 
 export async function setStudioMonth(monthIdx) {
   currentMonthIdx = monthIdx;
+  state.month = monthIdx;
   if (!currentData) return;
 
   await buildFieldBlock(currentData, currentCutaway);
@@ -4469,11 +4476,13 @@ export async function setStudioMonth(monthIdx) {
     const bn = monthChipText(m, "bn");
     pill.dataset.chipEn = en;
     pill.dataset.chipBn = bn;
-    pill.textContent = t(en, bn);
+    pill.title = t(en, bn);
+    pill.innerHTML = monthPillHtml(m);
   }
 
   const slider = containerEl?.querySelector("#studio-month-slider");
   if (slider && +slider.value !== monthIdx) slider.value = monthIdx;
+  slider?.setAttribute("aria-valuetext", t(monthChipText(m, "en"), monthChipText(m, "bn")));
 
   // The sparkline sorts by date, so pick the nearest observation from the same
   // sorted order; its index is what marks the active dot.

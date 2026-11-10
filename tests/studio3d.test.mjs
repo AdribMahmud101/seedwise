@@ -89,6 +89,24 @@ test("contract fixture renders month summary in Bengali", () => {
   state.lang = "en";
 });
 
+test('month player precedes the canvas with translated month ticks and accessible controls', () => {
+  try {
+    for (const lang of ['en', 'bn']) {
+      state.lang = lang;
+      const html = studio3dHtml(fixture, 0);
+      assert.ok(html.indexOf('class="studio-calendar-bar"') < html.indexOf('class="studio-stage-canvas-host"'));
+      assert.match(html, /id="studio-month-slider"[^>]*aria-label=/);
+      assert.match(html, /data-studio-action="toggle-play"[^>]*aria-label=/);
+      const labels = html.match(/class="studio-month-slider-labels"[^>]*>([\s\S]*?)<\/div>/)[1];
+      assert.equal((labels.match(/<span>/g) || []).length, 12);
+      assert.ok(labels.includes(lang === 'en' ? 'Jan' : 'জানু'));
+      assert.match(html, /class="studio-month-short"/);
+    }
+  } finally {
+    state.lang = 'en';
+  }
+});
+
 test("contract fixture satisfies required contract schema", () => {
   const data = fixture;
   assert.ok(data.field.id);

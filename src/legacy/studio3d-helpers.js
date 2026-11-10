@@ -580,22 +580,23 @@ const STAGE_BN = { establish: "অঙ্কুরোদ্গম", grow: "বৃ
 
 export { MONTHS_EN, MONTHS_BN };
 
+export function cropStageForFraction(cropId, fraction) {
+  // The Aman preview keeps its full green canopy through October, before November harvest.
+  const ripening = cropId === "aman" ? 0.8 : 0.65;
+  return fraction < 0.15 ? "establish" : fraction < ripening ? "grow" : fraction < 0.9 ? "mature" : "harvest";
+}
+
 /**
- * Find the nearest month with an active crop in the given rotation.
- * If the starting month already has a crop, returns that month index (0-11).
- * Otherwise searches radially (+1/-1, +2/-2, etc.) for the nearest crop month.
+ * Find the nearest actively growing crop month (0-11), excluding ripening and harvest.
+ * Search radially (+1/-1, +2/-2, etc.); keep the starting month if none is growing.
  */
-export function nearestCropMonth(rotation, month = 0) {
+export function nearestCropMonth(rotation, month = 0, agronomyData = null) {
   const months = Array.isArray(rotation) ? rotation : (rotation?.months || []);
   if (!months.length) return ((Number(month) % 12) + 12) % 12;
   const startM = ((Number(month) % 12) + 12) % 12;
   const hasCrop = (idx) => {
-    const val = months[idx];
-    if (!val || val === "fallow") return false;
-    if (typeof val === "object") {
-      return val.cropId ? val.cropId !== "fallow" : (val.stage ? val.stage !== "fallow" : true);
-    }
-    return true;
+    const crop = cropStageAt(rotation, idx, agronomyData);
+    return !!crop.cropId && (crop.stage === "establish" || crop.stage === "grow");
   };
   if (hasCrop(startM)) return startM;
   for (let dist = 1; dist <= 6; dist++) {
@@ -646,7 +647,7 @@ export function cropStageAt(rotation, month = 0, agronomyData = null) {
     ? durList.reduce((a, b) => a + b, 0) / durList.length
     : 90;
   const stageFraction = Math.min(1, Math.max(0, day / duration));
-  const stage = stageFraction < 0.15 ? "establish" : stageFraction < 0.65 ? "grow" : stageFraction < 0.9 ? "mature" : "harvest";
+  const stage = cropStageForFraction(cropId, stageFraction);
 
   return {
     cropId,
@@ -657,13 +658,14 @@ export function cropStageAt(rotation, month = 0, agronomyData = null) {
   };
 }
 
-export function monthChipText(month, lang = "en") {
+export function monthChipText(month, lang = "en", short = false) {
   if (!month) return "";
   const idx = Number((month.month || "").split("-")[1]) - 1;
   const months = lang === "bn" ? MONTHS_BN : MONTHS_EN;
   const stageMap = lang === "bn" ? STAGE_BN : STAGE_EN;
   const monthLabel = Number.isInteger(idx) && idx >= 0 && idx < 12 ? months[idx] : (month.month || "");
   const cropName = lang === "bn" ? (month.cropNameBn || month.cropName || "") : (month.cropName || "");
+  if (short) return `${monthLabel} · ${cropName.replace(/ rice$| ধান$/, "")}`;
   const stageLabel = stageMap[month.stage] ?? month.stage ?? "";
   return cropName ? `${monthLabel} · ${cropName} · ${stageLabel}` : `${monthLabel} · ${stageLabel}`;
 }
