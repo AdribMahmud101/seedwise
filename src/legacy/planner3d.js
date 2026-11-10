@@ -10,6 +10,12 @@ import {
   outlineBounds, ringSignedArea, canopyVisualHeight, idleFloatOffset,
   fitCameraToBlock, fitTopView, plannerRowLayout,
 } from "./planner3d-helpers.js";
+import {
+  smoothOutline,
+  computeMicroRelief,
+  rimErosionNoise,
+  generateUndersideGeometry,
+} from "./landshape.js";
 
 let renderer = null;
 let canvas = null;
@@ -201,14 +207,29 @@ async function createElevationSampler(data) {
 
 function makeHeightAt(data) {
   const [lat, lon] = data?.field?.centroid || [0, 0];
-  if (!elevationSampler) return () => 0;
-  const base = elevationSampler(lon, lat);
-  if (!Number.isFinite(base)) return () => 0;
+  const fieldId = data?.field?.id || "planner";
+  const outlineM = data?.field?.outlineM || [];
+  const isLowGround = data?.ground?.class === "low";
   const scaleX = 111195.08 * Math.cos((lat * Math.PI) / 180);
+  const base = elevationSampler ? elevationSampler(lon, lat) : 0;
+  const hasBase = Number.isFinite(base);
+
   return (x, z) => {
     // Studio world: x east, z south. Local outline y is north, so z = -y.
-    const el = elevationSampler(lon + x / scaleX, lat + -z / 111195.08);
-    return Number.isFinite(el) ? el - base : 0;
+    let macro = 0;
+    if (elevationSampler && hasBase) {
+      const el = elevationSampler(lon + x / scaleX, lat + -z / 111195.08);
+      if (Number.isFinite(el)) macro = el - base;
+    }
+    const micro = computeMicroRelief({
+      x,
+      z,
+      fieldId,
+      outlineM,
+      isLowGround,
+      maxNoiseM: 0.08,
+    });
+    return macro + micro;
   };
 }
 
@@ -407,7 +428,7 @@ function buildSurfaceGeometry(ringM, heightAt, bounds) {
   return geom;
 }
 
-function buildWallMesh(ringM, heightAt, bottomY, sideMaterial) {
+function buildWallMesh(ringM, heightAt, bottomY, sideMaterial, fieldId = "planner") {
   const positions = [];
   const uvs = [];
   const indices = [];
@@ -438,8 +459,13 @@ function buildWallMesh(ringM, heightAt, bottomY, sideMaterial) {
       const y1 = a[1] + (b[1] - a[1]) * t1;
       const z0 = -y0;
       const z1 = -y1;
-      const top0 = heightAt(x0, z0) - 0.03;
-      const top1 = heightAt(x1, z1) - 0.03;
+
+      // Eroded rim: deterministic subtle crumble/overhang and height variation along outline
+      const noise0 = rimErosionNoise(fieldId, edge, t0);
+      const noise1 = rimErosionNoise(fieldId, edge, t1);
+      const top0 = heightAt(x0, z0) - 0.03 + noise0.dh;
+      const top1 = heightAt(x1, z1) - 0.03 + noise1.dh;
+
       const u0 = ((travelled + len * t0) / Math.max(1e-6, total)) * 2;
       const u1 = ((travelled + len * t1) / Math.max(1e-6, total)) * 2;
       const base = positions.length / 3;
@@ -458,6 +484,30 @@ function buildWallMesh(ringM, heightAt, bottomY, sideMaterial) {
   geom.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geom.setIndex(indices);
   geom.computeVertexNormals();
+  const mesh = new THREE.Mesh(geom, sideMaterial);
+  mesh.userData.soil = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function buildUndersideMesh(ringM, bottomY, depthM, fieldId, sideMaterial) {
+  const geoData = generateUndersideGeometry({
+    ringM,
+    bottomY,
+    depthM,
+    fieldId,
+    numAngles: 36,
+    numRings: 8,
+  });
+  if (!geoData.positions.length) return null;
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(geoData.positions, 3));
+  geom.setAttribute("uv", new THREE.Float32BufferAttribute(geoData.uvs, 2));
+  geom.setIndex(geoData.indices);
+  geom.computeVertexNormals();
+
   const mesh = new THREE.Mesh(geom, sideMaterial);
   mesh.userData.soil = true;
   mesh.castShadow = true;
@@ -503,7 +553,8 @@ function buildFieldBlock(data) {
   if (!outlineM || outlineM.length < 3) return;
   const bounds = outlineBounds(outlineM);
   const depth = blockDepthM(bounds);
-  const ringM = outlineM;
+  // Organic outline smoothing pass (Chaikin / quadratic pass <= 1.5 m)
+  const ringM = smoothOutline(outlineM, 1.5);
   const heightAt = makeHeightAt(data);
   const topMat = new THREE.MeshStandardMaterial({
     map: buildTopTexture(data), roughness: 0.93, metalness: 0.01,
@@ -540,11 +591,13 @@ function buildFieldBlock(data) {
   if (!Number.isFinite(topMax)) topMax = 0;
   const bottomY = topMin - depth;
 
-  const wallMesh = buildWallMesh(ringM, heightAt, bottomY, sideMat);
+  const wallMesh = buildWallMesh(ringM, heightAt, bottomY, sideMat, data.field.id);
   const boundary = buildBoundaryLine(ringM, heightAt);
+  const undersideMesh = buildUndersideMesh(ringM, bottomY, depth, data.field.id, sideMat);
 
   blockGroup = new THREE.Group();
   blockGroup.add(topMesh, wallMesh, boundary);
+  if (undersideMesh) blockGroup.add(undersideMesh);
   ensureFloatGroup();
   floatGroup.add(blockGroup);
 
