@@ -1,0 +1,6 @@
+# PHONEFIT · Phone: field block too small and low
+
+Screenshot `helper/prompts/PHONEFIT_now.png` (412×915 viewport, DPR 2.625 — the owner's real phone; stage ≈ 378×843 CSS px). The field block spans only ~45 % of the stage width and sits in the lower half; the top 40 % is empty. Leader labels (LEADERS) now sit in a row below the block — keep that.
+Fix ONLY the phone framing in `src/legacy/studio3d.js` (`fitPerspective`/view offset for canvas width < 600): block width ≈ 85 % of stage width; vertical: centre the block + label row together in the free area between the top bar (bottom edge) and the stage bottom. Intro end frame = this framing; sway unchanged. Desktop/laptop framing must not change (assert by comparing camera distance at 1366×768 before/after in a test or log).
+Verify with Playwright at 412×915 DPR 2.625 and Pixel 7: measure the block's projected bounding box (project the field ring) → width ≥ 80 % of stage, top margin vs bottom margin within 15 %. Put the numbers in the commit message.
+Acceptance: `npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --rule 'no-undef:error' src/legacy/studio3d.js` clean; `npm test`; `npm run build`. Never touch package-lock.json/node_modules. Commit (commit as soon as it works; skip long screenshot sweeps).
