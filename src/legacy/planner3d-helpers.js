@@ -150,3 +150,70 @@ export function idleFloatOffset(timeS, fieldSpanM = 30, isDragging = false, pref
   const yaw = Math.sin(timeS * 0.45) * 0.012;
   return { dy, yaw };
 }
+
+// ------------------------------------------------- STUDIO5P idle sway helpers
+// Same slow horizontal idle motion as the studio, at the planner's ±5 amplitude.
+// Pure (no three.js/DOM) — safe to unit test.
+export const IDLE_SWAY_PERIOD_S = 14;
+export const IDLE_SWAY_AMPLITUDE_DEG = 5;
+export const IDLE_DOLLY_AMPLITUDE = 0.01; // ±1 % distance breathing
+export const IDLE_RESUME_DELAY_S = 6; // still seconds after input before motion resumes
+export const IDLE_EASE_IN_S = 1.5; // resume ramp duration
+export const IDLE_VERTICAL_SCALE = 0.2; // residual bob, ≤25 % of idleFloatOffset
+
+// Sinusoidal yaw/dolly/vertical offsets at wall-clock timeS. No gating here —
+// the caller scales by idleResumeGain() so pause/resume stays testable.
+export function idleSwayOffset(timeS, {
+  amplitudeDeg = IDLE_SWAY_AMPLITUDE_DEG,
+  periodS = IDLE_SWAY_PERIOD_S,
+  dollyAmp = IDLE_DOLLY_AMPLITUDE,
+  fieldSpanM = 30,
+  verticalScale = IDLE_VERTICAL_SCALE,
+} = {}) {
+  const zero = { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0 };
+  if (!Number.isFinite(timeS)) return zero;
+  const period = Number.isFinite(periodS) && periodS > 0 ? periodS : IDLE_SWAY_PERIOD_S;
+  const amp = Number.isFinite(amplitudeDeg) ? amplitudeDeg : IDLE_SWAY_AMPLITUDE_DEG;
+  const wave = Math.sin((timeS * 2 * Math.PI) / period);
+  const yawDeg = wave * amp;
+  const span = Number.isFinite(fieldSpanM) && fieldSpanM > 0 ? fieldSpanM : 30;
+  const scale = Number.isFinite(verticalScale) ? verticalScale : IDLE_VERTICAL_SCALE;
+  const dyAmplitude = Math.max(0.06, Math.min(0.28, span * 0.005)) * scale;
+  return {
+    yawDeg,
+    yawRad: (yawDeg * Math.PI) / 180,
+    dolly: wave * (Number.isFinite(dollyAmp) ? dollyAmp : IDLE_DOLLY_AMPLITUDE),
+    dy: Math.sin(timeS * 0.9) * dyAmplitude,
+  };
+}
+
+// Pause/resume envelope: 0 until delayS after the last input, then a smooth
+// 0→1 ramp over easeS. Instant pause, gentle return.
+export function idleResumeGain(timeSinceInputS, {
+  delayS = IDLE_RESUME_DELAY_S,
+  easeS = IDLE_EASE_IN_S,
+} = {}) {
+  if (!Number.isFinite(timeSinceInputS) || timeSinceInputS < 0) return 0;
+  const delay = Number.isFinite(delayS) && delayS >= 0 ? delayS : IDLE_RESUME_DELAY_S;
+  const ease = Number.isFinite(easeS) && easeS > 0 ? easeS : IDLE_EASE_IN_S;
+  if (timeSinceInputS < delay) return 0;
+  if (timeSinceInputS >= delay + ease) return 1;
+  const x = (timeSinceInputS - delay) / ease;
+  return 0.5 - 0.5 * Math.cos(Math.PI * x);
+}
+
+// Combined idle state: gated sinusoid plus the envelope gain. Dragging,
+// reduced motion, or a hidden tab parks everything at zero.
+export function idleCameraSway(timeS, timeSinceInputS, opts = {}) {
+  const {
+    isDragging = false,
+    prefersReducedMotion = false,
+    hidden = false,
+  } = opts;
+  const gain = isDragging || prefersReducedMotion || hidden
+    ? 0
+    : idleResumeGain(timeSinceInputS, opts);
+  if (gain <= 0) return { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0, gain: 0 };
+  const { yawDeg, yawRad, dolly, dy } = idleSwayOffset(timeS, opts);
+  return { yawDeg: yawDeg * gain, yawRad: yawRad * gain, dolly: dolly * gain, dy: dy * gain, gain };
+}
