@@ -11,6 +11,14 @@ test('overlay breakpoints follow canvas width at each boundary', () => {
   }
 });
 
+test('full chrome requires both a 900 px wide and 640 px tall stage', () => {
+  for (const [width, height, expected] of [
+    [1000, 465, 'medium'], [1200, 639.9, 'medium'], [900, 640, 'wide'],
+    [899.9, 820, 'medium'], [599.9, 820, 'narrow'], [600, 440, 'medium'],
+    [1884, 640, 'wide'], [390, 772, 'narrow'],
+  ]) assert.equal(studioOverlayBreakpoint(width, height), expected);
+});
+
 test('popover stays inside the canvas and below controls, including oversized content', () => {
   for (const canvasWidth of [360, 650, 1000]) {
     const bounds = { left: 8, top: 280, right: canvasWidth - 8, bottom: 552 };

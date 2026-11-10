@@ -2255,12 +2255,15 @@ function studioFreeRegion() {
   const controls = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
   const overlayBottom = (overlay?.bottom || rect.top) - rect.top;
   const controlsBottom = (controls?.bottom || rect.top) - rect.top;
-  if (canvasHostEl.dataset.overlaySize === 'narrow') {
+  if (canvasHostEl.dataset.chrome === 'compact') {
     // Prefer the stage centre, keeping the entire sway clear of the camera pill.
     // In narrow mode, controls are on the right, so only overlayBottom matters for top.
     const top = overlayBottom + 12;
-    return { region: { left: 0.015, right: 0.985, top: top / h, bottom: (h - 16) / h },
-      preferredCentreY: (overlayBottom + h - 16) / (2 * h) };
+    const right = ((controls?.left || rect.right) - rect.left - 12) / w;
+    const hint = canvasHostEl.querySelector('.studio-interaction-hint')?.getBoundingClientRect();
+    const bottom = hint?.height ? Math.min(h - 16, hint.top - rect.top - 12) : h - 16;
+    return { region: { left: 0.015, right, top: top / h, bottom: bottom / h },
+      preferredCentreY: (top + bottom) / (2 * h) };
   }
   const cards = [...canvasHostEl.querySelectorAll('.studio-probe-card, .studio-transect-card, .studio-surface-legend')]
     .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
@@ -2281,6 +2284,7 @@ function fitPerspective(data, close = false) {
   const elevationDeg = close ? 22 : 14;
   const yawDeg = close ? 26 : 10;
   const phone = canvasHostEl.dataset.overlaySize === 'narrow';
+  const compact = canvasHostEl.dataset.chrome === 'compact';
   const margin = close && phone ? 0.14 : isPhone() ? 0.22 : 0.18;
   const fit = fitCameraToBlock({
     outlineM: data.field.outlineM,
@@ -2303,16 +2307,17 @@ function fitPerspective(data, close = false) {
   // pushed the visible block low with empty space above it. Fit the phone
   // envelope to the real canopy so the block centres in the free area; the
   // width still binds the zoom at ~88 %.
-  const topSlack = phone
+  // Compact stages target about 70 % visible width, allowing for the full sway envelope.
+  const topSlack = compact
     ? Math.max(canopy, Math.max(b.width, b.height) * 0.01)
     : Math.max(canopy, Math.max(b.width, b.height) * 0.08);
-  const solved = close && !phone ? null : solveFramingMultiplier({
+  const solved = close && !compact ? null : solveFramingMultiplier({
     outlineM: data.field.outlineM, depthM: depth, fovDeg: cameraPersp.fov,
-    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.88 : 0.6,
+    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: compact ? 0.78 : 0.6,
     region: space.region, topM: currentBlock.topMax + topSlack,
     bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
   });
-  if (phone) {
+  if (compact) {
     const centreY = Math.max(space.preferredCentreY, space.region.top + solved.heightFrac / 2);
     solved.viewOffsetY += (space.region.top + space.region.bottom) / 2 - centreY;
   }
@@ -2371,14 +2376,15 @@ function fitOrtho(data) {
   cameraOrtho.up.set(0, 0, -1);
   cameraOrtho.lookAt(fit.target[0], 0, fit.target[2]);
   cameraOrtho.zoom = 1;
-  if (canvasHostEl.dataset.overlaySize === 'narrow') {
+  if (canvasHostEl.dataset.chrome === 'compact') {
     const { region } = studioFreeRegion();
     const b = outlineBounds(data.field.outlineM);
-    const halfWidth = Math.max(b.width / 0.88, b.height * hostAspect() / (region.bottom - region.top)) / 2;
+    const halfWidth = Math.max(b.width / 0.7, b.height * hostAspect() / (region.bottom - region.top)) / 2;
     const halfHeight = halfWidth / hostAspect();
     const centreY = ((region.top + region.bottom) / 2 - 0.5) * 2 * halfHeight;
-    cameraOrtho.left = -halfWidth;
-    cameraOrtho.right = halfWidth;
+    const centreX = (0.5 - (region.left + region.right) / 2) * 2 * halfWidth;
+    cameraOrtho.left = -halfWidth + centreX;
+    cameraOrtho.right = halfWidth + centreX;
     cameraOrtho.top = halfHeight + centreY;
     cameraOrtho.bottom = -halfHeight + centreY;
   }
@@ -2474,6 +2480,21 @@ function placeCallout(x, y, z, id, show, checkFacingNormal = false) {
   el.style.display = 'block';
   el.style.left = `${Math.max(22, Math.min(canvasHostEl.clientWidth - 22, (v.x * 0.5 + 0.5) * canvasHostEl.clientWidth))}px`;
   el.style.top = `${(-v.y * 0.5 + 0.5) * canvasHostEl.clientHeight}px`;
+  if (id.startsWith('callout-')) {
+    const label = el.querySelector('.callout-box').getBoundingClientRect();
+    const stage = canvasHostEl.getBoundingClientRect();
+    const earlierLabels = ['#callout-low-corner', '#callout-drain', '#callout-outlet'];
+    const blockers = ['.studio-overlay-tl', '.studio-stage-controls', '.studio-compass',
+      '.studio-interaction-hint', '.studio-touch-hint', ...earlierLabels.slice(0, earlierLabels.indexOf(`#${id}`))];
+    const blocked = [...canvasHostEl.querySelectorAll(blockers.join(','))]
+      .some((control) => {
+        const rect = control.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && label.left < rect.right + 8 && label.right > rect.left - 8
+          && label.top < rect.bottom + 8 && label.bottom > rect.top - 8;
+      });
+    if (blocked || label.left < stage.left + 8 || label.right > stage.right - 8
+      || label.top < stage.top + 8 || label.bottom > stage.bottom - 8) el.style.display = 'none';
+  }
 }
 
 function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) {
@@ -2641,12 +2662,19 @@ function sync3DCallouts() {
 
   // Keep the numbered buttons on the cut wall, rather than reserving a card column.
   const anchors = [scrTop, scrRoot, scrAqui];
+  const compactRegion = canvasHostEl.dataset.chrome === 'compact' ? studioFreeRegion().region : null;
+  let pinBottom = compactRegion ? compactRegion.top * canvasRect.height : 0;
   for (const [i, el] of [topsoilEl, rootzoneEl, aquiferEl].entries()) {
     if (!el) continue;
     const scr = anchors[i];
     el.style.display = scr.visible && !isTopView ? 'block' : 'none';
     el.style.left = `${Math.max(22, Math.min(canvasRect.width - 22, scr.x)) - 22}px`;
     el.style.top = `${Math.max(22, Math.min(canvasRect.height - 22, scr.y)) - 22}px`;
+    if (compactRegion) {
+      const top = Math.max(pinBottom, Math.min(scr.y - 22, compactRegion.bottom * canvasRect.height - (3 - i) * 48));
+      el.style.top = `${top}px`;
+      pinBottom = top + 48;
+    }
   }
   if (svgLeaders) svgLeaders.innerHTML = '';
   positionSoilPopover();
@@ -3184,7 +3212,7 @@ function updateSurfaceLegend() {
 
 function layoutSurfaceLegend() {
   if (!containerEl || !canvasHostEl) return;
-  const size = studioOverlayBreakpoint(canvasHostEl.clientWidth);
+  const size = studioOverlayBreakpoint(canvasHostEl.clientWidth, canvasHostEl.clientHeight);
   const card = containerEl.querySelector('.studio-surface-legend');
   const bar = containerEl.querySelector('.studio-surface-bar');
   const mini = containerEl.querySelector('.studio-surface-mini');
@@ -3206,8 +3234,8 @@ function layoutSurfaceLegend() {
   canvasHostEl.style.setProperty('--studio-probe-height', `${size === 'wide' ? probe?.offsetHeight || 0 : 0}px`);
 }
 
-export function studioOverlayBreakpoint(width) {
-  return width >= 900 ? "wide" : width >= 600 ? "medium" : "narrow";
+export function studioOverlayBreakpoint(width, height = Infinity) {
+  return width >= 900 && height >= 640 ? "wide" : width >= 600 ? "medium" : "narrow";
 }
 
 export function clampStudioPopover({ anchorX, anchorY, width, height, bounds }) {
@@ -3257,22 +3285,25 @@ function updateSoilDetails(data) {
 function updateOverlayLayout() {
   if (!canvasHostEl || !containerEl) return;
   const width = canvasHostEl.clientWidth;
-  const breakpoint = studioOverlayBreakpoint(width);
+  const breakpoint = studioOverlayBreakpoint(width, canvasHostEl.clientHeight);
   const changed = canvasHostEl.dataset.overlaySize !== breakpoint;
   canvasHostEl.dataset.overlaySize = breakpoint;
-  canvasHostEl.dataset.showCaption = String(width >= 700);
+  canvasHostEl.dataset.chrome = breakpoint === 'wide' ? 'full' : 'compact';
+  canvasHostEl.dataset.showCaption = String(breakpoint === 'wide');
   const layers = containerEl.querySelector('.studio-soil-layers');
   const inspection = containerEl.querySelector('.studio-inspection');
   if (changed) {
     const sheet = containerEl.querySelector('#studio-layers-sheet');
     const overlay = containerEl.querySelector('.studio-overlay-tl');
     const caption = overlay.querySelector('.studio-caption-copy');
-    if (breakpoint !== 'narrow' && sheet.open) sheet.dispatchEvent(new Event('cancel', { cancelable: true }));
+    if (breakpoint === 'wide' && sheet.open) sheet.dispatchEvent(new Event('cancel', { cancelable: true }));
     for (const selector of ['.studio-overlay-tc', '.studio-surface-selector', '.studio-slice-card', '.studio-crop-chip']) {
       const el = containerEl.querySelector(selector);
-      if (breakpoint === 'narrow') sheet.querySelector('.studio-layers-content').appendChild(el);
+      if (breakpoint !== 'wide') sheet.querySelector('.studio-layers-content').appendChild(el);
       else overlay.insertBefore(el, caption);
     }
+    const hint = containerEl.querySelector('.studio-interaction-hint');
+    (breakpoint === 'wide' ? caption : canvasHostEl).appendChild(hint);
     if (layers) {
       layers.open = breakpoint === 'wide' ? wideLayersOpen : true;
       const summary = layers.querySelector('summary');
@@ -3296,7 +3327,8 @@ function updateOverlayLayout() {
     }
   }
   const hint = containerEl.querySelector('.studio-interaction-hint');
-  if (width >= 700 && !hintShown && hint) {
+  if (width < 600 && hint) hint.hidden = true;
+  if (width >= 600 && !hintShown && hint) {
     hintShown = true;
     try {
       hint.hidden = sessionStorage.getItem('ropon_studio_overlay_hint') === '1';
@@ -3517,6 +3549,9 @@ function bindOverlayEvents() {
     const pin = e.target.closest('[data-soil-pin]');
     if (pin) openSoilPopover(pin.dataset.soilPin, pin);
     if (e.target.closest('[data-close-soil]')) closeSoilPopover();
+    if (e.target.closest('[data-dismiss-touch-hint]')) {
+      containerEl.querySelector('.studio-touch-hint').hidden = true;
+    }
     if (e.target.closest('[data-dismiss-hint]')) {
       containerEl.querySelector('.studio-interaction-hint').hidden = true;
       onResize();
@@ -3711,7 +3746,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <div class="studio-compass-arrow"></div>
           <div class="studio-compass-s"></div>
         </button>
-        <div class="studio-touch-hint" hidden><span>${t("Swipe sideways to turn · two fingers to zoom", "পাশে সোয়াইপ করলে ঘোরে · দুই আঙুলে জুম হয়")}</span></div>
+        <div class="studio-touch-hint" hidden><span>${t("Swipe sideways to turn · two fingers to zoom", "পাশে সোয়াইপ করলে ঘোরে · দুই আঙুলে জুম হয়")}</span><button type="button" data-dismiss-touch-hint aria-label="${t("Dismiss hint", "ইঙ্গিত বন্ধ করুন")}">×</button></div>
 
         <!-- Top-Left Surface Layer Switcher & Preset Views -->
         <div class="studio-overlay-tl">
@@ -3721,7 +3756,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             <button id="btn-view-2d" type="button" class="studio-view-btn ${currentViewMode === "top" ? "active" : ""}" data-studio-view="top"><span class="studio-view-long">${t("Top view", "উপরের দৃশ্য")}</span><span class="studio-view-short">${t("Top", "উপর")}</span></button>
           </div>
           <button type="button" class="studio-layers-button" data-studio-layers aria-label="${t("Layers", "লেয়ার")}" aria-haspopup="dialog" aria-expanded="false" aria-controls="studio-layers-sheet">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 7 9-4 9 4-9 4Z M3 12l9 4 9-4 M3 17l9 4 9-4"/></svg>
+            <span>${t("Layers", "লেয়ার")}</span>
           </button>
 
           <!-- Top-Centre Fallow / Harvested Notification Chip -->
