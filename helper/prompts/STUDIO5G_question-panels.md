@@ -1,0 +1,11 @@
+# STUDIO5G · Build the missing rotation-tool question panels
+
+STUDIO5B and STUDIO5F both failed to build these. Current #rotations has: rotation scenario list, 3D surface layers, the 3D tool with controls, "My priorities" sliders, four rotation cards. MISSING (verify with `grep -n "What is under my field" src/legacy/*.js` → nothing today). Reference: `helper/reference/rotation-tool/reference.html` (left column panels `panel-left-rotation`, `panel-left-water`, `panel-left-soil`, the comparison header with `select-pump-tariff`).
+
+Build in `src/legacy/rotations.js` (+ `app/rotation-tool.css`, already imported in app/layout.js — do NOT add <link> tags), placed in the left column under "3D surface layers" (desktop) / stacked below the 3D (phone):
+1. **"When is the field bare or stressed?"** — month strip of the selected rotation showing bare months (no crop) and stress months (use NDVI/moisture from `buildStudioData()`); planting layout buttons Line rows · Raised beds · Bund drains → `studio?.setPlantingLayout?.(id)`.
+2. **"Where will water collect?"** — low-ground share of the field from `data/low-ground.json`, drain open/blocked toggle; button "Show on 3D" → `studio?.setSurfaceMode?.('ponding')`. If `data/s1-water.json` exists (HEAD request first, no console error), show flooded % per month from it.
+3. **"What is under my field?"** — chips Moisture, pH, OM, N, P, K, Zinc, Boron. pH/OM/N from `data/soil-profile.json`; P/K/Zn/B/S from `data/soil-nutrients.json` when present and non-null, otherwise chip reads "Enter soil test". Each chip shows value + class + truth label. "+ Enter local soil test or tubewell depth" opens the existing dialog.
+4. **Pump tariff** select (Diesel STW / Electric / BMDA-Solar, ৳/hr, editable SCENARIO) in the "Four rotation scenarios" header → each rotation card shows irrigation cost ৳/season from our shortfall litres (`studiodata.js`) ÷ pump flow (state the assumed flow, SCENARIO).
+Every string `t(en,bn)`; truth labels; no invented numbers; ≥44 px; no sideways scroll at 390.
+Acceptance: `grep -c "What is under my field" src/legacy/rotations.js` ≥1; `npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --rule 'no-undef:error' src/legacy/rotations.js` clean; `npm test` (+ tests for tariff cost and chip fallback); `npm run build`. Never touch package-lock.json/node_modules. Commit.
