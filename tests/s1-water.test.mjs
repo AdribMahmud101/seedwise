@@ -142,10 +142,12 @@ for (const field of fields) {
     }
   });
 
-  test(`${field.id}: January–April <15%, not all 0/100, monsoon peak >= dry-season mean`, () => {
+  test(`${field.id}: January–April <15%, no 0↔100 flipping, monsoon peak >= dry-season mean`, () => {
     const values = site.dates.map(date => date.flooded_pct);
     assert.ok(values.slice(0, 4).every(value => value < 15), `January–April: ${values.slice(0, 4)}`);
-    assert.ok(values.some(value => value > 0 && value < 100), `All dates are 0/100: ${values}`);
+    // All-zero is a valid observation (upland fields); only 0↔100 flipping (STUDIO5D bug) is rejected.
+    const flips = values.slice(1).filter((v, i) => Math.abs(v - values[i]) >= 90).length;
+    assert.ok(flips < 2, `0↔100 flipping: ${values}`);
     assert.ok(Math.max(...values.slice(6, 9)) >= values.slice(0, 4).reduce((a, b) => a + b, 0) / 4);
   });
 }
