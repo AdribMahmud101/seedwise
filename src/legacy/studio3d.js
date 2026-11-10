@@ -142,6 +142,7 @@ let showBunds = true;
 let proposedDrain = false;
 let outletBlocked = false;
 let soilOverrides = null; // { ph, om, p, gwDepthM }
+let ndviRelativeOverride = null; // null = auto (within-field at ≥95 % one class), true/false = legend toggle
 let probeUV = { u: 0.5, v: 0.5 };
 let s1WaterData = null; // lazy loaded from /data/s1-water.json
 let soilNutrientsData = null; // lazy loaded from /data/soil-nutrients.json
@@ -504,6 +505,15 @@ function loadSurfacePack(name) {
   return surfacePacks.get(name);
 }
 
+// RELVAR: moisture always shows within-field tertiles (absolute is kept as the
+// headline); NDVI follows the legend toggle, defaulting to within-field when the
+// absolute view collapses to one class.
+function relativeOptionFor(mode) {
+  if (mode === 'moisture' || mode === 'ndmi') return true;
+  if (mode === 'ndvi') return ndviRelativeOverride ?? 'auto';
+  return undefined;
+}
+
 async function prepareSurface(data, mode, monthIdx) {
   const month = data.months?.[monthIdx] || {};
   const optical = ['ndvi', 'moisture', 'ndmi'].includes(mode);
@@ -551,7 +561,7 @@ async function prepareSurface(data, mode, monthIdx) {
   const context = { month, rotation: data.rotation, soil: data.soil, nutrients, soilOverrides,
     soilCellCount: soilGrid ? 9 : data.soil || nutrients ? 1 : null,
     soilRange: soilGrid ? { ph: cells.map((c) => soilAt(c.x, c.y, 'ph')).filter(Number.isFinite), om: cells.map((c) => soilAt(c.x, c.y, 'omPct')).filter(Number.isFinite) } : null,
-    zoneDates: zones?.dates, terrainAvailable: !!flow,
+    zoneDates: zones?.dates, terrainAvailable: !!flow, relative: relativeOptionFor(mode),
     date: mode === 'fertility' ? (soilGrid?.retrievedAt || nutrientPack?.retrievedAt)?.slice(0, 10) : null,
     observation: grid, radarObservation, rainMm: rainScenarioMm, exaggeration: heightExaggeration,
     elevationMin: elevations.length ? Math.min(...elevations) : null,
@@ -568,32 +578,15 @@ async function buildTopTexture(data, layer, monthIdx, model = null) {
   const ctx = cvs.getContext('2d');
   const b = outlineBounds(data.field.outlineM);
   const legend = model.legend;
-  const soilRanges = model.context.soilRange && Object.fromEntries(Object.entries(model.context.soilRange)
-    .map(([key, values]) => [key, [Math.min(...values), Math.max(...values)]]));
   // Paint the same polygon cells counted by the legend, without synthetic index variation.
+  // Fertility keeps flat class colours: SoilGrids is a 250 m map, too coarse for
+  // within-field zones, so contrast-stretched shading would invent differences.
   for (let row = 0; row < 128; row++) {
     for (let col = 0; col < 128; col++) {
       const x = b.minX + (col + 0.5) / 128 * b.width;
       const y = b.maxY - (row + 0.5) / 128 * b.height;
       const value = model.valueAt(x, y);
-      let color = new THREE.Color(surfaceClass(legend, value).color);
-      if (mode === 'fertility' && Number.isFinite(value)) {
-        const stops = ['#b97742', '#d9c778', '#659860', '#467f76'];
-        const position = Math.max(0, Math.min(2.9999, (value - 4.5) / 3 * 3));
-        const i = Math.floor(position);
-        color.set(stops[i]).lerp(new THREE.Color(stops[i + 1]), position - i);
-        const om = soilOverrides?.omPct ?? model.soilAt(x, y, 'omPct');
-        if (Number.isFinite(om)) color.multiplyScalar(1 - Math.min(0.25, om / 20));
-        const range = soilRanges;
-        const relative = (values, sample) => {
-          const [min, max] = values;
-          return max - min > 1e-8 ? Math.max(0, Math.min(1, (sample - min) / (max - min))) : 0.5;
-        };
-        if (range && !Number.isFinite(soilOverrides?.ph)) {
-          color.lerp(new THREE.Color('#e0cf93'), (1 - relative(range.ph, value)) * 0.18);
-          if (Number.isFinite(om)) color.multiplyScalar(1 - relative(range.om, om) * 0.18);
-        }
-      }
+      const color = new THREE.Color(surfaceClass(legend, value).color);
       if (['water', 'ponding'].includes(mode)) {
         const index = model.flow?.at(x, y);
         const wetness = rainScenarioMm > 0 && index !== undefined
@@ -613,8 +606,8 @@ async function buildTopTexture(data, layer, monthIdx, model = null) {
   }
   const tex = new THREE.CanvasTexture(cvs);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = mode === 'fertility' ? THREE.LinearFilter : THREE.NearestFilter;
-  tex.minFilter = mode === 'fertility' ? THREE.LinearFilter : THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
   textureCache.set(tex.uuid, tex);
   return tex;
 }
@@ -3177,8 +3170,17 @@ export function surfaceLegendHtml(legend) {
     offset += c.pct;
     return arc;
   }).join('');
+  const scaleToggle = legend.mode === 'ndvi' ? `
+      <div class="studio-scale-toggle" role="group" aria-label="${esc(t('NDVI scale', 'NDVI স্কেল'))}">
+        <button type="button" data-relative-toggle="absolute" aria-pressed="${legend.scale === 'absolute'}">${esc(t('Absolute', 'পরম'))}</button>
+        <button type="button" data-relative-toggle="relative" aria-pressed="${legend.scale !== 'absolute'}">${esc(t('Within this field', 'এই মাঠের মধ্যে'))}</button>
+      </div>` : '';
+  const callout = legend.callout === 'soilgrids-coarse' ? `
+      <p class="studio-surface-callout">${esc(t('SoilGrids is a 250 m map — too coarse to show differences inside this field. For within-field differences see', 'SoilGrids একটি ২৫০ মি মানচিত্র — এই মাঠের ভেতরের পার্থক্য দেখানোর মতো সূক্ষ্ম নয়। মাঠের ভেতরের পার্থক্যের জন্য দেখুন'))} <button type="button" class="linklike" data-surface-goto="productivity">${esc(t('Productivity zones', 'উৎপাদনশীলতার অঞ্চল'))}</button> ${esc(t('or', 'অথবা'))} <button type="button" class="linklike" data-soil-test>${esc(t('add your soil test', 'আপনার মাটি পরীক্ষা যোগ করুন'))}</button>.</p>` : '';
   return `<summary><span>${t('Colour key', 'রঙের নির্দেশিকা')} · ${esc(legend.title)}</span>${truth(legend.truth, { source: legend.source, date: legend.date })}</summary>
     <div class="studio-surface-legend-body">
+      ${legend.headline ? `<p class="studio-surface-headline">${esc(legend.headline)}</p>` : ''}
+      ${scaleToggle}
       <div class="studio-surface-shares">
         <svg class="studio-surface-donut" width="72" height="72" viewBox="0 0 72 72" role="img" aria-label="${esc(t('Share of field area', 'জমির ক্ষেত্রফলের অংশ'))}">
           <title>${esc(rows.map((c) => `${c.label}: ${c.pct.toFixed(1)} %`).join('; '))}</title>
@@ -3186,6 +3188,7 @@ export function surfaceLegendHtml(legend) {
         </svg>
         <ul>${rows.map((c) => `<li><i style="background:${c.color}" aria-hidden="true"></i><span>${esc(c.label)}</span><b>${c.pct.toFixed(1)} %</b></li>`).join('')}</ul>
       </div>
+      ${callout}
       ${legend.flowRows ? `<ul class="studio-flow-key">${legend.flowRows.map((row) => `<li><i style="background:${row.color}" aria-hidden="true"></i>${esc(row.label)}</li>`).join('')}</ul>` : ''}
       ${legend.remote ? `<p class="studio-surface-observed">${truth('REMOTE_OBSERVED')} ${esc(t('Remote observed (S1)', 'দূরবর্তী পর্যবেক্ষণ (S1)'))} · ${esc(legend.remote)}</p>` : ''}
       <p class="studio-surface-note">${esc(legend.note)}</p>
@@ -3565,6 +3568,19 @@ function bindOverlayEvents() {
         dialog.style.display = 'flex';
       }
     }
+    const relativeToggle = e.target.closest('[data-relative-toggle]');
+    if (relativeToggle) {
+      ndviRelativeOverride = relativeToggle.dataset.relativeToggle === 'relative';
+      if (currentData) {
+        buildFieldBlock(currentData, currentCutaway).then(() => {
+          buildPlantsAndRoots(currentData, currentMonthIdx);
+          updateProbeCard();
+          requestRender();
+        });
+      }
+    }
+    const surfaceGoto = e.target.closest('[data-surface-goto]');
+    if (surfaceGoto) setSurfaceMode(surfaceGoto.dataset.surfaceGoto);
     const tab = e.target.closest('[data-inspection-tab]');
     if (tab) selectInspectionTab(tab);
   }, options);
@@ -3856,7 +3872,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
       <div class="studio-surface-bar">
         <details class="studio-surface-legend">${surfaceLegendHtml(surfaceLegend(currentSurfaceMode, {
           month: m, rotation: data.rotation, soil: data.soil, soilOverrides,
-          lang: t('en', 'bn'), cells: [],
+          lang: t('en', 'bn'), cells: [], relative: relativeOptionFor(currentSurfaceMode),
         }))}</details>
       </div>
       <div class="studio-surface-mini" hidden></div>

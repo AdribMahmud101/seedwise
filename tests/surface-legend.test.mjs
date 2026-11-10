@@ -134,6 +134,81 @@ test('white waterline contains the wet perimeter without the shared diagonal', (
   assert.deepEqual(pondingWaterline([]), []);
 });
 
+test('RELVAR: moisture shows field-relative tertile classes with the absolute headline', () => {
+  // Real-ish NDMI sample (mithapukur March cells): all inside absolute 0.2–0.4 "Moist".
+  const values = [0.264, 0.305, 0.323, 0.324, 0.331, 0.331, 0.342, 0.344, 0.355];
+  const absolute = legendFor('moisture', values, { observation: { date: '2024-03-09' } });
+  assert.equal(absolute.scale, 'absolute');
+  assert.equal(absolute.classes[2].pct, 100);
+  const legend = legendFor('moisture', values, { observation: { date: '2024-03-09' }, relative: true });
+  assert.equal(legend.scale, 'relative');
+  assert.equal(legend.classes.length, 4); // three relative classes + No data
+  assert.match(legend.classes[0].label, /Drier than field/);
+  assert.match(legend.classes[1].label, /Typical/);
+  assert.match(legend.classes[2].label, /Wetter than field/);
+  assert.match(legend.classes[0].label, /<0\.324/); // tertile cuts are stated
+  assert.match(legend.classes[1].label, /0\.324–0\.335/);
+  assert.match(legend.classes[2].label, /≥0\.335/);
+  for (const c of legend.classes.slice(0, 3)) assert.ok(Math.abs(c.pct - 100 / 3) < 0.01);
+  assert.match(legend.headline, /Overall: Moist · NDMI 0\.26–0\.35, 2024-03-09/);
+  assert.match(legend.note, /tertiles/);
+  assert.equal(legend.truth, 'REMOTE_OBSERVED');
+  assert.match(legend.source, /Sentinel-2 L2A/);
+  assert.equal(surfaceClass(legend, 0.264), legend.classes[0]); // colouring follows relative classes
+  assert.equal(surfaceClass(legend, 0.331), legend.classes[1]);
+  assert.equal(surfaceClass(legend, 0.355), legend.classes[2]);
+  assert.equal(surfaceClass(legend, null), legend.classes.at(-1));
+});
+
+test('RELVAR: a narrow NDMI range shows uniform instead of forced classes', () => {
+  const legend = legendFor('moisture', [0.3, 0.305, 0.31, 0.312], {
+    observation: { date: '2024-11-09' }, relative: true,
+  });
+  assert.equal(legend.scale, 'uniform');
+  assert.equal(legend.classes.length, 2); // uniform + No data
+  assert.match(legend.classes[0].label, /no meaningful difference/i);
+  assert.equal(legend.classes[0].pct, 100);
+  assert.match(legend.headline, /Overall: Moist/);
+  const edge = legendFor('moisture', [0.3, 0.32], { observation: { date: '2024-11-09' }, relative: true });
+  assert.equal(edge.scale, 'relative'); // range exactly 0.02 still splits
+});
+
+test('RELVAR: NDVI defaults to within-field at ≥95 % one class, with an absolute toggle', () => {
+  const concentrated = [0.62, 0.64, 0.66, 0.68, 0.7, 0.72]; // 100 % Dense 0.6–0.75
+  const within = legendFor('ndvi', concentrated, { observation: { date: '2024-03-09' }, relative: 'auto' });
+  assert.equal(within.scale, 'relative');
+  assert.match(within.classes[0].label, /Less green than field/);
+  assert.match(within.classes[2].label, /Greener than field/);
+  assert.match(within.headline, /Overall: Dense · NDVI 0\.62–0\.72, 2024-03-09/);
+  const mixed = [0.1, 0.3, 0.5, 0.7, 0.8];
+  assert.equal(legendFor('ndvi', mixed, { observation: { date: '2024-03-09' }, relative: 'auto' }).scale, 'absolute');
+  assert.equal(legendFor('ndvi', concentrated, { observation: { date: '2024-03-09' }, relative: false }).scale, 'absolute');
+  assert.equal(legendFor('ndvi', mixed, { observation: { date: '2024-03-09' }, relative: true }).scale, 'relative');
+  const html = surfaceLegendHtml(within);
+  assert.match(html, /data-relative-toggle="absolute"/);
+  assert.match(html, /data-relative-toggle="relative"/);
+  assert.match(html, /Within this field/);
+});
+
+test('RELVAR: fertility shows one honest class with coarse-map callout actions', () => {
+  const legend = legendFor('fertility', [5.86, 5.87, 5.88], {
+    soil: { layers: [{ ph: 5.87, socGkg: 12 }] },
+    soilRange: { ph: [5.86, 5.88], om: [2.1, 2.2] },
+  });
+  assert.equal(legend.classes[2].pct, 100); // one absolute pH class, no invented zones
+  assert.match(legend.note, /one class/);
+  assert.match(legend.note, /5\.86.*5\.88/);
+  assert.match(legend.note, /below test resolution/);
+  assert.doesNotMatch(legend.note, /contrast stretched/);
+  const html = surfaceLegendHtml(legend);
+  assert.match(html, /too coarse to show differences inside this field/);
+  assert.match(html, /data-surface-goto="productivity"/);
+  assert.match(html, /Productivity zones/);
+  assert.match(html, /data-soil-test/);
+  const measured = legendFor('fertility', [6.1], { soilOverrides: { ph: 6.1 } });
+  assert.ok(!surfaceLegendHtml(measured).includes('data-surface-goto')); // farmer test needs no coarse-map callout
+});
+
 test('one bilingual legend includes an accessible 72 px donut, percentages and provenance in every mode', async () => {
   const fixture = JSON.parse(await readFile(new URL('fixtures/studio-data.json', import.meta.url)));
   try {

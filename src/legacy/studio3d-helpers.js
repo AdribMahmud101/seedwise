@@ -111,6 +111,42 @@ export function surfaceClass(legend, value) {
     value >= c.from && (value < c.to || (c.includeTo && value === c.to))) || legend.classes.at(-1);
 }
 
+// Area shares per class; cells without area are skipped, null stays No data.
+function applyShares(classes, cells) {
+  for (const c of classes) c.pct = 0;
+  let total = 0;
+  const probe = { classes };
+  for (const cell of cells || []) {
+    if (!(cell.area > 0)) continue;
+    surfaceClass(probe, cell.value).pct += cell.area;
+    total += cell.area;
+  }
+  for (const c of classes) c.pct = total ? c.pct / total * 100 : c.unknown ? 100 : 0;
+}
+
+// Within-field classes need at least this much index range; below it the field
+// reads as uniform and forcing tertiles would invent differences.
+export const FIELD_RELATIVE_UNIFORM_RANGE = 0.02;
+
+// Tertile cuts of finite values. Classification compares by value, not rank, so
+// equal values stay together; heavy ties fall back to equal intervals so that
+// real variation still shows instead of collapsing two classes.
+export function fieldTertiles(values) {
+  const sorted = (values || []).filter(Number.isFinite).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const min = sorted[0], max = sorted[sorted.length - 1];
+  const quantile = (fraction) => {
+    const position = (sorted.length - 1) * fraction, i = Math.floor(position);
+    return sorted[i] + (sorted[Math.ceil(position)] - sorted[i]) * (position - i);
+  };
+  let low = quantile(1 / 3), high = quantile(2 / 3);
+  if (!(high > low) && max > min) {
+    low = min + (max - min) / 3;
+    high = min + 2 * (max - min) / 3;
+  }
+  return { min, max, low, high, count: sorted.length };
+}
+
 export function cropSurfaceValue(month) {
   if (!month?.cropId || month.cropId === 'fallow' || month.stage === 'fallow') return 3;
   return month.stage === 'establish' ? 0 : ['mature', 'harvest'].includes(month.stage) ? 2 : 1;
@@ -368,6 +404,7 @@ export function surfaceLegend(mode, data = {}) {
   const month = data.month || {};
   const makeClass = (label, color, from, to, includeTo = false) => ({ label, color, from, to, includeTo, pct: 0 });
   let title, unit = '', classes, note, truth, source, date;
+  let headline = null, scale = null, relativeCuts = null, callout = null;
   date = data.observation?.date || data.date || text('Date unavailable', 'তারিখ পাওয়া যায়নি');
   if (mode === 'photo') {
     title = text('Satellite photo', 'স্যাটেলাইট ছবি');
@@ -384,10 +421,50 @@ export function surfaceLegend(mode, data = {}) {
       ? [text('Bare <0.2', 'খালি <0.2'), text('Sparse 0.2–0.4', 'অল্প 0.2–0.4'), text('Moderate 0.4–0.6', 'মাঝারি 0.4–0.6'), text('Dense 0.6–0.75', 'ঘন 0.6–0.75'), text('Very dense >0.75', 'অতি ঘন >0.75')]
       : [text('Dry <0', 'শুষ্ক <0'), text('Slightly moist 0–0.2', 'সামান্য আর্দ্র 0–0.2'), text('Moist 0.2–0.4', 'আর্দ্র 0.2–0.4'), text('Wet 0.4–0.6', 'ভেজা 0.4–0.6'), text('Very wet ≥0.6', 'অতি ভেজা ≥0.6')];
     const colors = ndvi ? ['#b88955', '#d4ce77', '#91bc64', '#438b42', '#155c32'] : ['#b67a42', '#d5bc77', '#8cbdac', '#419fba', '#1764a0'];
+    const shorts = ndvi
+      ? [text('Bare', 'খালি'), text('Sparse', 'অল্প'), text('Moderate', 'মাঝারি'), text('Dense', 'ঘন'), text('Very dense', 'অতি ঘন')]
+      : [text('Dry', 'শুষ্ক'), text('Slightly moist', 'সামান্য আর্দ্র'), text('Moist', 'আর্দ্র'), text('Wet', 'ভেজা'), text('Very wet', 'অতি ভেজা')];
     classes = labels.map((label, i) => makeClass(label, colors[i], breaks[i], breaks[i + 1], ndvi && i === 3));
-    note = text('Field area from Sentinel-2 cells; masked or missing cells are No data.', 'Sentinel-2 কোষ থেকে জমির অংশ; মেঘ বা অনুপস্থিত কোষে তথ্য নেই।');
+    const absoluteNote = text('Field area from Sentinel-2 cells; masked or missing cells are No data.', 'Sentinel-2 কোষ থেকে জমির অংশ; মেঘ বা অনুপস্থিত কোষে তথ্য নেই।');
+    note = absoluteNote;
     truth = data.observation ? 'REMOTE_OBSERVED' : 'UNKNOWN';
     source = 'Copernicus Sentinel-2 L2A · 20 m';
+    scale = 'absolute';
+    // Within-field view: the field's own tertiles. relative:true forces it (studio
+    // moisture, where every cell can sit in one absolute class); 'auto' takes it when
+    // one absolute class covers ≥95 % (studio NDVI default). Absent/false keeps absolute.
+    const absoluteProbe = [...classes.map((c) => ({ ...c })), { label: '', color: '', from: null, to: null, pct: 0, unknown: true }];
+    applyShares(absoluteProbe, data.cells);
+    const overallIdx = classes.reduce((best, c, i) => absoluteProbe[i].pct > absoluteProbe[best].pct ? i : best, 0);
+    const tertiles = fieldTertiles((data.cells || []).map((c) => c.value));
+    const wantsRelative = data.relative === true || (data.relative === 'auto' && absoluteProbe[overallIdx].pct >= 95);
+    if (tertiles && wantsRelative) {
+      const { min, max, low, high } = tertiles;
+      headline = `${text('Overall', 'সামগ্রিক')}: ${shorts[overallIdx]} · ${unit} ${min.toFixed(2)}–${max.toFixed(2)}, ${date}`;
+      if (max - min < FIELD_RELATIVE_UNIFORM_RANGE) {
+        scale = 'uniform';
+        classes = [makeClass(
+          `${text('Uniform — no meaningful difference', 'একই রকম — অর্থপূর্ণ পার্থক্য নেই')} · ${unit} ${min.toFixed(2)}–${max.toFixed(2)}`,
+          ndvi ? '#91bc64' : '#8cbdac', -Infinity, Infinity)];
+        note = text(
+          `${unit} range ${min.toFixed(3)}–${max.toFixed(3)} is under ${FIELD_RELATIVE_UNIFORM_RANGE} — too small for meaningful within-field classes, so the field shows as one. ${absoluteNote}`,
+          `${unit} সীমা ${min.toFixed(3)}–${max.toFixed(3)}, ${FIELD_RELATIVE_UNIFORM_RANGE}-এর নিচে — অর্থপূর্ণ শ্রেণির জন্য খুব ছোট, তাই পুরো মাঠ এক শ্রেণিতে দেখানো হয়েছে। ${absoluteNote}`);
+      } else {
+        scale = 'relative';
+        relativeCuts = [low, high];
+        const lo = low.toFixed(3), hi = high.toFixed(3);
+        const relLabels = ndvi
+          ? [text(`Less green than field · <${lo}`, `মাঠের চেয়ে কম সবুজ · <${lo}`), text(`Typical · ${lo}–${hi}`, `সাধারণ · ${lo}–${hi}`), text(`Greener than field · ≥${hi}`, `মাঠের চেয়ে বেশি সবুজ · ≥${hi}`)]
+          : [text(`Drier than field · <${lo}`, `মাঠের চেয়ে শুষ্ক · <${lo}`), text(`Typical · ${lo}–${hi}`, `সাধারণ · ${lo}–${hi}`), text(`Wetter than field · ≥${hi}`, `মাঠের চেয়ে ভেজা · ≥${hi}`)];
+        const relColors = ndvi ? ['#d4ce77', '#91bc64', '#438b42'] : ['#d5bc77', '#8cbdac', '#419fba'];
+        classes = [makeClass(relLabels[0], relColors[0], -Infinity, low),
+          makeClass(relLabels[1], relColors[1], low, high),
+          makeClass(relLabels[2], relColors[2], high, Infinity)];
+        note = text(
+          `Within-field classes from this field's ${unit} tertiles (cuts ${lo}, ${hi}) on ${date}. Colours compare parts of this field, not absolute ${ndvi ? 'greenness' : 'wetness'}. ${absoluteNote}`,
+          `এই মাঠের ${unit} মানের তিন ভাগ (সীমা ${lo}, ${hi}) থেকে শ্রেণি, ${date} তারিখে। রঙ মাঠের অংশগুলোর তুলনা দেখায়, পরম মান নয়। ${absoluteNote}`);
+      }
+    }
   } else if (mode === 'water') {
     title = text('Water flow & ponding', 'পানির প্রবাহ ও জমা পানি');
     unit = 'cm';
@@ -450,7 +527,8 @@ export function surfaceLegend(mode, data = {}) {
       : text(`Field-wide estimate: ${description}`, `পুরো মাঠের আনুমানিক মান: ${description}`);
     if (data.soilRange?.ph.length && !Number.isFinite(data.soilOverrides?.ph)) {
       const range = (values, digits) => `${Math.min(...values).toFixed(digits)}–${Math.max(...values).toFixed(digits)}`;
-      note = text(`Smooth blend of 250 m SoilGrids cells — not a soil test. pH ${range(data.soilRange.ph, 3)}; OM ${range(data.soilRange.om, 3)} %. Continuous pH/OM shading, contrast stretched to field range; donut uses absolute pH classes.`, `২৫০ মি SoilGrids কোষের মসৃণ মিশ্রণ — মাটি পরীক্ষা নয়। pH ${range(data.soilRange.ph, 3)}; জৈব পদার্থ ${range(data.soilRange.om, 3)} %। pH/জৈব পদার্থের ছায়া মাঠের মানের সীমায় বাড়িয়ে দেখানো; ডোনাটে প্রকৃত pH শ্রেণি।`);
+      const span = Math.max(...data.soilRange.ph) - Math.min(...data.soilRange.ph);
+      note = text(`Smooth blend of 250 m SoilGrids cells — not a soil test. pH ${range(data.soilRange.ph, 3)} across the field (range ${span.toFixed(3)} — below test resolution, shown as one class); OM ${range(data.soilRange.om, 3)} %. Donut uses absolute pH classes.`, `২৫০ মি SoilGrids কোষের মসৃণ মিশ্রণ — মাটি পরীক্ষা নয়। পুরো মাঠে pH ${range(data.soilRange.ph, 3)} (ব্যাপ্তি ${span.toFixed(3)} — পরীক্ষার মাত্রার নিচে, এক শ্রেণিতে দেখানো); জৈব পদার্থ ${range(data.soilRange.om, 3)} %। ডোনাটে প্রকৃত pH শ্রেণি।`);
     }
     note += `\n${text('P/K/Zn/B: add soil test. Subfield soil zones are not mapped.', 'P/K/Zn/B: মাটি পরীক্ষা যোগ করুন। মাঠের ভেতরের মাটির অঞ্চল মানচিত্রে নেই।')}`;
     const measuredPh = Number.isFinite(data.soilOverrides?.ph);
@@ -458,6 +536,7 @@ export function surfaceLegend(mode, data = {}) {
     source = measuredPh ? text('Farmer soil test · BARC pH classes', 'কৃষকের মাটি পরীক্ষা · BARC pH শ্রেণি')
       : text('ISRIC SoilGrids 2.0 · 250 m · BARC pH classes', 'ISRIC SoilGrids 2.0 · ২৫০ মি · BARC pH শ্রেণি');
     if (measuredPh) date = data.soilOverrides.date || text('Soil test date unavailable', 'মাটি পরীক্ষার তারিখ পাওয়া যায়নি');
+    if (!measuredPh) callout = 'soilgrids-coarse';
   } else {
     title = `${text('Crop canopy', 'ফসলের ক্যানোপি')}${month.cropName ? ` · ${text(month.cropName, month.cropNameBn || month.cropName)}` : ''}`;
     classes = [
@@ -472,14 +551,8 @@ export function surfaceLegend(mode, data = {}) {
     date = month.month || date;
   }
   classes.push({ label: text('No data', 'তথ্য নেই'), color: '#a5a9a5', from: null, to: null, pct: 0, unknown: true });
-  const legend = { title, unit, classes, note, truth, source, date, remote: data.remote, flowRows: data.flowRows };
-  let total = 0;
-  for (const cell of data.cells || []) {
-    if (!(cell.area > 0)) continue;
-    surfaceClass(legend, cell.value).pct += cell.area;
-    total += cell.area;
-  }
-  for (const c of classes) c.pct = total ? c.pct / total * 100 : c.unknown ? 100 : 0;
+  const legend = { title, unit, classes, note, truth, source, date, mode, headline, scale, relativeCuts, callout, remote: data.remote, flowRows: data.flowRows };
+  applyShares(classes, data.cells);
   return legend;
 }
 
