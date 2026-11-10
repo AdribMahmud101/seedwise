@@ -310,7 +310,7 @@ function rotations() {
         `<div id="rotation-list">${rankedCards()}</div>` +
       `</div>` +
     `</div>` +
-    `<link rel="stylesheet" href="app/rotation-tool.css">` +
+    `` +
     rotationTool.soilModal() +
     rotationTool.sourcesModal()
   );
