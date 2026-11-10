@@ -1,0 +1,12 @@
+# LEADERS · Leader-line soil annotations + real-phone framing
+
+Owner's REAL Android screenshot: `helper/prompts/LEADERS_phone.png` (Chrome, ~412 px). Problems: (1) the soil tags "Topsoil / Root zone / Deep soil" pile up BELOW the block, not on their bands, and are oversized; (2) the field block is small and off-centre with large empty space (headless emulation looked fine — real device differs; compute from actual canvas size, devicePixelRatio and visualViewport, never assumed sizes).
+Files: `src/legacy/studio3d.js` (soil callout positioning + framing), `src/legacy/studio3d-helpers.js` (pure layout helper), `app/studio.css`.
+1. **Leader-line annotations** (all widths): for each band, an anchor dot (8–10 px, white ring) exactly on the band's mid-depth on the camera-facing cut wall (projected every frame). A thin leader line (1.5 px, SVG overlay) goes from the dot to a compact label (pill, 12–13 px text, padding 4×10, band colour left stripe or fill) placed in free space beside the block — right side if room, else left; labels stacked in band order with ≥ 6 px gap; elbow line (horizontal then angled), never crossing another label or the controls.
+2. Labels must stay inside the canvas, never over the top bar/control pill/cards; if no side room (very narrow), place labels below the block in a row with lines going up to the dots.
+3. Hidden when the wall faces away; smooth (no jitter) — positions update only when projected anchors move > 0.5 px; respect the hover-freeze of the idle sway.
+4. Tap/click label or dot → existing detail popover; keyboard focusable; aria labels unchanged.
+5. **Framing:** phone (< 600 px canvas): field block ≈ 75–80 % of canvas width (leave room for labels), centred in the free area between top bar and bottom; desktop compact/full unchanged except leave a label gutter.
+6. Pure helper `layoutLeaderLabels(anchors, labelSizes, bounds, obstacles)` with tests (no overlaps, order preserved, inside bounds, side choice).
+Verify with Playwright Pixel 7 AND a 412×915 viewport at DPR 2.625 (like the owner's phone), plus 1366×768 and 1884×1000: dots on bands, lines visible, no overlap; describe in commit message.
+Acceptance: `npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --rule 'no-undef:error' src/legacy/studio3d.js src/legacy/studio3d-helpers.js` clean; `npm test`; `npm run build`. Never touch package-lock.json/node_modules. Commit.
