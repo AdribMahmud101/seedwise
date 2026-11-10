@@ -1,0 +1,741 @@
+{
+  "schemaVersion": 1,
+  "source": "ISRIC SoilGrids 2.0 and SRDI Upazila Nirdeshika",
+  "retrievedAt": "2026-11-10T08:13:21.067563+00:00",
+  "license": "CC BY 4.0 (SoilGrids) / SRDI Government Data",
+  "note": "SoilGrids: Modeled 250 m soil properties at 0-15 cm via WCS. SRDI: Upazila-level soil fertility from Land & Soil Resource Utilization Guide PDFs (TLS verify=False required). OM = SOC × 1.724. Failed values are null with documented attempts.",
+  "sites": {
+    "mithapukur": {
+      "id": "mithapukur",
+      "name": "Mithapukur",
+      "lat": 25.54,
+      "lon": 89.27,
+      "upazila": "Mithapukur",
+      "nutrients": {
+        "ph": {
+          "value": 6.1,
+          "unit": "",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/phh2o.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.067740+00:00"
+        },
+        "om": {
+          "value": 26.5496,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "Derived: OM = SOC × 1.724 (SOC from soc)",
+          "url": "https://maps.isric.org/mapserv?map=/map/soc.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "Derived from SOC (15.4 g/kg × 1.724)",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.067825+00:00"
+        },
+        "soc": {
+          "value": 15.4,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/soc.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.067993+00:00"
+        },
+        "totalN": {
+          "value": 1.48,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/nitrogen.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068042+00:00"
+        },
+        "cec": {
+          "value": 20.45,
+          "unit": "cmol+/kg",
+          "class_en": "Optimum",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/cec.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068087+00:00"
+        },
+        "P": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068129+00:00"
+        },
+        "K": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068160+00:00"
+        },
+        "S": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068187+00:00"
+        },
+        "Zn": {
+          "value": null,
+          "unit": "mg/kg",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068213+00:00"
+        },
+        "B": {
+          "value": null,
+          "unit": "mg/kg",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Mithapukur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068239+00:00"
+        }
+      }
+    },
+    "pirganj": {
+      "id": "pirganj",
+      "name": "Pirganj",
+      "lat": 25.5,
+      "lon": 89.22,
+      "upazila": "Pirganj",
+      "nutrients": {
+        "ph": {
+          "value": 6.05,
+          "unit": "",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/phh2o.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068290+00:00"
+        },
+        "om": {
+          "value": 26.722,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "Derived: OM = SOC × 1.724 (SOC from soc)",
+          "url": "https://maps.isric.org/mapserv?map=/map/soc.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "Derived from SOC (15.5 g/kg × 1.724)",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068340+00:00"
+        },
+        "soc": {
+          "value": 15.5,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/soc.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068491+00:00"
+        },
+        "totalN": {
+          "value": 1.59,
+          "unit": "g/kg",
+          "class_en": "Optimum",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/nitrogen.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068536+00:00"
+        },
+        "cec": {
+          "value": 19.55,
+          "unit": "cmol+/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/cec.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068574+00:00"
+        },
+        "P": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068606+00:00"
+        },
+        "K": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068634+00:00"
+        },
+        "S": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068659+00:00"
+        },
+        "Zn": {
+          "value": null,
+          "unit": "mg/kg",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068684+00:00"
+        },
+        "B": {
+          "value": null,
+          "unit": "mg/kg",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Pirganj.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.068708+00:00"
+        }
+      }
+    },
+    "gangachara": {
+      "id": "gangachara",
+      "name": "Gangachara",
+      "lat": 25.85,
+      "lon": 89.2,
+      "upazila": "Gangachara",
+      "nutrients": {
+        "ph": {
+          "value": 5.85,
+          "unit": "",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/phh2o.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068753+00:00"
+        },
+        "om": {
+          "value": 29.3942,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "Derived: OM = SOC × 1.724 (SOC from soc)",
+          "url": "https://maps.isric.org/mapserv?map=/map/soc.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "Derived from SOC (17.05 g/kg × 1.724)",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068798+00:00"
+        },
+        "soc": {
+          "value": 17.05,
+          "unit": "g/kg",
+          "class_en": "Medium",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/soc.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.068947+00:00"
+        },
+        "totalN": {
+          "value": 2.005,
+          "unit": "g/kg",
+          "class_en": "Optimum",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/nitrogen.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.069029+00:00"
+        },
+        "cec": {
+          "value": 20.1,
+          "unit": "cmol+/kg",
+          "class_en": "Optimum",
+          "class_bn": "",
+          "source": "ISRIC SoilGrids 2.0 (250 m)",
+          "url": "https://maps.isric.org/mapserv?map=/map/cec.map",
+          "sha256": null,
+          "depth": "0-15cm",
+          "method": "WCS 2.0.1 GetCoverage; containing pixel in EPSG:4326 output",
+          "truth": "MODELED",
+          "retrieved": "2026-11-10T08:13:21.069074+00:00"
+        },
+        "P": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.069105+00:00"
+        },
+        "K": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.069131+00:00"
+        },
+        "S": {
+          "value": null,
+          "unit": "kg/ha",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.069155+00:00"
+        },
+        "Zn": {
+          "value": null,
+          "unit": "mg/kg",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.069179+00:00"
+        },
+        "B": {
+          "value": null,
+          "unit": "mg/kg",
+          "class_en": null,
+          "class_bn": null,
+          "source": "SRDI Upazila Nirdeshika",
+          "url": null,
+          "sha256": null,
+          "status": "no open source found",
+          "searched": [
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Land%20and%20Soil%20Resource%20Utilization%20Guide/Rangpur/Gangachara.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            },
+            {
+              "url": "https://srdi.portal.gov.bd/sites/default/files/Upazila_Nirdeshika/Rangpur.pdf",
+              "status": 200,
+              "error": "HTML error page instead of PDF"
+            }
+          ],
+          "truth": null,
+          "retrieved": "2026-11-10T08:13:21.069202+00:00"
+        }
+      }
+    }
+  }
+}
