@@ -51,6 +51,7 @@ import {
   idleCameraSway,
   IDLE_RESUME_DELAY_S,
   solveFramingMultiplier,
+  layoutLeaderLabels,
   surfaceGridPositions,
   pondingPositions,
   waterTablePositions,
@@ -165,6 +166,7 @@ let restoringPopoverFocus = false;
 let suppressSoilHover = false;
 let overlayEvents = null;
 let hintShown = false;
+let leaderLayoutCache = null;
 let wideLayersOpen = false;
 let stageOverlayCleanup = null;
 let currentSurface = null;
@@ -773,6 +775,7 @@ function buildWallMesh(ringM, heightAt, bottomY, sideMaterial, fieldId = "pilot"
   const positions = [];
   const uvs = [];
   const indices = [];
+  const anchorTops = [];
   let total = 0;
   // Farm-traced outlines can be clockwise. Reverse the wall winding for those
   // rings so the outward faces receive light instead of rendering inside-out.
@@ -806,6 +809,7 @@ function buildWallMesh(ringM, heightAt, bottomY, sideMaterial, fieldId = "pilot"
       const noise1 = rimErosionNoise(fieldId, edge, t1);
       const top0 = heightAt(x0, z0) - 0.03 + noise0.dh;
       const top1 = heightAt(x1, z1) - 0.03 + noise1.dh;
+      if (t0 <= 0.5 && t1 >= 0.5) anchorTops[edge] = top0 + (top1-top0) * (0.5-t0)/(t1-t0);
 
       const u0 = ((travelled + len * t0) / Math.max(1e-6, total)) * 2;
       const u1 = ((travelled + len * t1) / Math.max(1e-6, total)) * 2;
@@ -827,6 +831,7 @@ function buildWallMesh(ringM, heightAt, bottomY, sideMaterial, fieldId = "pilot"
   geom.computeVertexNormals();
   const mesh = new THREE.Mesh(geom, sideMaterial);
   mesh.userData.soil = true;
+  mesh.userData.anchorTops = anchorTops;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
@@ -2415,8 +2420,8 @@ function setupControls() {
 }
 
 function initThree(host) {
-  const width = Math.max(1, host.clientWidth || 600);
-  const height = Math.max(1, host.clientHeight || 450);
+  leaderLayoutCache = null;
+  const { width, height } = host.getBoundingClientRect();
   isSoftwareRenderer = !hasWebGL();
 
   if (!renderer) {
@@ -2478,11 +2483,15 @@ function updateShadowLight() {
 
 /* --------------------------------------------------------------- camera fit */
 
+function canvasSize() {
+  const rect = canvas?.getBoundingClientRect();
+  const dpr = renderer?.getPixelRatio?.() || renderer?.ratio || window.devicePixelRatio || 1;
+  return { width: rect?.width || canvas.width / dpr, height: rect?.height || canvas.height / dpr };
+}
+
 function hostAspect() {
-  if (!canvasHostEl) return 1.5;
-  const w = canvasHostEl.clientWidth || 600;
-  const h = canvasHostEl.clientHeight || 400;
-  return Math.max(0.35, w / Math.max(1, h));
+  const { width, height } = canvasSize();
+  return width / Math.max(1, height);
 }
 
 function studioFreeRegion() {
@@ -2492,6 +2501,13 @@ function studioFreeRegion() {
   const controls = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
   const overlayBottom = (overlay?.bottom || rect.top) - rect.top;
   const controlsBottom = (controls?.bottom || rect.top) - rect.top;
+  if (w < 600) {
+    const top = overlayBottom + 16;
+    const viewportHeight = window.visualViewport?.height || document.documentElement.clientHeight;
+    const bottom = Math.min(h, viewportHeight) - 16;
+    return { region: { left: 0.03, right: 0.97, top: top / h, bottom: Math.max(top + 80, bottom) / h },
+      preferredCentreY: (top + bottom) / (2 * h) };
+  }
   if (canvasHostEl.dataset.chrome === 'compact') {
     // Prefer the stage centre, keeping the entire sway clear of the camera pill.
     // In narrow mode, controls are on the right, so only overlayBottom matters for top.
@@ -2522,9 +2538,11 @@ function fitPerspective(data, close = false) {
   const yawDeg = close ? 26 : 10;
   const phone = canvasHostEl.dataset.overlaySize === 'narrow';
   const compact = canvasHostEl.dataset.chrome === 'compact';
+  const outlineM = phone && currentCutaway > 0.05
+    ? currentBlock.ring.map(([x,z]) => [x,-z]) : data.field.outlineM;
   const margin = close && phone ? 0.14 : isPhone() ? 0.22 : 0.18;
   const fit = fitCameraToBlock({
-    outlineM: data.field.outlineM,
+    outlineM,
     depthM: depth,
     fovDeg: cameraPersp.fov,
     aspect: hostAspect(),
@@ -2539,6 +2557,10 @@ function fitPerspective(data, close = false) {
   // Shift target down to center the block in the frame below the UI
   // STUDIO5Q: overlay clearance now caps that zoom, including terrain and sway.
   const space = studioFreeRegion();
+  if (!phone) {
+    const gutter = Math.max(...[...canvasHostEl.querySelectorAll('.studio-soil-pin')].map(el => el.getBoundingClientRect().width)) + 24;
+    space.region.right -= gutter / canvasSize().width;
+  }
   const canopy = canopyVisualHeight(data.months[currentMonthIdx], Math.max(b.width, b.height));
   // STUDIO5T: on phones the span*0.08 air above the crops (≈2× the soil depth)
   // pushed the visible block low with empty space above it. Fit the phone
@@ -2548,9 +2570,10 @@ function fitPerspective(data, close = false) {
   const topSlack = compact
     ? Math.max(canopy, Math.max(b.width, b.height) * 0.01)
     : Math.max(canopy, Math.max(b.width, b.height) * 0.08);
+  // A 0.86 sway envelope gives 75–80% visible width at the resting phone camera.
   const solved = close && !compact ? null : solveFramingMultiplier({
-    outlineM: data.field.outlineM, depthM: depth, fovDeg: cameraPersp.fov,
-    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: compact ? 0.78 : 0.6,
+    outlineM, depthM: depth, fovDeg: cameraPersp.fov,
+    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.86 : compact ? 0.78 : 0.6,
     region: space.region, topM: currentBlock.topMax + topSlack,
     bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
   });
@@ -2570,12 +2593,10 @@ function fitPerspective(data, close = false) {
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
   if (solved && canvasHostEl) {
-    const w = canvasHostEl.clientWidth || 600;
-    const h = canvasHostEl.clientHeight || 400;
+    const { width: w, height: h } = canvasSize();
     cameraPersp.setViewOffset(w, h, solved.viewOffsetX * w, solved.viewOffsetY * h, w, h);
   } else if (close && !isPhone() && canvasHostEl) {
-    const w = canvasHostEl.clientWidth || 600;
-    const h = canvasHostEl.clientHeight || 400;
+    const { width: w, height: h } = canvasSize();
     cameraPersp.setViewOffset(w, h, (0.5 - 0.66) * w, (0.5 - 0.56) * h, w, h);
   } else {
     cameraPersp.clearViewOffset();
@@ -2660,11 +2681,13 @@ function onResize() {
   if (!renderer || !canvasHostEl) return;
   updateOverlayLayout();
   applyTouchMode();
-  const w = Math.max(1, canvasHostEl.clientWidth || 600);
-  const h = Math.max(1, canvasHostEl.clientHeight || 400);
+  const rect = canvasHostEl.getBoundingClientRect();
+  const w = Math.max(1, rect.width), h = Math.max(1, rect.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isSoftwareRenderer ? 1.5 : 2));
   renderer.setSize(w, h);
+  leaderLayoutCache = null;
   if (cameraPersp) {
-    cameraPersp.aspect = Math.max(0.35, w / Math.max(1, h));
+    cameraPersp.aspect = w / h;
     cameraPersp.updateProjectionMatrix();
   }
   if (currentData) fitCameras(currentData);
@@ -2737,31 +2760,8 @@ function placeCallout(x, y, z, id, show, checkFacingNormal = false) {
 function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) {
   if (!ringM || ringM.length < 2) return null;
 
-  // If sliced and camera is in front of the cut face (cam.x > effectiveMaxX),
-  // the visible cut cross-section is the active wall face.
-  if (cutawayFraction > 0.05 && camPos.x > effectiveMaxX - 0.5) {
-    let minZ = Infinity, maxZ = -Infinity;
-    for (const [x, y] of ringM) {
-      if (Math.abs(x - effectiveMaxX) < 1.0) {
-        const z = -y;
-        if (z < minZ) minZ = z;
-        if (z > maxZ) maxZ = z;
-      }
-    }
-    if (minZ !== Infinity && maxZ !== -Infinity && maxZ > minZ) {
-      return {
-        isCutFace: true,
-        x0: effectiveMaxX,
-        z0: minZ,
-        x1: effectiveMaxX,
-        z1: maxZ,
-        midX: effectiveMaxX,
-        midZ: (minZ + maxZ) / 2,
-        normalX: 1,
-        normalZ: 0,
-      };
-    }
-  }
+  // A sliced wall only exposes annotations from the cut side.
+  if (cutawayFraction > 0.05 && camPos.x <= effectiveMaxX) return null;
 
   // Find exterior wall edge whose outward normal best faces camera
   const isCW = ringSignedArea(ringM) < 0;
@@ -2771,6 +2771,7 @@ function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) 
   for (let i = 0; i < ringM.length; i++) {
     const a = ringM[i];
     const b = ringM[(i + 1) % ringM.length];
+    if (cutawayFraction > 0.05 && (Math.abs(a[0]-effectiveMaxX) > 1e-6 || Math.abs(b[0]-effectiveMaxX) > 1e-6)) continue;
     const p0 = { x: a[0], z: -a[1] };
     const p1 = { x: b[0], z: -b[1] };
     const dx = p1.x - p0.x;
@@ -2792,7 +2793,8 @@ function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) 
     if (dot > bestDot) {
       bestDot = dot;
       bestEdge = {
-        isCutFace: false,
+        edgeIndex: i,
+        isCutFace: cutawayFraction > 0.05,
         x0: p0.x,
         z0: p0.z,
         x1: p1.x,
@@ -2805,7 +2807,7 @@ function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) 
     }
   }
 
-  return bestEdge;
+  return bestDot > 0 ? bestEdge : null;
 }
 
 function sync3DCallouts() {
@@ -2848,7 +2850,6 @@ function sync3DCallouts() {
   placeCallout(otx, heightAt(otx, otz) + 0.55, otz, 'callout-outlet', isWater && sliceU >= 0.88);
 
   // Soil stratigraphic callouts pinned to the front-facing cut wall
-  const depth = Math.max(0.2, currentBlock.topMin - currentBlock.bottomY);
   const ringM = (currentBlock.ring || []).map(([x, negZ]) => [x, -negZ]);
   const camPos = activeCamera.position;
   const wallFace = findFrontFacingWallFace(ringM, camPos, cutFraction, currentBlock.effectiveMaxX ?? sx);
@@ -2858,62 +2859,71 @@ function sync3DCallouts() {
   const aquiferEl = containerEl.querySelector('#callout-aquifer');
   const svgLeaders = containerEl.querySelector('#svg-callout-leaders');
 
-  if (!isSoil || !wallFace) {
-    if (topsoilEl) topsoilEl.style.display = 'none';
-    if (rootzoneEl) rootzoneEl.style.display = 'none';
-    if (aquiferEl) aquiferEl.style.display = 'none';
+  const wallMesh = blockGroup?.children.find(mesh => mesh.userData.anchorTops);
+  if (!isSoil || !wallFace || !wallMesh) {
+    if (topsoilEl) topsoilEl.style.visibility = 'hidden';
+    if (rootzoneEl) rootzoneEl.style.visibility = 'hidden';
+    if (aquiferEl) aquiferEl.style.visibility = 'hidden';
     if (svgLeaders) svgLeaders.innerHTML = '';
+    leaderLayoutCache = null;
     return;
   }
 
-  // Anchor mid-depths: 0-15 cm -> 7.5 cm, 15-60 cm -> 37.5 cm, >120 cm -> 135 cm
-  const yTopsoil = currentBlock.topMin - (7.5 / 150) * depth;
-  const yRootzone = currentBlock.topMin - (37.5 / 150) * depth;
-  const yAquifer = currentBlock.topMin - (135 / 150) * depth;
-
-  const wallEdgeLen = Math.hypot(wallFace.x1 - wallFace.x0, wallFace.z1 - wallFace.z0);
-  const anchorAt = (tNorm, yVal) => {
-    const x = wallEdgeLen > 1e-4 ? wallFace.x0 + (wallFace.x1 - wallFace.x0) * tNorm : wallFace.midX;
-    const z = wallEdgeLen > 1e-4 ? wallFace.z0 + (wallFace.z1 - wallFace.z0) * tNorm : wallFace.midZ;
-    return new THREE.Vector3(x, yVal, z);
-  };
-
-  const pTop = anchorAt(0.15, yTopsoil);
-  const pRoot = anchorAt(0.50, yRootzone);
-  const pAqui = anchorAt(0.85, yAquifer);
-
-  const projectToScreen = (v3) => {
-    const v = v3.clone();
+  // Match the visible texture bands (0–24%, 24–58%, 84–100%) at the local wall height.
+  const x = (wallFace.x0 + wallFace.x1) / 2;
+  const z = (wallFace.z0 + wallFace.z1) / 2;
+  const wallTop = wallMesh.userData.anchorTops[wallFace.edgeIndex];
+  const projectToScreen = (v) => {
     if (floatGroup) floatGroup.localToWorld(v);
     v.project(activeCamera);
-    return {
-      x: (v.x * 0.5 + 0.5) * canvasHostEl.clientWidth,
-      y: (-v.y * 0.5 + 0.5) * canvasHostEl.clientHeight,
-      visible: v.z >= -1 && v.z <= 1,
-    };
+    const { width, height } = canvasSize();
+    return { x:(v.x * 0.5 + 0.5) * width, y:(0.5 - v.y * 0.5) * height,
+      visible:v.z >= -1 && v.z <= 1 };
   };
-
-  const scrTop = projectToScreen(pTop);
-  const scrRoot = projectToScreen(pRoot);
-  const scrAqui = projectToScreen(pAqui);
-
-  // Keep the numbered buttons on the cut wall, rather than reserving a card column.
-  const anchors = [scrTop, scrRoot, scrAqui];
-  const compactRegion = canvasHostEl.dataset.chrome === 'compact' ? studioFreeRegion().region : null;
-  let pinBottom = compactRegion ? compactRegion.top * canvasRect.height : 0;
-  for (const [i, el] of [topsoilEl, rootzoneEl, aquiferEl].entries()) {
-    if (!el) continue;
-    const scr = anchors[i];
-    el.style.display = scr.visible && !isTopView ? 'block' : 'none';
-    el.style.left = `${Math.max(22, Math.min(canvasRect.width - 22, scr.x)) - 22}px`;
-    el.style.top = `${Math.max(22, Math.min(canvasRect.height - 22, scr.y)) - 22}px`;
-    if (compactRegion) {
-      const top = Math.max(pinBottom, Math.min(scr.y - 22, compactRegion.bottom * canvasRect.height - (3 - i) * 48));
-      el.style.top = `${top}px`;
-      pinBottom = top + 48;
-    }
+  const elements = [topsoilEl, rootzoneEl, aquiferEl];
+  const anchors = [0.12, 0.41, 0.92].map((fraction,i) => ({
+    id:elements[i].dataset.band,
+    ...projectToScreen(new THREE.Vector3(x, wallTop - fraction * (wallTop-currentBlock.bottomY), z)),
+  }));
+  if (isTopView || anchors.some(a => !a.visible)) {
+    elements.forEach(el => { el.style.visibility = 'hidden'; });
+    svgLeaders.replaceChildren();
+    leaderLayoutCache = null;
+    return;
   }
-  if (svgLeaders) svgLeaders.innerHTML = '';
+  const projected = currentBlock.ring.flatMap(([x,z]) => [currentBlock.topMax, currentBlock.bottomY]
+    .map(y => projectToScreen(new THREE.Vector3(x,y,z))));
+  const block = { left:Math.min(...projected.map(p => p.x)), right:Math.max(...projected.map(p => p.x)),
+    top:Math.min(...projected.map(p => p.y)), bottom:Math.max(...projected.map(p => p.y)) };
+  const { width, height } = canvasSize();
+  const obstacles = [...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-compass, .studio-interaction-hint, .studio-touch-hint, .studio-probe-card, .studio-transect-card, .studio-surface-legend')]
+    .filter(el => !el.closest('dialog') && getComputedStyle(el).visibility !== 'hidden')
+    .map(el => el.getBoundingClientRect()).filter(r => r.width && r.height)
+    .map(r => ({left:r.left-canvasRect.left-6, right:r.right-canvasRect.left+6,
+      top:r.top-canvasRect.top-6, bottom:r.bottom-canvasRect.top+6}));
+  const sizes = elements.map(el => {
+    const r = el.querySelector('.studio-soil-pin').getBoundingClientRect();
+    return {width:r.width, height:r.height};
+  });
+  const key = JSON.stringify([width,height,sizes,obstacles]);
+  const moved = !leaderLayoutCache || key !== leaderLayoutCache.key
+    || anchors.some((a,i) => Math.hypot(a.x-leaderLayoutCache.anchors[i].x,a.y-leaderLayoutCache.anchors[i].y) > 0.5);
+  if (moved) {
+    const labels = layoutLeaderLabels(anchors, sizes, {left:8,top:8,right:width-8,bottom:height-8,block}, obstacles);
+    elements.forEach(el => { el.style.visibility = 'hidden'; });
+    const lines = [];
+    labels.forEach((p,i) => {
+      const el = elements[i], a = anchors[i], pin = el.querySelector('.studio-soil-pin');
+      el.style.visibility = 'visible';
+      el.style.left = `${a.x}px`;
+      el.style.top = `${a.y}px`;
+      pin.style.left = `${p.x-a.x}px`;
+      pin.style.top = `${p.y-a.y}px`;
+      lines.push(`<polyline class="callout-leader-line" points="${p.points.map(p => p.join(',')).join(' ')}"/>`);
+    });
+    svgLeaders.innerHTML = lines.join('');
+    leaderLayoutCache = {key,anchors};
+  }
   positionSoilPopover();
 }
 
@@ -3865,6 +3875,7 @@ function bindOverlayEvents() {
   overlayEvents = new AbortController();
   const options = { signal: overlayEvents.signal };
   bindStageOverlays(options);
+  window.visualViewport?.addEventListener('resize', onResize, options);
   containerEl.addEventListener('focusin', (e) => {
     const pin = e.target.closest('[data-soil-pin]');
     if (pin && !restoringPopoverFocus) openSoilPopover(pin.dataset.soilPin, pin);
@@ -4200,6 +4211,8 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
 
           ${["topsoil", "rootzone", "aquifer"].map((band, i) => `
             <div id="callout-${band}" class="callout-3d" data-band="${band}">
+              <button type="button" class="studio-soil-dot" data-soil-pin="${band}"
+                aria-label="${esc(calloutData[band].eyebrow)}" aria-expanded="false" aria-controls="studio-soil-popover"></button>
               <button type="button" class="studio-soil-pin" id="soil-pin-${band}" data-soil-pin="${band}"
                 aria-label="${esc(calloutData[band].eyebrow)}" aria-expanded="false" aria-controls="studio-soil-popover">
                 ${[t("Topsoil", "উপরের মাটি"), t("Root zone", "শিকড় স্তর"), t("Deep soil", "গভীর মাটি")][i]}
