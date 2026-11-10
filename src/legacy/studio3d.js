@@ -2583,6 +2583,7 @@ function renderTransectSVG() {
   if (!svg || !currentData || !currentBlock.bounds) return;
   const b = currentBlock.bounds;
   const heightAt = makeHeightAt(currentData);
+  let lastFiniteH = 0;
 
   const [a, end] = currentBlock.transect;
   if (!a || !end) { svg.innerHTML = ""; return; }
@@ -2595,7 +2596,7 @@ function renderTransectSVG() {
     sampleElevationFn: (u, v) => {
       const x = b.minX + u * b.width;
       const z = -(b.minY + v * b.height);
-      return heightAt(x, z);
+      const h = heightAt(x, z); return Number.isFinite(h) ? (lastFiniteH = h) : lastFiniteH; // off-grid samples are NaN
     },
     rainMm: rainScenarioMm,
     proposedDrain,
@@ -2604,6 +2605,7 @@ function renderTransectSVG() {
     height: 64,
   });
 
+  if (!Number.isFinite(profile.minE) || !Number.isFinite(profile.reliefM)) { svg.innerHTML = ""; return; }
   const W = 290, H = 64, px = 12;
   const waterE = profile.minE + 0.12 + (rainScenarioMm / 240) * (proposedDrain && !outletBlocked ? 0.35 : 0.85);
   const wY = Math.max(10, profile.Y(waterE));
