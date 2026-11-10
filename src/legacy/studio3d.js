@@ -3660,7 +3660,8 @@ function updateOverlayLayout() {
     const overlay = containerEl.querySelector('.studio-overlay-tl');
     const caption = overlay.querySelector('.studio-caption-copy');
     if (breakpoint === 'wide' && sheet.open) sheet.dispatchEvent(new Event('cancel', { cancelable: true }));
-    for (const selector of ['.studio-overlay-tc', '.studio-surface-selector', '.studio-slice-card', '.studio-crop-chip']) {
+    // the fallow/harvest notice stays visible on the stage in every layout (owner: golden harvest looked like missing crops)
+    for (const selector of ['.studio-surface-selector', '.studio-slice-card', '.studio-crop-chip']) {
       const el = containerEl.querySelector(selector);
       if (breakpoint !== 'wide') sheet.querySelector('.studio-layers-content').appendChild(el);
       else overlay.insertBefore(el, caption);
