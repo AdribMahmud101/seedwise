@@ -244,6 +244,99 @@ export function fitTopView({ outlineM, aspect = 1.5, margin = 0.12, altitude = 6
   return { halfWidth, halfHeight, y: altitude, target: [b.cx, 0, -b.cy] };
 }
 
+// Project block corners to NDC with the same math as THREE.PerspectiveCamera
+// (camera up +Y, optional setViewOffset shift as fractions of the full size).
+// Returns the NDC bounding box plus the canvas width/height fractions.
+export function projectFramingBox(corners, { position, target, fovDeg = 38, aspect = 1.5,
+  viewOffsetX = 0, viewOffsetY = 0 }) {
+  const fwd = norm3([target[0] - position[0], target[1] - position[1], target[2] - position[2]]);
+  const right = norm3(cross3(fwd, [0, 1, 0]));
+  const up = cross3(right, fwd);
+  const tanHalf = Math.tan(((fovDeg * Math.PI) / 180) / 2);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of corners) {
+    const vx = p[0] - position[0], vy = p[1] - position[1], vz = p[2] - position[2];
+    const depth = vx * fwd[0] + vy * fwd[1] + vz * fwd[2];
+    const hw = Math.max(1e-9, depth * tanHalf * aspect);
+    const hh = Math.max(1e-9, depth * tanHalf);
+    const nx = (vx * right[0] + vy * right[1] + vz * right[2]) / hw - 2 * viewOffsetX;
+    const ny = (vx * up[0] + vy * up[1] + vz * up[2]) / hh + 2 * viewOffsetY;
+    if (nx < minX) minX = nx; if (nx > maxX) maxX = nx;
+    if (ny < minY) minY = ny; if (ny > maxY) maxY = ny;
+  }
+  return { minX, maxX, minY, maxY,
+    widthFrac: (maxX - minX) / 2, heightFrac: (maxY - minY) / 2 };
+}
+
+function cross3(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+
+function norm3(v) {
+  const len = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+
+// STUDIO5P: solve the fit-distance multiplier so the field block fills targetFrac
+// of the canvas width, backing off until every block corner is inside the frame.
+// With centerX, a small bounded horizontal view shift centres the block (phone);
+// otherwise viewOffsetX stays fixed (desktop keeps its free-region offset).
+// Returns { multiplier, viewOffsetX, widthFrac, heightFrac, fits }.
+export function solveFramingMultiplier({ outlineM, depthM = 1.5, fovDeg = 38, aspect = 1.5,
+  elevationDeg = 14, yawDeg = 10, margin = 0.18, targetFrac = 0.72,
+  viewOffsetX = 0, viewOffsetY = 0, centerX = false, maxCenterX = 0.1,
+  minMult = 0.45, maxMult = 1.0, edgeMargin = 0.02 }) {
+  const fallback = { multiplier: 1, viewOffsetX, widthFrac: 0, heightFrac: 0, fits: true };
+  if (!Array.isArray(outlineM) || outlineM.length < 3) return fallback;
+  const fit = fitCameraToBlock({ outlineM, depthM, fovDeg, aspect, elevationDeg, yawDeg, margin });
+  if (!Number.isFinite(fit.distance) || fit.distance <= 0) return fallback;
+  const target = [fit.target[0], -depthM * 0.45, fit.target[2]];
+  const el = (elevationDeg * Math.PI) / 180;
+  const yaw = (yawDeg * Math.PI) / 180;
+  const dir = [Math.cos(el) * Math.sin(yaw), Math.sin(el), Math.cos(el) * Math.cos(yaw)];
+  const corners = [];
+  for (const [x, y] of outlineM) {
+    corners.push([x, 0, -y], [x, -depthM, -y]);
+  }
+  const measure = (mult, vox) => {
+    const d = fit.distance * mult;
+    const position = [target[0] + dir[0] * d, target[1] + dir[1] * d, target[2] + dir[2] * d];
+    const box = projectFramingBox(corners, { position, target, fovDeg, aspect,
+      viewOffsetX: vox, viewOffsetY });
+    const overflow = Math.max(box.maxX - (1 - edgeMargin), (-1 + edgeMargin) - box.minX,
+      box.maxY - (1 - edgeMargin), (-1 + edgeMargin) - box.minY, 0);
+    return { ...box, fits: overflow <= 0, overflow };
+  };
+  const clamp = (v) => Math.min(maxMult, Math.max(minMult, v));
+  const clampVox = (v) => Math.min(maxCenterX, Math.max(-maxCenterX, v));
+  let mult = clamp(1);
+  let vox = viewOffsetX;
+  for (let i = 0; i < 5; i++) {
+    const m = measure(mult, vox);
+    if (!(m.widthFrac > 1e-6) || !Number.isFinite(m.widthFrac)) break;
+    const next = clamp(mult * (m.widthFrac / targetFrac));
+    const voxNext = centerX ? clampVox(vox + ((m.minX + m.maxX) / 2) / 2) : vox;
+    if (Math.abs(next - mult) < 1e-4 && Math.abs(voxNext - vox) < 1e-4) {
+      mult = next; vox = voxNext; break;
+    }
+    mult = next; vox = voxNext;
+  }
+  for (let i = 0; i < 12; i++) {
+    const m = measure(mult, vox);
+    if (m.fits) break;
+    mult = clamp(mult * (1 + m.overflow * 0.9 + 0.02));
+    if (mult >= maxMult) break;
+  }
+  if (centerX) {
+    const m = measure(mult, vox);
+    const tuned = clampVox(vox + ((m.minX + m.maxX) / 2) / 2);
+    if (measure(mult, tuned).fits) vox = tuned;
+  }
+  const final = measure(mult, vox);
+  return { multiplier: mult, viewOffsetX: vox,
+    widthFrac: final.widthFrac, heightFrac: final.heightFrac, fits: final.fits };
+}
+
 // Idle hovering / slow drift for floating field block.
 // Zero when dragging or prefersReducedMotion is on.
 export function idleFloatOffset(timeS, fieldSpanM = 30, isDragging = false, prefersReducedMotion = false) {
@@ -257,6 +350,73 @@ export function idleFloatOffset(timeS, fieldSpanM = 30, isDragging = false, pref
   // Slow gentle drift yaw (approx ±0.012 radians ~ 0.7 degrees)
   const yaw = Math.sin(timeS * 0.45) * 0.012;
   return { dy, yaw };
+}
+
+// ------------------------------------------------- STUDIO5P idle sway helpers
+// Slow horizontal idle motion: the camera yaws around the field centre while the
+// block keeps only a residual vertical float. Pure (no three.js/DOM) — safe to unit test.
+export const IDLE_SWAY_PERIOD_S = 14;
+export const IDLE_SWAY_AMPLITUDE_DEG = 7; // studio ±7° (planner uses ±5°)
+export const IDLE_DOLLY_AMPLITUDE = 0.01; // ±1 % distance breathing
+export const IDLE_RESUME_DELAY_S = 6; // still seconds after input before motion resumes
+export const IDLE_EASE_IN_S = 1.5; // resume ramp duration
+export const IDLE_VERTICAL_SCALE = 0.2; // residual bob, ≤25 % of idleFloatOffset
+
+// Sinusoidal yaw/dolly/vertical offsets at wall-clock timeS. No gating here —
+// the caller scales by idleResumeGain() so pause/resume stays testable.
+export function idleSwayOffset(timeS, {
+  amplitudeDeg = IDLE_SWAY_AMPLITUDE_DEG,
+  periodS = IDLE_SWAY_PERIOD_S,
+  dollyAmp = IDLE_DOLLY_AMPLITUDE,
+  fieldSpanM = 30,
+  verticalScale = IDLE_VERTICAL_SCALE,
+} = {}) {
+  const zero = { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0 };
+  if (!Number.isFinite(timeS)) return zero;
+  const period = Number.isFinite(periodS) && periodS > 0 ? periodS : IDLE_SWAY_PERIOD_S;
+  const amp = Number.isFinite(amplitudeDeg) ? amplitudeDeg : IDLE_SWAY_AMPLITUDE_DEG;
+  const wave = Math.sin((timeS * 2 * Math.PI) / period);
+  const yawDeg = wave * amp;
+  const span = Number.isFinite(fieldSpanM) && fieldSpanM > 0 ? fieldSpanM : 30;
+  const scale = Number.isFinite(verticalScale) ? verticalScale : IDLE_VERTICAL_SCALE;
+  const dyAmplitude = Math.max(0.06, Math.min(0.28, span * 0.005)) * scale;
+  return {
+    yawDeg,
+    yawRad: (yawDeg * Math.PI) / 180,
+    dolly: wave * (Number.isFinite(dollyAmp) ? dollyAmp : IDLE_DOLLY_AMPLITUDE),
+    dy: Math.sin(timeS * 0.9) * dyAmplitude,
+  };
+}
+
+// Pause/resume envelope: 0 until delayS after the last input, then a smooth
+// 0→1 ramp over easeS. Instant pause, gentle return.
+export function idleResumeGain(timeSinceInputS, {
+  delayS = IDLE_RESUME_DELAY_S,
+  easeS = IDLE_EASE_IN_S,
+} = {}) {
+  if (!Number.isFinite(timeSinceInputS) || timeSinceInputS < 0) return 0;
+  const delay = Number.isFinite(delayS) && delayS >= 0 ? delayS : IDLE_RESUME_DELAY_S;
+  const ease = Number.isFinite(easeS) && easeS > 0 ? easeS : IDLE_EASE_IN_S;
+  if (timeSinceInputS < delay) return 0;
+  if (timeSinceInputS >= delay + ease) return 1;
+  const x = (timeSinceInputS - delay) / ease;
+  return 0.5 - 0.5 * Math.cos(Math.PI * x);
+}
+
+// Combined idle state: gated sinusoid plus the envelope gain. Dragging,
+// reduced motion, or a hidden tab parks everything at zero.
+export function idleCameraSway(timeS, timeSinceInputS, opts = {}) {
+  const {
+    isDragging = false,
+    prefersReducedMotion = false,
+    hidden = false,
+  } = opts;
+  const gain = isDragging || prefersReducedMotion || hidden
+    ? 0
+    : idleResumeGain(timeSinceInputS, opts);
+  if (gain <= 0) return { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0, gain: 0 };
+  const { yawDeg, yawRad, dolly, dy } = idleSwayOffset(timeS, opts);
+  return { yawDeg: yawDeg * gain, yawRad: yawRad * gain, dolly: dolly * gain, dy: dy * gain, gain };
 }
 
 // ------------------------------------------------------------- STUDIO5A helpers

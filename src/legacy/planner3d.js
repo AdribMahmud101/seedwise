@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { buildStudioData, FAO56_CROP_LIMITS } from "./studiodata.js";
 import {
-  outlineBounds, ringSignedArea, canopyVisualHeight, idleFloatOffset,
+  outlineBounds, ringSignedArea, canopyVisualHeight, idleCameraSway,
+  IDLE_RESUME_DELAY_S,
   fitCameraToBlock, fitTopView, plannerRowLayout,
 } from "./planner3d-helpers.js";
 import {
@@ -844,6 +845,14 @@ function buildShadow(data) {
 
 let floatGroup = null; // idle-float parent for block and plants
 let isDragging = false;
+// STUDIO5P idle sway: same slow horizontal camera motion as the studio at the
+// planner's ±5° amplitude. The camera part is a transient offset applied after
+// controls.update() and restored right after the frame renders, so it never
+// fights OrbitControls.
+let idleLastInputMs = -1e13; // last user input; sway resumes 6 s after, easing in over 1.5 s
+let idleBasePos = null; // camera position saved before the transient sway offset
+let idleHasOffset = false;
+let idleListenersBound = false;
 function ensureFloatGroup() {
   if (!scene) return;
   if (!floatGroup || floatGroup.parent !== scene) {
@@ -853,24 +862,78 @@ function ensureFloatGroup() {
   }
 }
 
-// Apply an idle hover/drift to the block and plants. Shadow stays put so
-// the block visibly lifts off the ground. The user dragging the orbit controls
-// freezes the offset so direct manipulation feels direct.
-function applyIdleFloat(timeS) {
+function restoreIdleCamera() {
+  if (idleHasOffset && cameraPersp && idleBasePos) {
+    cameraPersp.position.copy(idleBasePos);
+  }
+  idleHasOffset = false;
+}
+
+// Any pointer / wheel / key interaction parks the sway instantly.
+function markIdleInput() {
+  idleLastInputMs = performance.now();
+  restoreIdleCamera();
+  if (floatGroup) floatGroup.position.y = 0;
+}
+
+function bindIdleListeners() {
+  if (idleListenersBound || !canvasHostEl) return;
+  idleListenersBound = true;
+  canvasHostEl.addEventListener("pointerdown", markIdleInput, { capture: true, passive: true });
+  canvasHostEl.addEventListener("wheel", markIdleInput, { capture: true, passive: true });
+  window.addEventListener("keydown", markIdleInput);
+}
+
+function unbindIdleListeners() {
+  if (!idleListenersBound) return;
+  idleListenersBound = false;
+  try {
+    canvasHostEl?.removeEventListener("pointerdown", markIdleInput, { capture: true });
+    canvasHostEl?.removeEventListener("wheel", markIdleInput, { capture: true });
+  } catch (e) {}
+  try {
+    window.removeEventListener("keydown", markIdleInput);
+  } catch (e) {}
+}
+
+// Slow horizontal yaw sway of the camera around the field centre (±5°, 14 s
+// period) plus a tiny ±1 % dolly breathing; the block itself keeps only a
+// residual vertical float (≤25 % of the old bob) so its shadow stays put.
+// Pauses instantly on input, stays off under prefers-reduced-motion, while
+// dragging, or when the tab is hidden.
+function applyIdleFloat(timeS, nowMs = performance.now()) {
+  restoreIdleCamera();
   if (!floatGroup) return;
+  const hidden = typeof document !== "undefined" && document.hidden;
+  if (prefersReducedMotion || hidden || isDragging) {
+    floatGroup.position.set(0, 0, 0);
+    floatGroup.rotation.set(0, 0, 0);
+    return;
+  }
   const span = currentBlock.bounds
     ? Math.max(currentBlock.bounds.width, currentBlock.bounds.height)
     : 30;
-  const { dy, yaw } = idleFloatOffset(timeS, span, isDragging, prefersReducedMotion);
-  floatGroup.position.y = dy;
-  if (currentBlock.bounds) {
-    const cx = currentBlock.bounds.cx;
-    const cz = -currentBlock.bounds.cy;
-    floatGroup.position.x = cx * (1 - Math.cos(yaw)) + cz * Math.sin(yaw);
-    floatGroup.position.z = cz * (1 - Math.cos(yaw)) - cx * Math.sin(yaw);
-    floatGroup.rotation.y = yaw;
-  } else {
-    floatGroup.rotation.y = yaw;
+  const sway = idleCameraSway(timeS, (nowMs - idleLastInputMs) / 1000, { fieldSpanM: span });
+  if (sway.gain <= 0) {
+    floatGroup.position.set(0, 0, 0);
+    floatGroup.rotation.set(0, 0, 0);
+    return;
+  }
+  floatGroup.position.set(0, sway.dy, 0);
+  floatGroup.rotation.set(0, 0, 0);
+  if (cameraPersp && controls && activeCamera === cameraPersp && !isTopView
+    && (sway.yawRad !== 0 || sway.dolly !== 0)) {
+    if (!idleBasePos) idleBasePos = new THREE.Vector3();
+    idleBasePos.copy(cameraPersp.position);
+    const target = controls.target;
+    const offset = cameraPersp.position.clone().sub(target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.theta += sway.yawRad;
+    spherical.radius *= 1 + sway.dolly;
+    offset.setFromSpherical(spherical);
+    cameraPersp.position.copy(target).add(offset);
+    cameraPersp.lookAt(target);
+    idleHasOffset = true;
   }
 }
 
@@ -929,6 +992,7 @@ function setupControls() {
   controls.addEventListener("change", requestRender);
   controls.addEventListener("start", () => {
     isDragging = true;
+    markIdleInput();
     stopIntroAnimation(true);
     if (floatGroup) {
       // Settle the group back to rest while the user is dragging.
@@ -1246,6 +1310,8 @@ function updateIntroFrame(elapsedMs) {
 
   if (progress >= 1.0) {
     stopIntroAnimation(true);
+    // STUDIO5P: fade the idle sway in over 1.5 s from the exact end framing.
+    idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
   }
 }
 
@@ -1270,12 +1336,16 @@ function startAnimation() {
     animFrameId = requestAnimationFrame(loop);
     if (introAnim) {
       const now = performance.now();
+      restoreIdleCamera();
       updateIntroFrame(now - introAnim.startTime);
-    } else {
-      applyIdleFloat(time / 1000);
     }
     controls.update();
+    // Idle sway is a transient offset on top of the user's camera: applied
+    // after controls.update() and restored right after the frame renders.
+    if (!introAnim) applyIdleFloat(time / 1000);
+    else restoreIdleCamera();
     renderer.render(scene, activeCamera);
+    restoreIdleCamera();
   };
   animFrameId = requestAnimationFrame(loop);
 }
@@ -1287,8 +1357,10 @@ function stopAnimation() {
 
 function onVisibilityChange() {
   isVisible = inViewport && !document.hidden;
-  if (isVisible) startAnimation();
-  else {
+  if (isVisible) {
+    idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
+    startAnimation();
+  } else {
     stopIntroAnimation(true);
     stopAnimation();
   }
@@ -1297,6 +1369,7 @@ function onVisibilityChange() {
 function onMotionChange() {
   prefersReducedMotion = motionQuery?.matches || false;
   if (controls) controls.enableDamping = !prefersReducedMotion;
+  idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
   applyIdleFloat(0);
   startAnimation();
   requestRender();
@@ -1360,6 +1433,9 @@ export async function mountPlanner3d(host, input) {
   requestRender();
   onVisibilityChange();
   if (!isTopView) triggerIntroAnimation();
+  // When the intro is skipped the sway fades in from the default framing.
+  if (!introAnim) idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
+  bindIdleListeners();
 }
 
 export function disposePlanner3d() {
@@ -1374,6 +1450,9 @@ export function disposePlanner3d() {
   document.removeEventListener("visibilitychange", onVisibilityChange);
   motionQuery?.removeEventListener("change", onMotionChange);
   motionQuery = null;
+  unbindIdleListeners();
+  idleHasOffset = false;
+  idleBasePos = null;
   if (canvasHostEl) {
     canvasHostEl.onkeydown = null;
     canvasHostEl.closest(".planner3d-stage-wrap")?.classList.remove("planner3d-ready");

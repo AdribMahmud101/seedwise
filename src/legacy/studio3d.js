@@ -48,7 +48,9 @@ import {
   pointInPolygon,
   ringSignedArea,
   canopyVisualHeight,
-  idleFloatOffset,
+  idleCameraSway,
+  IDLE_RESUME_DELAY_S,
+  solveFramingMultiplier,
   surfaceGridPositions,
   pondingPositions,
   waterTablePositions,
@@ -1865,6 +1867,15 @@ class SoftwareRenderer {
 
 let floatGroup = null; // idle-float parent for block, plants, roots
 let isDragging = false;
+// STUDIO5P idle sway: the camera slowly yaws around the field centre while the
+// block keeps only a residual vertical float. The camera part is a transient
+// offset applied after controls.update() and restored right after the frame
+// renders, so it never fights OrbitControls.
+let idleLastInputMs = -1e13; // last user input; sway resumes 6 s after, easing in over 1.5 s
+let idleBasePos = null; // camera position saved before the transient sway offset
+let idleHasOffset = false;
+let idleActiveNow = false;
+let idleListenersBound = false;
 function ensureFloatGroup() {
   if (!scene) return;
   if (!floatGroup || floatGroup.parent !== scene) {
@@ -1874,24 +1885,82 @@ function ensureFloatGroup() {
   }
 }
 
-// Apply an idle hover/drift to the block + plants + roots. Shadow stays put so
-// the block visibly lifts off the ground. The user dragging the orbit controls
-// freezes the offset so direct manipulation feels direct.
-function applyIdleFloat(timeS) {
+function restoreIdleCamera() {
+  if (idleHasOffset && cameraPersp && idleBasePos) {
+    cameraPersp.position.copy(idleBasePos);
+  }
+  idleHasOffset = false;
+}
+
+// Any pointer / wheel / key / control interaction parks the sway instantly.
+function markIdleInput() {
+  idleLastInputMs = performance.now();
+  idleActiveNow = false;
+  restoreIdleCamera();
+  if (floatGroup) floatGroup.position.y = 0;
+  sync3DCallouts();
+}
+
+function bindIdleListeners() {
+  if (idleListenersBound || !containerEl) return;
+  idleListenersBound = true;
+  containerEl.addEventListener("pointerdown", markIdleInput, { capture: true, passive: true });
+  containerEl.addEventListener("wheel", markIdleInput, { capture: true, passive: true });
+  window.addEventListener("keydown", markIdleInput);
+}
+
+function unbindIdleListeners() {
+  if (!idleListenersBound) return;
+  idleListenersBound = false;
+  try {
+    containerEl?.removeEventListener("pointerdown", markIdleInput, { capture: true });
+    containerEl?.removeEventListener("wheel", markIdleInput, { capture: true });
+  } catch (e) {}
+  try {
+    window.removeEventListener("keydown", markIdleInput);
+  } catch (e) {}
+}
+
+// Slow horizontal yaw sway of the camera around the field centre (±7°, 14 s
+// period) plus a tiny ±1 % dolly breathing; the block itself keeps only a
+// residual vertical float (≤25 % of the old bob) so its shadow stays put.
+// Pauses instantly on input, stays off under prefers-reduced-motion, while
+// dragging, or when the tab is hidden.
+function applyIdleFloat(timeS, nowMs = performance.now()) {
+  restoreIdleCamera();
+  idleActiveNow = false;
   if (!floatGroup) return;
+  const hidden = typeof document !== "undefined" && document.hidden;
+  if (prefersReducedMotion || hidden || isDragging) {
+    floatGroup.position.set(0, 0, 0);
+    floatGroup.rotation.set(0, 0, 0);
+    return;
+  }
   const span = currentBlock.bounds
     ? Math.max(currentBlock.bounds.width, currentBlock.bounds.height)
     : 30;
-  const { dy, yaw } = idleFloatOffset(timeS, span, isDragging, prefersReducedMotion);
-  floatGroup.position.y = dy;
-  if (currentBlock.bounds) {
-    const cx = currentBlock.bounds.cx;
-    const cz = -currentBlock.bounds.cy;
-    floatGroup.position.x = cx * (1 - Math.cos(yaw)) + cz * Math.sin(yaw);
-    floatGroup.position.z = cz * (1 - Math.cos(yaw)) - cx * Math.sin(yaw);
-    floatGroup.rotation.y = yaw;
-  } else {
-    floatGroup.rotation.y = yaw;
+  const sway = idleCameraSway(timeS, (nowMs - idleLastInputMs) / 1000, { fieldSpanM: span });
+  if (sway.gain <= 0) {
+    floatGroup.position.set(0, 0, 0);
+    floatGroup.rotation.set(0, 0, 0);
+    return;
+  }
+  idleActiveNow = true;
+  floatGroup.position.set(0, sway.dy, 0);
+  floatGroup.rotation.set(0, 0, 0);
+  if (cameraPersp && controls && activeCamera === cameraPersp && !isTopView
+    && (sway.yawRad !== 0 || sway.dolly !== 0)) {
+    if (!idleBasePos) idleBasePos = new THREE.Vector3();
+    idleBasePos.copy(cameraPersp.position);
+    const target = controls.target;
+    const offset = cameraPersp.position.clone().sub(target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.theta += sway.yawRad;
+    spherical.radius *= 1 + sway.dolly;
+    offset.setFromSpherical(spherical);
+    cameraPersp.position.copy(target).add(offset);
+    cameraPersp.lookAt(target);
+    idleHasOffset = true;
   }
 }
 
@@ -1948,6 +2017,7 @@ function setupControls() {
   controls.addEventListener("change", requestRender);
   controls.addEventListener("start", () => {
     isDragging = true;
+    markIdleInput();
     stopIntroAnimation(true);
     if (floatGroup) {
       // Settle the group back to rest while the user is dragging.
@@ -2053,14 +2123,43 @@ function fitPerspective(data, close = false) {
     margin: close ? 0.14 : margin,
   });
 
-  // Block fills ~55-60 % of canvas width on desktop; ~85 % on phone.
+  // STUDIO5P: the default 3D-field framing fills ~70-75 % of the canvas width
+  // on desktop and ~90 % on phone. The solver backs off until the whole block
+  // fits, so arbitrary drawn boundaries stay fully visible. Close-up/Top unchanged.
   // Shift target down to center the block in the frame below the UI
   const isDesktop = !isPhone();
-  const distance = close
-    ? fit.distance * 0.72
-    : isDesktop
-      ? fit.distance * 1.0
-      : fit.distance * 0.75;
+  let distance;
+  let phoneVox = 0;
+  if (close) {
+    distance = fit.distance * 0.72;
+  } else if (isDesktop) {
+    distance = fit.distance * solveFramingMultiplier({
+      outlineM: data.field.outlineM,
+      depthM: depth,
+      fovDeg: cameraPersp.fov,
+      aspect: hostAspect(),
+      elevationDeg,
+      yawDeg,
+      margin,
+      targetFrac: 0.72,
+      viewOffsetX: 0.5 - 0.66,
+      viewOffsetY: 0.5 - 0.56,
+    }).multiplier;
+  } else {
+    const solved = solveFramingMultiplier({
+      outlineM: data.field.outlineM,
+      depthM: depth,
+      fovDeg: cameraPersp.fov,
+      aspect: hostAspect(),
+      elevationDeg,
+      yawDeg,
+      margin,
+      targetFrac: 0.9,
+      centerX: true,
+    });
+    distance = fit.distance * solved.multiplier;
+    phoneVox = solved.viewOffsetX;
+  }
   const el = (elevationDeg * Math.PI) / 180;
   const yaw = (yawDeg * Math.PI) / 180;
   const target = [fit.target[0], -depth * 0.45, fit.target[2]];
@@ -2075,13 +2174,18 @@ function fitPerspective(data, close = false) {
     const w = canvasHostEl.clientWidth || 600;
     const h = canvasHostEl.clientHeight || 400;
     cameraPersp.setViewOffset(w, h, (0.5 - 0.66) * w, (0.5 - 0.56) * h, w, h);
+  } else if (!isDesktop && !close && canvasHostEl) {
+    // Small bounded horizontal shift keeps the ~90 % phone framing centred.
+    const w = canvasHostEl.clientWidth || 600;
+    const h = canvasHostEl.clientHeight || 400;
+    cameraPersp.setViewOffset(w, h, phoneVox * w, 0, w, h);
   } else {
     cameraPersp.clearViewOffset();
   }
   cameraPersp.updateProjectionMatrix();
 
   controls.target.set(target[0], target[1], target[2]);
-  controls.minDistance = close ? Math.max(2, fit.distance * 0.18) : Math.max(3, fit.distance * 0.62);
+  controls.minDistance = close ? Math.max(2, fit.distance * 0.18) : Math.max(3, fit.distance * 0.4);
   controls.maxDistance = fit.distance * 2.8;
   controls.maxPolarAngle = Math.PI / 2 - 0.04;
   controls.update();
@@ -2851,6 +2955,8 @@ function updateIntroFrame(elapsedMs) {
 
   if (progress >= 1.0) {
     stopIntroAnimation(true);
+    // STUDIO5P: fade the idle sway in over 1.5 s from the exact end framing.
+    idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
   }
 }
 
@@ -2877,9 +2983,8 @@ function startAnimation() {
 
     if (introAnim) {
       const now = performance.now();
+      restoreIdleCamera();
       updateIntroFrame(now - introAnim.startTime);
-    } else {
-      applyIdleFloat(t);
     }
 
     // Smooth camera easing towards focused band
@@ -2897,8 +3002,14 @@ function startAnimation() {
     }
 
     controls?.update();
+    // Idle sway is a transient offset on top of the user's camera: applied
+    // after controls.update() and restored right after the frame renders.
+    if (!introAnim) applyIdleFloat(t);
+    else restoreIdleCamera();
     renderer.render(scene, activeCamera);
     updateCompass();
+    if (idleActiveNow) sync3DCallouts();
+    restoreIdleCamera();
   };
   animFrameId = requestAnimationFrame(loop);
 }
@@ -3440,6 +3551,9 @@ export async function mountStudio3d(container, data, opts = {}) {
     setupVisibilityObserver(container);
     startAnimation();
     triggerIntroAnimation();
+    // When the intro is skipped the sway fades in from the default framing.
+    if (!introAnim) idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
+    bindIdleListeners();
   } catch (err) {
     console.error("Studio3D initialization error:", err);
     showFallbackMessage(t("Failed to initialize 3D Studio.", "৩ডি স্টুডিও চালু করা যায়নি।"));
@@ -4045,6 +4159,7 @@ function setupVisibilityObserver(container) {
         const entry = entries[0];
         isVisible = entry.isIntersecting && !document.hidden;
         if (isVisible) {
+          idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
           startAnimation();
           requestRender();
         } else {
@@ -4061,6 +4176,7 @@ function setupVisibilityObserver(container) {
 function onVisibilityChange() {
   isVisible = !document.hidden;
   if (isVisible) {
+    idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
     startAnimation();
     requestRender();
   } else {
@@ -4084,6 +4200,9 @@ export function disposeStudio3d() {
     resizeObserver = null;
   }
   document.removeEventListener("visibilitychange", onVisibilityChange);
+  unbindIdleListeners();
+  idleHasOffset = false;
+  idleBasePos = null;
 
   if (scene) {
     scene.traverse((obj) => {
