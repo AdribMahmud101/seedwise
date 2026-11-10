@@ -596,3 +596,52 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
   };
 }
 
+/**
+ * Layout callout labels in a vertical column without overlapping,
+ * sorted by depth order and separated by minGap.
+ * Clamped within [topPadding, containerHeight - bottomPadding].
+ */
+export function deoverlapLabels(items, containerHeight, minGap = 8, topPadding = 16, bottomPadding = 16) {
+  if (!items || items.length === 0) return [];
+  const res = items
+    .map((it) => ({
+      ...it,
+      height: it.height || 36,
+      y: (it.anchorY != null ? it.anchorY : 0) - (it.height || 36) / 2,
+    }))
+    .sort((a, b) => (a.order ?? a.anchorY ?? 0) - (b.order ?? b.anchorY ?? 0));
+
+  for (let i = 0; i < res.length; i++) {
+    if (i === 0) {
+      res[i].y = Math.max(topPadding, res[i].y);
+    } else {
+      const prevBottom = res[i - 1].y + res[i - 1].height;
+      if (res[i].y < prevBottom + minGap) {
+        res[i].y = prevBottom + minGap;
+      }
+    }
+  }
+
+  const maxAllowedBottom = containerHeight - bottomPadding;
+  const last = res[res.length - 1];
+  if (last.y + last.height > maxAllowedBottom) {
+    last.y = maxAllowedBottom - last.height;
+    for (let i = res.length - 2; i >= 0; i--) {
+      const nextTop = res[i + 1].y;
+      if (res[i].y + res[i].height > nextTop - minGap) {
+        res[i].y = nextTop - minGap - res[i].height;
+      }
+    }
+    if (res[0].y < topPadding) {
+      res[0].y = topPadding;
+      for (let i = 1; i < res.length; i++) {
+        const prevBottom = res[i - 1].y + res[i - 1].height;
+        if (res[i].y < prevBottom + minGap) {
+          res[i].y = prevBottom + minGap;
+        }
+      }
+    }
+  }
+  return res;
+}
+
