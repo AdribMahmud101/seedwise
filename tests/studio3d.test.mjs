@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { rotations, posterCard } from "../src/legacy/rotations.js";
+import { rotations, studioSkeletonCard } from "../src/legacy/rotations.js";
 import { studio3dHtml } from "../src/legacy/studio3d.js";
 import { buildStudioData } from "../src/legacy/studiodata.js";
 import { state, t } from "../src/legacy/ui.js";
@@ -11,11 +11,23 @@ const fixture = JSON.parse(
   await readFile(new URL("fixtures/studio-data.json", import.meta.url), "utf8")
 );
 
-test("poster renders without importing three.js", () => {
-  const html = posterCard();
-  assert.match(html, /Your field, season by season/);
-  assert.match(html, /Open 3D studio/);
-  assert.match(html, /3D · ~180 KB · then works offline/);
+test("skeleton renders without importing three.js", () => {
+  const html = studioSkeletonCard();
+  assert.match(html, /studio-skeleton-root/);
+  assert.match(html, /Building your field…/);
+  assert.match(html, /studio-skeleton-fill/);
+  assert.match(html, /studio-skeleton-iso/);
+  assert.doesNotMatch(html, /Open 3D studio/);
+  assert.doesNotMatch(html, /studio-poster/);
+});
+
+test("rotations view embeds the skeleton, not the poster", () => {
+  state.lang = "en";
+  const html = rotations();
+  assert.match(html, /id="studio-3d-host"/);
+  assert.match(html, /studio-skeleton-root/);
+  assert.doesNotMatch(html, /studio-poster-root/);
+  assert.doesNotMatch(html, /open-studio3d/);
 });
 
 test("three stays behind the two lazy 3D entry modules", async () => {

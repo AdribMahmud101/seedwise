@@ -179,26 +179,54 @@ function rankedCards() {
 }
 
 /**
- * Poster card for studio
+ * Skeleton shown in place of the 3D stage until the first frame renders.
+ * Same height as the stage so the swap does not move the page.
  */
-function posterCard() {
-  return `<section class="studio-poster" id="studio-poster-root">
-    <div class="studio-poster-inner">
-      <div class="studio-poster-badge">✦ ${t('Interactive 3D Field', 'ইন্টারেক্টিভ ৩ডি জমি')}</div>
-      <h2>${t('Your field, season by season', 'আপনার জমি, মৌসুম ধরে ধরে')}</h2>
-      <p class="studio-poster-desc">${t('Watch real crops grow on your plot with 3D soil cutaway, root depth and NASA/Sentinel environmental observations.', 'মাটির গভীরতা, ফসলের শিকড় ও নাসার তথ্যের সাথে আপনার জমিতে ফসলচক্রের বাস্তব দৃশ্য দেখুন।')}</p>
-      <div class="studio-poster-actions">
-        <button class="button primary" data-action="open-studio3d">${t('Open 3D studio', '৩ডি স্টুডিও খুলুন')}</button>
-        <span class="studio-poster-note">${t('3D · ~180 KB · then works offline', '৩ডি · ~১৮০ কেবি · এরপর অফলাইনেও চলবে')}</span>
+export function studioSkeletonCard() {
+  return `<section class="studio-skeleton" id="studio-skeleton-root" role="status" aria-busy="true" aria-label="${t('Loading 3D field studio', '৩ডি মাঠ স্টুডিও লোড হচ্ছে')}">
+    <div class="studio-skeleton-block" aria-hidden="true">
+      <div class="studio-skeleton-iso">
+        <div class="studio-skeleton-top"></div>
+        <div class="studio-skeleton-side"></div>
       </div>
     </div>
-    <div class="studio-poster-art" aria-hidden="true">
-      <div class="art-field-block">
-        <div class="art-field-top"></div>
-        <div class="art-field-side"></div>
-      </div>
-    </div>
+    <p class="studio-skeleton-text">${t('Building your field…', 'জমির ৩ডি মডেল তৈরি হচ্ছে…')}</p>
+    <div class="studio-skeleton-bar" aria-hidden="true"><span class="studio-skeleton-fill" style="width:4%"></span></div>
   </section>`;
+}
+
+/**
+ * Static fallback when the device has no WebGL. The soil strip and question
+ * panels below the stage are independent and keep working.
+ */
+function studioNoWebglCard() {
+  return `<section class="studio-no-webgl" id="studio-no-webgl-root">
+    <div class="studio-skeleton-block" aria-hidden="true">
+      <div class="studio-skeleton-iso">
+        <div class="studio-skeleton-top"></div>
+        <div class="studio-skeleton-side"></div>
+      </div>
+    </div>
+    <p class="studio-skeleton-text">${t('3D not supported on this device', 'এই ডিভাইসে ৩ডি সমর্থিত নয়')}</p>
+  </section>`;
+}
+
+// Local WebGL probe so rotations.js never statically imports three.js.
+function webglAvailable() {
+  try {
+    const c = document.createElement('canvas');
+    return Boolean(
+      window.WebGLRenderingContext &&
+        (c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function setSkeletonProgress(host, frac) {
+  const fill = host?.querySelector('.studio-skeleton-fill');
+  if (fill) fill.style.width = `${Math.max(0, Math.min(100, Math.round(frac * 100)))}%`;
 }
 
 /**
@@ -550,16 +578,54 @@ function panelWhatIsUnderMyField() {
 /**
  * Open 3D Studio
  */
+let studioBuildToken = 0;
 export async function openStudio3d() {
   studioOpened = true;
   const host = document.querySelector('#studio-3d-host');
   if (!host) return;
 
+  if (!webglAvailable()) {
+    host.innerHTML = studioNoWebglCard();
+    return;
+  }
+
+  const buildToken = ++studioBuildToken;
   const f = field();
   const rotId = getSelectedRotationId();
+  const skeleton = host.querySelector('#studio-skeleton-root');
+  const hasStagedEnter = Boolean(host.querySelector('.studio-stage-enter'));
+  let forceTimer = null;
+
+  // Swap the skeleton for the mounted stage: pin the skeleton over the stage
+  // area and cross-fade (200 ms; instant under reduced motion). Idempotent.
+  let revealed = false;
+  const reveal = () => {
+    if (revealed) return;
+    revealed = true;
+    if (forceTimer) clearTimeout(forceTimer);
+    const stage = host.querySelector('.studio-stage-enter');
+    if (!stage || !skeleton?.isConnected) return;
+    stage.classList.add('studio-stage-entered');
+    const canvasHost = stage.querySelector('.studio-stage-canvas-host');
+    if (canvasHost) {
+      const hostRect = host.getBoundingClientRect();
+      const stageRect = canvasHost.getBoundingClientRect();
+      skeleton.style.top = `${Math.max(0, stageRect.top - hostRect.top)}px`;
+      skeleton.style.height = `${Math.max(0, stageRect.height)}px`;
+    }
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduceMotion) {
+      skeleton.remove();
+      return;
+    }
+    skeleton.classList.add('studio-skeleton-cover', 'studio-skeleton-fade');
+    setTimeout(() => skeleton.remove(), 220);
+  };
 
   try {
+    if (skeleton) setSkeletonProgress(host, 0.12);
     const { studioModule: mod, studioDataModule: dataMod } = await loadStudio3dModules();
+    if (skeleton) setSkeletonProgress(host, 0.35);
     const studioData = dataMod.buildStudioData({
       field: f,
       polygon: polygon(),
@@ -583,9 +649,29 @@ export async function openStudio3d() {
         openStudio3d();
       },
     };
-    host.innerHTML = mod.studio3dHtml(studioData, initialMonth, opts);
-    await mod.mountStudio3d(host, studioData, opts);
+    if (buildToken !== studioBuildToken) return; // superseded by a newer open
+    if (skeleton && !hasStagedEnter) {
+      // Mount behind the skeleton, then reveal on the first rendered frame.
+      setSkeletonProgress(host, 0.65);
+      const stage = document.createElement('div');
+      stage.className = 'studio-stage-enter';
+      stage.innerHTML = mod.studio3dHtml(studioData, initialMonth, opts);
+      host.insertBefore(stage, skeleton);
+      setSkeletonProgress(host, 0.85);
+      forceTimer = setTimeout(reveal, 4000);
+      await mod.mountStudio3d(stage, studioData, {
+        ...opts,
+        onFirstFrame: () => {
+          setSkeletonProgress(host, 1);
+          reveal();
+        },
+      });
+    } else {
+      host.innerHTML = mod.studio3dHtml(studioData, initialMonth, opts);
+      await mod.mountStudio3d(host, studioData, opts);
+    }
   } catch (err) {
+    if (forceTimer) clearTimeout(forceTimer);
     console.error('Failed to load studio3d:', err);
     host.innerHTML = `<div class="studio-fallback-msg">${t('Failed to load 3D studio.', '৩ডি স্টুডিও লোড হতে সমস্যা হয়েছে।')}</div>`;
   }
@@ -610,7 +696,7 @@ function rotations() {
         button(t('Field plan', 'জমির পরিকল্পনা'), 'print', 'secondary-action', 'print')
     ) +
     chips() +
-    `<div id="studio-3d-host">${posterCard()}</div>` +
+    `<div id="studio-3d-host">${studioSkeletonCard()}</div>` +
     `<div id="rotation-question-panels" class="rotation-question-panels-row">` +
       panelWhenBareOrStressed(null) +
       panelWhereWillWaterCollect() +
@@ -714,20 +800,22 @@ export async function mountRotations() {
     return;
   }
 
-  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
-  const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData;
-
-  if (isDesktop && !saveData && 'IntersectionObserver' in window) {
-    const poster = document.querySelector('#studio-poster-root');
-    if (poster) {
-      const obs = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-          obs.disconnect();
-          openStudio3d();
-        }
-      }, { threshold: 0.1 });
-      obs.observe(poster);
-    }
+  // Lazy-load three.js + data when the stage is near the viewport; the
+  // skeleton holds the layout until the first frame. No poster anywhere.
+  const host = document.querySelector('#studio-3d-host');
+  if (host && !webglAvailable()) {
+    host.innerHTML = studioNoWebglCard();
+  } else if (host && 'IntersectionObserver' in window) {
+    const target = host.querySelector('#studio-skeleton-root') || host;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        obs.disconnect();
+        openStudio3d();
+      }
+    }, { rootMargin: '200px' });
+    obs.observe(target);
+  } else if (host) {
+    openStudio3d();
   }
 
   rotationTool.initRotationPanels();
@@ -846,9 +934,6 @@ function method() {
  * Handle rotation actions
  */
 function rotationAction(action, value) {
-  if (action === 'open-studio3d') {
-    openStudio3d();
-  }
   if (action === 'preview-3d') {
     activeRotationId = value;
     openStudio3d();
@@ -934,4 +1019,4 @@ function rotationInput(el) {
 // Initialize soil overrides
 rotationTool.initSoilOverrides();
 
-export { rotations, rotationAction, rotationInput, posterCard };
+export { rotations, rotationAction, rotationInput };

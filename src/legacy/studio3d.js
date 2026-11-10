@@ -214,6 +214,105 @@ function whenReducedMotion() {
   );
 }
 
+/* ------------------------------------------- STUDIO5T phone gesture split */
+
+// Map-style gesture split for phones: a vertical one-finger drag scrolls the
+// page natively (canvas touch-action: pan-y) while a horizontal drag rotates
+// the field and two fingers pinch/tilt. Pure — unit tested.
+export const TOUCH_INTENT_THRESHOLD_PX = 10;
+export function touchGestureIntent(dx, dy, threshold = TOUCH_INTENT_THRESHOLD_PX) {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return "undecided";
+  if (Math.hypot(dx, dy) < threshold) return "undecided";
+  return Math.abs(dx) > Math.abs(dy) ? "rotate" : "scroll";
+}
+
+let touchSplitEnabled = false;
+let isFullscreenStage = false;
+let touchGesture = null; // { mode: "undecided" | "rotate" | "scroll" | "pinch", ... }
+let touchHintTimer = null;
+
+function isTouchSplitActive() {
+  if (isFullscreenStage) return false;
+  if (typeof window === "undefined") return false;
+  const narrow = canvasHostEl ? (canvasHostEl.clientWidth || 0) < 600 : window.innerWidth < 600;
+  if (narrow) return true;
+  try {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
+}
+
+function applyTouchMode() {
+  touchSplitEnabled = isTouchSplitActive();
+  if (!controls || !canvas) return;
+  if (touchSplitEnabled) {
+    // OrbitControls sets touch-action: none on connect; relax it so vertical
+    // one-finger drags scroll the page natively instead.
+    canvas.style.touchAction = "pan-y";
+    // One finger is handled by the gesture split below (ONE falls through to
+    // OrbitControls' STATE.NONE default). Two fingers keep pinch zoom and tilt
+    // (polar) within the existing distance/polar limits; top view keeps pan.
+    controls.touches.ONE = null;
+    controls.touches.TWO = controls.enableRotate === false ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE;
+  } else {
+    canvas.style.touchAction = "none";
+    controls.touches.ONE = THREE.TOUCH.ROTATE;
+    controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+  }
+}
+
+// One-finger horizontal rotate for the gesture split: azimuth only, mirroring
+// OrbitControls' touch speed (2π per canvas height) and direction.
+function rotateAzimuthByPixels(dxPx) {
+  if (!controls || !activeCamera || !canvas) return;
+  if (controls.enableRotate === false) return;
+  const heightPx = Math.max(1, canvas.clientHeight || 600);
+  const angle = (2 * Math.PI * dxPx * (controls.rotateSpeed || 1)) / heightPx;
+  const offset = activeCamera.position.clone().sub(controls.target);
+  const spherical = new THREE.Spherical().setFromVector3(offset);
+  spherical.theta -= angle;
+  offset.setFromSpherical(spherical);
+  activeCamera.position.copy(controls.target).add(offset);
+  activeCamera.lookAt(controls.target);
+  requestRender();
+}
+
+function endTouchRotate() {
+  isDragging = false;
+  startAnimation();
+  requestRender();
+}
+
+function showTouchHint() {
+  if (!containerEl || !touchSplitEnabled) return;
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem("ropon_studio_touch_hint") === "1";
+  } catch {
+    seen = false;
+  }
+  if (seen) return;
+  try {
+    sessionStorage.setItem("ropon_studio_touch_hint", "1");
+  } catch {
+    // Private mode: still show the hint once per mount.
+  }
+  const hint = containerEl.querySelector(".studio-touch-hint");
+  if (!hint) return;
+  hint.hidden = false;
+  void hint.offsetWidth; // force reflow so the fade-in transition runs
+  hint.classList.add("visible");
+  if (touchHintTimer) clearTimeout(touchHintTimer);
+  touchHintTimer = setTimeout(() => {
+    touchHintTimer = null;
+    hint.classList.remove("visible");
+    if (prefersReducedMotion) hint.hidden = true;
+    else touchHintTimer = setTimeout(() => { touchHintTimer = null; hint.hidden = true; }, 350);
+  }, 2500);
+}
+
 /* --------------------------------------------------------- soil and colour */
 
 // FAO texture-triangle grouping used to shade soil-layer bands.
@@ -2008,6 +2107,7 @@ function setupControls() {
     isDragging = false;
     startAnimation();
   });
+  applyTouchMode();
 }
 
 function initThree(host) {
@@ -2132,10 +2232,17 @@ function fitPerspective(data, close = false) {
   // STUDIO5Q: overlay clearance now caps that zoom, including terrain and sway.
   const space = studioFreeRegion();
   const canopy = canopyVisualHeight(data.months[currentMonthIdx], Math.max(b.width, b.height));
+  // STUDIO5T: on phones the span*0.08 air above the crops (≈2× the soil depth)
+  // pushed the visible block low with empty space above it. Fit the phone
+  // envelope to the real canopy so the block centres in the free area; the
+  // width still binds the zoom at ~88 %.
+  const topSlack = phone
+    ? Math.max(canopy, Math.max(b.width, b.height) * 0.01)
+    : Math.max(canopy, Math.max(b.width, b.height) * 0.08);
   const solved = close && !phone ? null : solveFramingMultiplier({
     outlineM: data.field.outlineM, depthM: depth, fovDeg: cameraPersp.fov,
     aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.88 : 0.6,
-    region: space.region, topM: currentBlock.topMax + Math.max(canopy, Math.max(b.width, b.height) * 0.08),
+    region: space.region, topM: currentBlock.topMax + topSlack,
     bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
   });
   if (phone) {
@@ -2171,6 +2278,7 @@ function fitPerspective(data, close = false) {
   controls.maxDistance = Math.max(fit.distance * 2.8, distance * 1.5);
   controls.maxPolarAngle = Math.PI / 2 - 0.04;
   controls.update();
+  applyTouchMode();
 
   return {
     target,
@@ -2216,6 +2324,7 @@ function fitOrtho(data) {
   controls.maxZoom = 8;
   controls.enableRotate = false;
   controls.update();
+  applyTouchMode();
 }
 
 function fitCameras(data) {
@@ -2240,6 +2349,7 @@ function fillPerspectiveAspect() {
 function onResize() {
   if (!renderer || !canvasHostEl) return;
   updateOverlayLayout();
+  applyTouchMode();
   const w = Math.max(1, canvasHostEl.clientWidth || 600);
   const h = Math.max(1, canvasHostEl.clientHeight || 400);
   renderer.setSize(w, h);
@@ -3198,6 +3308,8 @@ function bindStageOverlays(options) {
   const closeFullscreen = (fromHistory = false) => {
     if (!fullscreen) return;
     fullscreen = false;
+    isFullscreenStage = false;
+    applyTouchMode();
     if (document.fullscreenElement === stage) document.exitFullscreen().catch(() => {});
     if (stage.classList.contains('studio-fullscreen-fallback')) {
       stage.classList.remove('studio-fullscreen-fallback');
@@ -3238,6 +3350,10 @@ function bindStageOverlays(options) {
     if (fullscreen) { closeFullscreen(); return; }
     closeSoilPopover(false);
     fullscreen = true;
+    // No page to scroll in fullscreen: restore full one-finger orbit.
+    isFullscreenStage = true;
+    touchGesture = null;
+    applyTouchMode();
     pushOverlay('fullscreen');
     fullscreenButton.setAttribute('aria-pressed', 'true');
     try {
@@ -3521,6 +3637,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <div class="studio-compass-arrow"></div>
           <div class="studio-compass-s"></div>
         </button>
+        <div class="studio-touch-hint" hidden><span>${t("Swipe sideways to turn · two fingers to zoom", "পাশে সোয়াইপ করলে ঘোরে · দুই আঙুলে জুম হয়")}</span></div>
 
         <!-- Top-Left Surface Layer Switcher & Preset Views -->
         <div class="studio-overlay-tl">
@@ -3825,6 +3942,17 @@ export async function mountStudio3d(container, data, opts = {}) {
     bindEvents(container);
     setupVisibilityObserver(container);
     startAnimation();
+    // STUDIO5T: let the skeleton cross-fade on the first painted frame.
+    if (typeof opts.onFirstFrame === "function") {
+      const onFirstFrame = opts.onFirstFrame;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        try {
+          onFirstFrame();
+        } catch {
+          // Reveal is best-effort; rotations.js also force-reveals on timeout.
+        }
+      }));
+    }
     triggerIntroAnimation();
     // When the intro is skipped the sway fades in from the default framing.
     if (!introAnim) idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
@@ -4246,6 +4374,73 @@ function bindEvents(container) {
         requestRender();
       }
     });
+
+    // STUDIO5T gesture split: decide from the first ~10 px whether a one-finger
+    // drag rotates (horizontal) or scrolls the page (vertical, native). These
+    // listeners never preventDefault, so the browser keeps scrolling. Taps
+    // still probe via the pointerup handler above; two fingers stay with
+    // OrbitControls (pinch zoom + tilt). Mouse is unaffected.
+    // The canvas element is reused across rotation switches (no dispose), so
+    // bind once — a stacked touchmove would rotate twice per event.
+    if (canvas.dataset.touchSplitBound !== "1") {
+    canvas.dataset.touchSplitBound = "1";
+    canvas.addEventListener("touchstart", (e) => {
+      if (!touchSplitEnabled) return;
+      showTouchHint();
+      if (e.touches.length === 1) {
+        const t0 = e.touches[0];
+        touchGesture = { mode: "undecided", startX: t0.clientX, startY: t0.clientY, lastX: t0.clientX };
+      } else if (e.touches.length >= 2) {
+        // OrbitControls owns the pinch from here (it dispatched "start" and
+        // will dispatch "end"); leave isDragging alone.
+        touchGesture = { mode: "pinch" };
+      }
+    }, { passive: true });
+
+    canvas.addEventListener("touchmove", (e) => {
+      if (!touchSplitEnabled || !touchGesture || e.touches.length !== 1) return;
+      const t0 = e.touches[0];
+      if (touchGesture.mode === "undecided") {
+        const intent = touchGestureIntent(t0.clientX - touchGesture.startX, t0.clientY - touchGesture.startY);
+        if (intent === "undecided") return;
+        if (intent === "scroll" || controls?.enableRotate === false) {
+          touchGesture.mode = "scroll";
+          return;
+        }
+        touchGesture.mode = "rotate";
+        touchGesture.lastX = t0.clientX;
+        // Mirror the OrbitControls "start" listener.
+        isDragging = true;
+        markIdleInput();
+        stopIntroAnimation(true);
+        if (floatGroup) {
+          floatGroup.position.set(0, 0, 0);
+          floatGroup.rotation.set(0, 0, 0);
+        }
+      }
+      if (touchGesture.mode === "rotate") {
+        rotateAzimuthByPixels(t0.clientX - touchGesture.lastX);
+        touchGesture.lastX = t0.clientX;
+      }
+    }, { passive: true });
+
+    const endTouchGesture = (e) => {
+      if (!touchGesture) return;
+      if (touchGesture.mode === "rotate") endTouchRotate();
+      if (e.touches.length === 1) {
+        // One finger left after a pinch: allow a fresh one-finger gesture.
+        const t0 = e.touches[0];
+        touchGesture = { mode: "undecided", startX: t0.clientX, startY: t0.clientY, lastX: t0.clientX };
+      } else if (e.touches.length === 0) {
+        touchGesture = null;
+      }
+    };
+    canvas.addEventListener("touchend", endTouchGesture, { passive: true });
+    canvas.addEventListener("touchcancel", () => {
+      if (touchGesture?.mode === "rotate") endTouchRotate();
+      touchGesture = null;
+    }, { passive: true });
+    }
   }
 
   bindOverlayEvents();
@@ -4446,6 +4641,11 @@ export function disposeStudio3d() {
   }
   if (canvas?.parentNode) canvas.parentNode.removeChild(canvas);
   canvas = null;
+  touchSplitEnabled = false;
+  isFullscreenStage = false;
+  touchGesture = null;
+  if (touchHintTimer) clearTimeout(touchHintTimer);
+  touchHintTimer = null;
   scene = null;
   containerEl = null;
   canvasHostEl = null;
