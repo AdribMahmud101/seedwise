@@ -2126,7 +2126,9 @@ function studioFreeRegion() {
   const columnTop = side === 'left' ? leftTop : rightTop;
   if (!mobile) {
     const bottomHeight = Math.max(0, ...cards.map((r) => r.height)) + 40;
-    canvasHostEl.style.minHeight = `${Math.ceil(columnTop + columnHeight + bottomHeight)}px`;
+    // never grow past the visible window (owner: 3D must not be cut off); STUDIO5R replaces the tall label column
+    const fitH = Math.max(440, window.innerHeight - (parseFloat(canvasHostEl.style.getPropertyValue("--stage-top")) || 96) - 16);
+    canvasHostEl.style.minHeight = `${Math.min(fitH, Math.ceil(columnTop + columnHeight + bottomHeight))}px`;
   }
   const left = side === 'left' ? columnWidth + 28 : overlayRight + 16;
   const right = mobile ? w - 16 : side === 'right' ? w - columnWidth - 28 : w - 16;
@@ -3524,6 +3526,9 @@ export async function mountStudio3d(container, data, opts = {}) {
   const host = containerEl.querySelector(".studio-stage-canvas-host");
   if (!host) return;
   canvasHostEl = host;
+  // Fit the stage into the visible window below where it starts (owner: 3D must not be cut off on first view).
+  const pageTop = host.getBoundingClientRect().top + window.scrollY;
+  host.style.setProperty('--stage-top', `${Math.max(0, Math.min(pageTop, window.innerHeight * 0.45))}px`);
 
   let loader = host.querySelector(".studio-loading-overlay");
   if (!loader) {
