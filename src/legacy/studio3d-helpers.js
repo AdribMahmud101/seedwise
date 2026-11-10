@@ -148,6 +148,206 @@ export function surfaceCells(outline, sampleAt, resolution = 128) {
   return cells;
 }
 
+// D8 uses the steepest physical descent. A priority flood supplies spill routes across flats and pits.
+export function fieldFlow(outline, heightAt, resolution = 48) {
+  const bounds = outlineBounds(outline);
+  const cells = surfaceCells(outline, heightAt, resolution).map((c) => ({ ...c, elevation: c.value }));
+  const index = new Map(cells.map((c, i) => [`${c.row},${c.col}`, i]));
+  const neighbors = cells.map((c) => {
+    const result = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr || dc) {
+        const next = index.get(`${c.row + dr},${c.col + dc}`);
+        if (next !== undefined && pointInPolygon((c.x + cells[next].x) / 2, (c.y + cells[next].y) / 2, outline)) result.push(next);
+      }
+    }
+    return result;
+  });
+  if (!cells.length || cells.some((c) => !Number.isFinite(c.elevation))) return null;
+  const boundary = cells.map((_, i) => i).filter((i) => neighbors[i].length < 8);
+  const outlet = boundary.reduce((a, b) => cells[b].elevation < cells[a].elevation ? b : a, boundary[0]);
+  const filled = cells.map(() => Infinity), parent = cells.map(() => -1), order = [], pending = [outlet];
+  filled[outlet] = cells[outlet].elevation;
+  while (pending.length) {
+    let best = 0;
+    for (let j = 1; j < pending.length; j++) if (filled[pending[j]] < filled[pending[best]]) best = j;
+    const i = pending.splice(best, 1)[0];
+    order.push(i);
+    for (const j of neighbors[i]) if (filled[j] === Infinity) {
+      filled[j] = Math.max(filled[i], cells[j].elevation);
+      parent[j] = i;
+      pending.push(j);
+    }
+  }
+  if (order.length !== cells.length) return null;
+  const rank = new Map(order.map((i, r) => [i, r]));
+  const spillDirection = cells.map((c, i) => {
+    let next = parent[i], slope = 0;
+    for (const j of neighbors[i]) {
+      const descent = (filled[i] - filled[j]) / Math.hypot(c.x - cells[j].x, c.y - cells[j].y);
+      if (descent > slope && rank.get(j) < rank.get(i)) { slope = descent; next = j; }
+    }
+    return next;
+  });
+  const direction = cells.map((c, i) => {
+    let next = -1, slope = 0;
+    for (const j of neighbors[i]) {
+      const descent = (c.elevation - cells[j].elevation) / Math.hypot(c.x - cells[j].x, c.y - cells[j].y);
+      if (descent > slope) { slope = descent; next = j; }
+    }
+    // Flat ties follow the spill tree; a true pit remains a D8 sink until it fills.
+    if (next < 0 && parent[i] >= 0 && cells[parent[i]].elevation === c.elevation) next = parent[i];
+    return next;
+  });
+  const accumulation = cells.map(() => 1);
+  const downhill = cells.map((_, i) => i).sort((a, b) => cells[b].elevation - cells[a].elevation || rank.get(b) - rank.get(a));
+  for (const i of downhill) if (direction[i] >= 0) accumulation[direction[i]] += accumulation[i];
+  const at = (x, y) => index.get(`${Math.floor((bounds.maxY - y) / bounds.height * resolution)},${Math.floor((x - bounds.minX) / bounds.width * resolution)}`);
+  return { cells, neighbors, direction, spillDirection, accumulation, filled, order, outlet, at, bounds, resolution, index };
+}
+
+// Rain is a retained-runoff scenario, without a drainage time step or inferred radar depths.
+export function fillAndSpill(flow, rainMm, { areaM2, runoffCoefficient = 0.5, drainFraction = 0 } = {}) {
+  if (!flow) return null;
+  const { cells, filled, spillDirection: direction, order } = flow;
+  const totalArea = areaM2 ?? cells.reduce((sum, c) => sum + c.area, 0);
+  const cellArea = totalArea / cells.length;
+  const inputM3 = Math.max(0, rainMm) / 1000 * totalArea * runoffCoefficient;
+  const drainedM3 = inputM3 * drainFraction;
+  const volume = cells.map(() => (inputM3 - drainedM3) / cells.length);
+  const depths = cells.map(() => 0);
+  if (inputM3 === drainedM3) return { depths, inputM3, storedM3: 0, drainedM3, runoffCoefficient, depthAt: () => 0 };
+  // Adjacent pit cells sharing a spill level form one reservoir.
+  const groups = [], groupAt = cells.map(() => -1);
+  for (const i of order) if (filled[i] > cells[i].elevation && groupAt[i] < 0) {
+    const group = [], stack = [i], id = groups.length;
+    groupAt[i] = id;
+    while (stack.length) {
+      const j = stack.pop(); group.push(j);
+      for (const k of flow.neighbors[j]) if (groupAt[k] < 0 && filled[k] > cells[k].elevation && filled[k] === filled[i]) {
+        groupAt[k] = id; stack.push(k);
+      }
+    }
+    groups.push(group);
+  }
+  const store = (indices, amount, ceiling) => {
+    let low = Math.min(...indices.map((i) => cells[i].elevation)), high = ceiling;
+    const capacity = (level) => indices.reduce((sum, i) => sum + Math.max(depths[i], level - cells[i].elevation, 0) * cellArea, 0);
+    const previous = indices.reduce((sum, i) => sum + depths[i] * cellArea, 0);
+    const target = Math.min(capacity(ceiling), previous + amount);
+    for (let step = 0; step < 52; step++) {
+      const middle = (low + high) / 2;
+      if (capacity(middle) < target) low = middle; else high = middle;
+    }
+    for (const i of indices) depths[i] = Math.max(depths[i], (low + high) / 2 - cells[i].elevation, 0);
+    return Math.max(0, previous + amount - target);
+  };
+  let cornerVolume = 0;
+  for (const i of [...order].reverse()) {
+    const id = groupAt[i];
+    if (id >= 0) {
+      const group = groups[id];
+      // Process after every upstream member has delivered its runoff.
+      if (i !== group[0]) continue;
+      const incoming = group.reduce((sum, j) => sum + volume[j], 0);
+      const excess = store(group, incoming, filled[i]);
+      const exit = group.map((j) => direction[j]).find((j) => j < 0 || groupAt[j] !== id);
+      if (exit >= 0) volume[exit] += excess; else cornerVolume += excess;
+    } else if (direction[i] >= 0) volume[direction[i]] += volume[i];
+    else cornerVolume += volume[i];
+  }
+  // The corner pool cannot reach a depression behind a saddle until it reaches that spill height.
+  let low = cells[flow.outlet].elevation;
+  let high = Math.max(...cells.map((c) => c.elevation)) + inputM3 / totalArea;
+  const extraCapacity = (level) => cells.reduce((sum, c, i) => sum +
+    (filled[i] <= level ? Math.max(0, level - c.elevation - depths[i]) * cellArea : 0), 0);
+  for (let step = 0; step < 52; step++) {
+    const middle = (low + high) / 2;
+    if (extraCapacity(middle) < cornerVolume) low = middle; else high = middle;
+  }
+  const connected = cells.map((_, i) => i).filter((i) => filled[i] < high - 1e-9);
+  if (connected.length) cornerVolume = store(connected, cornerVolume, high);
+  const entering = cells.map((_, i) => i).filter((i) => filled[i] >= high - 1e-9 && filled[i] <= high + 1e-9);
+  if (entering.length) store(entering, cornerVolume, high);
+  const storedM3 = depths.reduce((sum, d) => sum + d * cellArea, 0);
+  const depthAt = (x, y) => {
+    const col = (x - flow.bounds.minX) / flow.bounds.width * flow.resolution - 0.5;
+    const row = (flow.bounds.maxY - y) / flow.bounds.height * flow.resolution - 0.5;
+    const c = Math.floor(col), r = Math.floor(row), fx = col - c, fy = row - r;
+    let sum = 0, weight = 0;
+    for (const [dr, dc, w] of [[0, 0, (1 - fx) * (1 - fy)], [0, 1, fx * (1 - fy)], [1, 0, (1 - fx) * fy], [1, 1, fx * fy]]) {
+      const i = flow.index.get(`${r + dr},${c + dc}`);
+      if (i !== undefined) { sum += depths[i] * w; weight += w; }
+    }
+    return weight > 0 ? sum / weight : 0;
+  };
+  return { depths, inputM3, storedM3, drainedM3, runoffCoefficient, depthAt };
+}
+
+export function interpolateSoil(grid, lon, lat, property) {
+  if (!grid || !Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+  const gx = (lon - grid.west) / grid.stepLon, gy = (grid.north - lat) / grid.stepLat;
+  if (gx < -1e-8 || gy < -1e-8 || gx > 2 + 1e-8 || gy > 2 + 1e-8) return null;
+  const x = Math.max(0, Math.min(2, gx)), y = Math.max(0, Math.min(2, gy));
+  const col = Math.min(1, Math.floor(x)), row = Math.min(1, Math.floor(y));
+  const fx = x - col, fy = y - row;
+  const values = [grid[property]?.[row]?.[col], grid[property]?.[row]?.[col + 1], grid[property]?.[row + 1]?.[col], grid[property]?.[row + 1]?.[col + 1]];
+  if (!values.every(Number.isFinite)) return null;
+  return values[0] * (1 - fx) * (1 - fy) + values[1] * fx * (1 - fy) + values[2] * (1 - fx) * fy + values[3] * fx * fy;
+}
+
+export function productivityZones(grids, outline, coordinates) {
+  if (grids.length !== 2) return { cells: [], at: () => null, dates: [] };
+  const grid = grids[0], [dx, , west, , dy, north] = grid.transform;
+  // Count every intersecting 20 m pixel, including partial rim pixels whose centres lie outside the field.
+  const fieldPixels = new Map();
+  for (const sample of surfaceCells(outline, () => null)) {
+    const [x, y] = projectWgs84ToUtm45N(...coordinates(sample.x, sample.y));
+    const col = Math.floor((x - west) / dx), row = Math.floor((y - north) / dy);
+    const key = `${row},${col}`;
+    if (!fieldPixels.has(key)) {
+      const cx = west + (col + 0.5) * dx, cy = north + (row + 0.5) * dy;
+      const values = grids.map((g) => {
+        const r = Math.floor((cy - g.transform[5]) / g.transform[4]), c = Math.floor((cx - g.transform[2]) / g.transform[0]);
+        const value = g.values[r]?.[c];
+        return Number.isFinite(value) && value >= -1 && value <= 1 ? value : null;
+      });
+      fieldPixels.set(key, { row, col, values, area: 0 });
+    }
+    fieldPixels.get(key).area += sample.area;
+  }
+  const cells = [...fieldPixels.values()];
+  const ranges = grids.map((_, i) => {
+    const values = cells.map((c) => c.values[i]).filter(Number.isFinite);
+    return [Math.min(...values), Math.max(...values)];
+  });
+  for (const c of cells) c.score = c.values.every(Number.isFinite) ? c.values.reduce((sum, v, i) => {
+    const [min, max] = ranges[i]; return sum + (max > min ? (v - min) / (max - min) : 0.5) / 2;
+  }, 0) : null;
+  const scores = cells.map((c) => c.score).filter(Number.isFinite).sort((a, b) => a - b);
+  const quantile = (fraction) => {
+    const position = (scores.length - 1) * fraction, i = Math.floor(position);
+    return scores[i] + (scores[Math.ceil(position)] - scores[i]) * (position - i);
+  };
+  const low = quantile(1 / 3), high = quantile(2 / 3);
+  const index = new Map(cells.map((c) => [`${c.row},${c.col}`, c]));
+  for (const c of cells) c.raw = c.score === null ? null : low === high ? 1 : c.score < low ? 0 : c.score >= high ? 2 : 1;
+  for (const c of cells) {
+    if (c.raw === null) { c.value = null; continue; }
+    const counts = [0, 0, 0];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const value = index.get(`${c.row + dr},${c.col + dc}`)?.raw;
+      if (Number.isFinite(value)) counts[value]++;
+    }
+    const majority = Math.max(...counts);
+    c.value = majority > counts.reduce((sum, n) => sum + n, 0) / 2 ? counts.indexOf(majority) : c.raw;
+  }
+  return { cells, dates: grids.map((g) => g.date), at: (lon, lat) => {
+    const [x, y] = projectWgs84ToUtm45N(lon, lat);
+    return index.get(`${Math.floor((y - north) / dy)},${Math.floor((x - west) / dx)}`)?.value ?? null;
+  } };
+}
+
 // Depth uses the same fill level as the clipped ponding mesh, without invented radar depths.
 export function pondingDepthCm(height, min, {
   rainMm = 0, exaggeration = 1, lowGround = false, proposedDrain = false,
@@ -189,7 +389,7 @@ export function surfaceLegend(mode, data = {}) {
     truth = data.observation ? 'REMOTE_OBSERVED' : 'UNKNOWN';
     source = 'Copernicus Sentinel-2 L2A · 20 m';
   } else if (mode === 'water') {
-    title = text('Water ponding', 'জমা পানি');
+    title = text('Water flow & ponding', 'পানির প্রবাহ ও জমা পানি');
     unit = 'cm';
     classes = [
       makeClass(text('None · 0 cm', 'নেই · 0 সেমি'), '#8f7352', 0, 0, true),
@@ -200,12 +400,25 @@ export function surfaceLegend(mode, data = {}) {
     ];
     const radar = data.radarObservation;
     const radarLine = Number.isFinite(radar?.floodedPct)
-      ? `Sentinel-1: ${radar.floodedPct.toFixed(1)} % · ${radar.date.slice(0, 7)}`
-      : text('Sentinel-1: no flooded % for this month', 'Sentinel-1: এই মাসে প্লাবিত অংশের তথ্য নেই');
-    note = `${text('Rain scenario', 'বৃষ্টির পরিকল্পনা')}: ${data.rainMm ?? 0} mm · ${text('depth is simulated', 'গভীরতা কাল্পনিক')}\n${radarLine}`;
+      ? text(`Satellite (Sentinel-1) saw: ${radar.floodedPct.toFixed(1)} % flooded on ${radar.date}`, `স্যাটেলাইট (Sentinel-1) দেখেছে: ${radar.date} তারিখে ${radar.floodedPct.toFixed(1)} % প্লাবিত`)
+      : text('Satellite (Sentinel-1): no observation available', 'স্যাটেলাইট (Sentinel-1): পর্যবেক্ষণ নেই');
+    note = `${text('Rain scenario', 'বৃষ্টির পরিকল্পনা')}: ${data.rainMm ?? 0} mm × ${text('field area × runoff coefficient 0.5', 'জমির ক্ষেত্রফল × প্রবাহ সহগ 0.5')}. ${text('D8 fill-and-spill; runoff retained in depressions / low corner, no drainage time step. Wetness: log(flow accumulation).', 'নিচু অংশ ভরে উপচে নিচু কোণে সাময়িক প্রবাহ জমে; নিষ্কাশনের সময় গণনা নেই। ভেজাভাব log(প্রবাহ সঞ্চয়) অনুসারে।')} ${text('Proposed drain exports 55% of runoff when unblocked.', 'প্রস্তাবিত নালা খোলা থাকলে 55% প্রবাহ বের হয়।')} ${data.terrainAvailable === false ? text('Terrain unavailable; simulation has no data.', 'ভূমির তথ্য নেই; সিমুলেশনের তথ্য নেই।') : ''}`;
     truth = 'SCENARIO';
-    source = text('Terrain fill + rain scenario; Sentinel-1 observes presence, not depth', 'ভূমি ও বৃষ্টির পরিকল্পনা; Sentinel-1 পানির উপস্থিতি দেখে, গভীরতা নয়');
+    source = text('Scenario (simulation) · NASADEM 30 m · D8 flow + rain volume', 'পরিকল্পনা (সিমুলেশন) · NASADEM ৩০ মি · D8 প্রবাহ ও বৃষ্টির পরিমাণ');
     date = month.month || date;
+    data = { ...data, remote: radarLine, flowRows: [
+      { label: text('Wet flow path · log accumulation', 'ভেজা প্রবাহপথ · log সঞ্চয়'), color: '#344d4b' },
+      { label: text('Runoff line · downslope', 'প্রবাহ রেখা · ঢাল বরাবর'), color: '#249aff' },
+    ] };
+  } else if (mode === 'productivity') {
+    title = text('Productivity zones', 'উৎপাদনশীলতার অঞ্চল');
+    classes = [makeClass(text('Low', 'কম'), '#bd8150', 0, 1),
+      makeClass(text('Medium', 'মাঝারি'), '#d3c966', 1, 2),
+      makeClass(text('High', 'বেশি'), '#43865e', 2, 3)];
+    note = text('Estimated · Sentinel-2 NDVI 2 dates · proxy for soil/management zones, verify with soil tests. Each date normalised within field (min–max), then averaged; tertiles, equal scores stay together; 3×3 majority smoothing (retain class without a strict majority). Area weights include partial edge pixels. Masked cells remain No data.', 'আনুমানিক · Sentinel-2 NDVI ২ তারিখ · মাটি/ব্যবস্থাপনা অঞ্চলের বিকল্প সূচক; মাটি পরীক্ষা দিয়ে যাচাই করুন। প্রতি তারিখের মাঠের min–max স্বাভাবিকীকরণ, গড়, তিন ভাগ; সমান মান একসঙ্গে; ৩×৩ সংখ্যাগরিষ্ঠ মসৃণকরণ (সংখ্যাগরিষ্ঠ না হলে শ্রেণি বজায় থাকে)। প্রান্তের আংশিক কোষসহ ক্ষেত্রফল গণনা। অনুপস্থিত কোষে তথ্য নেই।');
+    truth = data.zoneDates?.length === 2 ? 'MODELED' : 'UNKNOWN';
+    source = text('Estimated · Sentinel-2 NDVI · 20 m', 'আনুমানিক · Sentinel-2 NDVI · ২০ মি');
+    date = data.zoneDates?.join(' + ') || text('Two dates required', 'দুই তারিখ প্রয়োজন');
   } else if (mode === 'elevation') {
     title = text('Elevation & contours', 'উচ্চতা ও কনট্যুর');
     unit = 'm';
@@ -220,7 +433,7 @@ export function surfaceLegend(mode, data = {}) {
     truth = valid ? 'MODELED' : 'UNKNOWN';
     source = 'NASADEM · 30 m';
   } else if (mode === 'fertility') {
-    title = text('Soil fertility · pH class', 'মাটির উর্বরতা · pH শ্রেণি');
+    title = text('Soil fertility (SoilGrids)', 'মাটির উর্বরতা (SoilGrids)');
     unit = 'pH';
     const breaks = [-Infinity, 4.5, 5.5, 6.5, 7.5, 8.5, Infinity];
     const labels = [text('Very low', 'অতি কম'), text('Low', 'কম'), text('Medium', 'মাঝারি'), text('Optimum', 'উপযুক্ত'), text('High', 'বেশি'), text('Very high', 'অতি বেশি')];
@@ -235,6 +448,10 @@ export function surfaceLegend(mode, data = {}) {
     note = data.soilCellCount === 1
       ? text(`Whole field uses one 250 m soil cell → one class: ${description}`, `পুরো মাঠে একটি ২৫০ মি মাটির কোষ ব্যবহৃত → এক শ্রেণি: ${description}`)
       : text(`Field-wide estimate: ${description}`, `পুরো মাঠের আনুমানিক মান: ${description}`);
+    if (data.soilRange?.ph.length && !Number.isFinite(data.soilOverrides?.ph)) {
+      const range = (values, digits) => `${Math.min(...values).toFixed(digits)}–${Math.max(...values).toFixed(digits)}`;
+      note = text(`Smooth blend of 250 m SoilGrids cells — not a soil test. pH ${range(data.soilRange.ph, 3)}; OM ${range(data.soilRange.om, 3)} %. Continuous pH/OM shading, contrast stretched to field range; donut uses absolute pH classes.`, `২৫০ মি SoilGrids কোষের মসৃণ মিশ্রণ — মাটি পরীক্ষা নয়। pH ${range(data.soilRange.ph, 3)}; জৈব পদার্থ ${range(data.soilRange.om, 3)} %। pH/জৈব পদার্থের ছায়া মাঠের মানের সীমায় বাড়িয়ে দেখানো; ডোনাটে প্রকৃত pH শ্রেণি।`);
+    }
     note += `\n${text('P/K/Zn/B: add soil test. Subfield soil zones are not mapped.', 'P/K/Zn/B: মাটি পরীক্ষা যোগ করুন। মাঠের ভেতরের মাটির অঞ্চল মানচিত্রে নেই।')}`;
     const measuredPh = Number.isFinite(data.soilOverrides?.ph);
     truth = measuredPh ? 'FARMER_REPORTED' : Number.isFinite(ph) ? 'MODELED' : 'UNKNOWN';
@@ -255,7 +472,7 @@ export function surfaceLegend(mode, data = {}) {
     date = month.month || date;
   }
   classes.push({ label: text('No data', 'তথ্য নেই'), color: '#a5a9a5', from: null, to: null, pct: 0, unknown: true });
-  const legend = { title, unit, classes, note, truth, source, date };
+  const legend = { title, unit, classes, note, truth, source, date, remote: data.remote, flowRows: data.flowRows };
   let total = 0;
   for (const cell of data.cells || []) {
     if (!(cell.area > 0)) continue;
@@ -853,7 +1070,7 @@ export function pondingWaterline(positions) {
 // just above that same triangle. Interpolated shoreline vertices cannot cross its edges.
 export function pondingPositions(surface, {
   rainMm = 0, exaggeration = 1, lowGround = false,
-  proposedDrain = false, outletBlocked = false, waterMaskAt = () => null, minHeight = null,
+  proposedDrain = false, outletBlocked = false, waterMaskAt = () => null, minHeight = null, depthAt = null,
 } = {}) {
   if (!(rainMm > 0) || !surface.length) return [];
   let min = Infinity;
@@ -861,6 +1078,27 @@ export function pondingPositions(surface, {
   if (Number.isFinite(minHeight)) min = minHeight;
   const scale = Math.max(0.01, exaggeration);
   const positions = [];
+  if (depthAt) {
+    for (let i = 0; i < surface.length; i += 9) {
+      const triangle = [0, 3, 6].map((j) => {
+        const [x, h, z] = surface.slice(i + j, i + j + 3);
+        return [x, h, z, depthAt(x, z)];
+      });
+      const clipped = [];
+      triangle.forEach((a, j) => {
+        const b = triangle[(j + 1) % 3];
+        if (a[3] > 0.0001) clipped.push(a);
+        if ((a[3] > 0.0001) !== (b[3] > 0.0001)) {
+          const fraction = (0.0001 - a[3]) / (b[3] - a[3]);
+          clipped.push(a.map((value, k) => value + (b[k] - value) * fraction));
+        }
+      });
+      for (let j = 1; j < clipped.length - 1; j++) for (const [x, h, z, depth] of [clipped[0], clipped[j], clipped[j + 1]]) {
+        positions.push(x, h + depth + 0.02, z);
+      }
+    }
+    return positions;
+  }
   for (let i = 0; i < surface.length; i += 9) {
     const triangle = [0, 3, 6].map((j) => Array.from(surface.slice(i + j, i + j + 3)));
     const x = triangle.reduce((sum, p) => sum + p[0], 0) / 3;

@@ -140,6 +140,54 @@ def fetch_site(site):
         return None
 
 
+def fetch_neighborhood(site):
+    """Read real pH/SOC neighbours from a 250 m WCS raster in EPSG:4326."""
+    from PIL import Image
+
+    grids = {}
+    geometry = None
+    receipts = []
+    for prop, key in [('phh2o', 'ph'), ('soc', 'omPct')]:
+        lat, lon = site['lat'], site['lon']
+        step_lat = 250 / 111195.08
+        step_lon = step_lat / math.cos(math.radians(lat))
+        args = [('map', f'/map/{prop}.map'), ('SERVICE', 'WCS'), ('VERSION', '2.0.1'),
+                ('REQUEST', 'GetCoverage'), ('COVERAGEID', f'{prop}_0-5cm_mean'),
+                ('FORMAT', 'image/tiff'), ('SUBSET', f'long({lon - step_lon * 2},{lon + step_lon * 2})'),
+                ('SUBSET', f'lat({lat - step_lat * 2},{lat + step_lat * 2})'),
+                ('SUBSETTINGCRS', 'http://www.opengis.net/def/crs/EPSG/0/4326'),
+                ('OUTPUTCRS', 'http://www.opengis.net/def/crs/EPSG/0/4326')]
+        url = 'https://maps.isric.org/mapserv?' + urlencode(args)
+        with Image.open(BytesIO(request(url, 45))) as image:
+            sx, sy, _ = image.tag_v2[33550]
+            px, py, _, west, north, _ = image.tag_v2[33922]
+            col = math.floor(px + (lon - west) / sx)
+            row = math.floor(py + (north - lat) / sy)
+            if not (1 <= col < image.width - 1 and 1 <= row < image.height - 1):
+                raise ValueError('WCS does not cover 3×3 neighbourhood')
+            current = {'west': west + (col - 1 + .5 - px) * sx,
+                       'north': north - (row - 1 + .5 - py) * sy, 'stepLon': sx, 'stepLat': sy}
+            if geometry is not None and geometry != current:
+                raise ValueError('SoilGrids property grids do not align')
+            geometry = current
+            nodata = str(image.tag_v2.get(42113, '')).strip('\x00')
+            values = []
+            for r in range(row - 1, row + 2):
+                values.append([])
+                for c in range(col - 1, col + 2):
+                    raw = image.getpixel((c, r))
+                    if nodata and raw == float(nodata):
+                        raise ValueError('Neighbour is nodata')
+                    value = convert(prop, raw)
+                    values[-1].append(value * .1724 if prop == 'soc' else value)
+            grids[key] = values
+            receipts.append(url)
+    return {**geometry, **grids, 'cellM': 250, 'depthCm': [0, 5],
+            'method': '3×3 neighbouring pixels in WCS EPSG:4326 output; native model support 250 m; bilinear display',
+            'omConversion': 'OM (%) = SOC (g/kg) × 0.1724; estimated from organic carbon',
+            'requestUrls': receipts, 'retrievedAt': datetime.now(timezone.utc).isoformat()}
+
+
 def self_check():
     for prop, raw, expected in [('clay', 235, 23.5), ('sand', 500, 50), ('silt', 265, 26.5),
                                 ('soc', 123, 12.3), ('phh2o', 65, 6.5), ('bdod', 135, 1.35)]:
@@ -163,11 +211,27 @@ def self_check():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--self-check', action='store_true')
-    if parser.parse_args().self_check:
+    parser.add_argument('--neighborhood-only', action='store_true')
+    args = parser.parse_args()
+    if args.neighborhood_only:
+        output = ROOT / 'public/data/soil-profile.json'
+        pack = json.loads(output.read_text())
+        sites = json.loads((ROOT / 'public/data/earth-data.json').read_text())['fields']
+        for site in sites:
+            neighborhood = fetch_neighborhood(site)
+            if pack['sites'].get(site['id']):
+                pack['sites'][site['id']]['neighborhood'] = neighborhood
+                print(f"{site['id']}: real 3×3 pH/OM neighbourhood", flush=True)
+        output.write_text(json.dumps(pack, ensure_ascii=False, indent=2, allow_nan=False) + '\n')
+        return
+    if args.self_check:
         self_check()
         return
     sites = json.loads((ROOT / 'public/data/earth-data.json').read_text())['fields']
     profiles = {site['id']: fetch_site(site) for site in sites}
+    for site in sites:
+        if profiles[site['id']]:
+            profiles[site['id']]['neighborhood'] = fetch_neighborhood(site)
     pack = {'schemaVersion': 1, 'source': SOURCE, 'url': 'https://soilgrids.org/',
             'license': 'CC BY 4.0', 'licenseUrl': 'https://creativecommons.org/licenses/by/4.0/',
             'retrievedAt': datetime.now(timezone.utc).isoformat(), 'statistic': 'mean',

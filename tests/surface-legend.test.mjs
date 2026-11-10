@@ -39,8 +39,8 @@ test('area percentages weight only polygon cells, including concave outlines', (
   assert.equal(weighted.classes[4].pct, 75);
 });
 
-test('all six modes account for unknown coverage without inventing measurements', () => {
-  for (const mode of ['crops', 'ndvi', 'moisture', 'water', 'elevation', 'fertility']) {
+test('all surface modes account for unknown coverage without inventing measurements', () => {
+  for (const mode of ['crops', 'ndvi', 'moisture', 'water', 'elevation', 'fertility', 'productivity']) {
     const legend = legendFor(mode, [null, undefined, NaN, Infinity], { elevationMin: 30, elevationMax: 32 });
     assert.equal(legend.classes.at(-1).pct, 100);
     assert.match(legend.classes.at(-1).label, /No data/);
@@ -94,7 +94,9 @@ test('satellite dates, real elevation bounds, contours and scenario provenance a
   assert.match(elevation.note, /31.00.*33.00 m.*contours every 0.25 m.*4.5×/);
   const water = legendFor('water', [0, 3], { rainMm: 120, radarObservation: { date: '2024-03-15', floodedPct: 25 } });
   assert.match(water.note, /120 mm/);
-  assert.match(water.note, /Sentinel-1.*25.0 %.*2024-03/);
+  assert.match(water.remote, /Sentinel-1.*25.0 %.*2024-03-15/);
+  assert.match(water.note, /runoff coefficient 0.5/);
+  assert.equal(water.flowRows.length, 2);
   assert.equal(water.truth, 'SCENARIO');
   assert.equal(pondingDepthCm(0, 0, { rainMm: 120 }), 12);
   assert.equal(pondingDepthCm(1, 0, { rainMm: 120 }), 0);
@@ -139,7 +141,8 @@ test('one bilingual legend includes an accessible 72 px donut, percentages and p
       state.lang = lang;
       assert.equal((studio3dHtml(fixture).match(/<details class="studio-surface-legend"/g) || []).length, 1);
       assert.match(studio3dHtml(fixture), /option value="moisture"/);
-      for (const mode of ['crops', 'ndvi', 'moisture', 'water', 'elevation', 'fertility']) {
+      assert.match(studio3dHtml(fixture), /option value="productivity"/);
+      for (const mode of ['crops', 'ndvi', 'moisture', 'water', 'elevation', 'fertility', 'productivity']) {
         const legend = legendFor(mode, [0.5], { lang, month: fixture.months[0], elevationMin: 0, elevationMax: 1 });
         const html = surfaceLegendHtml(legend);
         assert.match(html, /width="72" height="72"/);
