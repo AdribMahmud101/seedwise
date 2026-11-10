@@ -1,114 +1,4 @@
 /* STUDIO3 · 3D Field Studio styles */
-.studio-poster {
-  margin: 18px 0 24px;
-  background: linear-gradient(135deg, #1b3322 0%, #294c34 50%, #3e6b48 100%);
-  color: #f4f6f0;
-  border-radius: 8px;
-  padding: 32px 28px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.studio-poster-inner {
-  position: relative;
-  z-index: 2;
-  max-width: 580px;
-}
-
-.studio-poster-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  font: 12px Mono, monospace;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-
-.studio-poster h2 {
-  font-size: 26px;
-  line-height: 1.25;
-  margin: 0 0 10px;
-  color: #ffffff;
-}
-
-.studio-poster-desc {
-  font-size: 14px;
-  line-height: 1.5;
-  color: #d1dfd4;
-  margin: 0 0 18px;
-}
-
-.studio-poster-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.studio-poster-note {
-  font: 12px Mono, monospace;
-  color: #a8c4b0;
-}
-
-/* CSS-only field block illustration */
-.studio-poster-art {
-  position: absolute;
-  right: -20px;
-  bottom: -20px;
-  width: 240px;
-  height: 200px;
-  opacity: 0.45;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.art-sky {
-  flex: 1;
-  background: radial-gradient(circle at 60% 40%, rgba(255,255,255,0.2) 0%, transparent 60%);
-}
-
-.art-field-block {
-  width: 180px;
-  height: 110px;
-  margin-left: auto;
-  position: relative;
-  transform: perspective(400px) rotateX(45deg) rotateZ(-25deg);
-  transform-style: preserve-3d;
-}
-
-.art-field-top {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #4b5a37 0%, #66bd63 70%, #d9ef8b 100%);
-  border: 1px solid rgba(255,255,255,0.4);
-  box-shadow: 0 0 15px rgba(0,0,0,0.3);
-}
-
-.art-field-side {
-  position: absolute;
-  bottom: -24px;
-  left: 0;
-  width: 100%;
-  height: 24px;
-  background: repeating-linear-gradient(
-    180deg,
-    #7a5f45 0px,
-    #7a5f45 6px,
-    #5f4731 6px,
-    #5f4731 14px,
-    #473420 14px,
-    #473420 24px
-  );
-  transform-origin: top;
-  transform: rotateX(-90deg);
-}
 
 /* Studio active layout */
 .studio-container {
@@ -1965,4 +1855,181 @@
   position: fixed;
   inset: 0;
   z-index: 10000;
+}
+
+/* STUDIO5T · skeleton auto-load + phone touch hint */
+#studio-3d-host {
+  position: relative;
+}
+
+.studio-skeleton,
+.studio-no-webgl {
+  margin: 18px 0 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  /* Same box as the stage so the reveal does not move the page. */
+  height: clamp(440px, calc(100svh - var(--stage-top, 96px) - 16px), 820px);
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 100%, rgba(195,208,180,0.55) 0%, rgba(195,208,180,0) 60%),
+    linear-gradient(180deg, #eef2e5 0%, #e6ecdc 55%, #dae2cc 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  transition: opacity 200ms ease;
+}
+
+.studio-skeleton-cover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0;
+  z-index: 5;
+}
+
+.studio-skeleton-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.studio-skeleton-block {
+  width: 220px;
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Shimmering isometric field-block silhouette, CSS only. */
+.studio-skeleton-iso {
+  width: 170px;
+  height: 104px;
+  position: relative;
+  transform: perspective(500px) rotateX(48deg) rotateZ(-28deg);
+  transform-style: preserve-3d;
+}
+
+.studio-skeleton-top {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #9db38a 0%, #c9d6b4 45%, #8aa377 100%);
+  box-shadow: 0 6px 18px rgba(35, 61, 43, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.studio-skeleton-top::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: studio-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.studio-skeleton-side {
+  position: absolute;
+  bottom: -24px;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  background: repeating-linear-gradient(
+    180deg,
+    #a08a68 0px,
+    #a08a68 6px,
+    #7a6248 6px,
+    #7a6248 14px,
+    #5c4832 14px,
+    #5c4832 24px
+  );
+  opacity: 0.8;
+  transform-origin: top;
+  transform: rotateX(-90deg);
+}
+
+/* Static illustration: no shimmer when WebGL is unavailable. */
+.studio-no-webgl .studio-skeleton-top::after {
+  content: none;
+}
+
+@keyframes studio-skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.studio-skeleton-text {
+  margin: 0;
+  font-size: 14px;
+  color: #3d5245;
+}
+
+.studio-skeleton-bar {
+  width: min(240px, 60%);
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(61, 82, 69, 0.18);
+  overflow: hidden;
+}
+
+.studio-skeleton-fill {
+  display: block;
+  height: 100%;
+  width: 4%;
+  border-radius: 2px;
+  background: #4b6b4f;
+  transition: width 250ms ease;
+}
+
+/* Stage mounts hidden behind the skeleton until the first frame. */
+.studio-stage-enter {
+  visibility: hidden;
+}
+
+.studio-stage-enter.studio-stage-entered {
+  visibility: visible;
+}
+
+/* One-time phone gesture hint, bottom-centre over the canvas. */
+.studio-touch-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(23, 46, 32, 0.88);
+  color: #f4f6f0;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.studio-touch-hint.visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-skeleton,
+  .studio-no-webgl,
+  .studio-skeleton-fill,
+  .studio-touch-hint {
+    transition: none;
+  }
+  .studio-skeleton-top::after {
+    animation: none;
+  }
 }
