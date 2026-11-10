@@ -2193,7 +2193,7 @@ function placeCallout(x, y, z, id, show, checkFacingNormal = false) {
     return;
   }
   el.style.display = 'block';
-  el.style.left = `${(v.x * 0.5 + 0.5) * canvasHostEl.clientWidth}px`;
+  el.style.left = `${Math.max(22, Math.min(canvasHostEl.clientWidth - 22, (v.x * 0.5 + 0.5) * canvasHostEl.clientWidth))}px`;
   el.style.top = `${(-v.y * 0.5 + 0.5) * canvasHostEl.clientHeight}px`;
 }
 
@@ -2273,6 +2273,16 @@ function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) 
 
 function sync3DCallouts() {
   if (!currentData || !currentBlock.bounds || !containerEl || !activeCamera || !canvasHostEl) return;
+  const canvasRect = canvasHostEl.getBoundingClientRect();
+  const overlayRect = containerEl.querySelector('.studio-overlay-tl')?.getBoundingClientRect();
+  const controlsRect = containerEl.querySelector('.studio-stage-controls')?.getBoundingClientRect();
+  const depthTicks = containerEl.querySelector('.studio-depth-ticks');
+  if (overlayRect) {
+    canvasHostEl.style.setProperty('--studio-overlay-bottom', `${overlayRect.bottom - canvasRect.top + 16}px`);
+  }
+  if (depthTicks && overlayRect) {
+    depthTicks.style.top = `${overlayRect.bottom - canvasRect.top + 8}px`;
+  }
   const b = currentBlock.bounds;
   const cutFraction = currentCutaway;
   const sliceU = 1 - cutFraction;
@@ -2353,6 +2363,7 @@ function sync3DCallouts() {
 
   const isMobile = window.innerWidth <= 420;
   if (isMobile) {
+    canvasHostEl.style.minHeight = '';
     if (svgLeaders) svgLeaders.innerHTML = '';
     const placeMobileDot = (el, scr) => {
       if (!el) return;
@@ -2361,7 +2372,7 @@ function sync3DCallouts() {
         return;
       }
       el.style.display = 'block';
-      el.style.left = `${scr.x}px`;
+      el.style.left = `${Math.max(22, Math.min(canvasHostEl.clientWidth - 22, scr.x))}px`;
       el.style.top = `${scr.y}px`;
     };
     placeMobileDot(topsoilEl, scrTop);
@@ -2371,12 +2382,8 @@ function sync3DCallouts() {
   }
 
   // Desktop / tablet: Layout labels in column beside the block
-  const avgAnchorX = (scrTop.x + scrRoot.x + scrAqui.x) / 3;
   const canvasW = canvasHostEl.clientWidth;
   const canvasH = canvasHostEl.clientHeight;
-
-  // Place column on whichever side has more free space
-  const placeOnRight = avgAnchorX < canvasW * 0.5;
 
   const topRect = topsoilEl?.querySelector('.callout-box')?.getBoundingClientRect();
   const rootRect = rootzoneEl?.querySelector('.callout-box')?.getBoundingClientRect();
@@ -2399,22 +2406,27 @@ function sync3DCallouts() {
     order: lbl.order,
   }));
 
-  // Min top and bottom padding to avoid title stack and bottom probe cards
-  const topPad = currentViewMode === "cutaway" ? 40 : 130;
-  const bottomPad = 90;
-  const positioned = deoverlapLabels(layoutItems, canvasH, 10, topPad, bottomPad);
+  // Determine column X
+  const columnWidth = Math.max(topRect?.width || 0, rootRect?.width || 0, aquiRect?.width || 0, 120);
+  const columnX = canvasW - columnWidth - 12;
 
+  // Min top and bottom padding to avoid title stack and bottom probe cards
+  const overlapsColumn = (rect) => rect && rect.width > 0 &&
+    rect.right > canvasRect.left + columnX - 8 && rect.left < canvasRect.left + columnX + columnWidth + 8;
+  let topPad = 16;
+  for (const rect of [overlayRect, controlsRect]) {
+    if (overlapsColumn(rect)) topPad = Math.max(topPad, rect.bottom - canvasRect.top + 8);
+  }
+  let bottomPad = 12;
+  for (const selector of ['.studio-probe-card', '.studio-transect-card']) {
+    const rect = containerEl.querySelector(selector)?.getBoundingClientRect();
+    if (overlapsColumn(rect)) bottomPad = Math.max(bottomPad, canvasRect.bottom - rect.top + 8);
+  }
+  canvasHostEl.style.minHeight = `${topPad + bottomPad + hTop + hRoot + hAqui + 20}px`;
+  const positioned = deoverlapLabels(layoutItems, canvasH, 10, topPad, bottomPad);
   const posMap = new Map();
   for (const p of positioned) {
     posMap.set(p.id, p.y);
-  }
-
-  // Determine column X
-  let columnX;
-  if (placeOnRight) {
-    columnX = Math.min(canvasW - 270, Math.max(avgAnchorX + 55, canvasW * 0.62));
-  } else {
-    columnX = Math.max(20, Math.min(avgAnchorX - 250, canvasW * 0.08));
   }
 
   let svgLines = '';
@@ -2429,8 +2441,7 @@ function sync3DCallouts() {
     lbl.el.style.top = `${boxY}px`;
 
     // Leader line from label card edge to 3D anchor dot
-    const boxW = lbl.el.querySelector('.callout-box')?.offsetWidth || 230;
-    const cardEdgeX = placeOnRight ? columnX : columnX + boxW;
+    const cardEdgeX = columnX;
     const cardEdgeY = boxY + lbl.height / 2;
 
     svgLines += `
@@ -3116,17 +3127,17 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <div class="studio-compass-s"></div>
         </button>
 
-        <!-- Top-Centre Fallow / Harvested Notification Chip -->
-        <div id="studio-overlay-fallow-host" class="studio-overlay-tc">
-          ${fallowOverlayChipHtml(data, currentMonthIdx)}
-        </div>
-
         <!-- Top-Left Surface Layer Switcher & Preset Views -->
         <div class="studio-overlay-tl">
           <div class="studio-view-toggle">
             <button id="btn-view-3d" type="button" class="studio-view-btn ${currentViewMode === "3d" ? "active" : ""}" data-studio-view="3d">${t("3D field", "৩ডি মাঠ")}</button>
             <button id="btn-view-cutaway" type="button" class="studio-view-btn ${currentViewMode === "cutaway" ? "active" : ""}" data-studio-view="cutaway">${t("Root Slice", "মাটির স্তর ও শিকড়")}</button>
             <button id="btn-view-2d" type="button" class="studio-view-btn ${currentViewMode === "top" ? "active" : ""}" data-studio-view="top">${t("Top view", "উপরের দৃশ্য")}</button>
+          </div>
+
+          <!-- Top-Centre Fallow / Harvested Notification Chip -->
+          <div id="studio-overlay-fallow-host" class="studio-overlay-tc">
+            ${fallowOverlayChipHtml(data, currentMonthIdx)}
           </div>
 
           <div class="studio-surface-selector">
