@@ -10,7 +10,7 @@ import {
   lookupProbePoint,
   pointInPolygon, outlineBounds, clipRing, surfaceGridPositions, pondingPositions,
   sampleS1Water, transectEndpoints, waterTablePositions,
-  usdaTextureClass, computeAutoExaggeration, buildCalloutData,
+  usdaTextureClass, computeAutoExaggeration, buildCalloutData, deoverlapLabels,
 } from "../src/legacy/studio3d-helpers.js";
 
 test("computePonding calculates ponding depth from low-ground and rainfall scenario", () => {
@@ -308,3 +308,48 @@ test("buildCalloutData produces bilingual stratigraphic callouts with SoilGrids 
   assert.equal(customCallouts.aquifer.isButton, false);
   assert.equal(customCallouts.aquifer.value, "2.8 m (Measured)");
 });
+
+test("deoverlapLabels arranges labels vertically with minGap and without overlaps", () => {
+  const items = [
+    { id: "aquifer", anchorY: 260, height: 40, order: 3 },
+    { id: "topsoil", anchorY: 240, height: 40, order: 1 },
+    { id: "rootzone", anchorY: 250, height: 40, order: 2 },
+  ];
+
+  const minGap = 8;
+  const placed = deoverlapLabels(items, 600, minGap, 20, 20);
+
+  assert.equal(placed.length, 3);
+  assert.equal(placed[0].id, "topsoil");
+  assert.equal(placed[1].id, "rootzone");
+  assert.equal(placed[2].id, "aquifer");
+
+  for (let i = 1; i < placed.length; i++) {
+    const prevBottom = placed[i - 1].y + placed[i - 1].height;
+    assert.ok(
+      placed[i].y >= prevBottom + minGap,
+      `Label ${placed[i].id} overlaps with ${placed[i - 1].id}: y=${placed[i].y}, prevBottom=${prevBottom}`,
+    );
+  }
+
+  // Clamping within bounds
+  assert.ok(placed[0].y >= 20);
+  assert.ok(placed[2].y + placed[2].height <= 580);
+
+  // When overflowing bottom
+  const crowded = [
+    { id: "1", anchorY: 550, height: 50, order: 1 },
+    { id: "2", anchorY: 560, height: 50, order: 2 },
+    { id: "3", anchorY: 570, height: 50, order: 3 },
+  ];
+  const placedCrowded = deoverlapLabels(crowded, 600, minGap, 10, 10);
+  assert.ok(placedCrowded[2].y + placedCrowded[2].height <= 590);
+  for (let i = 1; i < placedCrowded.length; i++) {
+    const prevBottom = placedCrowded[i - 1].y + placedCrowded[i - 1].height;
+    assert.ok(placedCrowded[i].y >= prevBottom + minGap);
+  }
+
+  // Empty list
+  assert.deepEqual(deoverlapLabels([], 600), []);
+});
+

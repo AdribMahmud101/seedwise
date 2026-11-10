@@ -424,10 +424,10 @@
 /* Soil-depth ruler shown when the block is cut away */
 .studio-depth-ticks {
   position: absolute;
-  left: 16px;
+  left: 8px;
   top: 112px;
   bottom: 92px;
-  width: 52px;
+  width: 48px;
   z-index: 4;
   pointer-events: none;
   opacity: 0;
@@ -1056,12 +1056,33 @@
   z-index: 15;
 }
 
+.studio-callout-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 14;
+}
+
+.callout-leader-line {
+  stroke: rgba(23, 62, 48, 0.45);
+  stroke-width: 1.25;
+  stroke-dasharray: 2, 2;
+  fill: none;
+}
+
 .callout-3d {
   position: absolute;
   transform: translate(-50%, -100%);
   pointer-events: none;
   z-index: 15;
   transition: opacity 0.15s ease;
+}
+
+.callout-3d[data-band] {
+  transform: none; /* Controlled directly by pixel layout in sync3DCallouts */
 }
 
 .callout-box {
@@ -1205,6 +1226,12 @@
 }
 
 @media (max-width: 420px) {
+  .studio-callout-svg {
+    display: none !important;
+  }
+  .callout-3d[data-band] {
+    transform: translate(-50%, -50%) !important;
+  }
   .callout-3d[data-band] .callout-box,
   .callout-3d[data-band] .callout-line,
   .callout-3d[data-band] .callout-dot {

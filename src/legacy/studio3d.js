@@ -59,6 +59,7 @@ import {
   buildCalloutData,
   computeAutoExaggeration,
   usdaTextureClass,
+  deoverlapLabels,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -1977,10 +1978,10 @@ function fitPerspective(data, close = false) {
 
   // Block fills ~70 % of the frame on 3D view; close-up pushes in closer.
   // Shift target down to center the block in the frame below the UI
-  const isDesktop3d = !isPhone() && !close;
+  const isDesktop = !isPhone();
   const distance = close
     ? fit.distance * 0.72
-    : isDesktop3d
+    : isDesktop
       ? fit.distance * 0.92 * 1.3
       : fit.distance * 0.92;
   const el = (elevationDeg * Math.PI) / 180;
@@ -1993,7 +1994,7 @@ function fitPerspective(data, close = false) {
   );
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
-  if (isDesktop3d && canvasHostEl) {
+  if (isDesktop && canvasHostEl) {
     const w = canvasHostEl.clientWidth || 600;
     const h = canvasHostEl.clientHeight || 400;
     cameraPersp.setViewOffset(w, h, (0.5 - 0.66) * w, (0.5 - 0.56) * h, w, h);
@@ -2112,14 +2113,88 @@ function placeCallout(x, y, z, id, show, checkFacingNormal = false) {
   el.style.top = `${(-v.y * 0.5 + 0.5) * canvasHostEl.clientHeight}px`;
 }
 
+function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) {
+  if (!ringM || ringM.length < 2) return null;
+
+  // If sliced and camera is in front of the cut face (cam.x > effectiveMaxX),
+  // the visible cut cross-section is the active wall face.
+  if (cutawayFraction > 0.05 && camPos.x > effectiveMaxX - 0.5) {
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const [x, y] of ringM) {
+      if (Math.abs(x - effectiveMaxX) < 1.0) {
+        const z = -y;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
+      }
+    }
+    if (minZ !== Infinity && maxZ !== -Infinity && maxZ > minZ) {
+      return {
+        isCutFace: true,
+        x0: effectiveMaxX,
+        z0: minZ,
+        x1: effectiveMaxX,
+        z1: maxZ,
+        midX: effectiveMaxX,
+        midZ: (minZ + maxZ) / 2,
+        normalX: 1,
+        normalZ: 0,
+      };
+    }
+  }
+
+  // Find exterior wall edge whose outward normal best faces camera
+  const isCW = ringSignedArea(ringM) < 0;
+  let bestEdge = null;
+  let bestDot = -Infinity;
+
+  for (let i = 0; i < ringM.length; i++) {
+    const a = ringM[i];
+    const b = ringM[(i + 1) % ringM.length];
+    const p0 = { x: a[0], z: -a[1] };
+    const p1 = { x: b[0], z: -b[1] };
+    const dx = p1.x - p0.x;
+    const dz = p1.z - p0.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-4) continue;
+
+    // Outward normal in world (x, z)
+    let nx = isCW ? dz / len : -dz / len;
+    let nz = isCW ? -dx / len : dx / len;
+
+    const midX = (p0.x + p1.x) / 2;
+    const midZ = (p0.z + p1.z) / 2;
+    const toCamX = camPos.x - midX;
+    const toCamZ = camPos.z - midZ;
+    const toCamLen = Math.hypot(toCamX, toCamZ) || 1;
+    const dot = (nx * toCamX + nz * toCamZ) / toCamLen;
+
+    if (dot > bestDot) {
+      bestDot = dot;
+      bestEdge = {
+        isCutFace: false,
+        x0: p0.x,
+        z0: p0.z,
+        x1: p1.x,
+        z1: p1.z,
+        midX,
+        midZ,
+        normalX: nx,
+        normalZ: nz,
+      };
+    }
+  }
+
+  return bestEdge;
+}
+
 function sync3DCallouts() {
-  if (!currentData || !currentBlock.bounds || !containerEl) return;
+  if (!currentData || !currentBlock.bounds || !containerEl || !activeCamera || !canvasHostEl) return;
   const b = currentBlock.bounds;
   const cutFraction = currentCutaway;
   const sliceU = 1 - cutFraction;
   const sx = b.minX + sliceU * b.width;
   const isWater = currentSurfaceMode === "water" || currentSurfaceMode === "ponding";
-  const isSoil = currentSurfaceMode === "fertility" || cutFraction > 0.05;
+  const isSoil = true; // Show callouts in default 3D view too, as per STUDIO5L
 
   const heightAt = makeHeightAt(currentData);
 
@@ -2142,11 +2217,147 @@ function sync3DCallouts() {
   const otz = -(b.minY + 0.73 * b.height);
   placeCallout(otx, heightAt(otx, otz) + 0.55, otz, 'callout-outlet', isWater && sliceU >= 0.88);
 
-  // Soil stratigraphic callouts along cutaway face
-  const depth = currentBlock.topMin - currentBlock.bottomY;
-  placeCallout(sx, currentBlock.topMin - 0.075 * depth, -b.cy + b.height * 0.22, 'callout-topsoil', isSoil, true);
-  placeCallout(sx, currentBlock.topMin - 0.35 * depth, -b.cy, 'callout-rootzone', isSoil, true);
-  placeCallout(sx, currentBlock.bottomY + 0.25 * depth, -b.cy - b.height * 0.22, 'callout-aquifer', isSoil, true);
+  // Soil stratigraphic callouts pinned to the front-facing cut wall
+  const depth = Math.max(0.2, currentBlock.topMin - currentBlock.bottomY);
+  const ringM = (currentBlock.ring || []).map(([x, negZ]) => [x, -negZ]);
+  const camPos = activeCamera.position;
+  const wallFace = findFrontFacingWallFace(ringM, camPos, cutFraction, currentBlock.effectiveMaxX ?? sx);
+
+  const topsoilEl = containerEl.querySelector('#callout-topsoil');
+  const rootzoneEl = containerEl.querySelector('#callout-rootzone');
+  const aquiferEl = containerEl.querySelector('#callout-aquifer');
+  const svgLeaders = containerEl.querySelector('#svg-callout-leaders');
+
+  if (!isSoil || !wallFace) {
+    if (topsoilEl) topsoilEl.style.display = 'none';
+    if (rootzoneEl) rootzoneEl.style.display = 'none';
+    if (aquiferEl) aquiferEl.style.display = 'none';
+    if (svgLeaders) svgLeaders.innerHTML = '';
+    return;
+  }
+
+  // Anchor mid-depths: 0-15 cm -> 7.5 cm, 15-60 cm -> 37.5 cm, >120 cm -> 135 cm
+  const yTopsoil = currentBlock.topMin - (7.5 / 150) * depth;
+  const yRootzone = currentBlock.topMin - (37.5 / 150) * depth;
+  const yAquifer = currentBlock.topMin - (135 / 150) * depth;
+
+  const wallEdgeLen = Math.hypot(wallFace.x1 - wallFace.x0, wallFace.z1 - wallFace.z0);
+  const anchorAt = (tNorm, yVal) => {
+    const x = wallEdgeLen > 1e-4 ? wallFace.x0 + (wallFace.x1 - wallFace.x0) * tNorm : wallFace.midX;
+    const z = wallEdgeLen > 1e-4 ? wallFace.z0 + (wallFace.z1 - wallFace.z0) * tNorm : wallFace.midZ;
+    return new THREE.Vector3(x, yVal, z);
+  };
+
+  const pTop = anchorAt(0.35, yTopsoil);
+  const pRoot = anchorAt(0.50, yRootzone);
+  const pAqui = anchorAt(0.65, yAquifer);
+
+  const projectToScreen = (v3) => {
+    const v = v3.clone();
+    if (floatGroup) floatGroup.localToWorld(v);
+    v.project(activeCamera);
+    return {
+      x: (v.x * 0.5 + 0.5) * canvasHostEl.clientWidth,
+      y: (-v.y * 0.5 + 0.5) * canvasHostEl.clientHeight,
+      visible: v.z >= -1 && v.z <= 1,
+    };
+  };
+
+  const scrTop = projectToScreen(pTop);
+  const scrRoot = projectToScreen(pRoot);
+  const scrAqui = projectToScreen(pAqui);
+
+  const isMobile = window.innerWidth <= 420;
+  if (isMobile) {
+    if (svgLeaders) svgLeaders.innerHTML = '';
+    const placeMobileDot = (el, scr) => {
+      if (!el) return;
+      if (!scr.visible) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'block';
+      el.style.left = `${scr.x}px`;
+      el.style.top = `${scr.y}px`;
+    };
+    placeMobileDot(topsoilEl, scrTop);
+    placeMobileDot(rootzoneEl, scrRoot);
+    placeMobileDot(aquiferEl, scrAqui);
+    return;
+  }
+
+  // Desktop / tablet: Layout labels in column beside the block
+  const avgAnchorX = (scrTop.x + scrRoot.x + scrAqui.x) / 3;
+  const canvasW = canvasHostEl.clientWidth;
+  const canvasH = canvasHostEl.clientHeight;
+
+  // Place column on whichever side has more free space
+  const placeOnRight = avgAnchorX < canvasW * 0.5;
+
+  const topRect = topsoilEl?.querySelector('.callout-box')?.getBoundingClientRect();
+  const rootRect = rootzoneEl?.querySelector('.callout-box')?.getBoundingClientRect();
+  const aquiRect = aquiferEl?.querySelector('.callout-box')?.getBoundingClientRect();
+
+  const hTop = topRect?.height || 42;
+  const hRoot = rootRect?.height || 42;
+  const hAqui = aquiRect?.height || 42;
+
+  const rawLabels = [
+    { id: 'topsoil', el: topsoilEl, anchor: scrTop, height: hTop, order: 1 },
+    { id: 'rootzone', el: rootzoneEl, anchor: scrRoot, height: hRoot, order: 2 },
+    { id: 'aquifer', el: aquiferEl, anchor: scrAqui, height: hAqui, order: 3 },
+  ];
+
+  const layoutItems = rawLabels.map((lbl) => ({
+    id: lbl.id,
+    anchorY: lbl.anchor.y,
+    height: lbl.height,
+    order: lbl.order,
+  }));
+
+  // Min top and bottom padding to avoid title stack and bottom probe cards
+  const topPad = currentViewMode === "cutaway" ? 40 : 130;
+  const bottomPad = 90;
+  const positioned = deoverlapLabels(layoutItems, canvasH, 10, topPad, bottomPad);
+
+  const posMap = new Map();
+  for (const p of positioned) {
+    posMap.set(p.id, p.y);
+  }
+
+  // Determine column X
+  let columnX;
+  if (placeOnRight) {
+    columnX = Math.min(canvasW - 270, Math.max(avgAnchorX + 55, canvasW * 0.62));
+  } else {
+    columnX = Math.max(20, Math.min(avgAnchorX - 250, canvasW * 0.08));
+  }
+
+  let svgLines = '';
+  for (const lbl of rawLabels) {
+    if (!lbl.el || !lbl.anchor.visible) {
+      if (lbl.el) lbl.el.style.display = 'none';
+      continue;
+    }
+    const boxY = posMap.get(lbl.id) ?? lbl.anchor.y;
+    lbl.el.style.display = 'block';
+    lbl.el.style.left = `${columnX}px`;
+    lbl.el.style.top = `${boxY}px`;
+
+    // Leader line from label card edge to 3D anchor dot
+    const boxW = lbl.el.querySelector('.callout-box')?.offsetWidth || 230;
+    const cardEdgeX = placeOnRight ? columnX : columnX + boxW;
+    const cardEdgeY = boxY + lbl.height / 2;
+
+    svgLines += `
+      <circle cx="${lbl.anchor.x.toFixed(1)}" cy="${lbl.anchor.y.toFixed(1)}" r="3.5" fill="#173e30" stroke="#fffdf5" stroke-width="1.5" />
+      <path d="M ${cardEdgeX.toFixed(1)},${cardEdgeY.toFixed(1)} L ${lbl.anchor.x.toFixed(1)},${lbl.anchor.y.toFixed(1)}" class="callout-leader-line" />
+    `;
+  }
+
+  if (svgLeaders) {
+    svgLeaders.innerHTML = svgLines;
+  }
 }
 
 function renderTransectSVG() {
@@ -2234,28 +2445,29 @@ function focusSoilBand(bandId) {
   if (!currentBlock.bounds || !cameraPersp || !controls) return;
   const b = currentBlock.bounds;
   const cutFraction = currentCutaway;
-  const sliceU = 1 - cutFraction;
-  const sx = b.minX + sliceU * b.width;
-  const depth = currentBlock.topMin - currentBlock.bottomY;
+  const sx = b.minX + (1 - cutFraction) * b.width;
+  const depth = Math.max(0.2, currentBlock.topMin - currentBlock.bottomY);
+  const ringM = (currentBlock.ring || []).map(([x, negZ]) => [x, -negZ]);
+  const camPos = activeCamera.position;
+  const wallFace = findFrontFacingWallFace(ringM, camPos, cutFraction, currentBlock.effectiveMaxX ?? sx);
 
   let targetY = currentBlock.topMin - 0.5 * depth;
-  let targetZ = -b.cy;
   if (bandId === "topsoil") {
-    targetY = currentBlock.topMin - 0.075 * depth;
-    targetZ = -b.cy + b.height * 0.22;
+    targetY = currentBlock.topMin - (7.5 / 150) * depth;
   } else if (bandId === "rootzone") {
-    targetY = currentBlock.topMin - 0.35 * depth;
-    targetZ = -b.cy;
+    targetY = currentBlock.topMin - (37.5 / 150) * depth;
   } else if (bandId === "aquifer") {
-    targetY = currentBlock.bottomY + 0.25 * depth;
-    targetZ = -b.cy - b.height * 0.22;
+    targetY = currentBlock.topMin - (135 / 150) * depth;
   }
 
-  const endTarget = new THREE.Vector3(sx, targetY, targetZ);
+  const focusX = wallFace ? wallFace.midX : sx;
+  const focusZ = wallFace ? wallFace.midZ : -b.cy;
+
+  const endTarget = new THREE.Vector3(focusX, targetY, focusZ);
   const endCamPos = new THREE.Vector3(
-    sx + Math.max(12, b.width * 0.45),
+    focusX + (wallFace ? wallFace.normalX * Math.max(12, b.width * 0.45) : Math.max(12, b.width * 0.45)),
     targetY + Math.max(4, depth * 0.5),
-    targetZ + Math.max(8, b.height * 0.35)
+    focusZ + (wallFace ? wallFace.normalZ * Math.max(12, b.height * 0.45) : Math.max(8, b.height * 0.35))
   );
 
   if (prefersReducedMotion) {
@@ -2578,7 +2790,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           </div>
 
           <span class="studio-crop-chip">● ${t("Illustrative crop preview · not observed plants", "কাল্পনিক ফসল পূর্বদর্শন · পর্যবেক্ষিত উদ্ভিদ নয়")}</span>
-          <div class="studio-caption-copy">
+          <div class="studio-caption-copy" ${currentViewMode === "cutaway" ? 'style="display:none;"' : ""}>
             <h2>${t("Your field. Brought to life.", "আপনার জমি। জীবন্ত রূপে।")}</h2>
             <p>${t("Drag to rotate · scroll to zoom · tap to inspect", "ঘোরাতে টানুন · জুম করতে স্ক্রল · পরীক্ষা করতে ট্যাপ")}</p>
           </div>
@@ -2594,6 +2806,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         ${depthTicksHtml()}
 
         <!-- Architectural Callouts overlay -->
+        <svg id="svg-callout-leaders" class="studio-callout-svg" aria-hidden="true"></svg>
         <div id="overlay-callouts" class="studio-callout-overlay">
           <div id="node-a" class="callout-3d"><div class="transect-node">A</div></div>
           <div id="node-ap" class="callout-3d"><div class="transect-node">A'</div></div>
@@ -2959,6 +3172,13 @@ function bindEvents(container) {
     };
   }
 
+  const updateTitleVisibility = () => {
+    const caption = containerEl?.querySelector(".studio-caption-copy");
+    if (caption) {
+      caption.style.display = currentViewMode === "cutaway" ? "none" : "";
+    }
+  };
+
   // Camera presets: 3D Block | Root Slice | Top 2D
   const btn3d = containerEl.querySelector("#btn-view-3d");
   if (btn3d) {
@@ -2966,6 +3186,7 @@ function bindEvents(container) {
       currentViewMode = "3d";
       isTopView = false;
       isCloseView = false;
+      updateTitleVisibility();
       containerEl.querySelectorAll(".studio-view-btn").forEach((b) => b.classList.remove("active"));
       btn3d.classList.add("active");
       activeCamera = cameraPersp;
@@ -2983,6 +3204,7 @@ function bindEvents(container) {
       currentViewMode = "cutaway";
       isTopView = false;
       isCloseView = true;
+      updateTitleVisibility();
       currentCutaway = 0.42; // Open slice
       containerEl.querySelectorAll(".studio-view-btn").forEach((b) => b.classList.remove("active"));
       btnCut.classList.add("active");
@@ -3010,6 +3232,7 @@ function bindEvents(container) {
       currentViewMode = "top";
       isTopView = true;
       isCloseView = false;
+      updateTitleVisibility();
       containerEl.querySelectorAll(".studio-view-btn").forEach((b) => b.classList.remove("active"));
       btn2d.classList.add("active");
       activeCamera = cameraOrtho;
