@@ -1878,7 +1878,7 @@ let isDragging = false;
 // block keeps only a residual vertical float. The camera part is a transient
 // offset applied after controls.update() and restored right after the frame
 // renders, so it never fights OrbitControls.
-let idleHover = false, idleFrozenT = null, idleFrozenNow = 0, idleShift = 0;
+let idleHover = false, idleHoverMix = 1, idleHoverLastMs = 0; // mouse over stage → sway eases to 0 so pins sit still
 let idleLastInputMs = -1e13; // last user input; sway resumes 6 s after, easing in over 1.5 s
 let idleBasePos = null; // camera position saved before the transient sway offset
 let idleHasOffset = false;
@@ -1951,19 +1951,15 @@ function applyIdleFloat(timeS, nowMs = performance.now()) {
     floatGroup.rotation.set(0, 0, 0);
     return;
   }
-  // Freeze (not reset) the sway while a mouse hovers the stage, so pins don't drift under the cursor.
-  if (idleHover) {
-    if (idleFrozenT === null) { idleFrozenT = timeS - idleShift; idleFrozenNow = nowMs; }
-    timeS = idleFrozenT; nowMs = idleFrozenNow;
-  } else {
-    if (idleFrozenT !== null) { idleShift = timeS - idleFrozenT; idleFrozenT = null; }
-    timeS -= idleShift;
-  }
   const span = currentBlock.bounds
     ? Math.max(currentBlock.bounds.width, currentBlock.bounds.height)
     : 30;
-  const sway = idleCameraSway(timeS, (nowMs - idleLastInputMs) / 1000, { fieldSpanM: span });
-  if (sway.gain <= 0) {
+  const sway = { ...idleCameraSway(timeS, (nowMs - idleLastInputMs) / 1000, { fieldSpanM: span }) };
+  const hoverDt = Math.min(0.5, Math.max(0, (nowMs - (idleHoverLastMs || nowMs)) / 1000)); idleHoverLastMs = nowMs;
+  idleHoverMix += ((idleHover ? 0 : 1) - idleHoverMix) * (1 - Math.exp(-hoverDt / 0.12)); // ~0.4 s settle, fps-independent
+  if (idleHoverMix < 0.002) idleHoverMix = 0;
+  sway.yawRad *= idleHoverMix; sway.dolly *= idleHoverMix; sway.dy *= idleHoverMix;
+  if (sway.gain <= 0 || idleHoverMix === 0) {
     floatGroup.position.set(0, 0, 0);
     floatGroup.rotation.set(0, 0, 0);
     return;
