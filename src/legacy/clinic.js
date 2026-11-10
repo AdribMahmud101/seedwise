@@ -73,7 +73,7 @@ function symptomView() {
        `<label class="symptom-option"><input type="checkbox" data-symptom="${s.id}" ${state.clinic.symptoms.includes(s.id) ? 'checked' : ''}>${esc(t(s.label, s.bn))}</label>`
    )
    .join('')}</div>
- <label class="photo-drop">${photo ? `<img src="${photo}" alt="${t('Your crop photograph', 'আপনার ফসলের ছবি')}">` : icon('camera', 26)}<span>${photo ? esc(previewName) : t('Attach a field photo (optional)', 'জমির ছবি দিন (ঐচ্ছিক)')}</span><small>${t('Photo for the field note. Symptoms determine the suggestions.', 'ছবিটি নোটের জন্য। সম্ভাব্য কারণগুলো নির্বাচিত লক্ষণ থেকে আসে।')}</small><input type="file" class="file-native" id="clinic-photo" accept="image/jpeg,image/png,image/webp"></label>
+ <label class="photo-drop">${photo ? `<img src="${photo}" alt="${t('Your crop photograph', 'আপনার ফসলের ছবি')}">` : icon('camera', 26)}<span id="clinic-photo-label">${photo ? esc(previewName) : t('Attach a field photo (optional)', 'জমির ছবি দিন (ঐচ্ছিক)')}</span><small id="clinic-photo-help">${t('Photo for the field note. Symptoms determine the suggestions.', 'ছবিটি নোটের জন্য। সম্ভাব্য কারণগুলো নির্বাচিত লক্ষণ থেকে আসে।')}</small><input type="file" class="file-native" id="clinic-photo" aria-labelledby="clinic-photo-label" aria-describedby="clinic-photo-help" accept="image/jpeg,image/png,image/webp"></label>
  ${photo ? button(t('Remove photo', 'ছবি বাদ দিন'), 'clear-photo', 'ghost small') : ''}<div class="spacer"></div>${button(t('Check possible causes', 'সম্ভাব্য কারণ দেখুন'), 'clinic-check', 'primary full', 'bug')}`
   )}
  <section class="panel" id="clinic-result">${result()}</section></div>`;

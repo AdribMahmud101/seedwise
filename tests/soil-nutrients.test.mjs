@@ -217,3 +217,78 @@ test('Units are appropriate for each nutrient', () => {
     }
   }
 });
+
+test('rotation nutrient chips map SoilGrids values, units, classes and missing data in EN and BN', async (context) => {
+  const { state, loadData, num, t } = await import('../src/legacy/ui.js');
+  const { rotations, mountRotations } = await import('../src/legacy/rotations.js');
+  const { saveSoilOverrides, resetSoilOverrides } = await import('../src/legacy/rotation-tool.js');
+  const baseURI = new URL('../public/', import.meta.url).href;
+  context.mock.method(globalThis, 'fetch', async (url) => {
+    const path = new URL(url, baseURI);
+    return { ok: true, json: async () => JSON.parse(readFileSync(path, 'utf8')) };
+  });
+  globalThis.document = {
+    baseURI,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    getElementById: () => null,
+  };
+  globalThis.window = { innerWidth: 390 };
+  globalThis.localStorage = { setItem() {}, removeItem() {} };
+  context.after(() => {
+    delete globalThis.document;
+    delete globalThis.window;
+    delete globalThis.localStorage;
+  });
+  await loadData();
+  await mountRotations();
+  const chip = (html, key) => {
+    const match = html.match(new RegExp(`data-nutrient="${key}">([\\s\\S]*?)</button>`));
+    assert.ok(match, `Missing ${key} chip`);
+    return match[1];
+  };
+
+  for (const lang of ['en', 'bn']) {
+    state.lang = lang;
+    for (const [siteId, site] of Object.entries(data.sites)) {
+      state.fieldId = siteId;
+      const html = rotations();
+      const nutrients = site.nutrients;
+      const expected = [
+        ['ph', nutrients.ph.value, '', 'ph'],
+        ['om', num(nutrients.om.value / 10, 2), '%', 'om'],
+        ['N', num(nutrients.totalN.value / 10, 3), '%', 'totalN'],
+        ['cec', nutrients.cec.value, 'cmol+/kg', 'cec'],
+      ];
+      for (const [key, value, unit, sourceKey] of expected) {
+        const rendered = chip(html, key);
+        assert.ok(rendered.includes(`<strong>${value}</strong> ${unit}`), `${siteId}.${key} value/unit in ${lang}`);
+        assert.ok(rendered.includes(`<span class="chip-class">${nutrients[sourceKey].class_en}</span>`));
+        assert.ok(rendered.includes(t('Estimated · SoilGrids 250 m', 'স্যাটেলাইট অনুমান · SoilGrids 250 m')));
+        assert.ok(!rendered.includes('chip-enter'));
+      }
+      for (const key of ['P', 'K', 'S', 'Zn', 'B']) {
+        assert.ok(chip(html, key).includes(t('Enter soil test', 'মাটি পরীক্ষা লিখুন')));
+      }
+    }
+
+    saveSoilOverrides({ ph: 7.2, om: 3.1 });
+    const local = rotations();
+    for (const [key, value] of [['ph', 7.2], ['om', 3.1]]) {
+      assert.ok(chip(local, key).includes(`<strong>${value}</strong>`));
+      assert.ok(chip(local, key).includes('by farmer'));
+      assert.ok(!chip(local, key).includes('SoilGrids 250 m'));
+    }
+    resetSoilOverrides();
+
+    // A custom field must not inherit a prepared site's soil estimates.
+    const { earth } = await import('../src/legacy/ui.js');
+    state.customFields = [{ ...earth.fields[0], id: 'custom-soil-test', custom: true }];
+    state.fieldId = 'custom-soil-test';
+    const missing = rotations();
+    for (const key of ['ph', 'om', 'N', 'cec']) {
+      assert.ok(chip(missing, key).includes(t('Enter soil test', 'মাটি পরীক্ষা লিখুন')));
+    }
+    state.customFields = [];
+  }
+});

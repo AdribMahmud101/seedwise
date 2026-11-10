@@ -463,9 +463,10 @@ function panelWhereWillWaterCollect() {
 function panelWhatIsUnderMyField() {
   const f = field();
   const fid = f?.id || state.fieldId;
-  const siteProfile = cachedSoilProfile?.sites?.[fid] || cachedSoilProfile?.sites?.mithapukur;
-  const topLayer = siteProfile?.layers?.[0];
-  const siteNutrients = cachedSoilNutrients && cachedSoilNutrients !== false ? (cachedSoilNutrients[fid] || cachedSoilNutrients.sites?.[fid] || null) : null;
+  const siteNutrients = cachedSoilNutrients?.sites?.[fid]?.nutrients;
+  const soilTruth = truth('MODELED', { source: 'SoilGrids 250 m' })
+    .replaceAll(t('Estimated', 'স্যাটেলাইট অনুমান'), t('Estimated · SoilGrids 250 m', 'স্যাটেলাইট অনুমান · SoilGrids 250 m'));
+  const nutrientClass = (key) => t(siteNutrients?.[key]?.class_en || '', siteNutrients?.[key]?.class_bn);
 
   // Local overrides from localStorage
   const localGw = rotationTool.soilOverrides?.gwDepth;
@@ -475,26 +476,27 @@ function panelWhatIsUnderMyField() {
   // Values:
   // 1. Moisture: from SMAP or studio
   const moistureVal = '0.50';
-  // 2. pH: from local or soil-profile.json
-  const phVal = localPh != null ? localPh : (topLayer?.ph != null ? topLayer.ph : 6.0);
-  const phClass = phVal < 5.5 ? t('Acidic', 'অম্লীয়') : phVal > 7.5 ? t('Alkaline', 'ক্ষারীয়') : t('Optimal', 'উপযুক্ত');
-  const phTruth = localPh != null ? truth('FARMER_REPORTED') : truth('MODELED', { source: 'SoilGrids 2.0' });
+  // 2. pH: local soil tests take precedence over SoilGrids nutrient values.
+  const phVal = localPh != null ? localPh : siteNutrients?.ph?.value;
+  const phClass = localPh != null ? (phVal < 5.5 ? t('Acidic', 'অম্লীয়') : phVal > 7.5 ? t('Alkaline', 'ক্ষারীয়') : t('Optimal', 'উপযুক্ত')) : nutrientClass('ph');
+  const phTruth = localPh != null ? truth('FARMER_REPORTED') : soilTruth;
 
-  // 3. OM: from local or soil-profile.json (socGkg * 1.724 / 10)
-  const omVal = localOm != null ? localOm : (topLayer?.socGkg != null ? (topLayer.socGkg * 1.724 / 10).toFixed(2) : '1.83');
-  const omClass = omVal < 1.5 ? t('Low', 'কম') : omVal > 2.5 ? t('Good', 'ভালো') : t('Medium', 'মাঝারি');
-  const omTruth = localOm != null ? truth('FARMER_REPORTED') : truth('MODELED', { source: 'SoilGrids 2.0' });
+  // 3. OM: local percent or SoilGrids organic matter converted from g/kg to percent.
+  const omVal = localOm != null ? localOm : (siteNutrients?.om?.value != null ? num(siteNutrients.om.value / 10, 2) : null);
+  const omClass = localOm != null ? (omVal < 1.5 ? t('Low', 'কম') : omVal > 2.5 ? t('Good', 'ভালো') : t('Medium', 'মাঝারি')) : nutrientClass('om');
+  const omTruth = localOm != null ? truth('FARMER_REPORTED') : soilTruth;
 
   // 4. Nitrogen
-  const nVal = siteNutrients?.n != null ? siteNutrients.n : null;
+  const nVal = siteNutrients?.totalN?.value != null ? num(siteNutrients.totalN.value / 10, 3) : null;
+  const cecVal = siteNutrients?.cec?.value;
   // 5. Phosphorus
-  const pVal = siteNutrients?.p != null ? siteNutrients.p : null;
+  const pVal = null;
   // 6. Potassium
-  const kVal = siteNutrients?.k != null ? siteNutrients.k : null;
+  const kVal = null;
   // 7. Zinc
-  const znVal = siteNutrients?.zn != null ? siteNutrients.zn : null;
+  const znVal = null;
   // 8. Boron
-  const bVal = siteNutrients?.b != null ? siteNutrients.b : null;
+  const bVal = null;
 
   function renderChip(key, label, val, unit, standardClass, truthBadge) {
     const isSelected = selectedNutrient === key;
@@ -524,7 +526,9 @@ function panelWhatIsUnderMyField() {
         ${renderChip('moisture', t('Moisture', 'আর্দ্রতা'), moistureVal, 'index', t('Adequate', 'পর্যাপ্ত'), truth('MODELED', { source: 'NASA SMAP L4' }))}
         ${renderChip('ph', 'pH', phVal, '', phClass, phTruth)}
         ${renderChip('om', t('OM', 'জৈব পদার্থ'), omVal, '%', omClass, omTruth)}
-        ${renderChip('N', t('Nitrogen', 'নাইট্রোজেন (N)'), nVal, 'kg/ha', t('Deficient', 'ঘাটতি'), truth('MODELED'))}
+        ${renderChip('N', t('Nitrogen', 'নাইট্রোজেন (N)'), nVal, '%', nutrientClass('totalN'), soilTruth)}
+        ${renderChip('cec', t('CEC', 'ক্যাটায়ন বিনিময় ক্ষমতা (CEC)'), cecVal, 'cmol+/kg', nutrientClass('cec'), soilTruth)}
+        ${renderChip('S', t('Sulfur', 'সালফার (S)'), null, '', '', '')}
         ${renderChip('P', t('Phosphorus', 'ফসফরাস (P)'), pVal, 'mg/kg', t('Medium', 'মাঝারি'), truth('MODELED'))}
         ${renderChip('K', t('Potassium', 'পটাশিয়াম (K)'), kVal, 'meq/100g', t('Low', 'কম'), truth('MODELED'))}
         ${renderChip('Zn', t('Zinc', 'জিংক (Zn)'), znVal, 'mg/kg', t('Low', 'কম'), truth('MODELED'))}
