@@ -1009,7 +1009,7 @@ async function buildFieldBlock(data, cutawayFraction) {
   }
 
   // Water Ponding layer
-  const waterPositions = ['water', 'ponding', 'crops', 'photo'].includes(model.mode)
+  const waterPositions = ['water', 'ponding'].includes(model.mode) // simulated water only in the Water view (crop view must not look flooded)
     ? pondingPositions(pos.array, model.ponding) : [];
   if (waterPositions.length) {
     const wGeo = new THREE.BufferGeometry();
