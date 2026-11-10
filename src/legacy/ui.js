@@ -36,6 +36,7 @@ let saved = {};
 try {
   saved = JSON.parse(localStorage.getItem(storageKey) || "{}") || {};
 } catch {}
+delete saved.month; // month is view state: always open on the default month, never a stale (possibly fallow) one
 const state = { ...structuredClone(defaults), ...saved };
 for (const key of ["weights", "planner", "clinic", "tabs", "water"])
   state[key] = { ...defaults[key], ...saved[key] };
@@ -56,7 +57,7 @@ async function loadData() {
 }
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify(state));
+    localStorage.setItem(storageKey, JSON.stringify({ ...state, month: undefined }));
     return true;
   } catch {
     toast(
