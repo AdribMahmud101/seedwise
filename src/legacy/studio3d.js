@@ -64,6 +64,10 @@ import {
   introCameraParams,
   shouldSkipIntro,
   sampleRowCropScale,
+  nearestCropMonth,
+  cropStageAt,
+  MONTHS_EN,
+  MONTHS_BN,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -80,6 +84,8 @@ export {
   clipRing,
   canopyVisualHeight,
   idleFloatOffset,
+  nearestCropMonth,
+  cropStageAt,
 } from "./studio3d-helpers.js";
 
 /* ------------------------------------------------------------------ state */
@@ -490,7 +496,15 @@ async function buildTopTexture(data, layer, monthIdx) {
         const furrowFreq = layout === "beds" ? 28 : layout === "bund-drains" ? 18 : 52;
         const furrow = Math.sin(u * Math.PI * furrowFreq);
         if (isFallow) {
-          r = Math.round(138 + furrow * 8); g = Math.round(116 + furrow * 7); b = Math.round(84 + furrow * 5);
+          // Slightly cracked / tilled soil texture for fallow months
+          const crackNoise = Math.min(
+            Math.abs(Math.sin(u * 96 + Math.sin(v * 48) * 1.2)),
+            Math.abs(Math.cos(v * 96 + Math.cos(u * 48) * 1.2))
+          );
+          const crackDarken = crackNoise < 0.12 ? 0.74 : 1.0;
+          r = Math.round((138 + furrow * 9) * crackDarken);
+          g = Math.round((116 + furrow * 7) * crackDarken);
+          b = Math.round((84 + furrow * 5) * crackDarken);
         } else {
           r = Math.round(r * 0.55 + (68 + furrow * 7) * 0.45);
           g = Math.round(g * 0.55 + (118 + furrow * 9) * 0.45);
@@ -1084,6 +1098,30 @@ export function buildClumpGeometry(cropId, heightM, spreadM, stage = "grow") {
   return g;
 }
 
+export function buildFallowResidueGeometry(spreadM = 0.3) {
+  const parts = [];
+  const r = Math.max(0.08, spreadM * 0.46);
+  // Stubble: short cut stems in old rows (straw colour, angled slightly)
+  for (let k = 0; k < 3; k++) {
+    const angle = (k / 3) * Math.PI * 2 + k * 0.35;
+    const h = 0.08 + (k % 2) * 0.04;
+    const stem = new THREE.CylinderGeometry(0.012, 0.016, h, 4);
+    stem.rotateZ(0.14 * Math.cos(angle));
+    stem.rotateX(0.14 * Math.sin(angle));
+    stem.translate(Math.cos(angle) * r * 0.35, h / 2, Math.sin(angle) * r * 0.35);
+    parts.push(stem);
+  }
+  // Low sparse weeds
+  for (let k = 0; k < 2; k++) {
+    const angle = k * Math.PI + 1.1;
+    const weed = new THREE.ConeGeometry(r * 0.18, 0.05, 3);
+    weed.rotateZ(0.35 * Math.cos(angle));
+    weed.translate(Math.cos(angle) * r * 0.55, 0.025, Math.sin(angle) * r * 0.55);
+    parts.push(weed);
+  }
+  return mergeClumpParts(parts);
+}
+
 export function createBotanicalPlantGeometry() {
   const geo = new THREE.BufferGeometry();
   const positions = [];
@@ -1156,15 +1194,31 @@ function buildPlantsAndRoots(data, monthIdx) {
   plantShaders = [];
 
   const month = data.months?.[monthIdx];
-  if (!month || month.stage === "fallow" || !month.cropId) return;
+  if (!month) return;
+  const isFallow = month.stage === "fallow" || !month.cropId;
+
+  // For fallow months: find previous crop in rotation for row spacing and residue
+  let prevCrop = null;
+  if (isFallow) {
+    const months = data.months || [];
+    for (let step = 1; step <= 12; step++) {
+      const idx = ((monthIdx - step) % 12 + 12) % 12;
+      const m = months[idx];
+      if (m && m.cropId && m.stage !== "fallow") {
+        prevCrop = m;
+        break;
+      }
+    }
+  }
 
   const outlineM = data.field.outlineM;
   const bounds = currentBlock.bounds || outlineBounds(outlineM);
   const heightAt = makeHeightAt(data);
   const maxPlants = isPhone() || (navigator.deviceMemory || 4) <= 4 ? 4000 : 38000;
   
-  // Adapt spacing based on plantingLayout
-  const step = cropSpacing(month.cropId);
+  // Adapt spacing based on plantingLayout and cropId (or previous crop if fallow)
+  const activeCropId = isFallow ? (prevCrop?.cropId || "boro") : month.cropId;
+  const step = cropSpacing(activeCropId);
   const layout = plantingLayout || "rows";
   const rowsAlongX = bounds.width >= bounds.height;
   let rowSpacing = (rowsAlongX ? step.row : step.plant) * (layout === "beds" ? 1.5 : layout === "bund-drains" ? 1.25 : 1);
@@ -1184,10 +1238,12 @@ function buildPlantsAndRoots(data, monthIdx) {
   if (positions.length === 0) return;
 
   const fieldSpan = Math.max(bounds.width, bounds.height);
-  const h = canopyVisualHeight(month, fieldSpan);
+  const h = isFallow ? 0.12 : canopyVisualHeight(month, fieldSpan);
   if (!(h > 0)) return;
 
-  const geom = buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing), month.stage);
+  const geom = isFallow
+    ? buildFallowResidueGeometry(Math.max(rowSpacing, plantSpacing))
+    : buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing), month.stage);
   
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -1213,8 +1269,18 @@ function buildPlantsAndRoots(data, monthIdx) {
   mesh.castShadow = !isPhone();
   mesh.receiveShadow = false;
   const dummy = new THREE.Object3D();
-  const base = new THREE.Color(stageColor(month.cropId, month.stage));
+  const strawColor = "#c8b382";
+  const base = new THREE.Color(isFallow ? strawColor : stageColor(month.cropId, month.stage));
   const colour = new THREE.Color();
+
+  // Stage scaling factor so seedlings and establishing crops are small, not invisible
+  const stageScale = isFallow
+    ? 1.0
+    : month.stage === "establish"
+      ? 0.42
+      : month.stage === "harvest"
+        ? 0.55
+        : 1.0;
 
   for (let i = 0; i < positions.length; i++) {
     const [x, y] = positions[i];
@@ -1227,9 +1293,9 @@ function buildPlantsAndRoots(data, monthIdx) {
       z + (deterministic(i, 4) - 0.5) * plantSpacing * 0.18,
     );
     dummy.rotation.set(0, yaw, 0);
-    const sx = jitter * (month.cropId === "potato" ? 1.35 : 1.0);
-    const sz = jitter * (month.cropId === "potato" ? 1.35 : 1.0);
-    const sy = 0.9 + deterministic(i, 5) * 0.24;
+    const sx = jitter * (month.cropId === "potato" ? 1.35 : 1.0) * stageScale;
+    const sz = jitter * (month.cropId === "potato" ? 1.35 : 1.0) * stageScale;
+    const sy = (0.9 + deterministic(i, 5) * 0.24) * stageScale;
     dummy.scale.set(sx, sy, sz);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
@@ -1249,8 +1315,8 @@ function buildPlantsAndRoots(data, monthIdx) {
   plantsGroup.userData.plants = {
     positions: positions.map(([x, y]) => [x, heightAt(x, -y) + 0.02, -y]),
     height: h,
-    color: stageColor(month.cropId, month.stage),
-    flower: month.cropId === "mustard" && month.stage !== "harvest" ? "#e8c93a" : null,
+    color: isFallow ? strawColor : stageColor(month.cropId, month.stage),
+    flower: !isFallow && month.cropId === "mustard" && month.stage !== "harvest" ? "#e8c93a" : null,
   };
   ensureFloatGroup();
   floatGroup.add(plantsGroup);
@@ -2901,6 +2967,45 @@ function rotationPickerHtml() {
 
 /* ------------------------------------------------------------ HTML template */
 
+function fallowOverlayChipHtml(data, monthIdx) {
+  if (!data?.months) return "";
+  const m = data.months[monthIdx];
+  if (!m || (m.stage !== "fallow" && m.stage !== "harvest")) return "";
+  const isFallow = m.stage === "fallow";
+
+  let nextCropMonth = null;
+  let nextMonthIdx = -1;
+  for (let step = 1; step <= 12; step++) {
+    const idx = (monthIdx + step) % 12;
+    const cand = data.months[idx];
+    if (cand && cand.cropId && cand.stage !== "fallow" && (!isFallow ? cand.cropId !== m.cropId : true)) {
+      nextCropMonth = cand;
+      nextMonthIdx = idx;
+      break;
+    }
+  }
+  if (!nextCropMonth) return "";
+
+  const mEn = Number.isInteger(nextMonthIdx) && nextMonthIdx >= 0 && nextMonthIdx < 12 ? MONTHS_EN[nextMonthIdx] : (nextCropMonth.month || "");
+  const mBn = Number.isInteger(nextMonthIdx) && nextMonthIdx >= 0 && nextMonthIdx < 12 ? MONTHS_BN[nextMonthIdx] : (nextCropMonth.month || "");
+  const cropEn = nextCropMonth.cropName || nextCropMonth.cropId || "Crop";
+  const cropBn = nextCropMonth.cropNameBn || nextCropMonth.cropName || nextCropMonth.cropId || "ফসল";
+
+  const prefixEn = isFallow ? "Fallow this month" : "Harvested";
+  const prefixBn = isFallow ? "এই মাসে পতিত" : "ফসল কাটা সম্পন্ন";
+
+  const labelText = t(
+    `${prefixEn} · Next crop: ${cropEn} (${mEn})`,
+    `${prefixBn} · পরবর্তী ফসল: ${cropBn} (${mBn})`,
+  );
+  const btnText = t("Show next crop", "পরবর্তী ফসল দেখুন");
+
+  return `<div class="studio-fallow-chip" data-next-month="${nextMonthIdx}">
+    <span class="studio-fallow-chip-text">${esc(labelText)}</span>
+    <button type="button" class="studio-fallow-chip-btn" data-studio-action="goto-month" data-month-target="${nextMonthIdx}">${esc(btnText)}</button>
+  </div>`;
+}
+
 function depthTicksHtml() {
   const ticks = [0, 15, 30, 60, 100];
   return `<div class="studio-depth-ticks" aria-hidden="true">${ticks
@@ -3010,6 +3115,11 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <div class="studio-compass-arrow"></div>
           <div class="studio-compass-s"></div>
         </button>
+
+        <!-- Top-Centre Fallow / Harvested Notification Chip -->
+        <div id="studio-overlay-fallow-host" class="studio-overlay-tc">
+          ${fallowOverlayChipHtml(data, currentMonthIdx)}
+        </div>
 
         <!-- Top-Left Surface Layer Switcher & Preset Views -->
         <div class="studio-overlay-tl">
@@ -3398,6 +3508,12 @@ export async function setStudioMonth(monthIdx) {
     if (rootzoneVal) rootzoneVal.textContent = calloutData.rootzone.value;
     const legendRootVal = containerEl.querySelector('.studio-callout-legend-item[data-band="rootzone"] .callout-val');
     if (legendRootVal) legendRootVal.textContent = calloutData.rootzone.value;
+  }
+
+  // Update fallow / harvested top-centre notification chip
+  const fallowHost = containerEl?.querySelector("#studio-overlay-fallow-host");
+  if (fallowHost) {
+    fallowHost.innerHTML = fallowOverlayChipHtml(currentData, currentMonthIdx);
   }
 
   requestRender();
@@ -3791,6 +3907,22 @@ function bindEvents(container) {
   // Dismiss intro on any user keydown or control click within container
   containerEl.addEventListener("keydown", () => stopIntroAnimation(true));
   containerEl.addEventListener("click", (e) => {
+    // Show next crop button on fallow overlay chip
+    const gotoBtn = e.target.closest("[data-studio-action='goto-month']");
+    if (gotoBtn) {
+      const targetM = parseInt(gotoBtn.dataset.monthTarget, 10);
+      if (Number.isInteger(targetM) && targetM >= 0 && targetM < 12) {
+        setStudioMonth(targetM);
+      }
+    }
+    // Rotation option picker buttons in rail
+    const rotBtn = e.target.closest("[data-studio-rot-id]");
+    if (rotBtn) {
+      const id = rotBtn.dataset.studioRotId;
+      if (id && typeof onRotationSelect === "function") {
+        onRotationSelect(id);
+      }
+    }
     if (e.target.closest("button, input, select, label, .studio-ctrl-btn, .studio-view-btn")) {
       if (!e.target.closest("[data-studio-ctrl='reset']")) {
         stopIntroAnimation(true);

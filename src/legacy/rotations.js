@@ -566,6 +566,11 @@ export async function openStudio3d() {
       boundary: state.boundaries[f.id] ? 'farmer' : 'traced',
     });
 
+    const initialMonth = (typeof mod.nearestCropMonth === 'function')
+      ? mod.nearestCropMonth(studioData, (state.month != null) ? state.month : new Date().getMonth())
+      : (state.month || 0);
+    state.month = initialMonth;
+
     const opts = {
       rotations: rotationOptionsFor(rotId),
       onRotationSelect: (id) => {
@@ -574,7 +579,7 @@ export async function openStudio3d() {
         openStudio3d();
       },
     };
-    host.innerHTML = mod.studio3dHtml(studioData, state.month || 0, opts);
+    host.innerHTML = mod.studio3dHtml(studioData, initialMonth, opts);
     await mod.mountStudio3d(host, studioData, opts);
   } catch (err) {
     console.error('Failed to load studio3d:', err);

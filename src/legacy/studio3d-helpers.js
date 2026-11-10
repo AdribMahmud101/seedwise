@@ -127,6 +127,85 @@ const MONTHS_BN = ["জানু","ফেব","মার্চ","এপ্রি
 const STAGE_EN = { establish: "establishing", grow: "growing", mature: "maturing", harvest: "harvest", fallow: "fallow" };
 const STAGE_BN = { establish: "অঙ্কুরোদ্গম", grow: "বৃদ্ধি", mature: "পরিণত", harvest: "ফসল কাটা", fallow: "পতিত" };
 
+export { MONTHS_EN, MONTHS_BN };
+
+/**
+ * Find the nearest month with an active crop in the given rotation.
+ * If the starting month already has a crop, returns that month index (0-11).
+ * Otherwise searches radially (+1/-1, +2/-2, etc.) for the nearest crop month.
+ */
+export function nearestCropMonth(rotation, month = 0) {
+  const months = Array.isArray(rotation) ? rotation : (rotation?.months || []);
+  if (!months.length) return ((Number(month) % 12) + 12) % 12;
+  const startM = ((Number(month) % 12) + 12) % 12;
+  const hasCrop = (idx) => {
+    const val = months[idx];
+    if (!val || val === "fallow") return false;
+    if (typeof val === "object") {
+      return val.cropId ? val.cropId !== "fallow" : (val.stage ? val.stage !== "fallow" : true);
+    }
+    return true;
+  };
+  if (hasCrop(startM)) return startM;
+  for (let dist = 1; dist <= 6; dist++) {
+    const fwd = (startM + dist) % 12;
+    if (hasCrop(fwd)) return fwd;
+    const bwd = (startM - dist + 12) % 12;
+    if (hasCrop(bwd)) return bwd;
+  }
+  return startM;
+}
+
+/**
+ * Determine crop stage and metadata for a given rotation at a specific month index.
+ */
+export function cropStageAt(rotation, month = 0, agronomyData = null) {
+  const months = Array.isArray(rotation) ? rotation : (rotation?.months || []);
+  const mIdx = ((Number(month) % 12) + 12) % 12;
+  const raw = months[mIdx];
+  const plannedCrop = typeof raw === "object" ? (raw?.cropId || raw?.stage || "fallow") : raw;
+  const cropId = (!plannedCrop || plannedCrop === "fallow") ? null : (plannedCrop === "pulse" ? "mungbean" : plannedCrop);
+
+  if (!cropId) {
+    return {
+      cropId: null,
+      stage: "fallow",
+      stageFraction: 0,
+      canopyHeightM: null,
+      rootDepthM: null,
+      cropName: "Fallow",
+      cropNameBn: "পতিত",
+    };
+  }
+
+  const crop = agronomyData?.crops?.find((c) => c.id === cropId);
+  const year = 2024;
+  let start = mIdx;
+  while (start > mIdx - 11) {
+    const prevIdx = ((start - 1) % 12 + 12) % 12;
+    const prevRaw = months[prevIdx];
+    const prevCrop = typeof prevRaw === "object" ? (prevRaw?.cropId || prevRaw?.stage || "fallow") : prevRaw;
+    if (prevCrop === plannedCrop) start--;
+    else break;
+  }
+
+  const day = (Date.UTC(year, mIdx, 15) - Date.UTC(year, start, 1)) / 86400000;
+  const durList = crop?.durationDays;
+  const duration = (Array.isArray(durList) && durList.length > 0)
+    ? durList.reduce((a, b) => a + b, 0) / durList.length
+    : 90;
+  const stageFraction = Math.min(1, Math.max(0, day / duration));
+  const stage = stageFraction < 0.15 ? "establish" : stageFraction < 0.65 ? "grow" : stageFraction < 0.9 ? "mature" : "harvest";
+
+  return {
+    cropId,
+    stage: (typeof raw === "object" && raw?.stage) ? raw.stage : stage,
+    stageFraction,
+    cropName: (typeof raw === "object" && raw?.cropName) ? raw.cropName : (crop?.label ?? cropId),
+    cropNameBn: (typeof raw === "object" && raw?.cropNameBn) ? raw.cropNameBn : (crop?.bn ?? cropId),
+  };
+}
+
 export function monthChipText(month, lang = "en") {
   if (!month) return "";
   const idx = Number((month.month || "").split("-")[1]) - 1;
@@ -549,11 +628,32 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
   // Band 2: 15-60 cm Root Zone
   // POWER GWETROOT for the selected month (fallback to month.rootWetness or month.wetness)
   const rootWetness = month.rootWetness != null ? Number(month.rootWetness).toFixed(2) : (month.wetness != null ? Number(month.wetness).toFixed(2) : "0.50");
-  const cropName = t(month.cropName || "Crop", month.cropNameBn || "ফসল");
+  const isFallow = month.stage === "fallow" || month.cropId === "fallow" || month.cropName === "Fallow" || (!month.cropId && !month.cropName);
+  let cropName = t(month.cropName || "Crop", month.cropNameBn || "ফসল");
+
+  if (isFallow) {
+    let prevCrop = null;
+    const months = data.months || [];
+    for (let step = 1; step <= 12; step++) {
+      const idx = ((monthIdx - step) % 12 + 12) % 12;
+      const m = months[idx];
+      if (m && m.cropId && m.stage !== "fallow" && m.cropName !== "Fallow") {
+        prevCrop = m;
+        break;
+      }
+    }
+    const prevName = prevCrop ? t(prevCrop.cropName || prevCrop.cropId, prevCrop.cropNameBn || prevCrop.cropName || prevCrop.cropId) : null;
+    cropName = prevName
+      ? t(`Fallow · residue of ${prevName}`, `পতিত · ${prevName}-এর অবশেষ`)
+      : t("Fallow", "পতিত");
+  }
+
   const rootDepthM = month.rootDepthM != null ? `${Number(month.rootDepthM).toFixed(1)} m` : null;
 
   const rootzoneEyebrow = `15–60 cm · ${t("ROOT ZONE", "শিকড় অঞ্চল")}`;
-  const rootzoneVal = `GWETROOT ${rootWetness} · ${cropName}${rootDepthM ? ` (${rootDepthM})` : ""}`;
+  const rootzoneVal = isFallow
+    ? `GWETROOT ${rootWetness} · ${cropName}`
+    : `GWETROOT ${rootWetness} · ${cropName}${rootDepthM ? ` (${rootDepthM})` : ""}`;
   const rootzoneTruth = "MODELED";
   const rootzoneTruthLabel = "NASA POWER · Agronomy, Estimated";
 

@@ -12,6 +12,7 @@ import {
   sampleS1Water, transectEndpoints, waterTablePositions,
   usdaTextureClass, computeAutoExaggeration, buildCalloutData, deoverlapLabels,
   easeOutCubic, introCameraParams, shouldSkipIntro, sampleRowCropScale,
+  nearestCropMonth, cropStageAt,
 } from "../src/legacy/studio3d-helpers.js";
 
 test("computePonding calculates ponding depth from low-ground and rainfall scenario", () => {
@@ -438,6 +439,92 @@ test("sampleRowCropScale staggers growth across row positions", () => {
   const backScale = sampleRowCropScale(midT, 1.0, 0.6, 2.2);
   assert.ok(frontScale > 0);
   assert.ok(frontScale > backScale, "front row must grow before back row");
+});
+
+test("nearestCropMonth finds the nearest active crop month in a rotation", () => {
+  // Array of string/object months:
+  // indices: 0: fallow, 1: boro (crop), 2: fallow, 3: fallow, 4: aman (crop)
+  const rotation = [
+    "fallow",
+    { cropId: "boro_rice" },
+    "fallow",
+    "fallow",
+    { cropId: "t_aman" },
+    "fallow",
+    "fallow",
+    "fallow",
+    "fallow",
+    "fallow",
+    "fallow",
+    "fallow",
+  ];
+
+  // Already on a crop month
+  assert.equal(nearestCropMonth(rotation, 1), 1);
+  assert.equal(nearestCropMonth(rotation, 4), 4);
+
+  // Month 0 (fallow): nearest is 1 (dist 1 vs 4 dist 4)
+  assert.equal(nearestCropMonth(rotation, 0), 1);
+  // Month 2 (fallow): nearest is 1 (dist 1)
+  assert.equal(nearestCropMonth(rotation, 2), 1);
+  // Month 3 (fallow): nearest is 4 (dist 1)
+  assert.equal(nearestCropMonth(rotation, 3), 4);
+  // Month 11 (fallow): wraps around -> dist 1 to month 0, dist 2 to month 1
+  assert.equal(nearestCropMonth(rotation, 11), 1);
+
+  // Empty or invalid rotation
+  assert.equal(nearestCropMonth([], 5), 5);
+  assert.equal(nearestCropMonth(null, 3), 3);
+});
+
+test("cropStageAt calculates stage and metadata for a month", () => {
+  const rotation = {
+    months: [
+      { cropId: "mustard", stage: "grow", cropName: "Mustard", cropNameBn: "সরিষা" },
+      { cropId: "fallow" },
+      "fallow",
+    ],
+  };
+
+  const crop = cropStageAt(rotation, 0);
+  assert.equal(crop.cropId, "mustard");
+  assert.equal(crop.stage, "grow");
+  assert.equal(crop.cropName, "Mustard");
+  assert.equal(crop.cropNameBn, "সরিষা");
+
+  const fallowCrop = cropStageAt(rotation, 1);
+  assert.equal(fallowCrop.cropId, null);
+  assert.equal(fallowCrop.stage, "fallow");
+
+  const fallowStrCrop = cropStageAt(rotation, 2);
+  assert.equal(fallowStrCrop.cropId, null);
+  assert.equal(fallowStrCrop.stage, "fallow");
+});
+
+test("buildCalloutData includes fallow residue description for fallow months", () => {
+  const dummyData = {
+    months: [
+      { month: "2024-01", cropId: "mustard", cropName: "Mustard", cropNameBn: "সরিষা", rootDepthM: 0.6, wetness: 0.48 },
+      { month: "2024-02", cropId: "fallow", stage: "fallow", cropName: "Fallow", cropNameBn: "পতিত", wetness: 0.42 },
+    ],
+    soil: { layers: [] },
+  };
+
+  const enCallouts = buildCalloutData({
+    data: dummyData,
+    monthIdx: 1,
+    soilOverrides: null,
+    t: (en, bn) => en,
+  });
+  assert.match(enCallouts.rootzone.value, /Fallow · residue of Mustard/);
+
+  const bnCallouts = buildCalloutData({
+    data: dummyData,
+    monthIdx: 1,
+    soilOverrides: null,
+    t: (en, bn) => bn || en,
+  });
+  assert.match(bnCallouts.rootzone.value, /পতিত · সরিষা-এর অবশেষ/);
 });
 
 

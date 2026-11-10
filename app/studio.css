@@ -626,6 +626,59 @@
   box-shadow: 0 2px 8px rgba(20, 55, 20, 0.06);
 }
 
+.studio-overlay-tc {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 90%;
+}
+
+.studio-overlay-tc > * {
+  pointer-events: auto;
+}
+
+.studio-fallow-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 250, 0.94);
+  color: #533f2d;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(184, 154, 102, 0.45);
+  box-shadow: 0 4px 14px rgba(60, 45, 25, 0.12);
+  white-space: nowrap;
+}
+
+.studio-fallow-chip-btn {
+  background: #3d5a2b;
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  min-height: 28px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.studio-fallow-chip-btn:hover {
+  background: #2f4721;
+}
+
+.studio-fallow-chip-btn:active {
+  transform: scale(0.97);
+}
+
 .studio-caption-copy {
   padding: 4px 0 0;
   max-width: 340px;
