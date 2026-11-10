@@ -36,7 +36,7 @@ async function loadSoilNutrientsData() {
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { t, truth, esc, num } from "./ui.js";
+import { t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
 import {
   outlineBounds,
   plantPositionsInPolygon,
@@ -69,6 +69,14 @@ import {
   cropStageAt,
   MONTHS_EN,
   MONTHS_BN,
+  surfaceLegend,
+  surfaceClass,
+  surfaceCells,
+  sampleSurfaceGrid,
+  cropSurfaceValue,
+  cropStageColor as stageColor,
+  pondingDepthCm,
+  pondingWaterline,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -154,6 +162,8 @@ let overlayEvents = null;
 let hintShown = false;
 let wideLayersOpen = false;
 let stageOverlayCleanup = null;
+let currentSurface = null;
+const surfacePacks = new Map();
 
 let blockGroup = null;
 let plantsGroup = null;
@@ -235,21 +245,6 @@ function soilBandColor(layer) {
     Math.max(0, Math.min(255, Math.round(v + ((clay - 20) / 25) * -24 - soc * 0.9)));
   const hex = (v) => v.toString(16).padStart(2, "0");
   return `#${hex(shift(r))}${hex(shift(g))}${hex(shift(b))}`;
-}
-
-function stageColor(cropId, stage) {
-  if (stage === "fallow") return "#8f7352";
-  if (stage === "harvest") return cropId === "potato" ? "#b89a66" : "#c8b273";
-  if (stage === "mature") {
-    if (cropId === "mustard") return "#e8c93a";
-    if (cropId === "potato") return "#4d6b30";
-    return "#cfa44e";
-  }
-  if (stage === "establish") return "#a8d47a";
-  if (cropId === "potato") return "#3f6e30"; // potato bushy dark green
-  if (cropId === "mustard") return "#b5c938"; // mustard yellow-green
-  if (cropId === "mungbean") return "#5fa044";
-  return "#387c32"; // rice green
 }
 
 /* ------------------------------------------------------------------ sky */
@@ -405,142 +400,86 @@ function nearestForMonth(list, monthIdx) {
   return nearestObservation(list || [], monthIdx, year);
 }
 
-async function buildTopTexture(data, layer, monthIdx) {
-  const month = data.months?.[monthIdx];
-  const mode = layer || currentSurfaceMode || "crops";
-  const layout = plantingLayout || "rows";
-  const rain = rainScenarioMm;
-  const cacheKey = `${data.field.id}-${mode}-${monthIdx}-${layout}-${rain}`;
-  if (textureCache.has(cacheKey)) return textureCache.get(cacheKey);
+function loadSurfacePack(name) {
+  if (!surfacePacks.has(name)) surfacePacks.set(name, fetchJsonMaybeGzip(`/data/${name}.json`));
+  return surfacePacks.get(name);
+}
 
-  const cvs = document.createElement("canvas");
-  cvs.width = 1024;
-  cvs.height = 1024;
-  const ctx = cvs.getContext("2d");
-  const W = 1024, H = 1024;
+async function prepareSurface(data, mode, monthIdx) {
+  const month = data.months?.[monthIdx] || {};
+  const optical = ['ndvi', 'moisture', 'ndmi'].includes(mode);
+  const [radarPack, nutrientPack, gridPack] = await Promise.all([
+    loadS1WaterData(), loadSoilNutrientsData(),
+    optical ? loadSurfacePack(mode === 'ndvi' ? 'ndvi-grid' : 'moisture-grid') : null,
+  ]);
+  const year = Number(month.month?.slice(0, 4)) || 2024;
+  const grid = nearestObservation(gridPack?.grids?.filter((g) => g.siteId === data.field.id), monthIdx, year)?.observation;
+  const site = radarPack?.[data.field.id];
+  const radar = nearestObservation(site?.dates?.filter((o) => o.date.startsWith(month.month)), monthIdx, year)?.observation;
+  const [lat, lon] = data.field.centroid;
+  const scaleX = 111195.08 * Math.cos(lat * Math.PI / 180);
+  const coordinates = (x, y) => [lon + x / scaleX, lat + y / 111195.08];
+  const heightAt = makeHeightAt(data);
+  const elevationAt = (x, y) => elevationSampler?.(...coordinates(x, y)) ?? null;
+  const waterMaskAt = (x, z) => sampleS1Water(site, radar, ...coordinates(x, -z));
+  const cells = surfaceCells(data.field.outlineM, (x, y) => ({
+    elevation: elevationAt(x, y), height: heightAt(x, -y), waterMask: waterMaskAt(x, -y),
+  }));
+  const minHeight = Math.min(...cells.map((c) => c.value.height));
+  const elevations = cells.map((c) => c.value.elevation).filter(Number.isFinite);
+  const ponding = { rainMm: rainScenarioMm, exaggeration: heightExaggeration,
+    lowGround: data.ground?.class === 'low', proposedDrain, outletBlocked, minHeight, waterMaskAt };
+  const nutrients = data.field.boundary === 'custom' ? null : nutrientPack?.sites?.[data.field.id]?.nutrients;
+  const ph = soilOverrides?.ph ?? data.soil?.layers?.[0]?.ph ?? nutrients?.ph?.value;
+  const valueAt = (x, y) => {
+    if (mode === 'ndvi' || mode === 'moisture' || mode === 'ndmi') return sampleSurfaceGrid(grid, ...coordinates(x, y));
+    if (mode === 'elevation' || mode === 'hypso') return elevationAt(x, y);
+    if (mode === 'water' || mode === 'ponding') return pondingDepthCm(heightAt(x, -y), minHeight, { ...ponding, waterMask: waterMaskAt(x, -y) });
+    if (mode === 'fertility') return ph;
+    return cropSurfaceValue(month);
+  };
+  const knownRadar = cells.filter((c) => c.value.waterMask !== null);
+  const radarObservation = radar && knownRadar.length ? { date: radar.date,
+    floodedPct: knownRadar.filter((c) => c.value.waterMask === 1).length / knownRadar.length * 100 } : null;
+  const context = { month, rotation: data.rotation, soil: data.soil, nutrients, soilOverrides,
+    soilCellCount: data.soil || nutrients ? 1 : null,
+    date: mode === 'fertility' && nutrientPack?.retrievedAt ? `${t('Retrieved', 'সংগ্রহ')} ${nutrientPack.retrievedAt.slice(0, 10)}` : null,
+    observation: grid, radarObservation, rainMm: rainScenarioMm, exaggeration: heightExaggeration,
+    elevationMin: elevations.length ? Math.min(...elevations) : null,
+    elevationMax: elevations.length ? Math.max(...elevations) : null,
+    lang: t('en', 'bn'), cells: cells.map((c) => ({ ...c, value: valueAt(c.x, c.y) })) };
+  return { mode, context, legend: surfaceLegend(mode, context), valueAt, elevationAt, ponding };
+}
 
-  const isFallow = month?.stage === "fallow" || !month?.cropId;
-
-  // Base ground tone
-  ctx.fillStyle = isFallow ? "#7a684d" : "#436937";
-  ctx.fillRect(0, 0, W, H);
-
-  // Attempt to draw real satellite photo
-  let img = null;
-  for (const name of [`/assets/sentinel-${data.field.id}.jpg`, `/assets/satellite-${data.field.id}.jpg`]) {
-    try {
-      img = await loadImageElement(name);
-      break;
-    } catch (e) {}
-  }
-  if (img) {
-    ctx.globalAlpha = 0.52;
-    drawImageCover(ctx, img, W, H);
-    ctx.globalAlpha = 1.0;
-  }
-
-  const imgData = ctx.getImageData(0, 0, W, H);
-  const d = imgData.data;
-
-  // Check if Sentinel-1 water or soil nutrient data is loaded
-  const nutrientsData = await loadSoilNutrientsData();
-
-  for (let py = 0; py < H; py += 2) {
-    const v = py / H;
-    for (let px = 0; px < W; px += 2) {
-      const u = px / W;
-      const idx0 = (py * W + px) * 4;
-      let r = d[idx0];
-      let g = d[idx0 + 1];
-      let b = d[idx0 + 2];
-
-      if (mode === "elevation" || mode === "hypso") {
-        // NASADEM Hypsometric Rainbow
-        const normE = Math.max(0, Math.min(1, 0.15 + u * 0.7 + Math.sin(v * 4) * 0.15));
-        if (normE < 0.25) {
-          const t = normE / 0.25;
-          r = 109 * (1 - t) + 37 * t; g = 40 * (1 - t) + 99 * t; b = 217;
-        } else if (normE < 0.5) {
-          const t = (normE - 0.25) / 0.25;
-          r = 37 * (1 - t) + 16 * t; g = 99 * (1 - t) + 185 * t; b = 217 * (1 - t) + 129 * t;
-        } else if (normE < 0.75) {
-          const t = (normE - 0.5) / 0.25;
-          r = 16 * (1 - t) + 234 * t; g = 185 * (1 - t) + 179 * t; b = 129 * (1 - t) + 8 * t;
-        } else {
-          const t = (normE - 0.75) / 0.25;
-          r = 234; g = 179 * (1 - t) + 58 * t; b = 8 * (1 - t) + 38 * t;
-        }
-      } else if (mode === "ndvi") {
-        // Sentinel-2 NDVI Vigour / Bare-Field Map
-        const near = nearestForMonth(data.vegetation || [], monthIdx);
-        const baseNdvi = near?.observation?.ndvi ?? (isFallow ? 0.24 : 0.68);
-        const ndvi = Math.max(0.12, Math.min(0.92, baseNdvi + Math.sin(u * 12 + v * 8) * 0.08));
-        if (ndvi < 0.35) {
-          const t = ndvi / 0.35;
-          r = 196 + t * 18; g = 155 + t * 45; b = 108;
-        } else {
-          const t = (ndvi - 0.35) / 0.55;
-          r = 214 * (1 - t) + 32 * t; g = 200 * (1 - t) + 118 * t; b = 108 * (1 - t) + 52 * t;
-        }
-      } else if (mode === "water" || mode === "ponding") {
-        // Water Ponding mode
-        const isLowGround = data.ground?.class === "low" || (u > 0.55 && v > 0.55);
-        const wetVal = isLowGround ? Math.min(1.0, rain / 80) : Math.min(0.8, rain / 180);
-        r = Math.round(45 + (1 - wetVal) * 75);
-        g = Math.round(110 + (1 - wetVal) * 65);
-        b = Math.round(135 + wetVal * 105);
-      } else if (mode === "fertility") {
-        // Soil Fertility Zones Map
-        const phVal = soilOverrides?.ph ?? data.soil?.layers?.[0]?.ph ?? 6.0;
-        const normScore = Math.max(0, Math.min(1, (phVal - 5.0) / 2.0));
-        if (normScore < 0.5) {
-          const t = normScore / 0.5;
-          r = 210; g = Math.round(85 + t * 105); b = 45;
-        } else {
-          const t = (normScore - 0.5) / 0.5;
-          r = Math.round(210 * (1 - t) + 42 * t); g = Math.round(190 * (1 - t) + 135 * t); b = Math.round(45 + t * 35);
-        }
-      } else {
-        // Crop Canopy + True colour mode
-        const furrowFreq = layout === "beds" ? 28 : layout === "bund-drains" ? 18 : 52;
-        const furrow = Math.sin(u * Math.PI * furrowFreq);
-        if (isFallow) {
-          // Slightly cracked / tilled soil texture for fallow months
-          const crackNoise = Math.min(
-            Math.abs(Math.sin(u * 96 + Math.sin(v * 48) * 1.2)),
-            Math.abs(Math.cos(v * 96 + Math.cos(u * 48) * 1.2))
-          );
-          const crackDarken = crackNoise < 0.12 ? 0.74 : 1.0;
-          r = Math.round((138 + furrow * 9) * crackDarken);
-          g = Math.round((116 + furrow * 7) * crackDarken);
-          b = Math.round((84 + furrow * 5) * crackDarken);
-        } else {
-          r = Math.round(r * 0.55 + (68 + furrow * 7) * 0.45);
-          g = Math.round(g * 0.55 + (118 + furrow * 9) * 0.45);
-          b = Math.round(b * 0.55 + (54 + furrow * 5) * 0.45);
-        }
-      }
-
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const idx = ((py + dy) * W + (px + dx)) * 4;
-          d[idx] = r; d[idx + 1] = g; d[idx + 2] = b; d[idx + 3] = 255;
-        }
-      }
+async function buildTopTexture(data, layer, monthIdx, model = null) {
+  const mode = layer || currentSurfaceMode || 'crops';
+  model ||= await prepareSurface(data, mode, monthIdx);
+  const cvs = document.createElement('canvas');
+  cvs.width = cvs.height = mode === 'photo' ? 1024 : 128;
+  const ctx = cvs.getContext('2d');
+  const b = outlineBounds(data.field.outlineM);
+  const legend = model.legend;
+  // Paint the same polygon cells counted by the legend, without synthetic index variation.
+  for (let row = 0; row < 128; row++) {
+    for (let col = 0; col < 128; col++) {
+      const x = b.minX + (col + 0.5) / 128 * b.width;
+      const y = b.maxY - (row + 0.5) / 128 * b.height;
+      ctx.fillStyle = surfaceClass(legend, model.valueAt(x, y)).color;
+      const scale = cvs.width / 128;
+      ctx.fillRect(col * scale, row * scale, scale, scale);
     }
   }
-
-  ctx.putImageData(imgData, 0, 0);
-
-  // Crisp parcel boundary outline
-  ctx.strokeStyle = "#dce897";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(W * 0.045, H * 0.045, W * 0.91, H * 0.91);
-
+  // The photo layer keeps its actual image; categorical surfaces keep exact class colours.
+  if (mode === 'photo') {
+    for (const name of [`/assets/sentinel-${data.field.id}.jpg`, `/assets/satellite-${data.field.id}.jpg`]) {
+      try { drawImageCover(ctx, await loadImageElement(name), cvs.width, cvs.height); break; } catch { /* Keep the unclassified base if offline. */ }
+    }
+  }
   const tex = new THREE.CanvasTexture(cvs);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  textureCache.set(cacheKey, tex);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  textureCache.set(tex.uuid, tex);
   return tex;
 }
 
@@ -649,6 +588,10 @@ function blockDepthM(bounds) {
 function disposeGroup(group) {
   if (!group) return;
   group.traverse((child) => {
+    if (child.userData.terrain && child.material?.map) {
+      child.material.map.dispose();
+      textureCache.delete(child.material.map.uuid);
+    }
     if (child.geometry) child.geometry.dispose();
     if (child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -658,7 +601,7 @@ function disposeGroup(group) {
   if (group.parent) group.parent.remove(group);
 }
 
-function buildSurfaceGeometry(ringM, heightAt, bounds) {
+function buildSurfaceGeometry(ringM, heightAt, bounds, model) {
   const ring = ringM.map(([x, y]) => new THREE.Vector2(x, y));
   const triangles = THREE.ShapeUtils.triangulateShape(ring, []);
   const positions = surfaceGridPositions(ringM, triangles, heightAt, isSoftwareRenderer ? 14 : 28);
@@ -669,29 +612,13 @@ function buildSurfaceGeometry(ringM, heightAt, bounds) {
   for (let i = 0; i < positions.length; i += 3) {
     const [x, h, z] = positions.slice(i, i + 3);
     uvs.push((x - bounds.minX) / width, (-z - bounds.minY) / depth);
-    elevations.push(h / Math.max(0.01, heightExaggeration));
+    elevations.push(model.elevationAt(x, -z) ?? 0);
   }
 
   const geom = new THREE.BufferGeometry();
   geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geom.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geom.setAttribute("aElevation", new THREE.Float32BufferAttribute(elevations, 1));
-
-  if (currentLayer === "elevation") {
-    const heights = elevations;
-    const min = Math.min(...heights);
-    const max = Math.max(...heights);
-    const colors = [];
-    const lo = new THREE.Color("#28758b");
-    const mid = new THREE.Color("#aecf9e");
-    const hi = new THREE.Color("#c3995e");
-    for (const h of heights) {
-      const a = max > min ? (h - min) / (max - min) : 0.5;
-      const c = a < 0.5 ? lo.clone().lerp(mid, a * 2) : mid.clone().lerp(hi, (a - 0.5) * 2);
-      colors.push(c.r, c.g, c.b);
-    }
-    geom.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  }
 
   geom.computeVertexNormals();
   return geom;
@@ -816,7 +743,7 @@ function buildBoundaryLine(ringM, heightAt) {
 
 function makeElevationMaterial() {
   const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true,
+    vertexColors: false,
     roughness: 0.96,
     metalness: 0,
     side: THREE.DoubleSide,
@@ -834,8 +761,8 @@ function makeElevationMaterial() {
       shader.fragmentShader.replace(
         "#include <color_fragment>",
         `#include <color_fragment>
-         float d=abs(fract(vElev/0.5-0.5)-0.5);
-         float edge=max(fwidth(vElev/0.5),0.006);
+         float d=abs(fract(vElev/0.25-0.5)-0.5);
+         float edge=max(fwidth(vElev/0.25),0.006);
          diffuseColor.rgb*=1.0-(1.0-smoothstep(0.0,edge,d))*0.35*uContours;`,
       );
     mat.userData.shader = shader;
@@ -865,16 +792,24 @@ async function buildFieldBlock(data, cutawayFraction) {
   if (ringM.length < 3) return;
 
   const heightAt = makeHeightAt(data);
-  const topTex = await buildTopTexture(data, currentSurfaceMode, currentMonthIdx);
-  const s1Data = await loadS1WaterData();
+  const model = await prepareSurface(data, currentSurfaceMode, currentMonthIdx);
   if (token !== buildToken) return;
+  const topTex = await buildTopTexture(data, currentSurfaceMode, currentMonthIdx, model);
+  if (token !== buildToken) {
+    topTex.dispose();
+    textureCache.delete(topTex.uuid);
+    return;
+  }
+  currentSurface = model;
+  const legendResized = updateSurfaceLegend();
 
-  const topMat = new THREE.MeshStandardMaterial({
+  const topMat = model.mode === 'elevation' || model.mode === 'hypso' ? makeElevationMaterial() : new THREE.MeshStandardMaterial({
     map: topTex,
     roughness: 0.88,
     metalness: 0.02,
     side: THREE.DoubleSide,
   });
+  topMat.map = topTex;
 
   const sideTex = buildStratigraphicSoilWallTexture(data);
   const sideMat = new THREE.MeshStandardMaterial({
@@ -889,10 +824,10 @@ async function buildFieldBlock(data, cutawayFraction) {
   });
   sideMat.userData.isSide = true;
 
-  const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds);
+  const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds, model);
   const topMesh = new THREE.Mesh(topGeom, topMat);
   topMesh.userData.terrain = true;
-  topMesh.userData.contours = currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso";
+  topMesh.userData.contours = (model.mode === 'elevation' || model.mode === 'hypso') && Number.isFinite(model.context.elevationMin);
   topMesh.castShadow = true;
   topMesh.receiveShadow = true;
 
@@ -938,31 +873,41 @@ async function buildFieldBlock(data, cutawayFraction) {
   }
 
   // Water Ponding layer
-  const site = s1Data?.[data.field.id];
-  const observation = nearestForMonth(site?.dates, currentMonthIdx)?.observation;
-  const [lat, lon] = data.field.centroid;
-  const scaleX = 111195.08 * Math.cos(lat * Math.PI / 180);
-  const waterPositions = pondingPositions(pos.array, {
-    rainMm: rainScenarioMm,
-    exaggeration: heightExaggeration,
-    lowGround: data.ground?.class === "low",
-    proposedDrain,
-    outletBlocked,
-    waterMaskAt: (x, z) => sampleS1Water(site, observation, lon + x / scaleX, lat - z / 111195.08),
-  });
+  const waterPositions = ['water', 'ponding', 'crops', 'photo'].includes(model.mode)
+    ? pondingPositions(pos.array, model.ponding) : [];
   if (waterPositions.length) {
     const wGeo = new THREE.BufferGeometry();
     wGeo.setAttribute("position", new THREE.Float32BufferAttribute(waterPositions, 3));
     wGeo.computeVertexNormals();
-    waterMesh = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
-      color: 0x368fab,
+    const waterLegend = surfaceLegend('water', model.context);
+    const colors = [];
+    for (let i = 0; i < waterPositions.length; i += 9) {
+      const x = (waterPositions[i] + waterPositions[i + 3] + waterPositions[i + 6]) / 3;
+      const z = (waterPositions[i + 2] + waterPositions[i + 5] + waterPositions[i + 8]) / 3;
+      const h = (waterPositions[i + 1] + waterPositions[i + 4] + waterPositions[i + 7]) / 3 - 0.02;
+      const depthCm = pondingDepthCm(h, model.ponding.minHeight, { ...model.ponding, waterMask: model.ponding.waterMaskAt(x, z) });
+      const color = new THREE.Color(surfaceClass(waterLegend, Math.max(0.001, depthCm)).color);
+      for (let j = 0; j < 3; j++) colors.push(color.r, color.g, color.b);
+    }
+    wGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    waterMesh = new THREE.Mesh(wGeo, new THREE.MeshPhysicalMaterial({
+      vertexColors: true,
       transparent: true,
-      opacity: 0.48,
-      roughness: 0.2,
+      opacity: 0.88,
+      roughness: 0.16,
+      metalness: 0.08,
+      clearcoat: 1,
+      clearcoatRoughness: 0.12,
       depthWrite: false,
       side: THREE.DoubleSide,
     }));
     waterMesh.userData.water = true;
+    // Only unshared wet-triangle edges form the white waterline, never the triangulation.
+    const shoreline = new THREE.BufferGeometry();
+    shoreline.setAttribute('position', new THREE.Float32BufferAttribute(pondingWaterline(waterPositions), 3));
+    const line = new THREE.LineSegments(shoreline, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1.5 }));
+    line.userData.waterline = true;
+    waterMesh.add(line);
     blockGroup.add(waterMesh);
   }
 
@@ -1012,6 +957,7 @@ async function buildFieldBlock(data, cutawayFraction) {
   renderTransectSVG();
   buildGlassFrame(ringM, topMin, bottomY, effectiveMaxX, cutawayFraction);
   buildEdgeTrees(ringM, heightAt);
+  if (legendResized) onResize();
 }
 
 /* ------------------------------------------------------------ crop clumps */
@@ -1204,6 +1150,7 @@ function buildPlantsAndRoots(data, monthIdx) {
 
   const month = data.months?.[monthIdx];
   if (!month) return;
+  if (!['crops', 'photo'].includes(currentSurfaceMode)) return;
   const isFallow = month.stage === "fallow" || !month.cropId;
 
   // For fallow months: find previous crop in rotation for row spacing and residue
@@ -1278,7 +1225,7 @@ function buildPlantsAndRoots(data, monthIdx) {
   mesh.castShadow = !isPhone();
   mesh.receiveShadow = false;
   const dummy = new THREE.Object3D();
-  const strawColor = "#c8b382";
+  const strawColor = stageColor(null, 'fallow');
   const base = new THREE.Color(isFallow ? strawColor : stageColor(month.cropId, month.stage));
   const colour = new THREE.Color();
 
@@ -1774,7 +1721,7 @@ class SoftwareRenderer {
       if (elevation && mesh.userData.contours) {
         const min = Math.min(...ids.map((i) => elevation.getX(i)));
         const max = Math.max(...ids.map((i) => elevation.getX(i)));
-        for (let level = Math.ceil(min / 0.5) * 0.5; level < max; level += 0.5) {
+        for (let level = Math.ceil(min / 0.25) * 0.25; level < max; level += 0.25) {
           const hits = [];
           for (let j = 0; j < 3; j++) {
             const av = elevation.getX(ids[j]);
@@ -1801,6 +1748,18 @@ class SoftwareRenderer {
     // Roots and boundary are line overlays above the soil.
     scene.traverse((group) => {
       if (!group.visible) return;
+      if (group.userData.waterline) {
+        const p = group.geometry.attributes.position;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < p.count; i += 2) {
+          const a = project(p.getX(i), p.getY(i), p.getZ(i));
+          const b = project(p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1));
+          ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        }
+        ctx.stroke();
+      }
       if (group.userData.lines) {
         ctx.strokeStyle = "rgba(236,213,183,0.9)";
         ctx.lineWidth = 1.1;
@@ -2136,7 +2095,7 @@ function studioFreeRegion() {
     return { region: { left: 0.015, right: 0.985, top: top / h, bottom: (h - 16) / h },
       preferredCentreY: (overlayBottom + h - 16) / (2 * h) };
   }
-  const cards = [...canvasHostEl.querySelectorAll('.studio-probe-card, .studio-transect-card')]
+  const cards = [...canvasHostEl.querySelectorAll('.studio-probe-card, .studio-transect-card, .studio-surface-legend')]
     .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
   const bottom = Math.min(h - 16, ...cards.map((r) => r.top - rect.top - 16));
   const top = Math.max(overlayBottom, controlsBottom) + 16;
@@ -3001,6 +2960,69 @@ function rotationPickerHtml() {
 
 /* ------------------------------------------------------------ HTML template */
 
+export function surfaceLegendHtml(legend) {
+  const rows = legend.classes.filter((c) => !c.unknown || c.pct > 0);
+  let offset = 0;
+  const arcs = rows.filter((c) => c.pct > 0).map((c) => {
+    const arc = `<circle cx="36" cy="36" r="26" fill="none" stroke="${c.color}" stroke-width="10" pathLength="100" stroke-dasharray="${c.pct} ${100 - c.pct}" stroke-dashoffset="${-offset}" transform="rotate(-90 36 36)"/>`;
+    offset += c.pct;
+    return arc;
+  }).join('');
+  return `<summary><span>${t('Colour key', 'রঙের নির্দেশিকা')} · ${esc(legend.title)}</span>${truth(legend.truth, { source: legend.source, date: legend.date })}</summary>
+    <div class="studio-surface-legend-body">
+      <div class="studio-surface-shares">
+        <svg class="studio-surface-donut" width="72" height="72" viewBox="0 0 72 72" role="img" aria-label="${esc(t('Share of field area', 'জমির ক্ষেত্রফলের অংশ'))}">
+          <title>${esc(rows.map((c) => `${c.label}: ${c.pct.toFixed(1)} %`).join('; '))}</title>
+          ${arcs}<text x="36" y="40" text-anchor="middle">100%</text>
+        </svg>
+        <ul>${rows.map((c) => `<li><i style="background:${c.color}" aria-hidden="true"></i><span>${esc(c.label)}</span><b>${c.pct.toFixed(1)} %</b></li>`).join('')}</ul>
+      </div>
+      <p class="studio-surface-note">${esc(legend.note)}</p>
+      <p class="studio-surface-source">${esc(legend.source)} · ${esc(legend.date)}</p>
+    </div>`;
+}
+
+function updateSurfaceLegend() {
+  if (!containerEl || !currentSurface) return;
+  const legend = currentSurface.legend;
+  const card = containerEl.querySelector('.studio-surface-legend');
+  const previousHeight = card?.offsetHeight;
+  if (card) {
+    card.innerHTML = surfaceLegendHtml(legend);
+    card.dataset.mode = currentSurface.mode;
+    card.dataset.month = currentSurface.context.month.month;
+  }
+  const mini = containerEl.querySelector('.studio-surface-mini');
+  if (mini) mini.innerHTML = `<b>${esc(legend.title)}</b>${legend.classes.filter((c) => c.pct > 0).map((c) =>
+    `<span><i style="background:${c.color}" aria-hidden="true"></i>${esc(c.label)} ${c.pct.toFixed(1)} %</span>`).join('')}${truth(legend.truth)}<span>${esc(legend.source)} · ${esc(legend.date)}</span>`;
+  layoutSurfaceLegend();
+  return card?.dataset.size === 'wide' && previousHeight !== card.offsetHeight;
+}
+
+function layoutSurfaceLegend() {
+  if (!containerEl || !canvasHostEl) return;
+  const size = studioOverlayBreakpoint(canvasHostEl.clientWidth);
+  const card = containerEl.querySelector('.studio-surface-legend');
+  const bar = containerEl.querySelector('.studio-surface-bar');
+  const mini = containerEl.querySelector('.studio-surface-mini');
+  if (!card || !bar) return;
+  const changed = card.dataset.size !== size;
+  card.dataset.size = size;
+  const target = size === 'wide' ? canvasHostEl : size === 'medium' ? bar : containerEl.querySelector('.studio-layers-content');
+  if (card.parentNode !== target) {
+    if (size === 'narrow') containerEl.querySelector('.studio-surface-selector').after(card);
+    else target.appendChild(card);
+  }
+  bar.hidden = size !== 'medium';
+  if (mini) mini.hidden = size !== 'narrow';
+  if (changed) card.open = size !== 'wide';
+  const summary = card.querySelector('summary');
+  summary.tabIndex = size === 'wide' ? 0 : -1;
+  summary.setAttribute('aria-disabled', String(size !== 'wide'));
+  const probe = containerEl.querySelector('#probe-card');
+  canvasHostEl.style.setProperty('--studio-probe-height', `${size === 'wide' ? probe?.offsetHeight || 0 : 0}px`);
+}
+
 export function studioOverlayBreakpoint(width) {
   return width >= 900 ? "wide" : width >= 600 ? "medium" : "narrow";
 }
@@ -3098,6 +3120,7 @@ function updateOverlayLayout() {
       sessionStorage.setItem('ropon_studio_overlay_hint', '1');
     } catch { hint.hidden = false; }
   }
+  layoutSurfaceLegend();
 }
 
 function highlightSoilBand(band) {
@@ -3334,6 +3357,10 @@ function bindOverlayEvents() {
     if (canvasHostEl.dataset.overlaySize === 'wide') wideLayersOpen = e.target.open;
     else if (!e.target.open) e.target.open = true;
   }, options);
+  containerEl.querySelector('.studio-surface-legend')?.addEventListener('toggle', () => {
+    if (canvasHostEl.dataset.overlaySize === 'wide') onResize();
+    else containerEl.querySelector('.studio-surface-legend').open = true;
+  }, options);
 }
 
 function selectInspectionTab(tab) {
@@ -3442,6 +3469,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="crops" ${currentSurfaceMode === "crops" ? "checked" : ""}><span>${t("Crop season (3D Plants)", "মৌসুমি ফসল (৩ডি উদ্ভিদ)")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentSurfaceMode === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI)", "আর্দ্রতা (NDMI)")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water ponding", "পানি জমা (পন্ডিং)")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="fertility" ${currentSurfaceMode === "fertility" ? "checked" : ""}><span>${t("Soil fertility zones", "মাটির উর্বরতা অঞ্চল")}</span></label>
@@ -3516,6 +3544,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
               <option value="crops" ${currentSurfaceMode === "crops" ? "selected" : ""}>${t("Crop canopy + true colour", "ফসল ক্যানোপি + আসল রঙ")}</option>
               <option value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "selected" : ""}>${t("NASADEM elevation + contours", "নাসাডেম উচ্চতা ও কনট্যুর")}</option>
               <option value="ndvi" ${currentSurfaceMode === "ndvi" ? "selected" : ""}>${t("Sentinel-2 NDVI vigour/bare-field", "সেন্টিনেল-২ এনডিভিআই / খালি জমি")}</option>
+              <option value="moisture" ${currentSurfaceMode === "moisture" ? "selected" : ""}>${t("Sentinel-2 moisture (NDMI)", "সেন্টিনেল-২ আর্দ্রতা (NDMI)")}</option>
               <option value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "selected" : ""}>${t("Water ponding", "পানি জমা (পন্ডিং)")}</option>
               <option value="fertility" ${currentSurfaceMode === "fertility" ? "selected" : ""}>${t("Soil fertility zones", "মাটির উর্বরতা অঞ্চল")}</option>
             </select>
@@ -3596,6 +3625,14 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <span>${t("Illustrative plants &amp; enlarged soil section", "কাল্পনিক উদ্ভিদ ও বড় করে দেখানো মাটির অংশ")}</span>
         </div>
       </div>
+
+      <div class="studio-surface-bar">
+        <details class="studio-surface-legend">${surfaceLegendHtml(surfaceLegend(currentSurfaceMode, {
+          month: m, rotation: data.rotation, soil: data.soil, soilOverrides,
+          lang: t('en', 'bn'), cells: [],
+        }))}</details>
+      </div>
+      <div class="studio-surface-mini" hidden></div>
 
       <details class="studio-soil-layers" open>
         <summary>${t("Soil layers", "মাটির স্তরসমূহ")}</summary>
@@ -4260,10 +4297,8 @@ export function setSoilOverrides(overrides) {
 
 export function setPlantingLayout(layout) {
   plantingLayout = layout || "rows";
-  textureCache.clear();
   if (containerEl && currentData) {
-    buildTopTexture(currentData, currentSurfaceMode, currentMonthIdx).then(() => {
-      buildFieldBlock(currentData, currentCutaway);
+    buildFieldBlock(currentData, currentCutaway).then(() => {
       buildPlantsAndRoots(currentData, currentMonthIdx);
       requestRender();
     });
@@ -4415,6 +4450,7 @@ export function disposeStudio3d() {
   containerEl = null;
   canvasHostEl = null;
   currentData = null;
+  currentSurface = null;
   elevationSampler = null;
   plantShaders = [];
   blockGroup = null;

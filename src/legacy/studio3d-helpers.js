@@ -105,6 +105,167 @@ export function nearestObservation(observations, monthIdx, year = 2024) {
   return best;
 }
 
+// Colour and area accounting share these classes; null never becomes a measurement.
+export function surfaceClass(legend, value) {
+  return legend.classes.find((c) => Number.isFinite(value) && !c.unknown &&
+    value >= c.from && (value < c.to || (c.includeTo && value === c.to))) || legend.classes.at(-1);
+}
+
+export function cropSurfaceValue(month) {
+  if (!month?.cropId || month.cropId === 'fallow' || month.stage === 'fallow') return 3;
+  return month.stage === 'establish' ? 0 : ['mature', 'harvest'].includes(month.stage) ? 2 : 1;
+}
+
+export function cropStageColor(cropId, stage) {
+  if (stage === 'fallow') return '#8f7352';
+  if (stage === 'harvest') return cropId === 'potato' ? '#b89a66' : '#c8b273';
+  if (stage === 'mature') {
+    if (cropId === 'mustard') return '#e8c93a';
+    if (cropId === 'potato') return '#4d6b30';
+    return '#cfa44e';
+  }
+  if (stage === 'establish') return '#a8d47a';
+  if (cropId === 'potato') return '#3f6e30'; // potato bushy dark green
+  if (cropId === 'mustard') return '#b5c938'; // mustard yellow-green
+  if (cropId === 'mungbean') return '#5fa044';
+  return '#387c32'; // rice green
+}
+
+// Equal-area raster cells, counted only when their centres fall inside the field.
+export function surfaceCells(outline, sampleAt, resolution = 128) {
+  if (!outline?.length || !(resolution > 0)) return [];
+  const b = outlineBounds(outline);
+  if (!(b.width > 0 && b.height > 0)) return [];
+  const cells = [];
+  const area = b.width * b.height / resolution ** 2;
+  for (let row = 0; row < resolution; row++) {
+    for (let col = 0; col < resolution; col++) {
+      const x = b.minX + (col + 0.5) / resolution * b.width;
+      const y = b.maxY - (row + 0.5) / resolution * b.height;
+      if (pointInPolygon(x, y, outline)) cells.push({ x, y, row, col, area, value: sampleAt(x, y) });
+    }
+  }
+  return cells;
+}
+
+// Depth uses the same fill level as the clipped ponding mesh, without invented radar depths.
+export function pondingDepthCm(height, min, {
+  rainMm = 0, exaggeration = 1, lowGround = false, proposedDrain = false,
+  outletBlocked = false, waterMask = null,
+} = {}) {
+  if (!(rainMm > 0)) return 0;
+  const scale = Math.max(0.01, exaggeration);
+  const factor = proposedDrain && !outletBlocked ? 0.45 : outletBlocked ? 1.3 : 1;
+  const fill = min + rainMm / 1000 * factor * (lowGround ? 1.3 : 1) * scale;
+  const level = fill + (waterMask === 1 ? 0.15 * Math.min(1, rainMm / 45) * scale * factor : 0);
+  return Math.max(0, (level - height) / scale * 100);
+}
+
+export function surfaceLegend(mode, data = {}) {
+  const bn = data.lang === 'bn';
+  const text = (en, local) => bn ? local : en;
+  mode = ({ hypso: 'elevation', ponding: 'water', ndmi: 'moisture' })[mode] || mode;
+  const month = data.month || {};
+  const makeClass = (label, color, from, to, includeTo = false) => ({ label, color, from, to, includeTo, pct: 0 });
+  let title, unit = '', classes, note, truth, source, date;
+  date = data.observation?.date || data.date || text('Date unavailable', 'তারিখ পাওয়া যায়নি');
+  if (mode === 'photo') {
+    title = text('Satellite photo', 'স্যাটেলাইট ছবি');
+    classes = [makeClass(text('True colour · unclassified', 'আসল রঙ · শ্রেণিবিহীন'), '#8f9d75', -Infinity, Infinity)];
+    note = text('Image colours show visible land cover, not index or soil classes.', 'ছবির রঙ দৃশ্যমান ভূমি দেখায়; সূচক বা মাটির শ্রেণি নয়।');
+    truth = 'REMOTE_OBSERVED';
+    source = text('Prepared Sentinel / satellite image', 'প্রস্তুত Sentinel / স্যাটেলাইট ছবি');
+  } else if (mode === 'ndvi' || mode === 'moisture') {
+    const ndvi = mode === 'ndvi';
+    title = ndvi ? text('Greenness (NDVI)', 'সবুজভাব (NDVI)') : text('Moisture (NDMI)', 'আর্দ্রতা (NDMI)');
+    unit = ndvi ? 'NDVI' : 'NDMI';
+    const breaks = ndvi ? [-Infinity, 0.2, 0.4, 0.6, 0.75, Infinity] : [-Infinity, 0, 0.2, 0.4, 0.6, Infinity];
+    const labels = ndvi
+      ? [text('Bare <0.2', 'খালি <0.2'), text('Sparse 0.2–0.4', 'অল্প 0.2–0.4'), text('Moderate 0.4–0.6', 'মাঝারি 0.4–0.6'), text('Dense 0.6–0.75', 'ঘন 0.6–0.75'), text('Very dense >0.75', 'অতি ঘন >0.75')]
+      : [text('Dry <0', 'শুষ্ক <0'), text('Slightly moist 0–0.2', 'সামান্য আর্দ্র 0–0.2'), text('Moist 0.2–0.4', 'আর্দ্র 0.2–0.4'), text('Wet 0.4–0.6', 'ভেজা 0.4–0.6'), text('Very wet ≥0.6', 'অতি ভেজা ≥0.6')];
+    const colors = ndvi ? ['#b88955', '#d4ce77', '#91bc64', '#438b42', '#155c32'] : ['#b67a42', '#d5bc77', '#8cbdac', '#419fba', '#1764a0'];
+    classes = labels.map((label, i) => makeClass(label, colors[i], breaks[i], breaks[i + 1], ndvi && i === 3));
+    note = text('Field area from Sentinel-2 cells; masked or missing cells are No data.', 'Sentinel-2 কোষ থেকে জমির অংশ; মেঘ বা অনুপস্থিত কোষে তথ্য নেই।');
+    truth = data.observation ? 'REMOTE_OBSERVED' : 'UNKNOWN';
+    source = 'Copernicus Sentinel-2 L2A · 20 m';
+  } else if (mode === 'water') {
+    title = text('Water ponding', 'জমা পানি');
+    unit = 'cm';
+    classes = [
+      makeClass(text('None · 0 cm', 'নেই · 0 সেমি'), '#8f7352', 0, 0, true),
+      makeClass(text('<5 cm', '<5 সেমি'), '#1d6fe0', 0, 5),
+      makeClass(text('5–15 cm', '5–15 সেমি'), '#185dc4', 5, 15),
+      makeClass(text('15–30 cm', '15–30 সেমি'), '#124caa', 15, 30, true),
+      makeClass(text('>30 cm', '>30 সেমি'), '#0b3d91', 30, Infinity),
+    ];
+    const radar = data.radarObservation;
+    const radarLine = Number.isFinite(radar?.floodedPct)
+      ? `Sentinel-1: ${radar.floodedPct.toFixed(1)} % · ${radar.date.slice(0, 7)}`
+      : text('Sentinel-1: no flooded % for this month', 'Sentinel-1: এই মাসে প্লাবিত অংশের তথ্য নেই');
+    note = `${text('Rain scenario', 'বৃষ্টির পরিকল্পনা')}: ${data.rainMm ?? 0} mm · ${text('depth is simulated', 'গভীরতা কাল্পনিক')}\n${radarLine}`;
+    truth = 'SCENARIO';
+    source = text('Terrain fill + rain scenario; Sentinel-1 observes presence, not depth', 'ভূমি ও বৃষ্টির পরিকল্পনা; Sentinel-1 পানির উপস্থিতি দেখে, গভীরতা নয়');
+    date = month.month || date;
+  } else if (mode === 'elevation') {
+    title = text('Elevation & contours', 'উচ্চতা ও কনট্যুর');
+    unit = 'm';
+    const min = data.elevationMin, max = data.elevationMax;
+    const valid = Number.isFinite(min) && Number.isFinite(max);
+    const colors = ['#28758b', '#68a59a', '#aecf9e', '#d1c17d', '#c3995e'];
+    classes = !valid ? [] : Array.from({ length: max > min ? 5 : 1 }, (_, i) => {
+      const from = min + (max - min) * i / 5, to = min + (max - min) * (i + 1) / 5;
+      return makeClass(`${from.toFixed(2)}–${to.toFixed(2)} m`, colors[i], from, to, i === 4 || max === min);
+    });
+    note = `${valid ? `${min.toFixed(2)}–${max.toFixed(2)} m · ` : ''}${text('contours every 0.25 m', 'প্রতি 0.25 মি কনট্যুর')} · ${text('relief exaggeration', 'উচ্চতা বাড়িয়ে দেখানো')} ${data.exaggeration ?? 1}×. ${text('Microrelief is illustrative.', 'সূক্ষ্ম ঢাল কাল্পনিক।')}`;
+    truth = valid ? 'MODELED' : 'UNKNOWN';
+    source = 'NASADEM · 30 m';
+  } else if (mode === 'fertility') {
+    title = text('Soil fertility · pH class', 'মাটির উর্বরতা · pH শ্রেণি');
+    unit = 'pH';
+    const breaks = [-Infinity, 4.5, 5.5, 6.5, 7.5, 8.5, Infinity];
+    const labels = [text('Very low', 'অতি কম'), text('Low', 'কম'), text('Medium', 'মাঝারি'), text('Optimum', 'উপযুক্ত'), text('High', 'বেশি'), text('Very high', 'অতি বেশি')];
+    const colors = ['#a64638', '#cd8849', '#d3bd59', '#548452', '#628eac', '#795f9a'];
+    classes = labels.map((label, i) => makeClass(`${label} · ${i === 0 ? '<4.5' : i === 5 ? '≥8.5' : `${breaks[i]}–${breaks[i + 1]}`}`, colors[i], breaks[i], breaks[i + 1]));
+    const ph = data.soilOverrides?.ph ?? data.soil?.layers?.[0]?.ph ?? data.nutrients?.ph?.value;
+    const soc = data.soil?.layers?.[0]?.socGkg;
+    const om = data.soilOverrides?.omPct ?? (Number.isFinite(soc) ? soc * 0.1724 :
+      Number.isFinite(data.nutrients?.om?.value) ? data.nutrients.om.value / (data.nutrients.om.unit === 'g/kg' ? 10 : 1) : null);
+    const index = Number.isFinite(ph) ? classes.findIndex((c) => ph >= c.from && ph < c.to) : -1;
+    const description = index >= 0 ? `${labels[index]} (pH ${ph.toFixed(1)}, OM ${Number.isFinite(om) ? om.toFixed(2) : '—'} %)` : text('No soil data', 'মাটির তথ্য নেই');
+    note = data.soilCellCount === 1
+      ? text(`Whole field uses one 250 m soil cell → one class: ${description}`, `পুরো মাঠে একটি ২৫০ মি মাটির কোষ ব্যবহৃত → এক শ্রেণি: ${description}`)
+      : text(`Field-wide estimate: ${description}`, `পুরো মাঠের আনুমানিক মান: ${description}`);
+    note += `\n${text('P/K/Zn/B: add soil test. Subfield soil zones are not mapped.', 'P/K/Zn/B: মাটি পরীক্ষা যোগ করুন। মাঠের ভেতরের মাটির অঞ্চল মানচিত্রে নেই।')}`;
+    const measuredPh = Number.isFinite(data.soilOverrides?.ph);
+    truth = measuredPh ? 'FARMER_REPORTED' : Number.isFinite(ph) ? 'MODELED' : 'UNKNOWN';
+    source = measuredPh ? text('Farmer soil test · BARC pH classes', 'কৃষকের মাটি পরীক্ষা · BARC pH শ্রেণি')
+      : text('ISRIC SoilGrids 2.0 · 250 m · BARC pH classes', 'ISRIC SoilGrids 2.0 · ২৫০ মি · BARC pH শ্রেণি');
+    if (measuredPh) date = data.soilOverrides.date || text('Soil test date unavailable', 'মাটি পরীক্ষার তারিখ পাওয়া যায়নি');
+  } else {
+    title = `${text('Crop canopy', 'ফসলের ক্যানোপি')}${month.cropName ? ` · ${text(month.cropName, month.cropNameBn || month.cropName)}` : ''}`;
+    classes = [
+      makeClass(text('Seedling / establishing', 'চারা / অঙ্কুরোদ্গম'), cropStageColor(month.cropId, 'establish'), 0, 1),
+      makeClass(text('Growing / full canopy', 'বৃদ্ধি / পূর্ণ ক্যানোপি'), cropStageColor(month.cropId, 'grow'), 1, 2),
+      makeClass(text('Ripening / harvest', 'পরিণত / ফসল কাটা'), cropStageColor(month.cropId, month.stage === 'harvest' ? 'harvest' : 'mature'), 2, 3),
+      makeClass(text('Bare / fallow', 'খালি / পতিত'), cropStageColor(null, 'fallow'), 3, 4),
+    ];
+    note = text('Illustrative crop + growth stage from the rotation plan; not observed canopy cover.', 'ফসলচক্রের পরিকল্পনা থেকে কাল্পনিক ফসল ও বৃদ্ধির ধাপ; পর্যবেক্ষিত ক্যানোপি নয়।');
+    truth = 'SCENARIO';
+    source = data.rotation?.label || text('Rotation plan', 'ফসলচক্রের পরিকল্পনা');
+    date = month.month || date;
+  }
+  classes.push({ label: text('No data', 'তথ্য নেই'), color: '#a5a9a5', from: null, to: null, pct: 0, unknown: true });
+  const legend = { title, unit, classes, note, truth, source, date };
+  let total = 0;
+  for (const cell of data.cells || []) {
+    if (!(cell.area > 0)) continue;
+    surfaceClass(legend, cell.value).pct += cell.area;
+    total += cell.area;
+  }
+  for (const c of classes) c.pct = total ? c.pct / total * 100 : c.unknown ? 100 : 0;
+  return legend;
+}
+
 // Visible clump height for the 3D plants. Data heights (canopyHeightM × stageFraction)
 // are honoured whenever they are tall enough to read against the field width, but a
 // floor proportional to the field span keeps establishing crops and short cover visible
@@ -665,25 +826,49 @@ export function sampleS1Water(site, observation, lon, lat) {
   return value === 0 || value === 1 ? value : null;
 }
 
+export function sampleSurfaceGrid(grid, lon, lat) {
+  if (grid?.crs !== 'EPSG:32645' || !grid.transform) return null;
+  const [x, y] = projectWgs84ToUtm45N(lon, lat);
+  const [dx, , west, , dy, north] = grid.transform;
+  const value = grid.values?.[Math.floor((y - north) / dy)]?.[Math.floor((x - west) / dx)];
+  return Number.isFinite(value) && value >= -1 && value <= 1 ? value : null;
+}
+
+export function pondingWaterline(positions) {
+  const edges = new Map();
+  for (let i = 0; i < positions.length; i += 9) {
+    const triangle = [0, 3, 6].map((j) => Array.from(positions.slice(i + j, i + j + 3)));
+    triangle.forEach((a, j) => {
+      const b = triangle[(j + 1) % 3];
+      const key = [a, b].map((p) => p.map((v) => v.toFixed(4)).join(',')).sort().join('|');
+      const edge = edges.get(key);
+      if (edge) edge.count++;
+      else edges.set(key, { count: 1, points: [...a, ...b] });
+    });
+  }
+  return [...edges.values()].filter((e) => e.count === 1).flatMap((e) => e.points);
+}
+
 // Clip each terrain triangle at the scenario fill level, then drape wet cells
 // just above that same triangle. Interpolated shoreline vertices cannot cross its edges.
 export function pondingPositions(surface, {
   rainMm = 0, exaggeration = 1, lowGround = false,
-  proposedDrain = false, outletBlocked = false, waterMaskAt = () => null,
+  proposedDrain = false, outletBlocked = false, waterMaskAt = () => null, minHeight = null,
 } = {}) {
   if (!(rainMm > 0) || !surface.length) return [];
   let min = Infinity;
   for (let i = 1; i < surface.length; i += 3) min = Math.min(min, surface[i]);
+  if (Number.isFinite(minHeight)) min = minHeight;
   const scale = Math.max(0.01, exaggeration);
-  const factor = proposedDrain && !outletBlocked ? 0.45 : outletBlocked ? 1.3 : 1;
-  const fill = min + rainMm / 1000 * factor * (lowGround ? 1.3 : 1) * scale;
   const positions = [];
   for (let i = 0; i < surface.length; i += 9) {
     const triangle = [0, 3, 6].map((j) => Array.from(surface.slice(i + j, i + j + 3)));
     const x = triangle.reduce((sum, p) => sum + p[0], 0) / 3;
     const z = triangle.reduce((sum, p) => sum + p[2], 0) / 3;
     // Radar supplies water presence, not depth. Its contribution remains a rain scenario.
-    const level = fill + (waterMaskAt(x, z) === 1 ? 0.15 * Math.min(1, rainMm / 45) * scale * factor : 0);
+    const level = min + pondingDepthCm(min, min, {
+      rainMm, exaggeration, lowGround, proposedDrain, outletBlocked, waterMask: waterMaskAt(x, z),
+    }) * scale / 100;
     const clipped = [];
     triangle.forEach((a, j) => {
       const b = triangle[(j + 1) % 3];
