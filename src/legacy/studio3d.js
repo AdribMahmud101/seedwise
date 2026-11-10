@@ -2435,7 +2435,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         </div>
 
         <!-- Tap Point Probe Card -->
-        <div class="studio-probe-card">
+        <div class="studio-probe-card" id="probe-card">
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e4d8;padding-bottom:3px;margin-bottom:4px;">
             <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--deep,#173e30);">${t("Point Probe (Click Field)", "পয়েন্ট প্রোব (জমিতে চাপুন)")}</span>
             <span id="probe-latlon" class="mono" style="font-size:10px;color:var(--text-dim,#536456);">25.8317°N, 89.2355°E</span>
@@ -2448,25 +2448,12 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         </div>
 
         <!-- Transect SVG cross-section Profile Card -->
-        <div class="studio-transect-card">
+        <div class="studio-transect-card" id="transect-card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
             <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--deep,#173e30);">${t("Transect Profile · A → A'", "ট্রানসেক্ট প্রোফাইল · A → A'")}</span>
             <span id="transect-relief-lbl" class="mono" style="font-size:10px;color:var(--text-dim,#536456);">${t("Relief: 2.5 m", "ঢাল: ২.৫ মি")}</span>
           </div>
           <svg id="svg-transect" viewBox="0 0 290 68" style="width:100%;height:64px;display:block;"></svg>
-        </div>
-
-        <div class="studio-terrain-card">
-          <div class="studio-terrain-head">
-            <label for="studio-height-slider-stage">${t("Terrain height", "ভূমির উচ্চতা")}</label>
-            <output id="studio-height-output-stage">${num(heightExaggeration, 0)}×</output>
-          </div>
-          <input type="range" id="studio-height-slider-stage" min="1" max="4.5" step="0.25" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
-          <small>${t("True scale · NASADEM ~30 m", "প্রকৃত স্কেল · নাসাডেম ~৩০ মি")}</small>
-          <label class="studio-terrain-surround">
-            <input type="checkbox" id="studio-surroundings-chk" ${showSurroundings ? "checked" : ""}>
-            <span>${t("Surroundings", "আশেপাশের জমি")}</span>
-          </label>
         </div>
 
         <div class="studio-model-caption" aria-hidden="true">
@@ -2478,6 +2465,21 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
 
       <!-- Interaction deck below viewport: Slice slider, Rain scenario slider, Relief scale slider + Roots & Bunds toggles -->
       <div class="studio-dock-deck">
+        <div class="studio-dock-item">
+          <div class="studio-dock-head">
+            <label for="studio-height-slider-stage">${t("Terrain height", "ভূমির উচ্চতা")}</label>
+            <output id="studio-height-output-stage" class="mono">${num(heightExaggeration, 0)}×</output>
+          </div>
+          <input type="range" id="studio-height-slider-stage" min="1" max="4.5" step="0.25" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
+          <div class="studio-dock-sub">
+            <span>${t("True scale · NASADEM ~30 m", "প্রকৃত স্কেল · নাসাডেম ~৩০ মি")}</span>
+            <label class="studio-terrain-surround" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin:0;padding:0;">
+              <input type="checkbox" id="studio-surroundings-chk" ${showSurroundings ? "checked" : ""}>
+              <span>${t("Surroundings", "আশেপাশে")}</span>
+            </label>
+          </div>
+        </div>
+
         <div class="studio-dock-item">
           <div class="studio-dock-head">
             <label for="slider-slice">${t("Subsurface Cutaway Slice", "মাটির নিচের স্তর কাটুন")}</label>

@@ -62,7 +62,7 @@ describe('STUDIO5B Rotation Tool', () => {
 
   describe('Soil Override LocalStorage', () => {
     it('should save soil overrides to localStorage', () => {
-      const testData = { gwDepth: 3.6, ph: 5.85, om: 2.05, p: 14.2 };
+      const testData = { gwDepth: 4.2, ph: 6.1, om: 2.98, p: 18.5 };
       rotationTool.saveSoilOverrides(testData);
       
       const saved = JSON.parse(global.localStorage.getItem('ropon.soilOverrides'));
@@ -71,7 +71,7 @@ describe('STUDIO5B Rotation Tool', () => {
 
     it('should reset soil overrides from localStorage', () => {
       // First save some data
-      rotationTool.saveSoilOverrides({ gwDepth: 3.6, ph: 5.85 });
+      rotationTool.saveSoilOverrides({ gwDepth: 4.2, ph: 6.1 });
       assert.ok(global.localStorage.getItem('ropon.soilOverrides'));
       
       // Then reset
