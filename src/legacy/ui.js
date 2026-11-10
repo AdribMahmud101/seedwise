@@ -387,7 +387,7 @@ function timeline(months) {
     pulse: t("Pulse", "ডাল"),
     fallow: t("Rest", "পতিত"),
   };
-  return `<div class="timeline-strip">${months.map((m, i) => `<div class="${m}" title="${monthName(i)} · ${colors[m]}">${i === 0 || months[i - 1] !== m ? colors[m] : ""}</div>`).join("")}</div><div class="month-labels">${months.map((_, i) => `<span>${monthName(i, true)}</span>`).join("")}</div>`;
+  return `<div class="timeline-scroll" tabindex="0" role="region" aria-label="${t("Crop calendar, scroll for all months", "ফসলের ক্যালেন্ডার, সব মাস দেখতে স্ক্রল করুন")}"><div class="timeline-strip">${months.map((m, i) => `<div class="${m}" title="${monthName(i)} · ${colors[m]}">${i === 0 || months[i - 1] !== m ? colors[m] : ""}</div>`).join("")}</div><div class="month-labels">${months.map((_, i) => `<span>${monthName(i, true)}</span>`).join("")}</div></div>`;
 }
 function chart(
   series,
@@ -447,7 +447,7 @@ function chart(
   for (let i = 0; i < n; i++)
     if (n <= 12 || i % 5 === 0)
       lines += `<text x="${x(i)}" y="${height - 7}" text-anchor="middle">${n === 12 ? monthName(i, true) : num(i + 1)}</text>`;
-  return `<div class="chart-legend">${series.map((s) => `<span><i class="legend-dot" style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}<span>${esc(unit)}</span></div><svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(description)}">${lines}</svg>`;
+  return `<div class="chart-legend">${series.map((s) => `<span><i class="legend-dot" style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}<span>${esc(unit)}</span></div><div class="chart-frame"><svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(description)}">${lines}</svg></div>`;
 }
 function stateEmpty(msg, actionLabel = "", action = null) {
   const hasAction = actionLabel && action;

@@ -213,7 +213,7 @@ function actions(a) {
 function calendar(c) {
   const start = +c.start.slice(5, 7) - 1,
     end = +c.end.slice(5, 7) - 1;
-  return `<div class="rr-months" aria-label="${esc(t("Months with a planting window", "বপনের সময়ের মাস"))}">${Array.from({ length: 12 }, (_, i) => `<span class="${i >= start && i <= end ? "season" : ""}">${esc(monthName(i, true))}</span>`).join("")}</div>`;
+  return `<div class="timeline-scroll" tabindex="0" role="region" aria-label="${esc(t("Months with a planting window", "বপনের সময়ের মাস"))}"><div class="rr-months">${Array.from({ length: 12 }, (_, i) => `<span class="${i >= start && i <= end ? "season" : ""}">${esc(monthName(i, true))}</span>`).join("")}</div></div>`;
 }
 function cropCard(c) {
   return `<article class="rr-crop ${c.available ? "available" : ""}"><div class="rr-crop-head"><div><div class="eyebrow">${esc(c.variety)}</div><h3>${word(c.name)}</h3></div>${tag(word(statuses[c.status]), c.available ? "green" : "amber")}</div>

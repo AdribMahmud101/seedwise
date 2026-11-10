@@ -36,7 +36,7 @@
 }
 
 .panel-card h2 {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -44,7 +44,7 @@
 }
 
 .panel-card .eyebrow {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
   font-size: 0.75rem;
   font-weight: 400;
   color: var(--text-secondary);
@@ -53,7 +53,7 @@
 }
 
 .panel-card .serif-head {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
 }
 
 /* ============================================
@@ -72,7 +72,7 @@
   display: inline-block;
   padding: 0.125rem 0.5rem;
   border-radius: 0.25rem;
-  font-family: 'Courier New', monospace;
+  font-family: 'Courier New', Bangla, monospace;
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -110,7 +110,7 @@
  * ============================================ */
 .season-step-btn {
   transition: all 0.2s ease;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
   cursor: pointer;
   text-align: left;
 }
@@ -131,7 +131,7 @@
 .layout-btn {
   transition: all 0.2s ease;
   cursor: pointer;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
 }
 
 .layout-btn:hover {
@@ -144,7 +144,7 @@
 .water-view-btn {
   transition: all 0.2s ease;
   cursor: pointer;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
 }
 
 .water-view-btn:hover {
@@ -164,7 +164,7 @@
   transition: all 0.2s ease;
   cursor: pointer;
   border: 1px solid var(--border-light);
-  font-family: 'Courier New', monospace;
+  font-family: 'Courier New', Bangla, monospace;
 }
 
 .nutrient-chip.active,
@@ -207,7 +207,7 @@
 }
 
 .econ-cell-value {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -276,7 +276,7 @@
 }
 
 .rotation-modal-header h3 {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -594,7 +594,7 @@
  * Monospace text styling
  * ============================================ */
 .mono {
-  font-family: 'Courier New', monospace;
+  font-family: 'Courier New', Bangla, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1020,7 +1020,7 @@ a:hover {
 }
 
 .question-panel h3 {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, 'Times New Roman', Bangla, serif;
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--text-primary, #173e30);
@@ -1085,7 +1085,7 @@ a:hover {
 }
 
 .month-name {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, Consolas, Bangla, monospace;
   font-size: 12px;
   font-weight: 600;
   color: #536456;
@@ -1230,7 +1230,7 @@ a:hover {
   min-width: 44px;
   padding: 8px 12px;
   border-radius: 4px;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, Consolas, Bangla, monospace;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -1297,13 +1297,13 @@ a:hover {
 
 .s1-flood-date {
   color: #536456;
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, Bangla, monospace;
   font-size: 12px;
 }
 
 .s1-flood-pct {
   color: #2563eb;
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, Bangla, monospace;
 }
 
 /* Nutrient chips */
@@ -1346,7 +1346,7 @@ a:hover {
 .nutrient-chip .chip-val {
   font-size: 12px;
   color: #315d42;
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, Bangla, monospace;
 }
 
 .nutrient-chip .chip-val.chip-enter {
@@ -1415,7 +1415,7 @@ a:hover {
   border-radius: 4px;
   border: 1px solid #cdcfc0;
   background: #fffdf5;
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: ui-monospace, Consolas, Bangla, monospace;
   font-size: 12px;
   font-weight: 600;
   color: #173e30;
@@ -1466,7 +1466,7 @@ a:hover {
 .main:has(#rotation-list) [style*="font-size:9px"],
 .main:has(#rotation-list) [style*="font-size:10px"],
 .main:has(#rotation-list) [style*="font-size:11px"] {
-  font-size: 12px !important; /* Inline legacy labels also need the readable minimum. */
+  font-size: 13px !important; /* Inline legacy labels also need the readable minimum. */
 }
 
 .main:has(#rotation-list) .text-link {
@@ -1530,3 +1530,66 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
   }
 }
 
+
+@media screen {
+  .rotation-question-panels-row {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 16px;
+  }
+  .rotation-question-panels-row > *:last-child {
+    grid-column: auto;
+  }
+  .month-strip {
+    min-width: 720px;
+    grid-template-columns: repeat(12, minmax(56px, 1fr));
+  }
+  .month-cell, .month-tag {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+  .question-panel .panel-body, .question-panel .panel-header {
+    padding: 16px;
+  }
+  .s1-flood-grid {
+    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  }
+  .main:has(#rotation-list) .priority-layout {
+    grid-template-columns: minmax(240px, 0.8fr) minmax(0, 2fr);
+  }
+  .main:has(#rotation-list) .priority-box .panel-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #rotation-list .rotation-card {
+    overflow-wrap: normal;
+    container-type: inline-size;
+  }
+  #rotation-list .rotation-info {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  }
+  #rotation-list .rotation-top h2 {
+    font-size: clamp(21px, 2.3vw, 29px);
+  }
+  @container workspace (max-width: 48rem) {
+    .main:has(#rotation-list) .priority-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .priority-box {
+      position: static;
+    }
+    .priority-item label {
+      font-size: 13px;
+    }
+    .pump-tariff-select-wrap, .pump-tariff-select-wrap select {
+      width: 100%;
+    }
+  }
+  @container workspace (max-width: 40rem) {
+    #rotation-list .rotation-info, .low-ground-stat-box {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .rotation-top {
+      flex-wrap: wrap;
+    }
+  }
+}

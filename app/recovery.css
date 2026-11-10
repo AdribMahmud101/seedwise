@@ -573,3 +573,46 @@
     print-color-adjust: exact;
   }
 }
+
+@media screen {
+  .rr-assessment, .rr-bottom, .rr-evidence-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 16px;
+  }
+  .rr-assessment .panel-body, .rr-bottom .panel-body, .rr-now, .rr-hold, .rr-evidence, .rr-crop, .rr-crop.available {
+    padding: 16px;
+  }
+  .rr-hazards {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  }
+  .rr-months {
+    min-width: 720px;
+  }
+  .rr-months span, .rr-tree small {
+    font-size: 12px;
+  }
+  @container workspace (max-width: 40rem) {
+    .rr-hazard, .rr-hazard.selected {
+      display: flex;
+      align-items: center;
+      min-height: 100px;
+      gap: 12px;
+      padding: 16px 40px 16px 12px;
+    }
+    .rr-hazard .rr-sketch {
+      width: 56px;
+      height: 52px;
+    }
+    .rr-hazard small {
+      max-width: none;
+      font-size: 13px;
+    }
+    .rr-assessment .form-grid, .rr-crop-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .rr-save-actions, .rr-linked, .rr-form-footer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

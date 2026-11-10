@@ -363,9 +363,9 @@ function panelWhenBareOrStressed(studioData) {
     </div>
     <div class="panel-body">
       <div class="month-strip-container">
-        <div class="month-strip" role="group" aria-label="${t('12-month seasonal strip', '১২ মাসের মৌসুমের চিত্র')}">
+        <div class="month-strip-scroll" tabindex="0" role="region" aria-label="${t('12-month seasonal strip, scroll for all months', '১২ মাসের মৌসুমের চিত্র, সব মাস দেখতে স্ক্রল করুন')}"><div class="month-strip" role="group" aria-label="${t('12-month seasonal strip', '১২ মাসের মৌসুমের চিত্র')}">
           ${monthCells}
-        </div>
+        </div></div>
         <div class="month-strip-legend">
           <span><span class="month-indicator month-crop"></span> ${t('Covered', 'ফসল')}</span>
           <span><span class="month-indicator month-stressed"></span> ${t('Moisture stress', 'পানির চাপ')} ${truth('MODELED')}</span>

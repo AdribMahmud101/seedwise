@@ -153,7 +153,7 @@
   border-radius: 4px;
   background: #3b82f6;
   color: #ffffff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -214,7 +214,7 @@
 .landscape-pin-tag small {
   display: block;
   font-family: Bangla, Plex, sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   color: #94a3b8;
   line-height: 1.1;
@@ -243,3 +243,14 @@
 .landscape-pin-tag small { font-size: 12px; }
 .landscape-card > .landscape-overlay-bottom .landscape-legend-labels { color: #3d4a42; }
 @media (max-width: 600px) { .landscape-controls { top: auto; bottom: 10px; } }
+
+@media screen {
+  .landscape-pin-tag small, .landscape-chip .badge-modeled {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .landscape-card > .landscape-overlay-bottom {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

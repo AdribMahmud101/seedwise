@@ -154,7 +154,7 @@
   /* Ensure sources line is visible */
   .sources-line {
     color: black !important;
-    font-size: 11px;
+    font-size: 12px;
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid #ccc;
