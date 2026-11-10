@@ -645,3 +645,65 @@ export function deoverlapLabels(items, containerHeight, minGap = 8, topPadding =
   return res;
 }
 
+// ------------------------------------------------------------- STUDIO5M intro animation helpers
+
+export function easeOutCubic(t) {
+  const p = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
+  return 1 - Math.pow(1 - p, 3);
+}
+
+export function introCameraParams({
+  progress,
+  finalDistance,
+  finalTarget,
+  finalElevationDeg = 14,
+  finalYawDeg = 10,
+  swingDeg = 80,
+  heightMult = 1.6,
+  distMult = 1.35,
+}) {
+  const p = easeOutCubic(progress);
+  const startEl = finalElevationDeg * heightMult;
+  const startYaw = finalYawDeg + swingDeg;
+  const startDist = finalDistance * distMult;
+
+  const currentElevationDeg = startEl + (finalElevationDeg - startEl) * p;
+  const currentYawDeg = startYaw + (finalYawDeg - startYaw) * p;
+  const currentDistance = startDist + (finalDistance - startDist) * p;
+
+  const elRad = (currentElevationDeg * Math.PI) / 180;
+  const yawRad = (currentYawDeg * Math.PI) / 180;
+
+  const target = [finalTarget[0], finalTarget[1], finalTarget[2]];
+  const position = [
+    target[0] + Math.cos(elRad) * Math.sin(yawRad) * currentDistance,
+    target[1] + Math.sin(elRad) * currentDistance,
+    target[2] + Math.cos(elRad) * Math.cos(yawRad) * currentDistance,
+  ];
+
+  return {
+    position,
+    target,
+    distance: currentDistance,
+    elevationDeg: currentElevationDeg,
+    yawDeg: currentYawDeg,
+  };
+}
+
+export function shouldSkipIntro({ prefersReducedMotion = false, isHidden = false, hasPlayed = false } = {}) {
+  return Boolean(prefersReducedMotion || isHidden || hasPlayed);
+}
+
+export function sampleRowCropScale(t, rowProgress = 0, startT = 0.6, endT = 2.2) {
+  if (t <= startT) return 0;
+  if (t >= endT) return 1;
+  const duration = endT - startT;
+  // Stagger start by row progress across first ~40% of duration
+  const rowStart = startT + rowProgress * (duration * 0.4);
+  const rowEnd = rowStart + (duration * 0.6);
+  if (t <= rowStart) return 0;
+  if (t >= rowEnd) return 1;
+  return easeOutCubic((t - rowStart) / (rowEnd - rowStart));
+}
+
+

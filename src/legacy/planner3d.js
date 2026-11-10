@@ -11,6 +11,12 @@ import {
   fitCameraToBlock, fitTopView, plannerRowLayout,
 } from "./planner3d-helpers.js";
 import {
+  easeOutCubic,
+  introCameraParams,
+  shouldSkipIntro,
+  sampleRowCropScale,
+} from "./studio3d-helpers.js";
+import {
   smoothOutline,
   computeMicroRelief,
   rimErosionNoise,
@@ -41,6 +47,7 @@ let buildToken = 0;
 let blockGroup = null;
 let plantsGroup = null;
 let shadowPlane = null;
+let introAnim = null;
 
 const currentBlock = {
   depth: 1.5, bottomY: -1.5, topMin: 0, topMax: 0, bounds: null,
@@ -773,6 +780,11 @@ function buildPlants(data) {
   }
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.userData.baseMatrices = new Float32Array(mesh.instanceMatrix.array);
+  const boundsY = bounds.maxY - bounds.minY;
+  mesh.userData.rowProgress = new Float32Array(positions.map(([, y]) => {
+    return boundsY > 1e-4 ? Math.max(0, Math.min(1, (y - bounds.minY) / boundsY)) : 0;
+  }));
 
   plantsGroup = new THREE.Group();
   ensureFloatGroup();
@@ -917,6 +929,7 @@ function setupControls() {
   controls.addEventListener("change", requestRender);
   controls.addEventListener("start", () => {
     isDragging = true;
+    stopIntroAnimation(true);
     if (floatGroup) {
       // Settle the group back to rest while the user is dragging.
       floatGroup.position.set(0, 0, 0);
@@ -995,6 +1008,13 @@ function fitPerspective(data) {
   controls.maxDistance = fit.distance * 2.8;
   controls.maxPolarAngle = Math.PI / 2 - 0.04;
   controls.update();
+
+  return {
+    target,
+    distance,
+    elevationDeg,
+    yawDeg,
+  };
 }
 
 function fitOrtho(data) {
@@ -1087,7 +1107,11 @@ function initThree(host) {
     intersectionObserver.observe(host);
   }
   document.addEventListener("visibilitychange", onVisibilityChange);
+  canvas.addEventListener("pointerdown", () => stopIntroAnimation(true));
+  canvas.addEventListener("wheel", () => stopIntroAnimation(true), { passive: true });
+  host.addEventListener("click", () => stopIntroAnimation(true));
   host.onkeydown = (event) => {
+    stopIntroAnimation(true);
     if (!host.closest(".planner3d-ready")) return;
     if (event.key === "+" || event.key === "=") zoomPlanner3d(1);
     else if (event.key === "-") zoomPlanner3d(-1);
@@ -1106,6 +1130,123 @@ function initThree(host) {
     event.preventDefault();
   };
   onResize();
+}
+
+/* --------------------------------------------------- Planner intro animation */
+
+function triggerIntroAnimation(force = false) {
+  if (!force && shouldSkipIntro({ prefersReducedMotion, isHidden: document.hidden || !isVisible })) return;
+  if (!force) {
+    try {
+      const key = "ropon_planner_intro_3d";
+      if (sessionStorage.getItem(key) === "1") return;
+      sessionStorage.setItem(key, "1");
+    } catch (e) {}
+  }
+
+  if (isTopView || !currentData) return;
+
+  const b = outlineBounds(currentData.field.outlineM);
+  const depth = currentBlock.depth || blockDepthM(b);
+  const fit = fitPerspective(currentData);
+  if (!fit) return;
+
+  introAnim = {
+    startTime: performance.now(),
+    duration: 2000, // 2s total for planner
+    finalDistance: fit.distance,
+    finalTarget: fit.target,
+    finalElevationDeg: fit.elevationDeg,
+    finalYawDeg: fit.yawDeg,
+    depth,
+  };
+
+  // Immediate initial state
+  if (plantsGroup) {
+    const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
+    if (mesh && mesh.userData.baseMatrices) {
+      const arr = mesh.instanceMatrix.array;
+      for (let i = 0; i < arr.length; i += 16) {
+        for (let c = 0; c < 12; c++) arr[i + c] = 0;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  updateIntroFrame(0);
+}
+
+function stopIntroAnimation(snapToEnd = true) {
+  if (!introAnim) return;
+  const anim = introAnim;
+  introAnim = null;
+
+  if (snapToEnd) {
+    if (plantsGroup) {
+      const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
+      if (mesh && mesh.userData.baseMatrices) {
+        mesh.instanceMatrix.array.set(mesh.userData.baseMatrices);
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+
+    const finalParams = introCameraParams({
+      progress: 1.0,
+      finalDistance: anim.finalDistance,
+      finalTarget: anim.finalTarget,
+      finalElevationDeg: anim.finalElevationDeg,
+      finalYawDeg: anim.finalYawDeg,
+    });
+    if (cameraPersp && controls) {
+      cameraPersp.position.set(finalParams.position[0], finalParams.position[1], finalParams.position[2]);
+      controls.target.set(finalParams.target[0], finalParams.target[1], finalParams.target[2]);
+      controls.update();
+    }
+    requestRender();
+  }
+}
+
+function updateIntroFrame(elapsedMs) {
+  if (!introAnim) return;
+  const tSec = elapsedMs / 1000;
+  const progress = Math.min(1, elapsedMs / introAnim.duration);
+
+  // Camera swing
+  const cam = introCameraParams({
+    progress,
+    finalDistance: introAnim.finalDistance,
+    finalTarget: introAnim.finalTarget,
+    finalElevationDeg: introAnim.finalElevationDeg,
+    finalYawDeg: introAnim.finalYawDeg,
+  });
+  if (cameraPersp && controls) {
+    cameraPersp.position.set(cam.position[0], cam.position[1], cam.position[2]);
+    controls.target.set(cam.target[0], cam.target[1], cam.target[2]);
+    controls.update();
+  }
+
+  // Crops grow up during 0.4 - 1.8 s
+  if (plantsGroup) {
+    const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
+    if (mesh && mesh.userData.baseMatrices && mesh.userData.rowProgress) {
+      const base = mesh.userData.baseMatrices;
+      const rows = mesh.userData.rowProgress;
+      const arr = mesh.instanceMatrix.array;
+      const count = rows.length;
+      for (let i = 0; i < count; i++) {
+        const offset = i * 16;
+        const scale = sampleRowCropScale(tSec, rows[i], 0.4, 1.8);
+        for (let c = 0; c < 12; c++) {
+          arr[offset + c] = base[offset + c] * scale;
+        }
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  if (progress >= 1.0) {
+    stopIntroAnimation(true);
+  }
 }
 
 function requestRender() {
@@ -1127,7 +1268,12 @@ function startAnimation() {
   if (animFrameId !== null) return;
   const loop = (time) => {
     animFrameId = requestAnimationFrame(loop);
-    applyIdleFloat(time / 1000);
+    if (introAnim) {
+      const now = performance.now();
+      updateIntroFrame(now - introAnim.startTime);
+    } else {
+      applyIdleFloat(time / 1000);
+    }
     controls.update();
     renderer.render(scene, activeCamera);
   };
@@ -1142,7 +1288,10 @@ function stopAnimation() {
 function onVisibilityChange() {
   isVisible = inViewport && !document.hidden;
   if (isVisible) startAnimation();
-  else stopAnimation();
+  else {
+    stopIntroAnimation(true);
+    stopAnimation();
+  }
 }
 
 function onMotionChange() {
@@ -1210,10 +1359,12 @@ export async function mountPlanner3d(host, input) {
   host.closest(".planner3d-stage-wrap").classList.add("planner3d-ready");
   requestRender();
   onVisibilityChange();
+  if (!isTopView) triggerIntroAnimation();
 }
 
 export function disposePlanner3d() {
   ++buildToken;
+  stopIntroAnimation(true);
   stopAnimation();
   if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
   renderFrameId = null;
