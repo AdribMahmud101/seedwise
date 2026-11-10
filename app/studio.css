@@ -1065,16 +1065,53 @@
 }
 
 .callout-box {
-  background: rgba(255, 253, 245, 0.95);
+  background: rgba(255, 253, 245, 0.96);
   border: 1px solid rgba(27, 56, 46, 0.25);
-  border-left: 3px solid var(--deep, #173e30);
-  border-radius: 3px;
-  padding: 4px 8px;
-  box-shadow: 0 3px 10px rgba(23, 62, 48, 0.14);
-  font-size: 11px;
-  font-weight: 600;
+  border-left: 4px solid var(--deep, #173e30);
+  border-radius: 4px;
+  padding: 6px 10px;
+  box-shadow: 0 4px 14px rgba(23, 62, 48, 0.16);
+  font-size: 12px;
   color: var(--ink, #1b382e);
   white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.callout-box:hover,
+.callout-box.highlight {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(23, 62, 48, 0.25);
+  border-color: rgba(23, 62, 48, 0.5);
+}
+
+.callout-eyebrow {
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim, #536456);
+  margin-bottom: 2px;
+}
+
+.callout-val {
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.callout-box.topsoil {
+  border-left-color: #5c3d24;
+}
+
+.callout-box.rootzone {
+  border-left-color: #8c5b36;
+}
+
+.callout-box.aquifer {
+  border-left-color: #2563eb;
 }
 
 .callout-box.water {
@@ -1088,6 +1125,97 @@
 
 .callout-box.soil {
   border-left-color: #7c5230;
+}
+
+.callout-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.callout-btn:hover {
+  color: #173e30;
+}
+
+/* Callout mobile dot */
+.callout-dot-num {
+  display: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #173e30;
+  color: #fffdf5;
+  font-weight: 700;
+  font-size: 11px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Legend list below canvas for mobile */
+.studio-callout-legend {
+  display: none;
+  margin: 8px 12px;
+  padding: 10px;
+  background: rgba(255, 253, 245, 0.95);
+  border: 1px solid var(--line, #cdcfc0);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.studio-callout-legend-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.studio-callout-legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.studio-callout-legend-item:hover,
+.studio-callout-legend-item.highlight {
+  background: rgba(23, 62, 48, 0.08);
+}
+
+.studio-callout-legend-item .num-badge {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #173e30;
+  color: #fffdf5;
+  font-size: 10px;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 420px) {
+  .callout-3d[data-band] .callout-box,
+  .callout-3d[data-band] .callout-line,
+  .callout-3d[data-band] .callout-dot {
+    display: none !important;
+  }
+  .callout-3d[data-band] .callout-dot-num {
+    display: flex;
+  }
+  .studio-callout-legend {
+    display: block;
+  }
 }
 
 .callout-line {

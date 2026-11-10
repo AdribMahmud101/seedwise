@@ -465,3 +465,134 @@ export function waterTablePositions(surface, level, bottomY, topMin) {
   if (!(level > bottomY && level < topMin)) return [];
   return Array.from(surface, (value, i) => i % 3 === 1 ? level : value);
 }
+
+// ------------------------------------------------------------------ STUDIO5K helpers
+
+/**
+ * Determine USDA soil texture class from sand, silt, and clay percentages.
+ */
+export function usdaTextureClass(clay, sand, silt) {
+  const sum = clay + sand + silt;
+  if (!Number.isFinite(sum) || sum <= 0) return 'loam';
+  const c = (clay * 100) / sum;
+  const sa = (sand * 100) / sum;
+  const si = (silt * 100) / sum;
+
+  if (si + 1.5 * c < 15) return 'sand';
+  if (si + 2 * c < 30) return 'loamy sand';
+  if ((c < 20 && sa > 52) || (c < 7 && si < 50)) return 'sandy loam';
+  if (c < 27 && 28 <= si && si < 50 && sa <= 52) return 'loam';
+  if (si >= 80 && c < 12) return 'silt';
+  if (si >= 50 && c < 27) return 'silt loam';
+  if (20 <= c && c < 35 && si < 28 && sa > 45) return 'sandy clay loam';
+  if (27 <= c && c < 40 && 20 < sa && sa <= 45) return 'clay loam';
+  if (27 <= c && c < 40 && sa <= 20) return 'silty clay loam';
+  if (c >= 35 && sa > 45) return 'sandy clay';
+  if (c >= 40 && si >= 40) return 'silty clay';
+  return 'clay';
+}
+
+/**
+ * Calculate auto vertical exaggeration targeting ~0.25 * block width of relief.
+ */
+export function computeAutoExaggeration(reliefM, blockWidthM, minExag = 1.0, maxExag = 4.5) {
+  if (!Number.isFinite(reliefM) || reliefM <= 0.05 || !Number.isFinite(blockWidthM) || blockWidthM <= 0) {
+    return 1.0;
+  }
+  const targetExag = (0.25 * blockWidthM) / reliefM;
+  // Snap to nearest 0.25 step within [minExag, maxExag]
+  const stepped = Math.round(targetExag * 4) / 4;
+  return Math.max(minExag, Math.min(maxExag, stepped));
+}
+
+/**
+ * Format callout data for the 3 stratigraphic bands:
+ * Band 1: 0–15 cm · TOPSOIL
+ * Band 2: 15–60 cm · ROOT ZONE
+ * Band 3: >120 cm · SUBSOIL & WATER TABLE
+ */
+export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t = (en) => en }) {
+  if (!data) return null;
+  const month = data.months?.[monthIdx] || data.months?.[0] || {};
+  const layers = data.soil?.layers || [];
+
+  // Band 1: 0-15 cm Topsoil
+  const topLayer = layers[0] || {};
+  const texture = (topLayer.clayPct != null && topLayer.sandPct != null && topLayer.siltPct != null)
+    ? usdaTextureClass(topLayer.clayPct, topLayer.sandPct, topLayer.siltPct)
+    : (topLayer.textureClass || 'clay loam');
+  
+  // Format texture nicely (capitalize words)
+  const textureTitle = texture.replace(/\b\w/g, (c) => c.toUpperCase());
+  const ph = topLayer.ph != null ? Number(topLayer.ph).toFixed(1) : (soilOverrides?.ph != null ? Number(soilOverrides.ph).toFixed(1) : null);
+  // Organic Matter (OM %) = SOC (g/kg) / 10 * 1.724 (van Bemmelen factor) or socGkg * 0.1724
+  let omPct = null;
+  if (topLayer.socGkg != null) {
+    omPct = (topLayer.socGkg * 0.1724).toFixed(2);
+  } else if (soilOverrides?.omPct != null) {
+    omPct = Number(soilOverrides.omPct).toFixed(2);
+  }
+
+  const topsoilEyebrow = `0–15 cm · ${t("TOPSOIL", "উপরের মাটি")}`;
+  const topsoilValParts = [];
+  if (soilOverrides) {
+    topsoilValParts.push(t("Measured · by farmer", "মাপা · কৃষক কর্তৃক"));
+  } else {
+    topsoilValParts.push(textureTitle);
+    if (ph != null) topsoilValParts.push(`pH ${ph}`);
+    if (omPct != null) topsoilValParts.push(`OM ${omPct}%`);
+  }
+  const topsoilVal = topsoilValParts.join(" · ");
+  const topsoilTruth = soilOverrides ? "FARMER_REPORTED" : "MODELED";
+  const topsoilTruthLabel = soilOverrides ? "Soil test, Measured" : "SoilGrids, Estimated";
+
+  // Band 2: 15-60 cm Root Zone
+  // POWER GWETROOT for the selected month (fallback to month.rootWetness or month.wetness)
+  const rootWetness = month.rootWetness != null ? Number(month.rootWetness).toFixed(2) : (month.wetness != null ? Number(month.wetness).toFixed(2) : "0.50");
+  const cropName = t(month.cropName || "Crop", month.cropNameBn || "ফসল");
+  const rootDepthM = month.rootDepthM != null ? `${Number(month.rootDepthM).toFixed(1)} m` : null;
+
+  const rootzoneEyebrow = `15–60 cm · ${t("ROOT ZONE", "শিকড় অঞ্চল")}`;
+  const rootzoneVal = `GWETROOT ${rootWetness} · ${cropName}${rootDepthM ? ` (${rootDepthM})` : ""}`;
+  const rootzoneTruth = "MODELED";
+  const rootzoneTruthLabel = "NASA POWER · Agronomy, Estimated";
+
+  // Band 3: >120 cm Subsoil & Water Table
+  const aquiferEyebrow = `>120 cm · ${t("SUBSOIL & WATER TABLE", "গভীর স্তর ও পানির স্তর")}`;
+  const hasLocalGw = soilOverrides?.gwDepthM != null && Number(soilOverrides.gwDepthM) > 0;
+  const aquiferVal = hasLocalGw
+    ? `${Number(soilOverrides.gwDepthM).toFixed(1)} m (${t("Measured", "মাপা")})`
+    : t("Well depth unknown (add local reading)", "কূপের গভীরতা অজানা (স্থানীয় তথ্য দিন)");
+  const aquiferTruth = hasLocalGw ? "FARMER_REPORTED" : "UNKNOWN";
+  const aquiferTruthLabel = hasLocalGw ? "Tubewell depth, Measured" : "Unknown — add local reading";
+
+  return {
+    topsoil: {
+      eyebrow: topsoilEyebrow,
+      value: topsoilVal,
+      truth: topsoilTruth,
+      truthLabel: topsoilTruthLabel,
+      texture,
+      ph,
+      omPct,
+    },
+    rootzone: {
+      eyebrow: rootzoneEyebrow,
+      value: rootzoneVal,
+      truth: rootzoneTruth,
+      truthLabel: rootzoneTruthLabel,
+      gwetroot: rootWetness,
+      cropName,
+      rootDepthM,
+    },
+    aquifer: {
+      eyebrow: aquiferEyebrow,
+      value: aquiferVal,
+      truth: aquiferTruth,
+      truthLabel: aquiferTruthLabel,
+      isButton: !hasLocalGw,
+      gwDepthM: hasLocalGw ? soilOverrides.gwDepthM : null,
+    },
+  };
+}
+
