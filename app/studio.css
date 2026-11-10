@@ -2045,3 +2045,16 @@
 .studio-surface-bar[hidden], .studio-surface-mini[hidden] { display: none; }
 .studio-layers-sheet .studio-surface-selector { font-size: 12px; }
 .studio-layers-sheet .studio-surface-selector .eyebrow { font-size: 12px !important; }
+
+/* Surface provenance stays distinct from simulated depth classes. */
+.studio-flow-key {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+}
+.studio-flow-key li { display: flex; align-items: center; gap: 6px; }
+.studio-flow-key i { width: 14px; height: 3px; display: inline-block; }
+.studio-surface-observed { font-size: 11px; line-height: 1.5; border-top: 1px solid #d7dfd5; padding-top: 7px; }

@@ -72,7 +72,59 @@
           "bulkDensity": 1.42,
           "textureClass": "clay loam"
         }
-      ]
+      ],
+      "neighborhood": {
+        "west": 89.26875410644497,
+        "north": 25.541124150457016,
+        "stepLon": 0.002491787110036133,
+        "stepLat": 0.0022483009140330523,
+        "ph": [
+          [
+            6.0,
+            6.1,
+            6.1
+          ],
+          [
+            6.1,
+            6.1,
+            6.1
+          ],
+          [
+            6.1,
+            6.1,
+            6.1
+          ]
+        ],
+        "omPct": [
+          [
+            2.9997599999999998,
+            2.98252,
+            3.017
+          ],
+          [
+            3.06872,
+            3.0514799999999997,
+            2.74116
+          ],
+          [
+            2.6722,
+            2.72392,
+            2.72392
+          ]
+        ],
+        "cellM": 250,
+        "depthCm": [
+          0,
+          5
+        ],
+        "method": "3×3 neighbouring pixels in WCS EPSG:4326 output; native model support 250 m; bilinear display",
+        "requestUrls": [
+          "https://maps.isric.org/mapserv?map=%2Fmap%2Fphh2o.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=phh2o_0-5cm_mean&FORMAT=image%2Ftiff&SUBSET=long%2889.26501642577992%2C89.27498357422007%29&SUBSET=lat%2825.535503398171933%2C25.544496601828065%29&SUBSETTINGCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326&OUTPUTCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326",
+          "https://maps.isric.org/mapserv?map=%2Fmap%2Fsoc.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=soc_0-5cm_mean&FORMAT=image%2Ftiff&SUBSET=long%2889.26501642577992%2C89.27498357422007%29&SUBSET=lat%2825.535503398171933%2C25.544496601828065%29&SUBSETTINGCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326&OUTPUTCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326"
+        ],
+        "retrievedAt": "2026-11-10T20:14:39.811449+00:00",
+        "omConversion": "OM (%) = SOC (g/kg) × 0.1724; estimated from organic carbon"
+      }
     },
     "pirganj": {
       "source": "ISRIC SoilGrids 2.0 (250 m), mean predictions",
@@ -136,7 +188,59 @@
           "bulkDensity": 1.4,
           "textureClass": "clay loam"
         }
-      ]
+      ],
+      "neighborhood": {
+        "west": 89.21875452162082,
+        "north": 25.501124150457017,
+        "stepLon": 0.002490956758341175,
+        "stepLat": 0.0022483009140330523,
+        "ph": [
+          [
+            6.0,
+            6.0,
+            6.0
+          ],
+          [
+            6.0,
+            6.0,
+            6.0
+          ],
+          [
+            6.1,
+            6.0,
+            6.0
+          ]
+        ],
+        "omPct": [
+          [
+            3.17216,
+            3.20664,
+            3.13768
+          ],
+          [
+            3.17216,
+            3.17216,
+            3.15492
+          ],
+          [
+            3.5342,
+            3.5342,
+            3.2756
+          ]
+        ],
+        "cellM": 250,
+        "depthCm": [
+          0,
+          5
+        ],
+        "method": "3×3 neighbouring pixels in WCS EPSG:4326 output; native model support 250 m; bilinear display",
+        "requestUrls": [
+          "https://maps.isric.org/mapserv?map=%2Fmap%2Fphh2o.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=phh2o_0-5cm_mean&FORMAT=image%2Ftiff&SUBSET=long%2889.21501808648331%2C89.22498191351669%29&SUBSET=lat%2825.495503398171934%2C25.504496601828066%29&SUBSETTINGCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326&OUTPUTCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326",
+          "https://maps.isric.org/mapserv?map=%2Fmap%2Fsoc.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=soc_0-5cm_mean&FORMAT=image%2Ftiff&SUBSET=long%2889.21501808648331%2C89.22498191351669%29&SUBSET=lat%2825.495503398171934%2C25.504496601828066%29&SUBSETTINGCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326&OUTPUTCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326"
+        ],
+        "retrievedAt": "2026-11-10T20:14:42.490028+00:00",
+        "omConversion": "OM (%) = SOC (g/kg) × 0.1724; estimated from organic carbon"
+      }
     },
     "gangachara": {
       "source": "ISRIC SoilGrids 2.0 (250 m), mean predictions",
@@ -200,7 +304,59 @@
           "bulkDensity": 1.43,
           "textureClass": "clay loam"
         }
-      ]
+      ],
+      "neighborhood": {
+        "west": 89.19875085874223,
+        "north": 25.851124150457018,
+        "stepLon": 0.002498282515536706,
+        "stepLat": 0.0022483009140330523,
+        "ph": [
+          [
+            5.9,
+            5.8,
+            5.8
+          ],
+          [
+            5.9,
+            5.8,
+            5.8
+          ],
+          [
+            5.8,
+            5.8,
+            5.8
+          ]
+        ],
+        "omPct": [
+          [
+            3.3273200000000003,
+            3.3618,
+            3.3100799999999997
+          ],
+          [
+            2.91356,
+            2.96528,
+            3.2756
+          ],
+          [
+            2.98252,
+            3.0514799999999997,
+            3.1204400000000003
+          ]
+        ],
+        "cellM": 250,
+        "depthCm": [
+          0,
+          5
+        ],
+        "method": "3×3 neighbouring pixels in WCS EPSG:4326 output; native model support 250 m; bilinear display",
+        "requestUrls": [
+          "https://maps.isric.org/mapserv?map=%2Fmap%2Fphh2o.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=phh2o_0-5cm_mean&FORMAT=image%2Ftiff&SUBSET=long%2889.19500343496892%2C89.20499656503108%29&SUBSET=lat%2825.845503398171935%2C25.854496601828068%29&SUBSETTINGCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326&OUTPUTCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326",
+          "https://maps.isric.org/mapserv?map=%2Fmap%2Fsoc.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=soc_0-5cm_mean&FORMAT=image%2Ftiff&SUBSET=long%2889.19500343496892%2C89.20499656503108%29&SUBSET=lat%2825.845503398171935%2C25.854496601828068%29&SUBSETTINGCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326&OUTPUTCRS=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F4326"
+        ],
+        "retrievedAt": "2026-11-10T20:14:45.814635+00:00",
+        "omConversion": "OM (%) = SOC (g/kg) × 0.1724; estimated from organic carbon"
+      }
     }
   }
 }

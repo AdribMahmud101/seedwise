@@ -75,7 +75,7 @@ import {
   sampleSurfaceGrid,
   cropSurfaceValue,
   cropStageColor as stageColor,
-  pondingDepthCm,
+  fieldFlow, fillAndSpill, interpolateSoil, productivityZones,
   pondingWaterline,
 } from "./studio3d-helpers.js";
 import {
@@ -408,14 +408,15 @@ function loadSurfacePack(name) {
 async function prepareSurface(data, mode, monthIdx) {
   const month = data.months?.[monthIdx] || {};
   const optical = ['ndvi', 'moisture', 'ndmi'].includes(mode);
-  const [radarPack, nutrientPack, gridPack] = await Promise.all([
+  const [radarPack, nutrientPack, gridPack, soilPack] = await Promise.all([
     loadS1WaterData(), loadSoilNutrientsData(),
-    optical ? loadSurfacePack(mode === 'ndvi' ? 'ndvi-grid' : 'moisture-grid') : null,
+    optical || mode === 'productivity' ? loadSurfacePack(mode === 'moisture' || mode === 'ndmi' ? 'moisture-grid' : 'ndvi-grid') : null,
+    mode === 'fertility' ? loadSurfacePack('soil-profile') : null,
   ]);
   const year = Number(month.month?.slice(0, 4)) || 2024;
   const grid = nearestObservation(gridPack?.grids?.filter((g) => g.siteId === data.field.id), monthIdx, year)?.observation;
   const site = radarPack?.[data.field.id];
-  const radar = nearestObservation(site?.dates?.filter((o) => o.date.startsWith(month.month)), monthIdx, year)?.observation;
+  const radar = nearestObservation(site?.dates, monthIdx, year)?.observation;
   const [lat, lon] = data.field.centroid;
   const scaleX = 111195.08 * Math.cos(lat * Math.PI / 180);
   const coordinates = (x, y) => [lon + x / scaleX, lat + y / 111195.08];
@@ -425,30 +426,39 @@ async function prepareSurface(data, mode, monthIdx) {
   const cells = surfaceCells(data.field.outlineM, (x, y) => ({
     elevation: elevationAt(x, y), height: heightAt(x, -y), waterMask: waterMaskAt(x, -y),
   }));
-  const minHeight = Math.min(...cells.map((c) => c.value.height));
   const elevations = cells.map((c) => c.value.elevation).filter(Number.isFinite);
-  const ponding = { rainMm: rainScenarioMm, exaggeration: heightExaggeration,
-    lowGround: data.ground?.class === 'low', proposedDrain, outletBlocked, minHeight, waterMaskAt };
+  // Route on physical NASADEM elevations; decorative microrelief never becomes observed terrain.
+  const flow = elevationSampler ? fieldFlow(data.field.outlineM, elevationAt) : null;
+  const pond = fillAndSpill(flow, rainScenarioMm, { areaM2: data.field.areaHa * 10000,
+    drainFraction: proposedDrain && !outletBlocked ? 0.55 : 0 });
+  const ponding = { rainMm: rainScenarioMm, depthAt: (x, z) => (pond?.depthAt(x, -z) || 0) * heightExaggeration };
+  const zones = mode === 'productivity' ? productivityZones(
+    gridPack?.grids?.filter((g) => g.siteId === data.field.id) || [], data.field.outlineM, coordinates) : null;
+  const soilGrid = data.field.boundary === 'custom' ? null : soilPack?.sites?.[data.field.id]?.neighborhood;
+  const soilAt = (x, y, key) => interpolateSoil(soilGrid, ...coordinates(x, y), key);
   const nutrients = data.field.boundary === 'custom' ? null : nutrientPack?.sites?.[data.field.id]?.nutrients;
   const ph = soilOverrides?.ph ?? data.soil?.layers?.[0]?.ph ?? nutrients?.ph?.value;
   const valueAt = (x, y) => {
     if (mode === 'ndvi' || mode === 'moisture' || mode === 'ndmi') return sampleSurfaceGrid(grid, ...coordinates(x, y));
     if (mode === 'elevation' || mode === 'hypso') return elevationAt(x, y);
-    if (mode === 'water' || mode === 'ponding') return pondingDepthCm(heightAt(x, -y), minHeight, { ...ponding, waterMask: waterMaskAt(x, -y) });
-    if (mode === 'fertility') return ph;
+    if (mode === 'water' || mode === 'ponding') return pond ? pond.depthAt(x, y) * 100 : null;
+    if (mode === 'fertility') return soilOverrides?.ph ?? soilAt(x, y, 'ph') ?? ph;
+    if (mode === 'productivity') return zones.at(...coordinates(x, y));
     return cropSurfaceValue(month);
   };
   const knownRadar = cells.filter((c) => c.value.waterMask !== null);
   const radarObservation = radar && knownRadar.length ? { date: radar.date,
     floodedPct: knownRadar.filter((c) => c.value.waterMask === 1).length / knownRadar.length * 100 } : null;
   const context = { month, rotation: data.rotation, soil: data.soil, nutrients, soilOverrides,
-    soilCellCount: data.soil || nutrients ? 1 : null,
-    date: mode === 'fertility' && nutrientPack?.retrievedAt ? `${t('Retrieved', 'সংগ্রহ')} ${nutrientPack.retrievedAt.slice(0, 10)}` : null,
+    soilCellCount: soilGrid ? 9 : data.soil || nutrients ? 1 : null,
+    soilRange: soilGrid ? { ph: cells.map((c) => soilAt(c.x, c.y, 'ph')).filter(Number.isFinite), om: cells.map((c) => soilAt(c.x, c.y, 'omPct')).filter(Number.isFinite) } : null,
+    zoneDates: zones?.dates, terrainAvailable: !!flow,
+    date: mode === 'fertility' ? (soilGrid?.retrievedAt || nutrientPack?.retrievedAt)?.slice(0, 10) : null,
     observation: grid, radarObservation, rainMm: rainScenarioMm, exaggeration: heightExaggeration,
     elevationMin: elevations.length ? Math.min(...elevations) : null,
     elevationMax: elevations.length ? Math.max(...elevations) : null,
-    lang: t('en', 'bn'), cells: cells.map((c) => ({ ...c, value: valueAt(c.x, c.y) })) };
-  return { mode, context, legend: surfaceLegend(mode, context), valueAt, elevationAt, ponding };
+    lang: t('en', 'bn'), cells: zones?.cells.length ? zones.cells : cells.map((c) => ({ ...c, value: valueAt(c.x, c.y) })) };
+  return { mode, context, legend: surfaceLegend(mode, context), valueAt, elevationAt, ponding, flow, pond, soilAt };
 }
 
 async function buildTopTexture(data, layer, monthIdx, model = null) {
@@ -459,12 +469,39 @@ async function buildTopTexture(data, layer, monthIdx, model = null) {
   const ctx = cvs.getContext('2d');
   const b = outlineBounds(data.field.outlineM);
   const legend = model.legend;
+  const soilRanges = model.context.soilRange && Object.fromEntries(Object.entries(model.context.soilRange)
+    .map(([key, values]) => [key, [Math.min(...values), Math.max(...values)]]));
   // Paint the same polygon cells counted by the legend, without synthetic index variation.
   for (let row = 0; row < 128; row++) {
     for (let col = 0; col < 128; col++) {
       const x = b.minX + (col + 0.5) / 128 * b.width;
       const y = b.maxY - (row + 0.5) / 128 * b.height;
-      ctx.fillStyle = surfaceClass(legend, model.valueAt(x, y)).color;
+      const value = model.valueAt(x, y);
+      let color = new THREE.Color(surfaceClass(legend, value).color);
+      if (mode === 'fertility' && Number.isFinite(value)) {
+        const stops = ['#b97742', '#d9c778', '#659860', '#467f76'];
+        const position = Math.max(0, Math.min(2.9999, (value - 4.5) / 3 * 3));
+        const i = Math.floor(position);
+        color.set(stops[i]).lerp(new THREE.Color(stops[i + 1]), position - i);
+        const om = soilOverrides?.omPct ?? model.soilAt(x, y, 'omPct');
+        if (Number.isFinite(om)) color.multiplyScalar(1 - Math.min(0.25, om / 20));
+        const range = soilRanges;
+        const relative = (values, sample) => {
+          const [min, max] = values;
+          return max - min > 1e-8 ? Math.max(0, Math.min(1, (sample - min) / (max - min))) : 0.5;
+        };
+        if (range && !Number.isFinite(soilOverrides?.ph)) {
+          color.lerp(new THREE.Color('#e0cf93'), (1 - relative(range.ph, value)) * 0.18);
+          if (Number.isFinite(om)) color.multiplyScalar(1 - relative(range.om, om) * 0.18);
+        }
+      }
+      if (['water', 'ponding'].includes(mode)) {
+        const index = model.flow?.at(x, y);
+        const wetness = rainScenarioMm > 0 && index !== undefined
+          ? Math.log1p(model.flow.accumulation[index]) / Math.log1p(model.flow.cells.length) : 0;
+        color.set('#a38a60').lerp(new THREE.Color('#344d4b'), Math.min(0.9, wetness * 1.8));
+      }
+      ctx.fillStyle = `#${color.getHexString()}`;
       const scale = cvs.width / 128;
       ctx.fillRect(col * scale, row * scale, scale, scale);
     }
@@ -477,8 +514,8 @@ async function buildTopTexture(data, layer, monthIdx, model = null) {
   }
   const tex = new THREE.CanvasTexture(cvs);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = mode === 'fertility' ? THREE.LinearFilter : THREE.NearestFilter;
+  tex.minFilter = mode === 'fertility' ? THREE.LinearFilter : THREE.NearestFilter;
   textureCache.set(tex.uuid, tex);
   return tex;
 }
@@ -884,8 +921,7 @@ async function buildFieldBlock(data, cutawayFraction) {
     for (let i = 0; i < waterPositions.length; i += 9) {
       const x = (waterPositions[i] + waterPositions[i + 3] + waterPositions[i + 6]) / 3;
       const z = (waterPositions[i + 2] + waterPositions[i + 5] + waterPositions[i + 8]) / 3;
-      const h = (waterPositions[i + 1] + waterPositions[i + 4] + waterPositions[i + 7]) / 3 - 0.02;
-      const depthCm = pondingDepthCm(h, model.ponding.minHeight, { ...model.ponding, waterMask: model.ponding.waterMaskAt(x, z) });
+      const depthCm = (model.pond?.depthAt(x, -z) || 0) * 100;
       const color = new THREE.Color(surfaceClass(waterLegend, Math.max(0.001, depthCm)).color);
       for (let j = 0; j < 3; j++) colors.push(color.r, color.g, color.b);
     }
@@ -909,6 +945,37 @@ async function buildFieldBlock(data, cutawayFraction) {
     line.userData.waterline = true;
     waterMesh.add(line);
     blockGroup.add(waterMesh);
+  }
+
+  if (['water', 'ponding'].includes(model.mode) && rainScenarioMm > 0 && model.flow) {
+    const positions = [], phases = [], { cells, direction, accumulation } = model.flow;
+    const threshold = Math.max(4, cells.length * 0.012);
+    for (let i = 0; i < cells.length; i++) {
+      const next = direction[i];
+      if (next < 0 || accumulation[i] < threshold) continue;
+      const a = cells[i], b = cells[next];
+      if (![a, b].every((c) => pointInPolygon(c.x, c.y, ringM))) continue;
+      // Interpolate terrain along each D8 segment so the line cannot tunnel through the surface.
+      const count = 6;
+      for (let j = 0; j < count; j++) for (const f of [j / count, (j + 1) / count]) {
+        const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+        positions.push(x, heightAt(x, -y) + 0.045, -y);
+        phases.push((accumulation[i] + f) * 0.23);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('flowPhase', new THREE.Float32BufferAttribute(phases, 1));
+    const material = new THREE.LineBasicMaterial({ color: 0x249aff, transparent: true, opacity: 0.9 });
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.flowTime = { value: 0 };
+      shader.vertexShader = 'attribute float flowPhase; varying float vFlowPhase;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFlowPhase = flowPhase;');
+      shader.fragmentShader = 'uniform float flowTime; varying float vFlowPhase;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.85 + 0.15 * sin(vFlowPhase - flowTime * 2.0);');
+      material.userData.flowShader = shader;
+    };
+    const runoff = new THREE.LineSegments(geometry, material);
+    runoff.userData.runoff = true;
+    blockGroup.add(runoff);
   }
 
   // Bunds follow the actual boundary at terrain height; no tree features are supplied.
@@ -1748,9 +1815,9 @@ class SoftwareRenderer {
     // Roots and boundary are line overlays above the soil.
     scene.traverse((group) => {
       if (!group.visible) return;
-      if (group.userData.waterline) {
+      if (group.userData.waterline || group.userData.runoff) {
         const p = group.geometry.attributes.position;
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = group.userData.runoff ? '#249aff' : '#ffffff';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         for (let i = 0; i < p.count; i += 2) {
@@ -2852,6 +2919,10 @@ function startAnimation() {
       }
     }
 
+    if (!prefersReducedMotion && blockGroup) blockGroup.traverse((object) => {
+      const shader = object.material?.userData?.flowShader;
+      if (shader) shader.uniforms.flowTime.value = t;
+    });
     if (introAnim) {
       const now = performance.now();
       restoreIdleCamera();
@@ -2977,6 +3048,8 @@ export function surfaceLegendHtml(legend) {
         </svg>
         <ul>${rows.map((c) => `<li><i style="background:${c.color}" aria-hidden="true"></i><span>${esc(c.label)}</span><b>${c.pct.toFixed(1)} %</b></li>`).join('')}</ul>
       </div>
+      ${legend.flowRows ? `<ul class="studio-flow-key">${legend.flowRows.map((row) => `<li><i style="background:${row.color}" aria-hidden="true"></i>${esc(row.label)}</li>`).join('')}</ul>` : ''}
+      ${legend.remote ? `<p class="studio-surface-observed">${truth('REMOTE_OBSERVED')} ${esc(t('Remote observed (S1)', 'দূরবর্তী পর্যবেক্ষণ (S1)'))} · ${esc(legend.remote)}</p>` : ''}
       <p class="studio-surface-note">${esc(legend.note)}</p>
       <p class="studio-surface-source">${esc(legend.source)} · ${esc(legend.date)}</p>
     </div>`;
@@ -3470,9 +3543,10 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentSurfaceMode === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI)", "আর্দ্রতা (NDMI)")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water ponding", "পানি জমা (পন্ডিং)")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water flow & ponding", "পানির প্রবাহ ও জমা পানি")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="fertility" ${currentSurfaceMode === "fertility" ? "checked" : ""}><span>${t("Soil fertility zones", "মাটির উর্বরতা অঞ্চল")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="productivity" ${currentSurfaceMode === "productivity" ? "checked" : ""}><span>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</span></label>
+          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="fertility" ${currentSurfaceMode === "fertility" ? "checked" : ""}><span>${t("Soil fertility (SoilGrids)", "মাটির উর্বরতা (SoilGrids)")}</span></label>
         </div>
         <div class="studio-terrain-tools">
           <label for="studio-height-slider">${t("Height exaggeration", "উচ্চতা বাড়িয়ে দেখানো")} <output id="studio-height-output">${num(heightExaggeration, 1)}×</output></label>
@@ -3545,8 +3619,9 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
               <option value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "selected" : ""}>${t("NASADEM elevation + contours", "নাসাডেম উচ্চতা ও কনট্যুর")}</option>
               <option value="ndvi" ${currentSurfaceMode === "ndvi" ? "selected" : ""}>${t("Sentinel-2 NDVI vigour/bare-field", "সেন্টিনেল-২ এনডিভিআই / খালি জমি")}</option>
               <option value="moisture" ${currentSurfaceMode === "moisture" ? "selected" : ""}>${t("Sentinel-2 moisture (NDMI)", "সেন্টিনেল-২ আর্দ্রতা (NDMI)")}</option>
-              <option value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "selected" : ""}>${t("Water ponding", "পানি জমা (পন্ডিং)")}</option>
-              <option value="fertility" ${currentSurfaceMode === "fertility" ? "selected" : ""}>${t("Soil fertility zones", "মাটির উর্বরতা অঞ্চল")}</option>
+              <option value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "selected" : ""}>${t("Water flow & ponding", "পানির প্রবাহ ও জমা পানি")}</option>
+              <option value="productivity" ${currentSurfaceMode === "productivity" ? "selected" : ""}>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</option>
+              <option value="fertility" ${currentSurfaceMode === "fertility" ? "selected" : ""}>${t("Soil fertility (SoilGrids)", "মাটির উর্বরতা (SoilGrids)")}</option>
             </select>
           </div>
 
