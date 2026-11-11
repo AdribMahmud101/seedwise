@@ -5,3 +5,6 @@ NETAREA1 (merged before this card runs) draws the field's bund, drain, path and 
 Also add markers for the row spacing and within-row spacing on a small patch of the planted area (e.g. "↔ 20 cm" between two rows, "↕ 20 cm" between two hills), updating live when the sliders move.
 Keep the honest readability note if plants/features are enlarged. Verify Chrome headless 1366×768 and 412×915@2.625 with widths 0.4/0.1/0.5 m: screenshots with markers visible and readable; zero console errors. Commit as soon as it works.
 Acceptance: eslint no-undef clean on changed src (`npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --parser-options=ecmaVersion:latest --rule 'no-undef:error' <files>`); `npm test` ALL pass; `npm run build`. Never touch package-lock.json/node_modules/secrets. Commit.
+
+## Follow-up (queued as NETAREA1C if not done here)
+Like NETAREA2B did for the studio: draw the planner's bund and drain at a readable minimum on-screen width (≥ ~6 px at default zoom, cap ×6) with the note "Bund and drain drawn wider for readability; numbers use your real widths"; drain shows visible water; selecting a chip highlights the feature.
