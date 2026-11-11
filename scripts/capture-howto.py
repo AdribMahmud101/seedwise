@@ -101,6 +101,16 @@ def setup_rotation_page(context, base):
     return page, errors
 
 
+def setup_planner_page(context, base):
+    page, errors = setup_rotation_page(context, base)
+    page.locator('#rotation-list [data-journey="rotation"]').first.click()
+    page.goto(base + '/#planner')
+    page.wait_for_selector('#plan-seasons [role="tab"]')
+    page.wait_for_selector('.plan-settings')
+    page.wait_for_timeout(700)
+    return page, errors
+
+
 def encode_clip(frames, duration_ms):
     last = None
     for width in (360, 320):
@@ -429,6 +439,165 @@ def capture_rotation_constraints(page):
     return frames, 260, 0
 
 
+def capture_planting_open_season(page):
+    page.locator('#plan-seasons').scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    tabs = page.locator('#plan-seasons [role="tab"]')
+    for index in (0, min(1, tabs.count() - 1)):
+        tab = tabs.nth(index)
+        tab.scroll_into_view_if_needed()
+        box = rect(page, '#plan-seasons [role="tab"]')
+        finger(page, *center(box))
+        frames.append(band_region(shot(page)))
+        tab.click()
+        page.wait_for_timeout(300)
+        frames.append(band_region(shot(page)))
+    header = rect(page, '.plan-settings .panel-header')
+    finger(page, *center(header))
+    frames.append(band_region(shot(page)))
+    page.wait_for_timeout(250)
+    frames.append(band_region(shot(page)))
+    return frames, 260, 2
+
+
+def capture_planting_adjust_spacing(page):
+    page.locator('.plan-settings').scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    selectors = ('.plan-locked-crop, .plan-crops', '#plan-usable-range', '#plan-row-range', '#plan-spacing-range')
+    for selector in selectors:
+        target = page.locator(selector).first
+        if not target.count():
+            continue
+        target.scroll_into_view_if_needed()
+        page.wait_for_timeout(160)
+        box = target.bounding_box()
+        finger(page, *center(box))
+        frames.append(band_region(shot(page)))
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    reset = page.locator('[data-action="plan-reset"]')
+    reset.scroll_into_view_if_needed()
+    finger(page, *center(rect(page, '[data-action="plan-reset"]')))
+    frames.append(band_region(shot(page)))
+    reset.click()
+    page.wait_for_timeout(250)
+    frames.append(band_region(shot(page)))
+    return frames, 240, 0
+
+
+def capture_planting_save_next(page):
+    button = page.locator('[data-action="plan-confirm"]')
+    button.scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    finger(page, *center(rect(page, '[data-action="plan-confirm"]')))
+    for _ in range(3):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    button.click()
+    page.wait_for_timeout(400)
+    frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
+def capture_planting_finish(page):
+    # The finish handoff is present on each planner render; capture its real CTA.
+    button = page.locator('[data-journey="finish"]')
+    button.scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    finger(page, *center(rect(page, '[data-journey="finish"]')))
+    for _ in range(3):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    button.click()
+    page.wait_for_timeout(400)
+    frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
+def setup_plans_page(context, base):
+    page, errors = setup_planner_page(context, base)
+    for _ in range(5):
+        confirm = page.locator('[data-action="plan-confirm"]')
+        if not confirm.count():
+            break
+        confirm.first.click()
+        page.wait_for_timeout(250)
+    finish = page.locator('[data-journey="finish"]')
+    if finish.count() and not finish.is_disabled():
+        finish.click()
+    page.goto(base + '/#plans')
+    page.wait_for_selector('.plan-card')
+    page.wait_for_timeout(350)
+    return page, errors
+
+
+def capture_plan_open(page):
+    page.locator('.plan-card:first-child [data-plans-action="open"]').scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    target = page.locator('.plan-card:first-child [data-plans-action="open"]')
+    finger(page, *center(rect(page, '.plan-card:first-child [data-plans-action="open"]')))
+    for _ in range(3):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    target.click()
+    page.wait_for_timeout(400)
+    frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
+def capture_plan_calendar(page):
+    page.goto(page.url.split('#')[0] + '#plan')
+    page.wait_for_selector('#plan-calendar')
+    target = page.locator('#plan-calendar')
+    target.scroll_into_view_if_needed()
+    page.wait_for_timeout(300)
+    frames = []
+    finger(page, *center(rect(page, '#plan-calendar')))
+    for _ in range(6):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
+def capture_plan_task(page):
+    page.goto(page.url.split('#')[0] + '#plan')
+    target = page.locator('#plan-checklist input[type="checkbox"]').first
+    target.scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    finger(page, *center(target.bounding_box()))
+    for _ in range(3):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    target.check()
+    page.wait_for_timeout(280)
+    frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
+def capture_plan_download(page):
+    page.goto(page.url.split('#')[0] + '#plan')
+    target = page.locator('#plan-download')
+    target.scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    finger(page, *center(rect(page, '#plan-download')))
+    for _ in range(3):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    # Download is a real button; accept and discard the generated file.
+    with page.expect_download():
+        target.click()
+    page.wait_for_timeout(280)
+    frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
 CLIPS = [
     ('field-map', capture_map),
     ('field-area', capture_area),
@@ -438,6 +607,14 @@ CLIPS = [
     ('rotation-compare', capture_rotation_compare),
     ('rotation-choose', capture_rotation_choose),
     ('rotation-constraints', capture_rotation_constraints),
+    ('planting-open-season', capture_planting_open_season),
+    ('planting-adjust-spacing', capture_planting_adjust_spacing),
+    ('planting-save-next', capture_planting_save_next),
+    ('planting-finish', capture_planting_finish),
+    ('plan-open', capture_plan_open),
+    ('plan-calendar', capture_plan_calendar),
+    ('plan-task', capture_plan_task),
+    ('plan-download', capture_plan_download),
 ]
 
 
@@ -460,7 +637,7 @@ def main():
                 context = browser.new_context(viewport={'width': VIEW_W, 'height': VIEW_H},
                                               device_scale_factor=DSF, is_mobile=True,
                                               has_touch=True, service_workers='block')
-                setup = setup_rotation_page if clip_id.startswith('rotation-') else setup_field_page
+                setup = setup_rotation_page if clip_id.startswith('rotation-') else setup_planner_page if clip_id.startswith('planting-') else setup_plans_page if clip_id.startswith('plan-') else setup_field_page
                 page, errors = setup(context, base)
                 try:
                     frames, duration, poster_idx = capture(page)

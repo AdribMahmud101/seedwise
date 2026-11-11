@@ -59,25 +59,28 @@ test('checklist state from plan + events per page', () => {
   // 3. Planner page checklist
   story.setStoryPage('planner', () => {});
   checklist = story.getPageChecklist('planner');
-  assert.equal(checklist.length, 2);
-  assert.equal(checklist[0].id, 'planting-seasons');
-  assert.equal(checklist[1].id, 'planting-finish');
+  assert.equal(checklist.length, 4);
+  assert.equal(checklist[0].id, 'planting-open-season');
+  assert.equal(checklist[1].id, 'planting-adjust-spacing');
+  assert.equal(checklist[2].id, 'planting-save-next');
+  assert.equal(checklist[3].id, 'planting-finish');
   assert.equal(checklist[0].done, false);
   assert.equal(checklist[1].done, false);
 
   // Confirm planting
   journey.confirmPlanting();
   checklist = story.getPageChecklist('planner');
-  assert.equal(checklist[0].done, true);
-  assert.equal(checklist[1].done, true);
+  assert.equal(checklist[2].done, true);
+  assert.equal(checklist[3].done, true);
 
   // 4. Plan page checklist
   story.setStoryPage('plan', () => {});
   checklist = story.getPageChecklist('plan');
-  assert.equal(checklist.length, 3);
-  assert.equal(checklist[0].id, 'plan-calendar');
-  assert.equal(checklist[1].id, 'plan-task');
-  assert.equal(checklist[2].id, 'plan-download');
+  assert.equal(checklist.length, 4);
+  assert.equal(checklist[0].id, 'plan-open');
+  assert.equal(checklist[1].id, 'plan-calendar');
+  assert.equal(checklist[2].id, 'plan-task');
+  assert.equal(checklist[3].id, 'plan-download');
 });
 
 test('Continue behaviour: incomplete triggers show-me target; complete allows handoff', () => {
