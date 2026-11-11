@@ -1934,3 +1934,14 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
   .adv-suggest-btn::before, .adv-suggest-btn::after { animation: none; }
   .adv-suggest-btn:hover { transform: none; }
 }
+/* Ready-made plans + together/sequence choice */
+.adv-presets { margin: 14px 0 4px; }
+.adv-presets-label { display: block; font-size: 13px; font-weight: 600; color: #8a6a1f; margin-bottom: 8px; }
+.adv-presets-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+.adv-preset { flex: none; scroll-snap-align: start; display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; min-height: 52px; padding: 8px 14px; border-radius: 12px; border: 1px solid #d9e4cc; background: #fffef9; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 2px 8px rgba(36,57,44,.08); transition: transform .15s ease, box-shadow .15s ease; }
+.adv-preset span { grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 13px; background: var(--adv, #4f7d4a); }
+.adv-preset small { color: #5f6f62; font-size: 12px; }
+.adv-preset:hover, .adv-preset:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(122,176,92,.28); }
+.adv-seq { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.adv-seq button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid #cdd8c0; background: #fffef9; font: inherit; font-size: 14px; cursor: pointer; }
+.adv-seq button.on { background: #24392c; color: #f4f7ee; border-color: #24392c; }

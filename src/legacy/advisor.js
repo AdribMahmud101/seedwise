@@ -44,11 +44,17 @@ const VERDICT = {
   not_suitable: ['✕', 'Not suitable here', 'এখানে উপযুক্ত নয়', 'no'],
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ui = { mode: 'rotation', crops: [], notes: '', status: 'idle', result: null, error: '' };
+const ui = { mode: 'rotation', crops: [], notes: '', status: 'idle', result: null, error: '', sequence: false, planMode: null };
+let presets = null; // pre-computed ready-made plans (public/data/advisor-presets.json)
+function loadPresets() {
+  if (presets !== null || typeof fetch !== 'function') return;
+  presets = [];
+  fetch('/data/advisor-presets.json').then((r) => (r.ok ? r.json() : null)).then((d) => { presets = d?.presets || []; rerender(); }).catch(() => { presets = []; });
+}
 
 export function advisorRequest(context) {
   const category = cropCategory(ui.crops);
-  const mode = category === 'single_crop' ? 'single' : category === 'fruit_only' || category === 'fruit_fruit' ? 'orchard' : 'mixed';
+  const mode = category === 'single_crop' ? 'single' : category === 'fruit_only' || category === 'fruit_fruit' ? 'orchard' : category === 'crop_crop' && ui.sequence ? 'rotation' : 'mixed';
   return { lang: state.lang === 'bn' ? 'bn' : 'en', mode, category, crops: ui.crops.slice(0, 2), notes: ui.notes.slice(0, 300), context };
 }
 
@@ -103,15 +109,27 @@ function resultHtml(r) {
   </div>`;
 }
 
+function presetRow() {
+  loadPresets();
+  const mine = (presets || []).filter((x) => x.fieldId === state.fieldId);
+  if (!mine.length) return '';
+  return `<div class="adv-presets"><span class="adv-presets-label">✦ ${t('Ready-made plans for this field — one tap', 'এই জমির তৈরি পরিকল্পনা — এক চাপে')}</span><div class="adv-presets-row">${mine.map((x, i) => {
+    const [mark, , , cls] = VERDICT[x.verdict] || VERDICT.possible_with_conditions;
+    return `<button type="button" class="adv-preset adv-${cls}" data-action="adv-preset" data-value="${i}"><span>${mark}</span><strong>${esc(x.crops.join(x.mode === 'rotation' ? ' → ' : ' + '))}</strong><small>${x.mode === 'rotation' ? t('seasons', 'মৌসুম') : x.mode === 'orchard' ? t('orchard', 'বাগান') : t('together', 'একসাথে')}</small></button>`;
+  }).join('')}</div></div>`;
+}
+
 export function advisorCard() {
   const busy = ui.status === 'loading';
   return `<section class="panel adv-card" id="advisor-card" aria-labelledby="adv-title">
     <div class="adv-head"><span class="adv-planty">${plantyMascot(busy ? 'thinking' : ui.result ? 'happy' : 'idle')}</span>
       <div><span class="eyebrow">${t('AI decision helper', 'এআই সিদ্ধান্ত সহায়ক')}</span><h2 id="adv-title">${t('Plan your own crops', 'নিজের ফসল বেছে পরিকল্পনা')}</h2>
       <p class="note">${t('Tell Planty what you want to grow — up to 2 crops. It checks them against this field and the research, and says no (with better options) if they will not work.', 'হাইব্রিড আমন + স্ট্রবেরি, বা শুধু আম? Planty এই জমি ও গবেষণার সঙ্গে মিলিয়ে দেখে — না হলে সরাসরি না বলে।')}</p></div></div>
+    ${presetRow()}
     <p class="adv-category">${ui.crops.length ? `${t('Plan type', 'ধরন')}: <strong>${t(...CATEGORY_LABEL[cropCategory(ui.crops)])}</strong>` : t('Type or tap up to 2 crops — e.g. Potato + Strawberry, Aman + Mustard, or only Mango.', 'সর্বোচ্চ ২টি ফসল লিখুন বা বাছুন — যেমন আলু + স্ট্রবেরি, আমন + সরিষা, বা শুধু আম।')}</p>
     <div class="adv-chips">${ADVISOR_CROPS.map(([en, bn]) => { const on = ui.crops.includes(en); return `<button type="button" class="adv-chip${on ? ' on' : ''}" aria-pressed="${on}" data-action="adv-crop" data-value="${esc(en)}"${!on && ui.crops.length >= 2 ? ' disabled' : ''}>${t(en, bn)}</button>`; }).join('')}
       ${ui.crops.filter((c) => !ADVISOR_CROPS.some(([en]) => en === c)).map((c) => `<button type="button" class="adv-chip on" aria-pressed="true" data-action="adv-crop" data-value="${esc(c)}">${esc(c)} ✕</button>`).join('')}</div>
+    ${cropCategory(ui.crops) === 'crop_crop' ? `<div class="adv-seq" role="radiogroup" aria-label="${t('How to grow them', 'কীভাবে চাষ')}"><button type="button" role="radio" aria-checked="${!ui.sequence}" class="${!ui.sequence ? 'on' : ''}" data-action="adv-seq" data-value="0">${t('Together — split the land', 'একসাথে — জমি ভাগ')}</button><button type="button" role="radio" aria-checked="${ui.sequence}" class="${ui.sequence ? 'on' : ''}" data-action="adv-seq" data-value="1">${t('One after another — seasons', 'একটির পর একটি — মৌসুমে')}</button></div>` : ''}
     <div class="adv-add"><input id="adv-other" type="text" maxlength="40" placeholder="${t('Add another crop (e.g. Dragon fruit)', 'অন্য ফসল যোগ করুন')}" aria-label="${t('Add another crop', 'অন্য ফসল যোগ করুন')}"><button type="button" class="button small" data-action="adv-add">${t('Add', 'যোগ')}</button></div>
     <textarea id="adv-notes" maxlength="300" rows="2" placeholder="${t('What matters to you? (optional)', 'আপনার কাছে কী জরুরি? (ঐচ্ছিক)')}">${esc(ui.notes)}</textarea>
     <div class="adv-actions"><span class="note">${ui.crops.length}/2 ${t('crops', 'ফসল')}</span>
@@ -132,6 +150,16 @@ export async function advisorAction(action, value) {
   const notes = document.querySelector('#adv-notes');
   if (notes) ui.notes = notes.value;
   if (action === 'adv-use') { useInPlanner(); return; }
+  if (action === 'adv-seq') { ui.sequence = value === '1'; ui.result = null; rerender(); return; }
+  if (action === 'adv-preset') {
+    const x = (presets || []).filter((p) => p.fieldId === state.fieldId)[Number(value)];
+    if (!x) return;
+    ui.crops = x.crops.slice(0, 2); ui.sequence = x.mode === 'rotation'; ui.planMode = x.mode; ui.error = '';
+    ui.result = { ...x, source: x.source || 'pre-computed' };
+    reveal(); rerender();
+    requestAnimationFrame(() => document.querySelector('#advisor-card .adv-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return;
+  }
   if (action === 'adv-exit') { ui.result = null; ui.error = ''; ui.crops = []; rerender(); return; }
   if (action === 'adv-try') {
     const g = ui.result?.suggestions?.[Number(value)];
@@ -147,6 +175,7 @@ export async function advisorAction(action, value) {
   if (action === 'adv-mode') { ui.mode = value; rerender(); return; }
   if (action === 'adv-crop') {
     ui.crops = ui.crops.includes(value) ? ui.crops.filter((c) => c !== value) : ui.crops.length < 2 ? [...ui.crops, value] : ui.crops;
+    ui.planMode = null;
     rerender(); return;
   }
   if (action === 'adv-add') {
@@ -156,7 +185,7 @@ export async function advisorAction(action, value) {
     rerender(); return;
   }
   if (action === 'adv-check' && ui.crops.length) {
-    ui.status = 'loading'; ui.error = ''; ui.result = null; rerender();
+    ui.status = 'loading'; ui.error = ''; ui.result = null; ui.planMode = null; rerender();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 40000);
     try {
@@ -221,7 +250,7 @@ function useInPlanner() {
   const r = ui.result;
   if (!r?.planting?.length || r.verdict === 'not_suitable') return;
   // Mode follows the auto-detected category (two crops together = mixed land split; one crop = whole field).
-  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: advisorRequest({}).mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
+  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: ui.planMode || advisorRequest({}).mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
   { const cs = distinctHexes(plan.planting.map((c) => c.color)); plan.planting = plan.planting.map((c, i) => ({ ...c, color: cs[i] })); } // every mode: chips/dots easy to scan
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
   location.hash = '#planner';
