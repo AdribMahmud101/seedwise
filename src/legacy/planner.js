@@ -55,7 +55,7 @@ function planner() {
   const p = state.planner;
   return (
     header(
-      t('Planting desk  /  04', 'বপনের নকশা  /  ০৪'),
+      t('Planting desk  /  03', 'বপনের নকশা  /  ০৩'),
       t('Planting planner', 'বপনের পরিকল্পনা'),
       t(
         'Turn the field boundary into a row layout and an approximate planting count.',
