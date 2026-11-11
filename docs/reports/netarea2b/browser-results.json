@@ -1,0 +1,58 @@
+[
+  {
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "scale": 1,
+    "chrome": "158.0.8127.18",
+    "labels": [
+      "0.4 m",
+      "0.1 m",
+      "0.5 m",
+      "35.5 m"
+    ],
+    "popover": {
+      "left": 1009.6875,
+      "top": 183.453125,
+      "right": 1329.6875,
+      "bottom": 464.015625,
+      "stage": {
+        "left": 602.3125,
+        "top": 72.453125,
+        "right": 1337.6875,
+        "bottom": 472.453125
+      },
+      "scroll": false
+    },
+    "consoleErrors": []
+  },
+  {
+    "viewport": {
+      "width": 412,
+      "height": 915
+    },
+    "scale": 2.625,
+    "chrome": "158.0.8127.18",
+    "labels": [
+      "0.4 m",
+      "0.1 m",
+      "0.5 m",
+      "35.5 m"
+    ],
+    "popover": {
+      "left": 25,
+      "top": 626,
+      "right": 387,
+      "bottom": 906.5625,
+      "stage": {
+        "left": 17,
+        "top": 72.125,
+        "right": 395,
+        "bottom": 915.125
+      },
+      "scroll": false
+    },
+    "consoleErrors": []
+  }
+]

@@ -2,6 +2,11 @@
 import { projectWgs84ToUtm45N } from "./spatial.js";
 import { netArea } from './netarea.js';
 
+export function infrastructureDisplayWidth(widthM, pixelsPerMetre) {
+  if (!(widthM > 0)) return 0;
+  return Math.min(widthM * 6, Math.max(widthM, 6 / Math.max(1e-6, pixelsPerMetre)));
+}
+
 export function lowestFieldEdge(outline, elevationAt) {
   let best = 0, lowest = Infinity;
   outline.forEach((a, i) => {
@@ -85,11 +90,12 @@ export function fieldInfrastructure(outline, triangles, inputs, elevationAt, min
     const boundary = shape?.outline || outline;
     let available = shape ? shape.triangles.map(ids => ids.map(i => boundary[i])) : initial;
     return definitions.map(definition => {
-      const displayWidthM = definition.widthM > 0 ? Math.max(definition.widthM, minimum) : 0;
-      const feature = { ...definition, displayWidthM, polygons: [] };
+      const displayWidthM = ['bund', 'drain'].includes(definition.id)
+        ? infrastructureDisplayWidth(definition.widthM, minimum > 0 ? 6 / minimum : Infinity) : definition.widthM;
+      const feature = { ...definition, displayWidthM, axis: frame.axis, center: frame.center, polygons: [] };
       let clips;
       if (feature.id === 'bund') clips = boundary.map((_, i) => strip(i, displayWidthM, 0, boundary));
-      if (feature.id === 'drain') clips = [strip(edgeIndex, displayWidthM, normalized.bundWidthM > 0 ? Math.max(normalized.bundWidthM, minimum) : 0)];
+      if (feature.id === 'drain') clips = [strip(edgeIndex, displayWidthM, normalized.bundWidthM > 0 ? Math.min(normalized.bundWidthM * 6, Math.max(normalized.bundWidthM, minimum)) : 0)];
       if (feature.id === 'path') {
         const reach = Math.hypot(bounds.width, bounds.height);
         clips = [[[-reach, -displayWidthM / 2], [reach, -displayWidthM / 2], [reach, displayWidthM / 2], [-reach, displayWidthM / 2]]
@@ -128,6 +134,55 @@ export function infrastructureAt(features, x, y, clearanceM = 0) {
     if (x < bounds.minX - clearanceM || x > bounds.maxX + clearanceM || y < bounds.minY - clearanceM || y > bounds.maxY + clearanceM) return false;
     return pointInPolygon(x, y, poly) || (clearanceM > 0 && distToPolygonEdge(x, y, poly) < clearanceM);
   })) || null;
+}
+
+export function terrainOutsideDrain(positions, features, heightAt) {
+  const drain = features.find(f => f.id === 'drain');
+  if (!drain) return positions;
+  const result = [];
+  for (let i = 0; i < positions.length; i += 9) {
+    let polygons = [[0, 3, 6].map(j => [positions[i + j], -positions[i + j + 2]])];
+    for (const clip of drain.polygons) polygons = partitionInfrastructure(polygons, clip).outside;
+    for (const poly of polygons) for (let j = 1; j < poly.length - 1; j++) {
+      for (const [x, y] of [poly[0], poly[j], poly[j + 1]]) result.push(x, heightAt(x, -y), -y);
+    }
+  }
+  return result;
+}
+
+export function infrastructureMeasurementAnchors(features, outline) {
+  if (outline.length < 3) return [];
+  const winding = Math.sign(ringSignedArea(outline));
+  const edges = outline.map((a, i) => {
+    const b = outline[(i + 1) % outline.length], length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    return { a, b, i, length, normal: [-(b[1] - a[1]) / length * winding, (b[0] - a[0]) / length * winding] };
+  }).filter(e => e.length > 1e-6).sort((a, b) => b.length - a.length);
+  const markers = [];
+  for (const feature of features.filter(f => f.id !== 'other')) {
+    const width = feature.displayWidthM;
+    const candidates = [];
+    if (feature.id === 'path') {
+      const [ux, uy] = feature.axis;
+      for (const offset of [0, 0.2, -0.2, 0.35, -0.35]) candidates.push({
+        center: [feature.center[0] + ux * edges[0].length * offset, feature.center[1] + uy * edges[0].length * offset], normal: [-uy, ux],
+      });
+    } else {
+      const offset = feature.id === 'drain' ? features.find(f => f.id === 'bund')?.displayWidthM || 0 : 0;
+      for (const edge of edges.filter(e => feature.id !== 'drain' || e.i === feature.edgeIndex)) {
+        for (const fraction of feature.id === 'bund' ? [0.3, 0.7, 0.5] : [0.7, 0.3, 0.5]) candidates.push({
+          center: edge.a.map((v, i) => v + (edge.b[i] - v) * fraction + edge.normal[i] * (offset + width / 2)), normal: edge.normal,
+        });
+      }
+    }
+    const candidate = candidates.find(({ center, normal }) => [-0.49, -0.25, 0, 0.25, 0.49].every(t =>
+      infrastructureAt([feature], center[0] + normal[0] * width * t, center[1] + normal[1] * width * t)));
+    if (candidate) markers.push({ id: feature.id, label: `${feature.widthM} m`,
+      a: candidate.center.map((v, i) => v - candidate.normal[i] * width / 2),
+      b: candidate.center.map((v, i) => v + candidate.normal[i] * width / 2) });
+  }
+  const edge = edges[0];
+  if (edge) markers.push({ id: 'edge', label: `${Number(edge.length.toFixed(1))} m`, a: edge.a, b: edge.b });
+  return markers;
 }
 
 export function outlineBounds(outlineM) {

@@ -131,6 +131,7 @@ import {
   fieldFlow, fillAndSpill, interpolateSoil, productivityZones,
   pondingWaterline,
   fieldInfrastructure, infrastructureAt, distToPolygonEdge,
+  infrastructureMeasurementAnchors, terrainOutsideDrain,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -225,6 +226,9 @@ let wideLayersOpen = false;
 let stageOverlayCleanup = null;
 let currentSurface = null;
 let infrastructureFeatures = [];
+let measurementsVisible = true;
+let measurementAnchors = [];
+let measurementLayoutCache = null;
 const surfacePacks = new Map();
 
 /* --- SMOOTH animated surface-layer switching --- */
@@ -851,7 +855,7 @@ function disposeGroup(group) {
 function buildSurfaceGeometry(ringM, heightAt, bounds, model) {
   const ring = ringM.map(([x, y]) => new THREE.Vector2(x, y));
   const triangles = THREE.ShapeUtils.triangulateShape(ring, []);
-  const positions = surfaceGridPositions(ringM, triangles, heightAt, isSoftwareRenderer ? 14 : 28);
+  const positions = terrainOutsideDrain(surfaceGridPositions(ringM, triangles, heightAt, isSoftwareRenderer ? 14 : 28), infrastructureFeatures, heightAt);
   const uvs = [];
   const elevations = [];
   const width = Math.max(1e-6, bounds.width);
@@ -1019,7 +1023,8 @@ function infrastructureFor(data, minimum = 0, renderedOutline = null) {
 
 function infrastructureChipsHtml(features) {
   return features.map(f => `<button type="button" class="studio-feature-chip${openSoilBand === f.id ? ' highlight' : ''}" id="soil-pin-${f.id}" data-soil-pin="${f.id}"
-    aria-expanded="${openSoilBand === f.id}" aria-controls="studio-soil-popover"><i style="background:${infrastructureColors[f.id]}" aria-hidden="true"></i>${esc(infrastructureNames()[f.id])}</button>`).join('');
+    aria-expanded="${openSoilBand === f.id}" aria-controls="studio-soil-popover"><i style="background:${infrastructureColors[f.id]}" aria-hidden="true"></i>${esc(infrastructureNames()[f.id])}</button>`).join('')
+    + `<button type="button" class="studio-feature-chip" data-measurements aria-pressed="${measurementsVisible}">${t('Measurements', 'মাপ')}</button>`;
 }
 
 function refreshInfrastructureDetails(data) {
@@ -1031,15 +1036,13 @@ function refreshInfrastructureDetails(data) {
   if (chips) chips.innerHTML = infrastructureChipsHtml(infrastructureFeatures);
   if (infrastructureNames()[openSoilBand]) popoverTrigger = containerEl.querySelector(`#soil-pin-${openSoilBand}`);
   const note = containerEl?.querySelector('.studio-feature-note');
-  if (note) note.textContent = infrastructureFeatures.some(f => f.id !== 'other' && f.displayWidthM > f.widthM)
-    ? t('Sub-pixel widths enlarged for readability; parameters retain true scale.', 'দেখার সুবিধায় পিক্সেলের চেয়ে সরু প্রস্থ বড় করা হয়েছে; পরামিতি প্রকৃত মাপে।')
-    : t('Widths shown at true scale. Placement is illustrative.', 'প্রস্থ প্রকৃত মাপে। অবস্থান কাল্পনিক।');
+  if (note) note.textContent = t('Bund and drain drawn wider for readability; numbers use your real widths.', 'দেখার সুবিধায় আল ও নালা চওড়া দেখানো হয়েছে; সংখ্যায় আপনার প্রকৃত প্রস্থ।');
 }
 
 function buildInfrastructure(data, heightAt, maxX, renderedOutline) {
-  const span = Math.max(...['width', 'height'].map(k => outlineBounds(data.field.outlineM)[k]));
-  // A single CSS pixel is the only horizontal enlargement; metrics keep physical widths.
-  infrastructureFeatures = infrastructureFor(data, span / Math.max(1, (canvasHostEl?.clientWidth || 600) * 0.65), renderedOutline);
+  // Six CSS pixels now target readability, capped at six times each physical width.
+  measurementAnchors = infrastructureMeasurementAnchors(infrastructureFeatures, data.field.outlineM);
+  measurementLayoutCache = null;
   refreshInfrastructureDetails(data);
   const group = new THREE.Group();
   for (const feature of infrastructureFeatures) {
@@ -1057,8 +1060,8 @@ function buildInfrastructure(data, heightAt, maxX, renderedOutline) {
     };
     const lift = (x, y) => {
       const u = cross(x, y);
-      if (feature.id === 'bund') return 0.045 + Math.sin(Math.PI * u) * Math.min(0.3, feature.widthM * 0.6);
-      if (feature.id === 'drain') return 0.035 + Math.pow(Math.abs(u - 0.5) * 2, 3) * 0.18;
+      if (feature.id === 'bund') return 0.025 + Math.sin(Math.PI * u) * 0.3;
+      if (feature.id === 'drain') return -0.22 + Math.pow(Math.abs(u - 0.5) * 2, 2) * 0.26;
       return 0.045;
     };
     const vertex = ([x, y]) => {
@@ -1066,7 +1069,7 @@ function buildInfrastructure(data, heightAt, maxX, renderedOutline) {
       const hatch = feature.id === 'other' && ((x + y) % 1.8 + 1.8) % 1.8 < 0.45;
       const shade = hatch ? 0.65 : 0.92 + Math.sin(x * 21 + y * 17) * 0.08;
       colors.push(base.r * shade, base.g * shade, base.b * shade);
-      if (feature.id === 'drain') water.push(x, heightAt(x, -y) + 0.075, -y);
+      if (feature.id === 'drain') water.push(x, heightAt(x, -y) - 0.09, -y);
     };
     const tessellate = (a, b, c, depth = 0) => {
       const sides = [[a, b, c], [b, c, a], [c, a, b]].sort((s, t) =>
@@ -1096,7 +1099,12 @@ function buildInfrastructure(data, heightAt, maxX, renderedOutline) {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.userData.infrastructure = feature.id;
       mesh.visible = feature.id !== 'bund' || showBunds;
-      if (feature.id === openSoilBand && material.emissive) material.emissive.set(0x625027);
+      if (material.emissive) {
+        material.emissive.set(feature.id === openSoilBand ? 0x66d9cf : 0x000000);
+        material.emissiveIntensity = 0.65;
+      }
+      material.userData.baseColor = material.color.clone();
+      if (infrastructureNames()[openSoilBand] && feature.id !== openSoilBand) material.color.multiplyScalar(0.72);
       mesh.renderOrder = 3;
       group.add(mesh);
       return mesh;
@@ -1108,7 +1116,16 @@ function buildInfrastructure(data, heightAt, maxX, renderedOutline) {
     };
     const mesh = meshFor(positions, soilMaterial);
     mesh.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    if (water.length) meshFor(water, new THREE.MeshPhysicalMaterial({ color: 0x47949e, roughness: 0.18, clearcoat: 1, side: THREE.DoubleSide }));
+    if (water.length) {
+      const material = new THREE.MeshPhysicalMaterial({ color: 0x6496a1, roughness: 0.25, clearcoat: 1, side: THREE.DoubleSide });
+      material.onBeforeCompile = shader => {
+        shader.uniforms.flowTime = { value: 0 };
+        shader.vertexShader = 'varying vec2 vDrainPosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvDrainPosition = position.xz;');
+        shader.fragmentShader = 'varying vec2 vDrainPosition; uniform float flowTime;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.94 + 0.06 * sin(vDrainPosition.x * 9.0 + vDrainPosition.y * 13.0 + flowTime * 1.5);');
+        material.userData.flowShader = shader;
+      };
+      meshFor(water, material);
+    }
     if (grass.length) meshFor(grass, new THREE.MeshStandardMaterial({ color: 0x657747, roughness: 1, side: THREE.DoubleSide }));
   }
   return group;
@@ -1271,6 +1288,9 @@ async function buildFieldBlock(data, cutawayFraction) {
   });
   sideMat.userData.isSide = true;
 
+  const span = Math.max(bounds.width, bounds.height);
+  const pixelsPerMetre = Math.max(1, Math.min(canvasHostEl?.clientWidth || 600, canvasHostEl?.clientHeight || 600) * 0.55) / span;
+  infrastructureFeatures = infrastructureFor(data, 6 / pixelsPerMetre, smoothedOutline);
   const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds, model);
   const topMesh = new THREE.Mesh(topGeom, topMat);
   topMesh.userData.terrain = true;
@@ -3050,6 +3070,62 @@ function findFrontFacingWallFace(ringM, camPos, cutawayFraction, effectiveMaxX) 
   return bestDot > 0 ? bestEdge : null;
 }
 
+function syncMeasurements() {
+  const overlay = canvasHostEl?.querySelector('.studio-measurements');
+  if (!overlay || !activeCamera || !currentData || !blockGroup) return;
+  overlay.hidden = !measurementsVisible;
+  if (!measurementsVisible) { overlay.replaceChildren(); return; }
+  const { width, height } = canvasSize();
+  const heightAt = makeHeightAt(currentData);
+  floatGroup?.updateWorldMatrix(true, true);
+  activeCamera.updateMatrixWorld();
+  const raycaster = new THREE.Raycaster();
+  const project = (point, id) => {
+    const [x, y] = point;
+    const world = new THREE.Vector3(x, heightAt(x, -y) + (['bund', 'edge'].includes(id) ? 0.36 : 0.065), -y);
+    floatGroup?.localToWorld(world);
+    const p = world.clone().project(activeCamera);
+    if (x > currentBlock.effectiveMaxX + 1e-5 || Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || Math.abs(p.z) > 1) return null;
+    return { x: (p.x * 0.5 + 0.5) * width, y: (0.5 - p.y * 0.5) * height, ndc: p, world };
+  };
+  const projected = measurementAnchors.filter(m => m.id !== 'bund' || showBunds).map(m => ({ ...m, a: project(m.a, m.id), b: project(m.b, m.id),
+    center: project(m.a.map((v, i) => (v + m.b[i]) / 2), m.id) })).filter(m => m.a && m.b && m.center);
+  const rect = canvasHostEl.getBoundingClientRect();
+  const obstacles = [...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-feature-key, #node-a, #node-ap, #studio-soil-popover:not([hidden])')]
+    .map(el => el.getBoundingClientRect()).filter(r => r.width && r.height)
+    .map(r => ({ left: r.left - rect.left, right: r.right - rect.left, top: r.top - rect.top, bottom: r.bottom - rect.top }));
+  const key = JSON.stringify([width, height, projected.map(m => [m.id, m.label]), obstacles]);
+  if (measurementLayoutCache?.key === key && projected.every((m, i) => ['a', 'b'].every(end =>
+    Math.hypot(m[end].x - measurementLayoutCache.projected[i][end].x, m[end].y - measurementLayoutCache.projected[i][end].y) <= 0.5))) return;
+  const visible = projected.filter(m => ['a', 'b', 'center'].every(end => {
+    const anchor = m[end];
+    raycaster.setFromCamera(new THREE.Vector2(anchor.ndc.x, anchor.ndc.y), activeCamera);
+    const distance = anchor.world.distanceTo(raycaster.ray.origin);
+    return !raycaster.intersectObjects(blockGroup.children, true).some(hit =>
+      hit.object.visible && hit.object.isMesh && hit.distance < distance - 0.12);
+  }));
+  const labels = [];
+  const overlaps = (a, b) => a.left < b.right + 4 && a.right > b.left - 4 && a.top < b.bottom + 4 && a.bottom > b.top - 4;
+  overlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  overlay.innerHTML = `<defs><marker id="studio-dimension-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 0 L 5 3 L 1 6" fill="none" stroke="currentColor"/></marker></defs>` + visible.map(m => {
+    const textWidth = Math.max(42, m.label.length * 7 + 8);
+    let label;
+    for (const [dx, dy] of [[0, -18], [0, 25], [55, -18], [-55, -18], [0, -42], [0, 49]]) {
+      const x = Math.max(textWidth / 2 + 8, Math.min(width - textWidth / 2 - 8, m.center.x + dx));
+      const y = Math.max(18, Math.min(height - 12, m.center.y + dy));
+      const box = { left: x - textWidth / 2, right: x + textWidth / 2, top: y - 12, bottom: y + 4 };
+      if (![...obstacles, ...labels].some(r => overlaps(box, r))) { label = { x, y, ...box }; labels.push(box); break; }
+    }
+    if (!label) return '';
+    return `<g data-measurement="${m.id}"><title>${esc(infrastructureNames()[m.id] || t('Field edge', 'জমির ধার'))}: ${esc(m.label)}</title>
+      <line class="studio-dimension-halo" x1="${m.a.x}" y1="${m.a.y}" x2="${m.b.x}" y2="${m.b.y}"/>
+      <line class="studio-dimension-line" x1="${m.a.x}" y1="${m.a.y}" x2="${m.b.x}" y2="${m.b.y}" marker-start="url(#studio-dimension-arrow)" marker-end="url(#studio-dimension-arrow)"/>
+      <path class="studio-dimension-leader" d="M${m.center.x},${m.center.y} L${label.x},${label.y + 4}"/>
+      <text x="${label.x}" y="${label.y}">${esc(m.label)}</text></g>`;
+  }).join('');
+  measurementLayoutCache = { key, projected };
+}
+
 function sync3DCallouts() {
   if (!currentData || !currentBlock.bounds || !containerEl || !activeCamera || !canvasHostEl) return;
   const canvasRect = canvasHostEl.getBoundingClientRect();
@@ -3075,6 +3151,8 @@ function sync3DCallouts() {
     const p = currentBlock.transect[i];
     placeCallout(p?.[0] ?? 0, p ? heightAt(p[0], -p[1]) + 0.025 : 0, p ? -p[1] : 0, id, !!p);
   }
+
+  syncMeasurements();
 
   // Hydrology callouts
   const lcx = b.minX + 0.62 * b.width;
@@ -3580,6 +3658,9 @@ function startAnimation() {
     if (!prefersReducedMotion && blockGroup) blockGroup.traverse((object) => {
       const shader = object.material?.userData?.flowShader;
       if (shader) shader.uniforms.flowTime.value = t;
+      if (object.userData.infrastructure && object.material?.emissive) {
+        object.material.emissiveIntensity = object.userData.infrastructure === openSoilBand ? 0.65 + Math.sin(t * 4) * 0.25 : 0.65;
+      }
     });
     if (introAnim) {
       const now = performance.now();
@@ -3990,7 +4071,11 @@ function highlightSoilBand(band) {
   });
   blockGroup?.traverse(mesh => {
     if (mesh.userData.infrastructure && mesh.material?.emissive) {
-      mesh.material.emissive.set(mesh.userData.infrastructure === band ? 0x625027 : 0x000000);
+      const material = mesh.material;
+      material.userData.baseColor ||= material.color.clone();
+      material.color.copy(material.userData.baseColor).multiplyScalar(infrastructureNames()[band] && mesh.userData.infrastructure !== band ? 0.72 : 1);
+      material.emissive.set(mesh.userData.infrastructure === band ? 0x66d9cf : 0x000000);
+      material.emissiveIntensity = 0.65;
     }
   });
   requestRender();
@@ -4037,18 +4122,37 @@ function positionSoilPopover() {
   if (!pin) return;
   const rect = canvasHostEl.getBoundingClientRect();
   const anchor = pin.getBoundingClientRect();
+  const feature = !!infrastructureNames()[openSoilBand];
+  popover.dataset.feature = String(feature);
   // Use the clear region below the controls, including the title and one-time hint.
-  const controlsBottom = Math.max(...[...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-compass')]
+  const controlsBottom = Math.max(0, ...[...canvasHostEl.querySelectorAll(feature ? '.studio-overlay-tl' : '.studio-overlay-tl, .studio-stage-controls, .studio-compass')]
     .map((el) => el.getBoundingClientRect().bottom - rect.top));
-  const bounds = { left: 8, top: controlsBottom + 8, right: rect.width - 8, bottom: rect.height - 8 };
-  const featureKey = canvasHostEl.querySelector('.studio-feature-key');
-  if (infrastructureNames()[openSoilBand] && featureKey) bounds.bottom = Math.min(bounds.bottom, featureKey.getBoundingClientRect().top - rect.top - 8);
-  popover.style.width = `${Math.min(320, bounds.right - bounds.left)}px`;
+  const viewport = window.visualViewport;
+  const phone = canvasHostEl.dataset.overlaySize === 'narrow';
+  const bounds = studioPopoverBounds(rect, { left: viewport?.offsetLeft || 0, top: viewport?.offsetTop || 0,
+    width: viewport?.width || window.innerWidth, height: viewport?.height || window.innerHeight }, controlsBottom, phone);
+  popover.style.width = `${phone ? bounds.right - bounds.left : Math.min(320, bounds.right - bounds.left)}px`;
   popover.style.maxHeight = `${Math.max(0, bounds.bottom - bounds.top)}px`;
   const placed = clampStudioPopover({ anchorX: anchor.left - rect.left + anchor.width / 2,
     anchorY: anchor.top - rect.top + anchor.height / 2, width: popover.offsetWidth, height: popover.offsetHeight, bounds });
   popover.style.left = `${placed.left}px`;
   popover.style.top = `${placed.top}px`;
+  if (feature && !phone) {
+    popover.style.left = `${bounds.right - popover.offsetWidth}px`;
+    popover.style.top = `${bounds.bottom - Math.min(popover.offsetHeight, bounds.bottom - bounds.top)}px`;
+  }
+  if (phone) {
+    popover.style.left = `${bounds.left}px`;
+    popover.style.top = `${bounds.bottom - Math.min(popover.offsetHeight, bounds.bottom - bounds.top)}px`;
+  }
+}
+
+export function studioPopoverBounds(rect, viewport, controlsBottom, phone) {
+  const left = Math.max(8, (viewport.left || 0) - rect.left + 8);
+  const right = Math.max(left, Math.min(rect.width - 8, (viewport.left || 0) + viewport.width - rect.left - 8));
+  const bottom = Math.max(8, Math.min(rect.height - 8, (viewport.top || 0) + viewport.height - rect.top - 8));
+  const top = Math.min(bottom, Math.max(8, controlsBottom + 8, (viewport.top || 0) - rect.top + 8));
+  return { left, top: phone ? Math.max(top, bottom - viewport.height * 0.7) : top, right, bottom };
 }
 
 function bindStageOverlays(options) {
@@ -4172,6 +4276,8 @@ function bindOverlayEvents() {
   const options = { signal: overlayEvents.signal };
   bindStageOverlays(options);
   window.visualViewport?.addEventListener('resize', onResize, options);
+  window.addEventListener('scroll', positionSoilPopover, { ...options, passive: true });
+  window.visualViewport?.addEventListener('scroll', positionSoilPopover, options);
   containerEl.addEventListener('focusin', (e) => {
     const pin = e.target.closest('[data-soil-pin]');
     if (pin && !restoringPopoverFocus) openSoilPopover(pin.dataset.soilPin, pin);
@@ -4213,6 +4319,13 @@ function bindOverlayEvents() {
     }
   }, options);
   containerEl.addEventListener('click', (e) => {
+    const measurements = e.target.closest('[data-measurements]');
+    if (measurements) {
+      measurementsVisible = !measurementsVisible;
+      measurements.setAttribute('aria-pressed', String(measurementsVisible));
+      measurementLayoutCache = null;
+      syncMeasurements();
+    }
     const pin = e.target.closest('[data-soil-pin]');
     if (pin) { openSoilPopover(pin.dataset.soilPin, pin); soilPinned = true; }
     if (e.target.closest('[data-close-soil]')) closeSoilPopover();
@@ -4549,8 +4662,9 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         </div>
         <div class="studio-feature-key" aria-label="${t('Field infrastructure colour key', 'জমির অবকাঠামোর রঙের নির্দেশিকা')}">
           <div class="studio-feature-chips">${infrastructureChipsHtml(infrastructureFeatures)}</div>
-          <small class="studio-feature-note">${t('Widths shown at true scale. Placement is illustrative.', 'প্রস্থ প্রকৃত মাপে। অবস্থান কাল্পনিক।')}</small>
+          <small class="studio-feature-note">${t('Bund and drain drawn wider for readability; numbers use your real widths.', 'দেখার সুবিধায় আল ও নালা চওড়া দেখানো হয়েছে; সংখ্যায় আপনার প্রকৃত প্রস্থ।')}</small>
         </div>
+        <svg class="studio-measurements" aria-label="${t('Field measurements in metres', 'জমির মাপ মিটারে')}"></svg>
         <div id="studio-soil-popover" class="studio-soil-popover" role="dialog" aria-label="${t("Soil layer details", "মাটির স্তরের বিবরণ")}" hidden>
           <button type="button" data-close-soil class="studio-popover-close" aria-label="${t("Close", "বন্ধ করুন")}">×</button>
           ${["topsoil", "rootzone", "aquifer"].map((band) => `<div data-soil-detail="${band}" hidden>${soilDetailHtml(band, calloutData[band])}</div>`).join("")}
