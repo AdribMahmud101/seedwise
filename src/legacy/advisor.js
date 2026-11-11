@@ -239,7 +239,7 @@ export function customSettingsPanel() {
     <input type="range" name="custom-${key}" data-idx="${i}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${esc(label)}">
     <output>${value}${unit}</output></label>`;
   return `<section class="panel plan-settings cs-panel"><div class="panel-header"><div><span class="eyebrow">${t('Your crops · from Rotation studio', 'আপনার ফসল · ফসলচক্র থেকে')}</span>
-    <h2>${t('Planting settings', 'বপনের মাপ')}</h2></div></div><div class="panel-body">
+    <h2>${t('Planting settings', 'বপনের মাপ')}</h2></div></div><form id="plant-controls" class="panel-body" novalidate>
     <p class="note">${t('Crops are set by your custom plan. Adjust spacing and the land split here; to change crops, go back to the decision helper.', 'ফসল আপনার কাস্টম পরিকল্পনা থেকে। দূরত্ব ও জমির ভাগ এখানে বদলান; ফসল বদলাতে সিদ্ধান্ত সহায়কে ফিরুন।')}
       <a href="#rotations" class="cs-change">${t('Change crops', 'ফসল বদলান')}</a></p>
     ${!rotation && p.planting.length === 2 ? `<div class="cs-split"><div class="cs-split-head"><span><i style="background:${esc(p.planting[0].color)}"></i>${esc(p.planting[0].crop)} ${p.planting[0].sharePct}%</span><span>${esc(p.planting[1].crop)} ${p.planting[1].sharePct}%<i style="background:${esc(p.planting[1].color)}"></i></span></div>
@@ -250,7 +250,7 @@ export function customSettingsPanel() {
       ${slider(i, 'within', t('Within-row spacing', 'সারিতে দূরত্ব'), c.model === 'tree' ? 200 : 5, c.model === 'tree' ? 1200 : 120, c.model === 'tree' ? 50 : 5, c.withinRowCm, ' cm')}</div>`).join('')}
     <p class="cs-total">${t('Total plants', 'মোট চারা')}: <strong>~${total.toLocaleString()}</strong> <span class="truth">◌ ${t('Scenario', 'কাল্পনিক')}</span></p>
     <p class="note">${t('Spacing suggested by AI (general guidance). Usable area comes from your field widths.', 'দূরত্ব এআই প্রস্তাবিত (সাধারণ নির্দেশনা)। চাষযোগ্য জমি আপনার জমির মাপ থেকে।')}</p>
-  </div></section>`;
+  </form></section>`;
 }
 // Returns true if the input belonged to the custom panel (caller re-renders).
 export function customInput(el) {
