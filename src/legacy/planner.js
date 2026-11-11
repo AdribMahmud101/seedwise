@@ -1,4 +1,5 @@
 import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput, customSeasonToggle } from './advisor.js';
+import { recommendedSetupChanges } from './recommended-setup.js';
 import {
   state,
   agronomy,
@@ -456,6 +457,51 @@ function schedulePlanner3d() {
     }
   }, 120);
 }
+function applyRecommendedSetup() {
+  const plan = getCustomPlan();
+  if (!plan) return;
+  const changes = recommendedSetupChanges(plan, agronomy);
+  const targets = [];
+  changes.forEach((change) => {
+    if (change.type === 'split') targets.push({ el: document.querySelector('[name="custom-split"]'), value: change.to });
+    else {
+      if (change.row) targets.push({ el: document.querySelector(`[name="custom-row"][data-idx="${change.idx}"]`), value: change.row.to, idx: change.idx });
+      if (change.within) targets.push({ el: document.querySelector(`[name="custom-within"][data-idx="${change.idx}"]`), value: change.within.to, idx: change.idx });
+    }
+  });
+  const valid = targets.filter((item) => item.el);
+  if (!valid.length) return;
+  document.querySelectorAll('.cs-recommend button').forEach((button) => { button.disabled = true; });
+  const finish = () => {
+    valid.forEach(({ el, value }) => { el.value = value; customInput(el); });
+    const host = document.querySelector('.plan-settings');
+    if (host) host.outerHTML = plannerSettings();
+    const banner = document.querySelector('.adv-plan-banner');
+    if (banner) banner.outerHTML = customPlanBanner();
+    [...new Set(valid.map((item) => item.idx).filter(Number.isInteger))].forEach((idx) => {
+      const row = document.querySelectorAll('.cs-crop')[idx];
+      row?.classList.add('cs-applied');
+      row?.addEventListener('animationend', () => row.classList.remove('cs-applied'), { once: true });
+    });
+    schedulePlanner3d();
+  };
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { finish(); return; }
+  const start = performance.now();
+  const initial = valid.map(({ el, value }) => ({ el, from: Number(el.value), to: value }));
+  const tick = (now) => {
+    const progress = Math.min(1, (now - start) / 600);
+    const eased = 1 - (1 - progress) ** 3;
+    initial.forEach(({ el, from, to }) => {
+      const value = from + (to - from) * eased;
+      el.value = value;
+      const output = el.parentElement.querySelector('output');
+      if (output) output.textContent = `${Math.round(value)} cm`;
+    });
+    if (progress < 1) requestAnimationFrame(tick);
+    else finish();
+  };
+  requestAnimationFrame(tick);
+}
 
 function disposePlanner() {
   disposePlanty?.();
@@ -543,6 +589,26 @@ function focusSeasonTab() {
   tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 function plannerAction(action, value) {
+  if (action === 'custom-recommend-toggle') {
+    const panel = document.querySelector('.cs-recommend-preview');
+    const button = document.querySelector('[data-action="custom-recommend-toggle"]');
+    const open = button?.getAttribute('aria-expanded') !== 'true';
+    panel?.classList.toggle('open', open);
+    if (panel) { panel.toggleAttribute('inert', !open); panel.setAttribute('aria-hidden', String(!open)); }
+    button?.setAttribute('aria-expanded', String(open));
+    return;
+  }
+  if (action === 'custom-recommend-cancel') {
+    const panel = document.querySelector('.cs-recommend-preview');
+    panel?.classList.remove('open');
+    if (panel) { panel.setAttribute('inert', ''); panel.setAttribute('aria-hidden', 'true'); }
+    document.querySelector('[data-action="custom-recommend-toggle"]')?.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  if (action === 'custom-recommend-apply') {
+    applyRecommendedSetup();
+    return;
+  }
   if (action === 'plan-season') {
     const plan = seasonPlan();
     activeSeason(plan);

@@ -1,8 +1,9 @@
 // "Plan your own crops" — AI decision helper card for the Rotation studio.
 // Calls /api/rotation-advisor (worker); the verdict is shown exactly as returned (no invented numbers).
-import { t, esc, field, area, state, outlook as outlookPack, floodFields, nasaBadge } from './ui.js';
+import { t, esc, field, area, state, outlook as outlookPack, floodFields, nasaBadge, agronomy } from './ui.js';
 import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { plantyMascot } from './planty.js';
+import { recommendedSetupChanges } from './recommended-setup.js';
 
 export const ADVISOR_CROPS = [
   ['Hybrid Aman rice', 'হাইব্রিড আমন ধান'], ['Boro rice', 'বোরো ধান'], ['Potato', 'আলু'], ['Mustard', 'সরিষা'],
@@ -308,6 +309,12 @@ const CUSTOM_KEY = 'ropon_custom_plan_v1';
 export function getCustomPlan() {
   try {
     const p = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null');
+    let migrated = false;
+    if (Array.isArray(p?.planting)) p.planting.forEach((c) => {
+      if (!c.originalSpacingCm && Number.isFinite(Number(c.rowSpacingCm)) && Number.isFinite(Number(c.withinRowCm))) { c.originalSpacingCm = [c.rowSpacingCm, c.withinRowCm]; migrated = true; }
+    });
+    if (p?.planting?.length === 2 && !Number.isFinite(Number(p.originalSharePct))) { p.originalSharePct = p.planting[0].sharePct; migrated = true; }
+    if (migrated) saveCustom(p);
     if (p && Array.isArray(p.planting) && p.planting.length > 1) { const cs = distinctHexes(p.planting.map((c) => c.color)); p.planting.forEach((c, i) => { c.color = cs[i]; }); } // also fixes plans saved earlier
     return p && Array.isArray(p.planting) && p.planting.length && p.fieldId === state.fieldId ? p : null;
   } catch { return null; }
@@ -361,7 +368,8 @@ function useInPlanner() {
   const r = ui.result;
   if (!r?.planting?.length || r.verdict === 'not_suitable') return;
   // Mode follows the auto-detected category (two crops together = mixed land split; one crop = whole field).
-  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: ui.planMode || advisorRequest({}).mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
+  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: ui.planMode || advisorRequest({}).mode, planting: r.planting.map((c) => ({ ...c, originalSpacingCm: [c.rowSpacingCm, c.withinRowCm] })), calendar: r.calendar, savedAt: new Date().toISOString() };
+  if (plan.mode !== 'rotation' && plan.planting.length === 2) plan.originalSharePct = plan.planting[0].sharePct;
   { const cs = distinctHexes(plan.planting.map((c) => c.color)); plan.planting = plan.planting.map((c, i) => ({ ...c, color: cs[i] })); } // every mode: chips/dots easy to scan
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
   location.hash = '#planner';
@@ -392,6 +400,19 @@ export function customPlanBanner() {
 // ---- Custom plan: planting settings for the crops chosen in the Rotation studio ----
 const CUSTOM_KEY_SET = 'ropon_custom_plan_v1';
 function saveCustom(p) { try { localStorage.setItem(CUSTOM_KEY_SET, JSON.stringify(p)); } catch { /* ignore */ } }
+function recommendedSetupHtml(p) {
+  const changes = recommendedSetupChanges(p, agronomy);
+  const rows = changes.map((change) => {
+    const text = change.type === 'split'
+      ? `${t('Land split', 'জমির ভাগ')} ${change.from}/${100 - change.from} → ${change.to}/${100 - change.to}%`
+      : `${change.crop} · ${[change.row && `${t('row', 'সারি')} ${change.row.from} → ${change.row.to} cm`, change.within && `${t('within', 'গাছ')} ${change.within.from} → ${change.within.to} cm`].filter(Boolean).join(' · ')}`;
+    const chip = change.source.kind === 'Research'
+      ? `${t('Research', 'গবেষণা')} · ${change.source.title}` : `${t('AI', 'এআই')} · ${t('general guidance', 'সাধারণ নির্দেশনা')}`;
+    return `<li>${esc(text)} <span class="cs-source">${esc(chip)}</span></li>`;
+  }).join('');
+  return `<div class="cs-recommend"><button type="button" class="button small" data-action="custom-recommend-toggle" aria-expanded="false" ${changes.length ? '' : 'disabled'}>${changes.length ? `✦ ${t('Use recommended setup', 'প্রস্তাবিত মাপ ব্যবহার করুন')}` : `✓ ${t('Recommended setup in use', 'প্রস্তাবিত মাপ ব্যবহার হচ্ছে')}`}</button>
+    ${changes.length ? `<div class="cs-recommend-preview" inert aria-hidden="true"><div class="cs-recommend-inner"><ul>${rows}</ul><div><button type="button" class="button primary small" data-action="custom-recommend-apply">${t('Apply', 'প্রয়োগ করুন')}</button> <button type="button" class="button small" data-action="custom-recommend-cancel">${t('Cancel', 'বাতিল')}</button></div></div></div>` : ''}</div>`;
+}
 export function customSettingsPanel() {
   const p = getCustomPlan();
   if (!p) return '';
@@ -402,7 +423,7 @@ export function customSettingsPanel() {
     <input type="range" name="custom-${key}" data-idx="${i}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${esc(label)}">
     <output>${value}${unit}</output></label>`;
   return `<section class="panel plan-settings cs-panel"><div class="panel-header"><div><span class="eyebrow">${t('Your crops · from Rotation studio', 'আপনার ফসল · ফসলচক্র থেকে')}</span>
-    <h2>${t('Planting settings', 'বপনের মাপ')}</h2></div></div><form id="plant-controls" class="panel-body" novalidate>
+    <h2>${t('Planting settings', 'বপনের মাপ')}</h2></div></div><form id="plant-controls" class="panel-body" novalidate>${recommendedSetupHtml(p)}
     <p class="note">${t('Crops are set by your custom plan. Adjust spacing and the land split here; to change crops, go back to the decision helper.', 'ফসল আপনার কাস্টম পরিকল্পনা থেকে। দূরত্ব ও জমির ভাগ এখানে বদলান; ফসল বদলাতে সিদ্ধান্ত সহায়কে ফিরুন।')}
       <a href="#rotations" class="cs-change">${t('Change crops', 'ফসল বদলান')}</a></p>
     ${!rotation && p.planting.length === 2 ? `<div class="cs-split"><div class="cs-split-head"><span><i style="background:${esc(p.planting[0].color)}"></i>${esc(p.planting[0].crop)} ${p.planting[0].sharePct}%</span><span>${esc(p.planting[1].crop)} ${p.planting[1].sharePct}%<i style="background:${esc(p.planting[1].color)}"></i></span></div>
