@@ -1669,6 +1669,7 @@ function deterministic(i, seed) {
 }
 
 function buildPlants(data) {
+  if (data.custom?.planting?.length) return buildCustomPlants(data);
   const prevSig = plantsGroup?.userData?.plantSig || null;
   const prevCrop = plantsGroup?.userData?.plants?.cropId || null;
   disposeGroup(plantsGroup);
@@ -2494,6 +2495,116 @@ export function zoomPlanner3d(direction) {
   requestRender();
 }
 
+
+// ---- Custom plan (from the Rotation studio AI decision helper): generic models per crop, land split in strips ----
+const CUSTOM_CLUMP = { grass: 'aman', rice: 'aman', herb: 'mungbean', vine: 'mungbean', potato: 'potato', mustard: 'mustard', mungbean: 'mungbean', wheat: 'wheat', maize: 'maize' };
+
+// Pure: strip boundaries along the long axis from land shares (sum may be ≠ 100; normalised).
+export function customStrips(minV, maxV, shares) {
+  const total = shares.reduce((a, s) => a + Math.max(0, s), 0) || shares.length;
+  let at = minV;
+  return shares.map((s) => {
+    const w = ((total === shares.length && !shares.some((x) => x > 0)) ? 1 : Math.max(0, s)) / total * (maxV - minV);
+    const strip = [at, at + w];
+    at += w;
+    return strip;
+  });
+}
+
+function customTreeParts(item) {
+  const h = item.heightM;
+  const trunk = new THREE.CylinderGeometry(h * 0.045, h * 0.065, h * 0.45, 7);
+  trunk.translate(0, h * 0.225, 0);
+  const canopy = new THREE.IcosahedronGeometry(h * 0.33, 1);
+  canopy.scale(1, 0.85, 1);
+  canopy.translate(0, h * 0.68, 0);
+  return { trunk, canopy, fruitR: Math.max(0.04, h * 0.035), canopyR: h * 0.33, canopyY: h * 0.68 };
+}
+
+function buildCustomPlants(data) {
+  disposeGroup(plantsGroup);
+  plantsGroup = null;
+  const items = (data.custom?.planting || []).filter((p) => p.sharePct > 0);
+  if (!items.length) return;
+  const outlineM = data.field.outlineM;
+  const bounds = currentBlock.bounds || outlineBounds(outlineM);
+  const heightAt = makeHeightAt(data);
+  const zoneGeom = zoneModelFor(data, heightAt).geom;
+  const alongX = bounds.width >= bounds.height;
+  const [lo, hi] = alongX ? [bounds.minX, bounds.maxX] : [bounds.minY, bounds.maxY];
+  const strips = customStrips(lo, hi, items.map((p) => p.sharePct));
+  const group = new THREE.Group();
+  const dummy = new THREE.Object3D();
+  const fieldArea = Math.max(1, bounds.width * bounds.height);
+  const legend = [];
+  items.forEach((item, idx) => {
+    const [a, b] = strips[idx];
+    const tall = item.model === 'tree';
+    const trueRow = item.rowSpacingCm / 100, trueWithin = item.withinRowCm / 100;
+    // Readable sampling: trees at true spacing; small plants thinned so a strip holds ≤ ~900 instances.
+    const stripArea = fieldArea * ((b - a) / Math.max(1e-6, hi - lo));
+    const thin = tall ? 1 : Math.max(1, Math.sqrt((stripArea / (trueRow * trueWithin)) / 900));
+    const stepA = trueRow * thin, stepB = trueWithin * thin;
+    const pts = [];
+    const [c0, c1] = alongX ? [bounds.minY, bounds.maxY] : [bounds.minX, bounds.maxX];
+    for (let u = a + stepA / 2; u < b; u += stepA) {
+      for (let v = c0 + stepB / 2; v < c1; v += stepB) {
+        const x = alongX ? u : v, y = alongX ? v : u;
+        const clear = fieldZoneClearance(x, y, zoneGeom, outlineM);
+        if (clear > (tall ? item.heightM * 0.2 : 0.05)) pts.push([x, y]);
+      }
+    }
+    if (!pts.length) return;
+    const display = tall ? 1 : Math.min(4, Math.max(1.6, thin * 0.6)); // small plants enlarged for readability
+    const leaf = new THREE.Color(item.color);
+    const fruit = item.fruitColor ? new THREE.Color(item.fruitColor) : null;
+    if (tall || item.model === 'shrub') {
+      const parts = tall ? customTreeParts(item)
+        : { canopy: new THREE.IcosahedronGeometry(item.heightM * 0.5 * display, 1).translate(0, item.heightM * 0.45 * display, 0), canopyR: item.heightM * 0.5 * display, canopyY: item.heightM * 0.45 * display, fruitR: Math.max(0.03, item.heightM * 0.08 * display) };
+      const canopyMesh = new THREE.InstancedMesh(parts.canopy, new THREE.MeshStandardMaterial({ color: leaf, roughness: 0.85, flatShading: true }), pts.length);
+      const trunkMesh = parts.trunk ? new THREE.InstancedMesh(parts.trunk, new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.95 }), pts.length) : null;
+      const perPlant = fruit ? (tall ? 9 : 4) : 0;
+      const fruitMesh = perPlant ? new THREE.InstancedMesh(new THREE.SphereGeometry(parts.fruitR, 8, 6), new THREE.MeshStandardMaterial({ color: fruit, roughness: 0.5 }), pts.length * perPlant) : null;
+      pts.forEach(([x, y], i) => {
+        const z = -y, gy = heightAt(x, z);
+        const s = 0.85 + deterministic(i, 7 + idx) * 0.3;
+        dummy.position.set(x, gy, z); dummy.rotation.set(0, deterministic(i, 8) * Math.PI * 2, 0); dummy.scale.set(s, s, s); dummy.updateMatrix();
+        canopyMesh.setMatrixAt(i, dummy.matrix);
+        if (trunkMesh) trunkMesh.setMatrixAt(i, dummy.matrix);
+        for (let k = 0; k < perPlant; k++) {
+          const ang = (k / perPlant) * Math.PI * 2 + deterministic(i * 13 + k, 9);
+          const r = parts.canopyR * s * 0.92, yy = gy + parts.canopyY * s + (deterministic(i * 7 + k, 10) - 0.55) * parts.canopyR * s;
+          dummy.position.set(x + Math.cos(ang) * r, yy, z + Math.sin(ang) * r); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+          fruitMesh.setMatrixAt(i * perPlant + k, dummy.matrix);
+        }
+      });
+      [canopyMesh, trunkMesh, fruitMesh].filter(Boolean).forEach((m) => { m.castShadow = !isPhone(); m.instanceMatrix.needsUpdate = true; group.add(m); });
+    } else {
+      const clumpId = CUSTOM_CLUMP[item.model] || 'mungbean';
+      const geom = buildClumpGeometry(clumpId, item.heightM * display, 0.6 * display, 'grow', 'high');
+      const mesh = new THREE.InstancedMesh(geom, new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), pts.length);
+      pts.forEach(([x, y], i) => {
+        const z = -y, s = 0.85 + deterministic(i, 11 + idx) * 0.3;
+        dummy.position.set(x, heightAt(x, z) + 0.015, z); dummy.rotation.set(0, deterministic(i, 12) * Math.PI * 2, 0); dummy.scale.set(s, s, s); dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+        mesh.setColorAt(i, leaf.clone().multiplyScalar(0.85 + deterministic(i, 13) * 0.3));
+      });
+      mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.castShadow = !isPhone(); group.add(mesh);
+    }
+    legend.push(`${item.crop} ${item.sharePct}%`);
+  });
+  plantsGroup = group;
+  ensureFloatGroup();
+  floatGroup.add(plantsGroup);
+  const chip = canvasHostEl?.closest('.planner3d-stage-wrap')?.querySelector('.planner3d-crop-chip');
+  const note = document.documentElement.lang === 'bn'
+    ? `কাস্টম পরিকল্পনা: ${legend.join(' · ')} — সাধারণ মডেল, রং এআই নির্ধারিত; ছোট গাছ বোঝার সুবিধায় বড় ও কম দেখানো।`
+    : `Custom plan: ${legend.join(' · ')} — generic models, colours chosen by AI; small plants enlarged and thinned for readability.`;
+  if (chip) chip.textContent = note;
+  if (canvasHostEl) canvasHostEl.dataset.customPlan = legend.join('|');
+}
+
 export async function mountPlanner3d(host, input) {
   const token = ++buildToken;
   const data = buildStudioData(input);
@@ -2503,6 +2614,7 @@ export async function mountPlanner3d(host, input) {
     stageFraction: 0.75, canopyHeightM: FAO56_CROP_LIMITS[cropId].heightM }];
   data.planner = { ...input.planner };
   data.net = input.net || null;
+  data.custom = input.custom || null;
   const key = JSON.stringify([data.field.centroid, data.field.bboxLatLon, data.field.outlineM]);
   const refit = key !== elevationKey || host !== canvasHostEl;
   if (!motionQuery) {

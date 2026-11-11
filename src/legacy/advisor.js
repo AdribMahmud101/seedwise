@@ -67,7 +67,8 @@ function resultHtml(r) {
     ${calendarStrip(r.calendar || [])}
     <div class="adv-grid">${list(t('Why', 'কেন'), r.reasons)}${list(t('Risks', 'ঝুঁকি'), r.risks)}${list(t("What you'd need", 'যা লাগবে'), r.requirements)}${list(t('Better options for this field', 'এই জমির জন্য ভালো বিকল্প'), r.alternatives)}</div>
     ${r.evidence?.length ? `<p class="adv-evidence">${t('Evidence', 'প্রমাণ')}: ${r.evidence.map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>`).join(' · ')}</p>` : ''}
-    <p class="note adv-note">${t('AI decision helper · experimental · check with your extension officer. Saving custom plans to your journey is coming next.', 'এআই সিদ্ধান্ত সহায়ক · পরীক্ষামূলক · কৃষি কর্মকর্তার সঙ্গে মিলিয়ে নিন। কাস্টম পরিকল্পনা যাত্রায় সংরক্ষণ শীঘ্রই আসছে।')}</p>
+    ${r.verdict !== 'not_suitable' && r.planting?.length ? `<div class="adv-use"><button type="button" class="button primary" data-action="adv-use">${t('Use this plan in the planner →', 'এই পরিকল্পনা বপনে ব্যবহার করুন →')}</button><span class="note">${r.planting.map((p) => `${esc(p.crop)} ${p.sharePct}%`).join(' · ')}</span></div>` : ''}
+    <p class="note adv-note">${t('AI decision helper · experimental · check with your extension officer.', 'এআই সিদ্ধান্ত সহায়ক · পরীক্ষামূলক · কৃষি কর্মকর্তার সঙ্গে মিলিয়ে নিন।')}</p>
   </div>`;
 }
 
@@ -98,6 +99,7 @@ function rerender() {
 export async function advisorAction(action, value) {
   const notes = document.querySelector('#adv-notes');
   if (notes) ui.notes = notes.value;
+  if (action === 'adv-use') { useInPlanner(); return; }
   if (action === 'adv-mode') { ui.mode = value; rerender(); return; }
   if (action === 'adv-crop') {
     ui.crops = ui.crops.includes(value) ? ui.crops.filter((c) => c !== value) : ui.crops.length < 5 ? [...ui.crops, value] : ui.crops;
@@ -127,4 +129,40 @@ export async function advisorAction(action, value) {
       clearTimeout(timer); ui.status = 'idle'; rerender();
     }
   }
+}
+
+// ---- Custom plan hand-off to the Planting planner ----
+const CUSTOM_KEY = 'ropon_custom_plan_v1';
+export function getCustomPlan() {
+  try {
+    const p = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null');
+    return p && Array.isArray(p.planting) && p.planting.length && p.fieldId === state.fieldId ? p : null;
+  } catch { return null; }
+}
+export function clearCustomPlan() { try { localStorage.removeItem(CUSTOM_KEY); } catch { /* ignore */ } }
+function useInPlanner() {
+  const r = ui.result;
+  if (!r?.planting?.length || r.verdict === 'not_suitable') return;
+  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: ui.mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
+  location.hash = '#planner';
+}
+// Pure: estimated plant count for one crop's share of the usable area.
+export function customCount(areaHa, usablePct, item) {
+  const m2 = Number(areaHa) * 10000 * (Number(usablePct) / 100) * (item.sharePct / 100);
+  const each = (item.rowSpacingCm / 100) * (item.withinRowCm / 100);
+  return m2 > 0 && each > 0 ? Math.floor(m2 / each) : 0;
+}
+export function customPlanBanner() {
+  const p = getCustomPlan();
+  if (!p) return '';
+  const [mark, en, bn, cls] = VERDICT[p.verdict] || VERDICT.possible_with_conditions;
+  const usable = Number(state.planner?.usable) || 88;
+  return `<section class="panel adv-plan-banner adv-${cls}" aria-label="${t('Custom plan', 'কাস্টম পরিকল্পনা')}">
+    <div class="adv-plan-head"><span class="adv-mark">${mark}</span><div><span class="eyebrow">${t('Custom plan from Rotation studio', 'ফসলচক্র থেকে কাস্টম পরিকল্পনা')} · ${t(en, bn)}</span><h2>${esc(p.title || '')}</h2></div>
+      <button type="button" class="button small" data-action="custom-plan-clear">${t('Back to standard planting', 'সাধারণ বপনে ফিরুন')}</button></div>
+    <div class="adv-plan-crops">${p.planting.map((c) => `<div class="adv-plan-crop"><i style="background:${esc(c.color)}"></i><div><strong>${esc(c.crop)}</strong>
+      <small>${c.sharePct}% ${t('of the field', 'জমির')} · ${esc(c.model)} · ${c.rowSpacingCm} × ${c.withinRowCm} cm · ~${customCount(area(), usable, c).toLocaleString()} ${t('plants', 'চারা')}</small></div></div>`).join('')}</div>
+    <p class="note">${t('3D shows each crop in its share of the land (generic tree / bush / field-crop models; colours and spacing suggested by AI — general guidance, not measurements). Plant counts use your usable area.', '৩ডি-তে প্রতিটি ফসল তার জমির অংশে (সাধারণ গাছ/ঝোপ/মাঠফসলের মডেল; রং ও দূরত্ব এআই প্রস্তাবিত — সাধারণ নির্দেশনা)।')}</p>
+  </section>`;
 }

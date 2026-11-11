@@ -1881,3 +1881,4 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
   .adv-card::before { animation: none; background-position: 50% 50%; }
   .adv-planty, .adv-planty:has(.planty-thinking), .adv-planty:has(.planty-happy) { animation: none; }
 }
+.adv-use { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }

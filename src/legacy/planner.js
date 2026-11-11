@@ -1,3 +1,4 @@
+import { getCustomPlan, clearCustomPlan, customPlanBanner } from './advisor.js';
 import {
   state,
   agronomy,
@@ -227,6 +228,7 @@ function planner() {
       button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
     ) +
     chips() +
+    customPlanBanner() +
     `<div id="journey-finish-slot">${journeyFinishCTA()}</div><section id="plan-seasons">${seasonTabs(plan)}</section>
     <div id="plan-season-panel" ${season ? `role="tabpanel" aria-labelledby="plan-season-tab-${plan.rotation.seasons.indexOf(season)}"` : ''} class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
  <div class="planner3d-stage-wrap">
@@ -443,6 +445,7 @@ function schedulePlanner3d() {
         field: field(), polygon: polygon(), agronomy, soilProfile,
         planner: { ...state.planner },
         net: { inputs: netInputsFor(), edited: isNetEdited() },
+        custom: getCustomPlan(),
       });
     } catch (error) {
       if (version !== plannerVersion) return;
@@ -555,6 +558,7 @@ function plannerAction(action, value) {
     refreshPlannerSettings();
     document.querySelector('[name="plantCrop"]:checked')?.focus({ preventScroll: true });
   }
+  if (action === 'custom-plan-clear') { clearCustomPlan(); drawPlanner(); return; }
   if (action === 'plan-confirm' && activeSeason()) {
     const plan = seasonPlan();
     const next = nextSeason(plan, activeSeason(plan));

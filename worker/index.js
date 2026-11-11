@@ -161,6 +161,26 @@ async function readBody(request) {
 const ADVISOR_MODES = new Set(['rotation', 'single', 'mixed', 'orchard']);
 const ADVISOR_VERDICTS = new Set(['recommended', 'possible_with_conditions', 'not_suitable']);
 const ADVISOR_STAGES = new Set(['sow', 'grow', 'harvest', 'fallow', 'orchard']);
+const ADVISOR_MODELS = new Set(['tree', 'shrub', 'herb', 'grass', 'vine', 'rice', 'potato', 'mustard', 'mungbean', 'wheat', 'maize']);
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const clampN = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+// Pure: per-crop planting spec the planner 3D draws (generic tree/shrub/herb models, colours, spacing, land share).
+export function normalisePlanting(list) {
+  const items = (Array.isArray(list) ? list : []).slice(0, 5).map((p) => ({
+    crop: typeof p?.crop === 'string' ? p.crop.trim().slice(0, 40) : '',
+    model: ADVISOR_MODELS.has(p?.model) ? p.model : 'herb',
+    color: HEX.test(p?.color || '') ? p.color : '#5f9e4a',
+    fruitColor: HEX.test(p?.fruitColor || '') ? p.fruitColor : null,
+    heightM: clampN(p?.heightM, 0.1, 15, 0.8),
+    rowSpacingCm: clampN(p?.rowSpacingCm, 5, 1500, 40),
+    withinRowCm: clampN(p?.withinRowCm, 5, 1500, 30),
+    sharePct: clampN(p?.sharePct, 0, 100, 0),
+  })).filter((p) => p.crop);
+  if (!items.length) return [];
+  const total = items.reduce((a, p) => a + p.sharePct, 0);
+  items.forEach((p) => { p.sharePct = total > 0 ? Math.round((p.sharePct / total) * 1000) / 10 : Math.round(1000 / items.length) / 10; });
+  return items;
+}
 const ADVISOR_CONTEXT_KEYS = ['fieldId', 'fieldName', 'areaHa', 'irrigation', 'budget', 'soil', 'outlook', 'flood', 'waterTable'];
 let agronomyCache = null;
 
@@ -222,6 +242,7 @@ export function normaliseAdvice(parsed, sources) {
     alternatives: cleanList(parsed.alternatives, 4, 140),
     confidence: ['low', 'medium', 'high'].includes(parsed.confidence) ? parsed.confidence : 'low',
     evidence,
+    planting: parsed.verdict === 'not_suitable' ? [] : normalisePlanting(parsed.planting),
   };
 }
 
@@ -271,7 +292,8 @@ Your job: judge suitability for THIS field honestly and build the best 12-month 
 BE BRUTALLY HONEST: if the proposal is unsuitable (climate, waterlogging, soil, season clash, perennial vs annual conflict, no market/input reality, needs inputs the farmer lacks), set verdict "not_suitable", say clearly why in the summary, and give better alternatives. Use "possible_with_conditions" only when it can work with specific, realistic requirements. Do not flatter.
 Rules: use only the facts in the field context and research data for field-specific claims; general agronomy knowledge for Bangladesh is allowed but say it is general; never invent measurements, yields, prices or chemical doses; cite evidence ONLY by source ids from the research "sources" list (omit if none fit).
 Respond with ONE JSON object only, no prose, in ${req.lang === 'bn' ? 'Bengali' : 'English'} for all text values:
-{"verdict":"recommended|possible_with_conditions|not_suitable","title":"short plan name","summary":"2-4 plain sentences","calendar":[{"month":1,"crop":"name or null","stage":"sow|grow|harvest|fallow|orchard"}... all 12 months],"reasons":["..."],"risks":["..."],"requirements":["..."],"alternatives":["..."],"confidence":"low|medium|high","evidence":["source-id"]}`;
+{"verdict":"recommended|possible_with_conditions|not_suitable","title":"short plan name","summary":"2-4 plain sentences","calendar":[{"month":1,"crop":"name or null","stage":"sow|grow|harvest|fallow|orchard"}... all 12 months],"reasons":["..."],"risks":["..."],"requirements":["..."],"alternatives":["..."],"confidence":"low|medium|high","evidence":["source-id"],"planting":[{"crop":"name","model":"tree|shrub|herb|grass|vine|rice|potato|mustard|mungbean|wheat|maize","color":"#RRGGBB foliage","fruitColor":"#RRGGBB or null","heightM":number,"rowSpacingCm":number,"withinRowCm":number,"sharePct":number}]}
+For "planting": one entry per crop in YOUR recommended plan (empty if not_suitable); choose the 3D model type that best represents the plant (fruit trees like mango/jackfruit = tree; strawberry/chilli/tomato = shrub; rice = rice; potato = potato; mustard = mustard; pulses = mungbean; maize/wheat; leafy/other = herb; climbers = vine); realistic foliage and fruit colours; typical Bangladesh spacing (general guidance); sharePct = share of the field each crop occupies AT THE SAME TIME (mixed/hybrid splits the land; a season rotation gives each crop 100 on its own season — then use the share of the field for the crop in its season, normally 100).`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35000);
   try {
