@@ -154,3 +154,132 @@
     padding: 8px 10px;
   }
 }
+
+/* Usable-area truth note under the slider. */
+.plan-usable-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plan-use-field {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Field-zone legend chips. */
+.zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.zone-legend button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfdf4;
+  color: #3c4a35;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.zone-legend button.active {
+  background: #28523e;
+  border-color: #28523e;
+  color: #f6f9ed;
+}
+
+.zone-legend-overlay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: auto;
+  z-index: 3;
+}
+
+/* Tapped-zone parameter popover. */
+.zone-popover {
+  position: absolute;
+  z-index: 5;
+  width: min(280px, calc(100% - 16px));
+  background: #fffdf6;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(20, 40, 20, 0.18);
+  padding: 10px 12px 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.zone-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.zone-popover-close {
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px -8px -8px 0;
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.zone-popover-grid {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.zone-popover-grid > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .zone-popover {
+    position: static;
+    align-self: stretch;
+    width: auto;
+    margin: 8px;
+  }
+}
+
+.zone-popover-grid dt {
+  color: #5c6b54;
+}
+
+.zone-popover-grid dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.zone-popover-edit {
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .zone-popover {
+    width: calc(100% - 16px);
+  }
+}

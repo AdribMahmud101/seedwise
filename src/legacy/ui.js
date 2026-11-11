@@ -68,7 +68,7 @@ function syncSeasonField() {
   if (!getPlan()?.field) return;
   const selected = field();
   if (!selected) return;
-  const snapshot = fieldSnapshot(selected, polygon(), profile());
+  const snapshot = fieldSnapshot(selected, polygon(), profile(), state.netInputs[selected.id]);
   const serialized = JSON.stringify(snapshot);
   if (getPlan()?.field && serialized === lastSeasonField) return;
   confirmField(snapshot);
@@ -84,12 +84,16 @@ function applySeasonPlan(plan) {
   }
   state.fieldId = snapshot.id;
   state.profiles[snapshot.id] = structuredClone(snapshot.constraints);
+  if (snapshot.netInputs) {
+    if (snapshot.netEdited) state.netInputs[snapshot.id] = structuredClone(snapshot.netInputs);
+    else delete state.netInputs[snapshot.id];
+  }
   if (snapshot.outline) {
     if (JSON.stringify(snapshot.outline) === JSON.stringify(basePolygon(field()))) delete state.boundaries[snapshot.id];
     else state.boundaries[snapshot.id] = structuredClone(snapshot.outline);
   }
   if (plan.rotation) state.weights = { ...plan.rotation.priorities };
-  lastSeasonField = JSON.stringify(fieldSnapshot(field(), polygon(), profile()));
+  lastSeasonField = JSON.stringify(fieldSnapshot(field(), polygon(), profile(), state.netInputs[snapshot.id]));
 }
 subscribe(applySeasonPlan);
 function persist() {

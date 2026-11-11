@@ -122,7 +122,7 @@ test('rotation changes reset planting to real recommended defaults and retain bi
     const defaults = recommendedSettings(settings.crop);
     assert.equal(settings.rowSpacingCm, defaults.row);
     assert.equal(settings.withinRowCm, defaults.spacing);
-    assert.equal(settings.usableAreaPct, defaults.usable);
+    assert.equal(settings.usableAreaPct, journey.fieldUsableDefault(plan.field));
     assert.equal(settings.confirmedAt, null);
   }
   journey.confirmPlanting();
@@ -298,14 +298,14 @@ test('field persistence and planner/rotation hooks preserve page state and sync 
     rotationAction('save-rotation', 'legume');
     assert.equal(journey.getPlan().rotation.id, 'legume');
     assert.equal(getSelectedRotationId(), 'legume');
-    const { setPlantCrop, plannerAction, planner } = await import('../src/legacy/planner.js');
+    const { setPlantCrop, plannerAction, planner, fieldUsableDefault } = await import('../src/legacy/planner.js');
     plannerAction('plan-season', 'potato');
     state.planner.usable = 71;
     setPlantCrop('potato');
     assert.equal(journey.getPlan().planting.potato.usableAreaPct, 71);
     assert.equal(state.planner.usable, 71);
     plannerAction('plan-reset');
-    assert.equal(journey.getPlan().planting.potato.usableAreaPct, recommendedSettings('potato').usable);
+    assert.equal(journey.getPlan().planting.potato.usableAreaPct, fieldUsableDefault());
     journey.setPlanting('potato', { rowSpacingCm: 72, usableAreaPct: 69 });
     planner();
     assert.equal(state.planner.row, 72);

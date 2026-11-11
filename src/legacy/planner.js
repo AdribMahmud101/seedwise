@@ -22,11 +22,34 @@ import {
   toast,
 } from './ui.js';
 import { PLANTING, capacity } from './engine.js';
-import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext } from './planner-controls.js';
+import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext, resolvePlannerUsable } from './planner-controls.js';
+import { cultivableUsablePct } from './netarea.js';
+import { netAreaFor, netInputsFor, isNetEdited } from './fields.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
 import { getPlan, setPlanting } from './journey.js';
 import { journeyFinishCTA } from './journey-bar.js';
+
+// One usable-area truth: the slider defaults to the field's cultivable share
+// from its bund/drain/path widths (netarea.js). Pure w.r.t. state except reads.
+export function fieldUsableDefault() {
+  try {
+    const net = netAreaFor(field());
+    if (!(net.perimeterM > 0) || !(net.grossHa > 0)) return 88;
+    return cultivableUsablePct(net.grossHa, net.perimeterM, net.inputs);
+  } catch {
+    return 88;
+  }
+}
+
+function ensurePlannerUsable() {
+  const p = state.planner;
+  p.usable = resolvePlannerUsable(p, fieldUsableDefault());
+  if (p.usableSource !== 'override') {
+    p.usableSource = 'field';
+  }
+  return p.usable;
+}
 
 let plannerSeasonKey = null;
 let plannerPlanId = null;
@@ -49,14 +72,15 @@ const seasonCrop = season => ['aman', 'boro'].includes(season.crop) ? 'rice' : s
 function loadSeason(season, plan) {
   const settings = plan.planting[season.key];
   Object.assign(state.planner, { crop: settings.crop, row: settings.rowSpacingCm,
-    spacing: settings.withinRowCm, usable: settings.usableAreaPct });
+    spacing: settings.withinRowCm, usable: settings.usableAreaPct, usableSource: settings.usableSource ?? 'override' });
 }
 function saveSeasonPlanting(extra = {}) {
   const season = activeSeason();
   if (!season) return;
   try {
     return setPlanting(season.key, { crop: state.planner.crop, rowSpacingCm: state.planner.row,
-      withinRowCm: state.planner.spacing, usableAreaPct: state.planner.usable, ...extra });
+      withinRowCm: state.planner.spacing, usableAreaPct: state.planner.usable,
+      usableSource: state.planner.usableSource, ...extra });
   } catch (error) {
     console.warn('Season planting could not be saved', error);
     toast(t('Season settings could not be saved. Please try again.', 'মৌসুমের মাপ সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'));
@@ -128,10 +152,17 @@ function numericControl(name, label, unit) {
   const p = state.planner;
   const { min, max, step } = controlLimits(p.crop, name);
   const value = p[name];
+  const places = name === 'usable' ? 1 : 0;
   return `<div class="plan-control" style="--progress:${(value - min) / (max - min) * 100}%">
-    <div class="plan-control-label"><label for="plan-${name}">${label}</label><span class="plan-number"><input id="plan-${name}" name="${name}" type="number" min="${min}" max="${max}" step="${step}" value="${value}" inputmode="numeric" required aria-describedby="plan-${name}-limits"><span>${unit}</span></span></div>
-    <div class="plan-range-wrap"><output for="plan-${name} plan-${name}-range" aria-hidden="true">${num(value)} ${unit}</output><input id="plan-${name}-range" name="${name}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label} (${unit})"></div>
+    <div class="plan-control-label"><label for="plan-${name}">${label}</label><span class="plan-number"><input id="plan-${name}" name="${name}" type="number" min="${min}" max="${max}" step="${step}" value="${value}" inputmode="decimal" required aria-describedby="plan-${name}-limits"><span>${unit}</span></span></div>
+    <div class="plan-range-wrap"><output for="plan-${name} plan-${name}-range" aria-hidden="true">${num(value, places)} ${unit}</output><input id="plan-${name}-range" name="${name}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label} (${unit})"></div>
     <div id="plan-${name}-limits" class="plan-range-limits"><span>${num(min)} ${unit}</span><span>${num(max)} ${unit}</span></div></div>`;
+}
+function usableNote() {
+  const override = state.planner.usableSource === 'override';
+  return override
+    ? `<p class="note plan-usable-note">${t('Your planner override', 'আপনার পরিকল্পনার মান')} <button type="button" class="plan-use-field" data-action="plan-use-field-widths">${t('Use field widths', 'জমির মাপ ব্যবহার করুন')}</button></p>`
+    : `<p class="note plan-usable-note">${t('From your field widths', 'আপনার জমির মাপ থেকে')} · <a href="#field">${t('Edit on My field', 'আমার জমিতে বদলান')}</a></p>`;
 }
 function plannerSettings() {
   const p = state.planner;
@@ -142,6 +173,7 @@ function plannerSettings() {
   return `<section class="panel plan-settings"><div class="panel-header"><div>${season ? (() => { const i = plan.rotation.seasons.indexOf(season); const months = `${monthName(season.sowMonth - 1, true)}–${monthName(season.harvestMonth - 1, true)}`; return `<span class="eyebrow">${t(`SEASON ${i + 1} OF ${plan.rotation.seasons.length} · ${months}`, `মৌসুম ${i + 1}/${plan.rotation.seasons.length} · ${months}`)}</span><h2>${t(`Planting for ${seasonLabel(season)}`, `${seasonLabel(season)} — বপনের মাপ`)}</h2><p class="note plan-season-scope">${t(`These settings apply only to the ${seasonLabel(season)} season (${months}). Other seasons keep their own.`, `এই মাপ শুধু ${seasonLabel(season)} মৌসুমের (${months}) জন্য। অন্য মৌসুমের মাপ আলাদা থাকে।`)}</p>`; })() : `<span class="eyebrow">${t('MAKE IT YOUR FIELD', 'নিজের জমির মাপ দিন')}</span><h2>${t('Planting settings', 'বপনের মাপ')}</h2>`}</div></div><div class="panel-body">
     <form id="plant-controls">${locked ? `<div class="plan-locked-crop"><div>${cropIcon(p.crop)}<b>${seasonLabel(season)}</b></div><button type="button" class="plan-change-crop" data-action="plan-change-crop">${t('Change crop', 'ফসল বদলান')}</button></div>` : `<fieldset class="plan-crops"><legend>${season ? t('Custom crop', 'নিজস্ব ফসল') : t('Choose your crop', 'আপনার ফসল বাছুন')}</legend><div class="plan-crop-grid">${Object.entries(PLANTING).map(([id, crop]) => `<label class="plan-crop"><input type="radio" name="plantCrop" value="${id}" ${id === p.crop ? 'checked' : ''}><span>${cropIcon(id)}<span>${t(crop.label, crop.bn)}</span></span></label>`).join('')}</div></fieldset>`}
     ${numericControl('usable', t('Usable area', 'চাষযোগ্য জমি'), '%')}
+    ${usableNote()}
     ${p.crop === 'mustard' ? `<p class="plan-broadcast note">${t('Broadcast sowing · no rows. Seed uses the published 7 kg/ha reference rate.', 'ছিটিয়ে বপন · সারি নেই। প্রকাশিত ৭ কেজি/হেক্টর হার ধরে বীজের হিসাব।')}</p>` : numericControl('row', t('Row spacing', 'সারির দূরত্ব'), 'cm') + numericControl('spacing', t('Within-row spacing', 'গাছের দূরত্ব'), 'cm')}
     <button type="button" class="plan-reset" data-action="plan-reset">↺ ${t('Reset to recommended', 'প্রস্তাবিত মাপে ফিরুন')}</button><div class="plan-season-confirmation">${seasonConfirmation(plan)}</div></form></div></section>`;
 }
@@ -174,7 +206,8 @@ function planner() {
   const plan = seasonPlan();
   const season = activeSeason(plan);
   if (season) loadSeason(season, plan);
-  if (!Object.hasOwn(PLANTING, p.crop)) Object.assign(p, recommendedSettings('rice'));
+  else ensurePlannerUsable();
+  if (!Object.hasOwn(PLANTING, p.crop)) Object.assign(p, { ...recommendedSettings('rice'), usable: p.usable });
   for (const name of ['usable', 'row', 'spacing']) {
     if (p.crop === 'mustard' && name !== 'usable') continue;
     p[name] = clampPlannerValue(p.crop, name, Number.isFinite(p[name]) ? p[name] : recommendedSettings(p.crop)[name]);
@@ -406,6 +439,7 @@ function schedulePlanner3d() {
       await mod.mountPlanner3d(host, {
         field: field(), polygon: polygon(), agronomy, soilProfile,
         planner: { ...state.planner },
+        net: { inputs: netInputsFor(), edited: isNetEdited() },
       });
     } catch (error) {
       if (version !== plannerVersion) return;
@@ -533,11 +567,19 @@ function plannerAction(action, value) {
       onDone: () => guide.celebrate({ en: 'You’re ready to plan your planting!', bn: 'আপনি বপনের পরিকল্পনা করতে প্রস্তুত!' }) },
   ]);
   if (action === 'plan-reset') {
-    Object.assign(state.planner, recommendedSettings(state.planner.crop));
+    Object.assign(state.planner, { ...recommendedSettings(state.planner.crop),
+      usable: fieldUsableDefault(), usableSource: 'field' });
     persist();
     saveSeasonPlanting();
     refreshPlannerSettings();
     document.querySelector('.plan-reset')?.focus({ preventScroll: true });
+  }
+  if (action === 'plan-use-field-widths') {
+    Object.assign(state.planner, { usable: fieldUsableDefault(), usableSource: 'field' });
+    persist();
+    saveSeasonPlanting();
+    refreshPlannerSettings();
+    document.querySelector('.plan-use-field')?.focus({ preventScroll: true });
   }
   if (action === 'plan-view') {
     state.planner.view = value === 'top' ? 'top' : '3d';
@@ -590,6 +632,11 @@ function plannerInput(el) {
   // Keep partial number drafts editable; commit and clamp on change.
   if (el.type === 'number' && (el.value === '' || Number(el.value) < min || Number(el.value) > max)) return;
   if (syncPlannerControl(el, state.planner) === null) return;
+  if (el.name === 'usable') {
+    state.planner.usableSource = 'override';
+    const note = typeof document !== 'undefined' ? document.querySelector('.plan-usable-note') : null;
+    if (note) note.outerHTML = usableNote();
+  }
   persist();
   saveSeasonPlanting();
   refreshSeasonChrome();
@@ -604,6 +651,11 @@ function plannerChange(el) {
   } else {
     if (el.value === '' || !Number.isFinite(Number(el.value))) el.value = state.planner[el.name];
     syncPlannerControl(el, state.planner);
+    if (el.name === 'usable') {
+      state.planner.usableSource = 'override';
+      const note = typeof document !== 'undefined' ? document.querySelector('.plan-usable-note') : null;
+      if (note) note.outerHTML = usableNote();
+    }
     persist();
     saveSeasonPlanting();
     refreshSeasonChrome();

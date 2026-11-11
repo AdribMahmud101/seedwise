@@ -1,4 +1,5 @@
 import { PLANTING } from './engine.js';
+import { cultivableUsablePct } from './netarea.js';
 
 const spacingLimits = {
   rice: { row: [15, 30], spacing: [15, 30] },
@@ -8,7 +9,8 @@ const spacingLimits = {
 };
 
 export function controlLimits(crop, name) {
-  const [min, max] = name === 'usable' ? [1, 100] : spacingLimits[crop][name];
+  if (name === 'usable') return { min: 1, max: 100, step: 0.1 };
+  const [min, max] = spacingLimits[crop][name];
   return { min, max, step: 1 };
 }
 
@@ -19,7 +21,29 @@ export function recommendedSettings(crop) {
 
 export function clampPlannerValue(crop, name, value) {
   const { min, max, step } = controlLimits(crop, name);
-  return Math.min(max, Math.max(min, min + Math.round((Number(value) - min) / step) * step));
+  const snapped = min + Math.round((Number(value) - min) / step) * step;
+  // Avoid 88.70000000001-style float dust on the 0.1 usable step.
+  const clean = step < 1 ? Math.round(snapped * 10) / 10 : snapped;
+  return Math.min(max, Math.max(min, clean));
+}
+
+// One usable-area truth: the planner default is the field's cultivable share
+// from netarea.js (farmer-saved widths when present, scenario defaults otherwise).
+export function usableDefaultFromNet(grossHa, perimeterM, inputs) {
+  return cultivableUsablePct(grossHa, perimeterM, inputs);
+}
+
+// A moved slider becomes the farmer's planner override; anything else follows
+// the field widths. Pure so journey defaults and planner state share the rule.
+export function resolvePlannerUsable(planner, fieldDefault) {
+  if (planner?.usableSource === 'override' && Number.isFinite(planner.usable)) {
+    return clampPlannerValue(planner.crop || 'rice', 'usable', planner.usable);
+  }
+  return fieldDefault;
+}
+
+export function zoneSourceLabel(edited) {
+  return edited ? 'Entered by farmer' : 'Scenario default';
 }
 
 export function syncPlannerControl(input, planner) {

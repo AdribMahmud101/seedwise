@@ -1,0 +1,38 @@
+{
+  "chrome": "158.0.8127.18",
+  "desktop": {
+    "viewport": [
+      1366,
+      768
+    ],
+    "scale": 1,
+    "usable": 86.9,
+    "consoleErrors": [],
+    "popover": "Path\n\u00d7\nWidth\n0.5 m\nLength\n34.9 m\nArea\n17.4 m\u00b2 \u00b7 0.43 decimals\nShare of field\n1.9 %\nSource\nEntered by farmer\nEdit on My field"
+  },
+  "phone": {
+    "viewport": [
+      412,
+      915
+    ],
+    "scale": 2.625,
+    "usable": 86.9,
+    "consoleErrors": [],
+    "popover": "Path\n\u00d7\nWidth\n0.5 m\nLength\n34.9 m\nArea\n17.4 m\u00b2 \u00b7 0.43 decimals\nShare of field\n1.9 %\nSource\nEntered by farmer\nEdit on My field"
+  },
+  "renderer": {
+    "kinds": [
+      "bund",
+      "drain",
+      "other",
+      "path"
+    ],
+    "upward": 420,
+    "totalNormals": 420,
+    "depth": -0.30000001192092896,
+    "rootLeaks": 0,
+    "footprintLeaks": 0,
+    "plantCount": 78,
+    "consoleErrors": []
+  }
+}

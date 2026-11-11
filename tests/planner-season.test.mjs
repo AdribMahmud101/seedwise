@@ -5,7 +5,8 @@ import * as journey from '../src/legacy/journey.js';
 import { capacity } from '../src/legacy/engine.js';
 import { recommendedSettings } from '../src/legacy/planner-controls.js';
 import { planner, plannerAction, plannerInput, setPlantCrop } from '../src/legacy/planner.js';
-import { state, loadData, basePolygon, defaultProfile, defaultPriorities } from '../src/legacy/ui.js';
+import { state, loadData, basePolygon, defaultProfile, defaultPriorities, persist } from '../src/legacy/ui.js';
+import { cultivableUsablePct, polygonPerimeterM } from '../src/legacy/netarea.js';
 
 const earth = JSON.parse(readFileSync(new URL('../public/data/earth-data.json', import.meta.url)));
 const agronomy = JSON.parse(readFileSync(new URL('../public/data/agronomy.json', import.meta.url)));
@@ -13,6 +14,7 @@ const site = earth.fields.find(field => field.id === 'mithapukur');
 const storage = new Map();
 
 beforeEach(async t => {
+  storage.clear();
   t.mock.method(globalThis, 'fetch', async url => Response.json(String(url).includes('agronomy') ? agronomy : earth));
   Object.defineProperty(globalThis, 'localStorage', { value: {
     getItem: key => storage.get(key) ?? null,
@@ -27,6 +29,7 @@ beforeEach(async t => {
   journey.resetPlan();
   state.lang = 'en';
   state.fieldId = site.id;
+  state.netInputs = {};
   state.planner = { ...recommendedSettings('rice'), angle: 0.62 };
   await loadData();
   journey.resetPlan();
@@ -47,6 +50,31 @@ function edit(name, value) {
   const control = { querySelectorAll: () => inputs, querySelector: () => null, style: { setProperty() {} } };
   plannerInput({ name, value: String(value), type: 'range', closest: () => control });
 }
+
+test('saved widths update following seasons, preserve overrides, and reset survives reload', async () => {
+  start();
+  edit('usable', 71.3);
+  const widths = { bundWidthM: 0.4, drainWidthM: 0.1, pathWidthM: 0.5, otherDecimals: 0 };
+  state.netInputs[site.id] = widths;
+  persist();
+  const plan = journey.getPlan();
+  const expected = cultivableUsablePct(plan.field.areaHa, polygonPerimeterM(plan.field.outline), widths);
+  assert.equal(plan.planting.aman.usableAreaPct, 71.3);
+  assert.equal(plan.planting.aman.usableSource, 'override');
+  assert.equal(plan.planting.potato.usableAreaPct, expected);
+  plannerAction('plan-season', 'potato');
+  assert.equal(state.planner.usable, expected);
+  assert.match(planner(), /From your field widths/);
+  // Moving to exactly the field value still explicitly chooses an override.
+  edit('usable', expected);
+  assert.match(planner(), /Your planner override/);
+  plannerAction('plan-use-field-widths');
+  assert.match(planner(), /From your field widths/);
+  const reloaded = await import('../src/legacy/journey.js?netarea-reload');
+  assert.equal(reloaded.getPlan().planting.potato.usableSource, 'field');
+  assert.equal(reloaded.getPlan().planting.aman.usableSource, 'override');
+  assert.deepEqual(reloaded.getPlan().field.netInputs, widths);
+});
 
 test('three season tabs follow rotation labels, dates and locked crops in both languages', () => {
   start();

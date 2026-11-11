@@ -655,7 +655,7 @@ export const DEMO_BEATS = [
       const earth = ui.earth ?? (await fetchDemoJson('earth-data'));
       const f = earth.fields.find(item => item.id === 'mithapukur');
       const constraints = ui.defaultProfile();
-      const snapshot = fieldSnapshot(f, ui.basePolygon(f), constraints);
+      const snapshot = fieldSnapshot(f, ui.basePolygon(f), constraints, ui.state.netInputs[f.id]);
       return confirmField({ ...snapshot, name: "Rahim's field" });
     },
   },
