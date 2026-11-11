@@ -1898,3 +1898,39 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
 .rot-scored-title { font-size: clamp(18px, 2.2vw, 22px); margin: 22px 0 10px; }
 @keyframes rot-reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .rot-reveal { animation: none; } }
+
+/* Suggestions: calm container (not alarm red); each option glows with a travelling border + twinkling sparkle. */
+.adv-drop { background: #f7f9f1; border-color: #dfe7d2; }
+.adv-drop > p:first-child strong { color: #8a5a1f; }
+.adv-drop-label { color: #3f5a44; font-weight: 600; }
+.adv-suggest-btn {
+  position: relative; isolation: isolate; overflow: visible;
+  background: linear-gradient(135deg, #fbfdf6, #f1f8e8); border: 1px solid transparent;
+  box-shadow: 0 0 0 1px rgba(122, 176, 92, .25), 0 6px 18px rgba(122, 176, 92, .18);
+  transition: transform .2s ease, box-shadow .2s ease;
+  padding-right: 34px;
+}
+.adv-suggest-btn::before {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 2px; z-index: -1; pointer-events: none;
+  background: linear-gradient(110deg, #7ab05c, #e3b341, #0b3d91, #7ab05c);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: adv-sug-shine 4s linear infinite;
+}
+.adv-suggest-btn::after {
+  content: "✦"; position: absolute; top: 8px; right: 10px; font-size: 15px; color: #e3b341;
+  text-shadow: 0 0 6px rgba(227, 179, 65, .8); animation: adv-twinkle 2.2s ease-in-out infinite;
+}
+.adv-suggest-btn:nth-child(2)::after { animation-delay: .7s; }
+.adv-suggest-btn:nth-child(3)::after { animation-delay: 1.4s; }
+.adv-suggest-btn:hover, .adv-suggest-btn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px rgba(122, 176, 92, .45), 0 10px 26px rgba(122, 176, 92, .32), 0 0 18px rgba(227, 179, 65, .25);
+}
+@keyframes adv-sug-shine { to { background-position: 300% 0; } }
+@keyframes adv-twinkle { 0%, 100% { opacity: .35; transform: scale(.8) rotate(0deg); } 50% { opacity: 1; transform: scale(1.25) rotate(20deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .adv-suggest-btn::before, .adv-suggest-btn::after { animation: none; }
+  .adv-suggest-btn:hover { transform: none; }
+}
