@@ -489,3 +489,11 @@ body:has(.planty-guide:not(.planty-guide--hint)) .coach-host {
   width: 100%;
   justify-content: center;
 }
+
+/* Coach must never cover the page's main buttons: a compact card anchored bottom-left that scrolls inside. */
+@media (min-width: 701px) {
+  .coach-host--docked {
+    max-height: min(50vh, 440px);
+    overscroll-behavior: contain;
+  }
+}
