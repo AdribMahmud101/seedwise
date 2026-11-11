@@ -336,3 +336,18 @@
   }
 }
 
+
+/* Demo bar buttons: .button's light background hid the light bar text — keep them readable on the dark bar. */
+.demo-controls-bar .button:not(.primary) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f7faed;
+  border-color: rgba(247, 250, 237, 0.45);
+}
+.demo-controls-bar .button:not(.primary):hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* During Rahim's demo the narration bubble guides; hide the coach panel so only one Planty is on screen. */
+body:has(.demo-controls-bar) .coach-host {
+  display: none;
+}
