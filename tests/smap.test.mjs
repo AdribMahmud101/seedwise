@@ -191,7 +191,7 @@ test('#field html contains SMAP tile with m³/m³ for Mithapukur', async () => {
   const html = home();
 
   // Check SMAP tile is present
-  assert.ok(html.includes('Soil water (SMAP)') || html.includes('মাটির পানি (SMAP)'), 'SMAP tile title present');
+  assert.ok(html.includes('Soil water') || html.includes('মাটির পানি'), 'SMAP tile title present');
 
   // Check m³/m³ is shown
   assert.ok(html.includes('m³/m³'), 'm³/m³ unit shown in SMAP tile');
@@ -207,9 +207,49 @@ test('#field html contains SMAP tile with m³/m³ for Mithapukur', async () => {
   state.lang = 'bn';
   const bnHtml = home();
 
-  assert.ok(bnHtml.includes('মাটির পানি (SMAP)'), 'SMAP tile title in Bengali');
+  assert.ok(bnHtml.includes('মাটির পানি'), 'SMAP tile title in Bengali');
   assert.ok(bnHtml.includes('m³/m³'), 'm³/m³ unit shown in Bengali');
   assert.ok(bnHtml.includes('9 km') || bnHtml.includes('৯ কিমি'), '9 km or ৯ কিমি in Bengali');
+});
+
+test('historical tiles keep values, provenance and status in separate aligned rows in both languages', async () => {
+  globalThis.document = { baseURI: new URL('../public/', import.meta.url).href };
+  globalThis.fetch = async url => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, 'utf8')),
+  });
+  await loadData();
+  state.fieldId = 'mithapukur';
+  state.month = 10;
+  const { field, num } = await import('../src/legacy/ui.js');
+  const { getSmapSurfaceForMonth } = await import('../src/legacy/water.js');
+  const m = field().monthly[state.month];
+  const soil = getSmapSurfaceForMonth(state.fieldId, state.month);
+  try {
+    for (const lang of ['en', 'bn']) {
+      state.lang = lang;
+      const tiles = home().match(/<article class="data-stat">[\s\S]*?<\/article>/g);
+      assert.equal(tiles.length, 5);
+      const labels = lang === 'en'
+        ? ['Soil wetness', 'Soil water', 'Rainfall', 'Temperature', 'Water use']
+        : ['মাটির আর্দ্রতা', 'মাটির পানি', 'বৃষ্টিপাত', 'তাপমাত্রা', 'পানির চাহিদা'];
+      const values = [num(m.wetness, 2), num(soil.sfmc, 2), num(m.rainGpm, 1), num(m.tmean, 1), num(m.et0, 1)];
+      const units = ['index 0–1', 'm³/m³', 'mm', '°C', 'mm'];
+      for (const [i, tile] of tiles.entries()) {
+        assert.ok(tile.includes(`<span>${labels[i]}</span>`));
+        assert.match(tile, /class="stat-top">[^]*?<\/div><div class="stat-badge">[^]*?nasa-chip/);
+        assert.ok(tile.includes(`<span class="stat-number">${values[i]}<small>${units[i]}</small></span>`));
+        assert.match(tile, /class="stat-spark"><svg class="spark"/);
+        const footer = tile.split('class="stat-foot">')[1];
+        assert.match(footer, /class="stat-source"/);
+        assert.match(footer, /class="stat-truth"><span class="truth estimated"/);
+        assert.doesNotMatch(footer, /<br>|Dry|Normal|Wet|শুষ্ক|স্বাভাবিক|ভিজা/);
+      }
+      assert.match(tiles[1], /class="stat-status">[^<]+<\/span><\/div><div class="stat-spark">/);
+    }
+  } finally {
+    state.lang = 'en';
+  }
 });
 
 test('#field html shows "Not prepared" for custom fields', async () => {
@@ -248,4 +288,9 @@ test('#field html shows "Not prepared" for custom fields', async () => {
 
   // Check SMAP tile shows "Not prepared for this field"
   assert.ok(html.includes('Not prepared for this field') || html.includes('এই জমির তথ্য প্রস্তুত নেই'), 'Not prepared message shown for custom field');
+  const tile = html.match(/<article class="data-stat">[\s\S]*?<\/article>/g)[1];
+  assert.match(tile, /class="stat-badge"><\/div>/);
+  assert.match(tile, /class="stat-number">—<small>m³\/m³<\/small>/);
+  assert.match(tile, /class="stat-spark"><\/div>/);
+  assert.match(tile, /class="stat-truth"><\/div>/);
 });
