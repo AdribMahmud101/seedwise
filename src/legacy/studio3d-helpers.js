@@ -1435,8 +1435,8 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, wat
 
   const rootzoneEyebrow = `15–60 cm · ${t("ROOT ZONE", "শিকড় অঞ্চল")}`;
   const rootzoneVal = hasWetness
-    ? t(`Root zone: ${wetnessWord} (${Math.round(fraction * 100)} % of saturation)`, `শিকড় অঞ্চল: ${wetnessWord} (সম্পৃক্ততার ${Math.round(fraction * 100)} %)`)
-    : t("Root zone: unknown", "শিকড় অঞ্চল: অজানা");
+    ? t(`Soil moisture: ${wetnessWord} (${Math.round(fraction * 100)} % of saturation)`, `মাটির আর্দ্রতা: ${wetnessWord} (সম্পৃক্ততার ${Math.round(fraction * 100)} %)`)
+    : t("Soil moisture: unknown", "মাটির আর্দ্রতা: অজানা");
   const cropVal = isFallow ? cropName : `${t("Planned", "পরিকল্পিত")}: ${cropName}${rotationName ? ` (${rotationName})` : ""}${rootDepthM ? ` · ${t("roots", "শিকড়")} ~${rootDepthM}` : ""}`;
   const rootzoneTruth = "MODELED";
   const rootzoneTruthLabel = t("Estimated · NASA POWER ~50 km, top ~1 m", "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি");

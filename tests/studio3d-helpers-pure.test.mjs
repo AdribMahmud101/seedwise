@@ -288,7 +288,7 @@ test("buildCalloutData separates estimated soil conditions from the planned crop
 
   assert.ok(callouts.rootzone);
   assert.equal(callouts.rootzone.eyebrow, "15–60 cm · ROOT ZONE");
-  assert.equal(callouts.rootzone.value, "Root zone: moist (48 % of saturation)");
+  assert.equal(callouts.rootzone.value, "Soil moisture: moist (48 % of saturation)");
   assert.equal(callouts.rootzone.truth, "MODELED");
   assert.equal(callouts.rootzone.truthLabel, "Estimated · NASA POWER ~50 km, top ~1 m");
   assert.equal(callouts.rootzone.cropValue, "Planned: Mustard (Rotation 01) · roots ~0.6 m");
@@ -323,7 +323,7 @@ test("buildCalloutData classifies unrounded root wetness at every threshold", ()
     [0.6, "wet"], [0.8, "wet"], [0.85, "wet"], [0.8501, "saturated"], [1, "saturated"],
   ]) {
     const { rootzone } = buildCalloutData({ data: { months: [{ rootWetness, wetness: 0.5 }] } });
-    assert.equal(rootzone.value, `Root zone: ${word} (${Math.round(rootWetness * 100)} % of saturation)`);
+    assert.equal(rootzone.value, `Soil moisture: ${word} (${Math.round(rootWetness * 100)} % of saturation)`);
     assert.doesNotMatch(rootzone.value, /GWETROOT/);
   }
 });
@@ -332,12 +332,12 @@ test("buildCalloutData leaves missing or invalid wetness unknown", () => {
   assert.equal(buildCalloutData({ data: null }), null);
   for (const wetness of [undefined, null, "", NaN, Infinity, -0.1, 1.1, "bad"]) {
     const { rootzone } = buildCalloutData({ data: { months: [{ wetness }] } });
-    assert.equal(rootzone.value, "Root zone: unknown");
+    assert.equal(rootzone.value, "Soil moisture: unknown");
     assert.equal(rootzone.gwetroot, null);
     assert.equal(rootzone.cropValue, "Planned: Crop");
   }
   const { rootzone } = buildCalloutData({ data: { months: [{ rootWetness: null, wetness: 0 }] } });
-  assert.equal(rootzone.value, "Root zone: dry (0 % of saturation)");
+  assert.equal(rootzone.value, "Soil moisture: dry (0 % of saturation)");
 });
 
 test("buildCalloutData uses the previewed rotation and selected month's crop and roots", () => {
@@ -350,7 +350,7 @@ test("buildCalloutData uses the previewed rotation and selected month's crop and
     soil: { layers: [{ clayPct: 32, sandPct: 35, siltPct: 33, ph: 5.8, socGkg: 10.6 }] },
   };
   const callouts = buildCalloutData({ data, monthIdx: 1 });
-  assert.equal(callouts.rootzone.value, "Root zone: wet (80 % of saturation)");
+  assert.equal(callouts.rootzone.value, "Soil moisture: wet (80 % of saturation)");
   assert.equal(callouts.rootzone.cropValue, "Planned: Potato (Rotation 01) · roots ~0.1 m");
 
   const bn = buildCalloutData({ data, monthIdx: 1, t: (en, bn) => bn });
@@ -358,7 +358,7 @@ test("buildCalloutData uses the previewed rotation and selected month's crop and
   assert.equal(bn.topsoil.value, "এঁটেল দোআঁশ · pH 5.8 · জৈব পদার্থ 1.83%");
   assert.equal(bn.topsoil.truthLabel, "আনুমানিক · SoilGrids 250 মি");
   assert.equal(bn.rootzone.eyebrow, "15–60 cm · শিকড় অঞ্চল");
-  assert.equal(bn.rootzone.value, "শিকড় অঞ্চল: ভেজা (সম্পৃক্ততার 80 %)");
+  assert.equal(bn.rootzone.value, "মাটির আর্দ্রতা: ভেজা (সম্পৃক্ততার 80 %)");
   assert.equal(bn.rootzone.truthLabel, "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি");
   assert.equal(bn.rootzone.cropValue, "পরিকল্পিত: আলু (ফসলচক্র 01) · শিকড় ~0.1 মি");
   assert.equal(bn.rootzone.cropTruthLabel, "কাল্পনিক পরিকল্পনা");

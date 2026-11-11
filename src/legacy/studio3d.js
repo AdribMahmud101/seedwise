@@ -3650,8 +3650,12 @@ function soilPinLabel(band, detail) {
 function soilDetailHtml(band, detail) {
   const truthLabel = band === "aquifer" && detail.isButton
     ? t("Unknown — add local reading", "অজানা — স্থানীয় তথ্য দিন") : detail.truthLabel;
-  return `<div class="callout-box ${band}" title="${esc(truthLabel)}">
-    <div class="callout-eyebrow">${esc(detail.eyebrow)}</div>
+  const title = { topsoil: t("Topsoil", "উপরের মাটি"), rootzone: t("Root zone", "শিকড় স্তর"), aquifer: t("Deep soil & water table", "গভীর মাটি ও পানির স্তর") }[band];
+  const depth = String(detail.eyebrow || "").split(" · ")[0];
+  // Only sources that really are NASA get the badge (root zone = NASA POWER soil moisture).
+  const nasa = band === "rootzone" ? t("NASA soil moisture", "নাসার মাটির আর্দ্রতা") : "";
+  return `<div class="callout-box ${band}${nasa ? " has-nasa" : ""}" title="${esc(truthLabel)}">
+    <div class="callout-head"><span class="callout-title">${esc(title)}</span><span class="callout-depth">${esc(depth)}</span>${nasa ? `<span class="nasa-chip">${esc(nasa)}</span>` : ""}</div>
     <div class="callout-val">${detail.isButton
       ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
       : esc(detail.value)}</div>

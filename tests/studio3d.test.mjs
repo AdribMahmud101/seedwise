@@ -137,7 +137,7 @@ test("desktop and mobile soil callouts show translated estimates and a separate 
     for (const lang of ["en", "bn"]) {
       state.lang = lang;
       const html = studio3dHtml(data);
-      const rootValue = lang === "en" ? "Root zone: wet (80 % of saturation)" : "শিকড় অঞ্চল: ভেজা (সম্পৃক্ততার 80 %)";
+      const rootValue = lang === "en" ? "Soil moisture: wet (80 % of saturation)" : "মাটির আর্দ্রতা: ভেজা (সম্পৃক্ততার 80 %)";
       const cropValue = lang === "en" ? "Planned: Potato (Rotation 01) · roots ~0.1 m" : "পরিকল্পিত: আলু (ফসলচক্র 01) · শিকড় ~0.1 মি";
       const soilTag = lang === "en" ? "Estimated · SoilGrids 250 m" : "আনুমানিক · SoilGrids 250 মি";
       const rootTag = lang === "en" ? "Estimated · NASA POWER ~50 km, top ~1 m" : "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি";
