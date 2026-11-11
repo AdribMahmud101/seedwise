@@ -128,7 +128,7 @@ function advisorSteps(context) {
   return [
     ...(context.outlook ? [[t('Reading NASA POWER seasonal outlook', 'NASA POWER মৌসুমি পূর্বাভাস দেখা হচ্ছে'), nasaBadge('power')]] : []),
     ...(context.flood ? [[t('Checking satellite flood history (NASA HLS · Prithvi)', 'স্যাটেলাইট বন্যার ইতিহাস দেখা হচ্ছে (NASA HLS · Prithvi)'), nasaBadge(['hls', 'prithvi'])]] : []),
-    [t('Matching Rangpur research & rotations (agronomy.json)', 'রংপুরের গবেষণা ও ফসলচক্রের সঙ্গে মেলানো হচ্ছে (agronomy.json)'), ''],
+    [t('Matching Rangpur research & rotations', 'রংপুরের গবেষণা ও ফসলচক্রের সঙ্গে মেলানো হচ্ছে'), ''],
   ];
 }
 
