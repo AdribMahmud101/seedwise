@@ -10,6 +10,7 @@ import {
   fieldZoneClearance,
   plannerMeasurementAnchors, plannerSpacingAnchors,
   measurementWidthLabel, measurementEdgeLabel, spacingMeasurementLabel,
+  zonePixelsPerMetre, clampZonePopover,
 } from '../src/legacy/planner3d-helpers.js';
 import { capacity } from '../src/legacy/engine.js';
 
@@ -267,6 +268,91 @@ test('rotated dimensions stay perpendicular and concave strips keep full cross-s
   }
   const empty = { ...cgeom, bundWidthM: 0, drain: null, path: null, other: null };
   assert.deepEqual(plannerMeasurementAnchors(concave, czones, empty).map((m) => m.id), ['edge']);
+});
+
+test('NETAREA1C: default-zoom pixels-per-metre follows the studio estimator', () => {
+  assert.equal(zonePixelsPerMetre(600, 40), 8.25);
+  assert.equal(zonePixelsPerMetre(300, 30), 5.5);
+  // Hidden stage / degenerate outline fall back to studio defaults, never NaN.
+  assert.equal(zonePixelsPerMetre(0, 0), 11);
+  assert.equal(zonePixelsPerMetre(-5, -2), 11);
+  assert.ok(Number.isFinite(zonePixelsPerMetre(412, 25)));
+});
+
+test('NETAREA1C: bund and drain enlarge to 6 px at default zoom, capped at x6', () => {
+  const ppm = 8.25; // 600 px stage on a 40 m span -> 6 px ~= 0.727 m
+  const zones = computeFieldZones(rect, widths, { drainEdgeIndex: 0, pixelsPerMetre: ppm });
+  const minReadable = 6 / ppm;
+  assert.ok(Math.abs(zones.bund.displayWidthM - minReadable) < 1e-9);
+  assert.equal(zones.bund.enlarged, true);
+  // The 0.1 m drain hits the x6 cap instead of the 6 px target.
+  assert.ok(Math.abs(zones.drain.displayWidthM - 0.6) < 1e-9);
+  assert.equal(zones.drain.enlarged, true);
+  // The path keeps the span rule (0.5 m stays true scale on a 40 m span).
+  assert.equal(zones.path.displayWidthM, 0.5);
+  assert.equal(zones.path.enlarged, false);
+  // Real numbers never follow the display enlargement.
+  assert.equal(zones.bund.widthM, 0.4);
+  assert.equal(zones.drain.widthM, 0.1);
+  const plain = computeFieldZones(rect, widths, { drainEdgeIndex: 0 });
+  for (const kind of ['bund', 'drain', 'path']) {
+    assert.equal(zones[kind].widthM, plain[kind].widthM);
+    assert.equal(zones[kind].lengthM, plain[kind].lengthM);
+    assert.equal(zones[kind].areaM2, plain[kind].areaM2);
+  }
+});
+
+test('NETAREA1C: tiny pixels-per-metre still caps at six times the real width', () => {
+  const zones = computeFieldZones(rect, widths, { drainEdgeIndex: 0, pixelsPerMetre: 1 });
+  assert.ok(Math.abs(zones.bund.displayWidthM - 2.4) < 1e-9);
+  assert.ok(Math.abs(zones.drain.displayWidthM - 0.6) < 1e-9);
+});
+
+test('NETAREA1C: features already above 6 px keep their true widths', () => {
+  const zones = computeFieldZones(rect, widths, { drainEdgeIndex: 0, pixelsPerMetre: 30 });
+  assert.equal(zones.bund.displayWidthM, 0.4);
+  assert.equal(zones.bund.enlarged, false);
+  assert.ok(Math.abs(zones.drain.displayWidthM - 0.2) < 1e-9);
+  const zero = computeFieldZones(rect,
+    { bundWidthM: 0, drainWidthM: 0, pathWidthM: 0, otherDecimals: 0 },
+    { pixelsPerMetre: 8.25 });
+  assert.equal(zero.bund, null);
+  assert.equal(zero.drain, null);
+});
+
+test('NETAREA1C: display geometry matches the capped widths; plants stay out', () => {
+  const ppm = 8.25;
+  const zones = computeFieldZones(rect, widths, { drainEdgeIndex: 0, pixelsPerMetre: ppm });
+  const geom = buildZoneGeometry(rect, widths, { drainEdgeIndex: 0, display: true, pixelsPerMetre: ppm });
+  assert.equal(geom.bundWidthM, zones.bund.displayWidthM);
+  assert.equal(geom.drain.widthM, zones.drain.displayWidthM);
+  assert.equal(geom.path.widthM, zones.path.displayWidthM);
+  // The drain centre-line still sits just inside the drawn bund.
+  assert.ok(geom.drain.widthM > 0 && geom.bundWidthM > 0);
+  const markers = plannerMeasurementAnchors(rect, zones, geom);
+  const drain = markers.find((m) => m.id === 'drain');
+  assert.equal(drain.label, '0.1 m');
+  assert.ok(Math.abs(Math.hypot(drain.b[0] - drain.a[0], drain.b[1] - drain.a[1]) - 0.6) < 1e-6);
+  const layout = plannerRowLayout(rect, 20, 20, 100, geom);
+  assert.ok(layout.positions.length > 0);
+  assert.ok(layout.positions.every(([x, y]) => pointInFieldZones(x, y, geom, rect) === null));
+});
+
+test('NETAREA1C: zone popover placement flips and clamps inside the stage', () => {
+  const bounds = { left: 8, top: 8, right: 392, bottom: 352 };
+  const right = clampZonePopover({ anchorX: 100, anchorY: 200, width: 240, height: 160, bounds });
+  assert.equal(right.left, 130);
+  assert.equal(right.top, 120);
+  const left = clampZonePopover({ anchorX: 360, anchorY: 200, width: 240, height: 160, bounds });
+  assert.equal(left.left, 90);
+  const bottom = clampZonePopover({ anchorX: 100, anchorY: 340, width: 240, height: 160, bounds });
+  assert.equal(bottom.top, 192);
+  assert.ok(bottom.top + bottom.height <= bounds.bottom);
+  const small = clampZonePopover({ anchorX: 200, anchorY: 180, width: 800, height: 600, bounds });
+  assert.equal(small.width, bounds.right - bounds.left);
+  assert.equal(small.height, bounds.bottom - bounds.top);
+  assert.equal(small.left, bounds.left);
+  assert.equal(small.top, bounds.top);
 });
 
 test('spacing markers sit on a clear planted patch and track the sliders', () => {
