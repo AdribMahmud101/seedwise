@@ -8,7 +8,7 @@ import {
 } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
-import { buildExportHTML, cropGlyph } from './plan.js';
+import { buildExportHTML, cropGlyph, cropLabel } from './plan.js';
 
 const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_BN = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
@@ -44,7 +44,7 @@ export function miniSeasonCalendarSVG(seasons = [], { lang = 'en', uid = 'mcal' 
     const color = CROP_BAR[season.crop] || '#4f9a3d';
     months.forEach((m) => {
       const x = pad + m * colW;
-      svg += `<rect x="${x}" y="${pad}" width="${colW - 1}" height="${barH}" fill="${color}" rx="2"><title>${esc(season.crop)}: ${m + 1}</title></rect>`;
+      svg += `<rect x="${x}" y="${pad}" width="${colW - 1}" height="${barH}" fill="${color}" rx="2"><title>${esc(lang === 'bn' ? season.cropBn : cropLabel(season.crop, lang))}: ${m + 1}</title></rect>`;
     });
   });
   // Month initials line
@@ -87,7 +87,7 @@ export function plans() {
     const seasons = p.rotation?.seasons ?? [];
     const names = state.lang === 'bn' ? MONTH_BN : MONTH_EN;
     const chips = seasons.map(season =>
-      `<span class="plan-chip plan-chip--compact plan-crop-${esc(season.crop)}">${cropGlyph(season.crop)}<span><b>${esc(state.lang === 'bn' ? season.cropBn : season.crop)}</b><small>${esc(names[season.sowMonth - 1])}–${esc(names[season.harvestMonth - 1])}</small></span></span>`).join('');
+      `<span class="plan-chip plan-chip--compact plan-crop-${esc(season.crop)}">${cropGlyph(season.crop)}<span><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b><small>${esc(names[season.sowMonth - 1])}–${esc(names[season.harvestMonth - 1])}</small></span></span>`).join('');
 
     return `
       <article class="plan-card ${isHighlighted ? 'plan-card--highlighted' : ''}" data-plan-id="${esc(entry.id)}" data-plan-status="${esc(entry.status)}">
@@ -100,7 +100,7 @@ export function plans() {
               <span class="plan-card-date">${esc(dateStr)}</span>
             </div>
             <h3 class="plan-card-title">${esc(entry.name)}</h3>
-            <p class="plan-card-meta">${esc(p.field?.name || t('Field', 'জমি'))} · ${num(p.field?.areaHa ?? 0, 2)} ha</p>
+            ${p.field ? `<p class="plan-card-meta">${esc(p.field.name)} · ${num(p.field.areaHa, 2)} ha</p>` : ''}
           </div>
         </div>
         <div class="plan-card-chips" role="list">${chips}</div>

@@ -137,7 +137,8 @@ test('hand-offs confirm snapshots, celebrate, and show hints after the destinati
     // Need to confirm all seasons before finish
     journey.confirmPlanting();
     await bar.journeyAction('finish');
-    assert.equal(journey.stepStatus().planting, 'done');
+    assert.equal(journey.getPlan(), null);
+    assert.equal(journey.listPlans()[0].plan.steps.planting, 'done');
     assert.equal(destinations.at(-1), 'plans');
     assert.equal(celebrate.mock.calls.length, 3);
   } finally { globalThis.document = oldDocument; }

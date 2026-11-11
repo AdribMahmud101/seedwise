@@ -4,6 +4,7 @@ import { clampPlannerValue, recommendedSettings } from './planner-controls.js';
 const STORAGE_KEY = 'ropon_season_plan_v1';
 const SAVED_PLANS_KEY = 'ropon_saved_plans_v1';
 const MIGRATION_KEY = 'ropon_saved_plans_migrated_v1';
+const READY_PLAN_KEY = 'ropon_ready_plan_id';
 const VERSION = 1;
 const STEPS = ['field', 'rotation', 'planting', 'plan'];
 const listeners = new Set();
@@ -260,7 +261,18 @@ export function getPlan() {
     } catch { current = null; }
     loaded = true;
   }
+  // Older sessions left a Ready snapshot active after finishing.
+  if (current && getSavedPlan(current.id)?.status === 'ready') {
+    globalThis.sessionStorage?.setItem(READY_PLAN_KEY, current.id);
+    globalThis.localStorage?.removeItem(STORAGE_KEY);
+    current = null;
+  }
   return copy(current);
+}
+
+export function getReadyPlan() {
+  const entry = getSavedPlan(globalThis.sessionStorage?.getItem(READY_PLAN_KEY));
+  return entry?.status === 'ready' ? entry : null;
 }
 
 function notify() {
@@ -284,6 +296,8 @@ function save(plan) {
 }
 
 export function startPlan({ mode = 'own' } = {}) {
+  globalThis.sessionStorage?.removeItem(READY_PLAN_KEY);
+  globalThis.sessionStorage?.removeItem('ropon_ready_strip_dismissed');
   const now = new Date().toISOString();
   return save({ version: VERSION, id: globalThis.crypto.randomUUID(), mode, createdAt: now, updatedAt: now,
     field: null, rotation: null, planting: {}, plan: { generatedAt: null, version: VERSION },
@@ -322,6 +336,7 @@ export function resetPlan() {
 
 // Check if all non-fallow seasons in the rotation have been confirmed (confirmedAt set)
 export function defaultPlanName(plan) {
+  if (!plan?.field || !plan?.rotation) return `New plan · ${(plan?.createdAt ?? new Date().toISOString()).slice(0, 10)}`;
   const fieldName = plan?.field?.name || 'My field';
   const rotationShort = plan?.rotation?.name || 'Rotation';
   return `${fieldName} · ${rotationShort}`;
@@ -339,8 +354,10 @@ function readSavedListRaw() {
 function writeSavedListRaw(list) {
   try {
     globalThis.localStorage?.setItem(SAVED_PLANS_KEY, JSON.stringify(list));
+    return true;
   } catch (error) {
     console.warn('Could not persist saved plans list', error);
+    return false;
   }
 }
 
@@ -353,7 +370,7 @@ function validateSavedEntry(entry) {
   if (!entry.plan) return null;
   try {
     const plan = validatePlan(entry.plan);
-    if (plan.mode === 'demo') return null;
+    if (plan.mode === 'demo' || !plan.field) return null;
     return {
       id: entry.id,
       name: entry.name,
@@ -372,7 +389,7 @@ export function migrateActivePlanOnce() {
   try {
     if (globalThis.localStorage.getItem(MIGRATION_KEY)) return;
     const active = getPlan();
-    if (active && active.mode !== 'demo') {
+    if (active?.field && active.mode !== 'demo') {
       const list = listPlans();
       if (!list.some(item => item.id === active.id)) {
         const isReady = active.steps?.plan === 'done' && !!active.plan?.generatedAt;
@@ -419,7 +436,7 @@ export function getSavedPlan(id) {
 }
 
 export function savePlan(planToSave, { status = 'draft', name } = {}) {
-  if (!planToSave || planToSave.mode === 'demo') return null;
+  if (!planToSave?.field || planToSave.mode === 'demo') return null;
   const validated = validatePlan(planToSave);
   const now = new Date().toISOString();
   const list = listPlans();
@@ -440,14 +457,32 @@ export function savePlan(planToSave, { status = 'draft', name } = {}) {
   } else {
     list.unshift(validEntry);
   }
-  writeSavedListRaw(list);
+  if (!writeSavedListRaw(list)) throw new Error('Could not save plan');
+  if (validEntry.status === 'ready') {
+    globalThis.sessionStorage?.setItem(READY_PLAN_KEY, validEntry.id);
+    globalThis.sessionStorage?.removeItem('ropon_ready_strip_dismissed');
+    if (current?.id === validEntry.id) resetPlan();
+  }
   return validEntry;
 }
 
 export function openPlan(id) {
   const entry = getSavedPlan(id);
   if (!entry) return null;
+  if (entry.status === 'ready') {
+    globalThis.sessionStorage?.setItem(READY_PLAN_KEY, entry.id);
+    resetPlan();
+    return copy(entry.plan);
+  }
+  globalThis.sessionStorage?.removeItem(READY_PLAN_KEY);
   return save(copy(entry.plan));
+}
+
+export function editReadyPlan() {
+  const entry = getReadyPlan();
+  if (!entry) return null;
+  savePlan(entry.plan, { status: 'draft' });
+  return openPlan(entry.id);
 }
 
 export function renamePlan(id, newName) {

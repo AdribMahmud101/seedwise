@@ -3,7 +3,7 @@ import {
   nasaBadge, truth, header, panel, tag, button, toast, repaint, download,
 } from './ui.js';
 import { monthlyRotationWater, CROP_KC } from './engine.js';
-import { getPlan, importPlanJSON, markPlanGenerated, stepStatus } from './journey.js';
+import { getPlan, getReadyPlan, editReadyPlan, importPlanJSON, markPlanGenerated, stepStatus } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setPlannerSeason } from './planner.js';
@@ -12,7 +12,7 @@ import { recommendedSettings } from './planner-controls.js';
 const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_BN = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
 const CROP_NAMES = {
-  aman: ['Aman', 'আমন'], boro: ['Boro', 'বোরো'], rice: ['Rice', 'ধান'],
+  aman: ['Aman rice', 'আমন'], boro: ['Boro rice', 'বোরো'], rice: ['Rice', 'ধান'],
   mustard: ['Mustard', 'সরিষা'], potato: ['Potato', 'আলু'],
   mungbean: ['Mungbean', 'মুগ'], fallow: ['Fallow', 'পতিত'],
 };
@@ -25,7 +25,9 @@ const CROP_BAR = {
   mungbean: { sow: '#3d702f', grow: '#5fa044', harvest: '#8fbf5a' },
   fallow: { sow: '#b8ab93', grow: '#c9bda6', harvest: '#b8ab93' },
 };
-const cropLabel = (crop, lang) => (CROP_NAMES[crop] ?? [crop, crop])[lang === 'bn' ? 1 : 0];
+export const cropLabel = (crop, lang) => (CROP_NAMES[crop] ?? [crop, crop])[lang === 'bn' ? 1 : 0];
+
+const displayPlan = () => getPlan() ?? getReadyPlan()?.plan;
 
 // 0-based month indices covered by a season, following sow → harvest across New Year.
 export function planMonths(season) {
@@ -364,7 +366,7 @@ function planMonthly(plan) {
 
 function heroCard(plan) {
   const generated = plan.plan?.generatedAt;
-  const ready = plan.steps?.plan === 'done' && generated;
+  const ready = (plan.steps?.plan === 'done' && generated) || getReadyPlan()?.id === plan.id;
   const date = (generated ?? plan.updatedAt ?? '').slice(0, 10);
   const seasons = plan.rotation?.seasons ?? [];
   const names = state.lang === 'bn' ? MONTH_BN : MONTH_EN;
@@ -439,7 +441,7 @@ function numbersCard(plan) {
 function checklistCard(plan) {
   const done = plan.checklist ?? {};
   const items = deriveChecklist(plan).map(item =>
-    `<li><label><input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}><span>${esc(t(item.en, item.bn))}</span></label></li>`).join('');
+    `<li><label><input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}${getPlan() ? '' : ' disabled'}><span>${esc(t(item.en, item.bn))}</span></label></li>`).join('');
   return `<section class="panel"><div class="panel-header"><h2>${t('What to do, step by step', 'ধাপে ধাপে কী করবেন')}</h2></div>
     <div class="panel-body"><ul class="plan-check" id="plan-checklist">${items}</ul></div></section>`;
 }
@@ -487,17 +489,17 @@ function emptyPlan() {
 let active3dKey = null;
 
 export function plan() {
-  const current = getPlan();
+  const current = displayPlan();
   if (!current?.field || !current?.rotation) return emptyPlan();
   const planted = current.rotation.seasons.filter(season => season.crop !== 'fallow');
   if (!planted.some(season => season.key === active3dKey)) active3dKey = planted[0]?.key ?? null;
-  const backLink = `<div class="plan-back-bar"><a class="button ghost plan-back-link" href="#plans">← ${t('My plans', 'আমার পরিকল্পনা')}</a></div>`;
+  const backLink = `<div class="plan-back-bar"><a class="button ghost plan-back-link" href="#plans">← ${t('My plans', 'আমার পরিকল্পনা')}</a>${!getPlan() ? `<button type="button" class="button primary" data-action="plan-edit">${t('Edit this plan', 'এই পরিকল্পনা বদলান')}</button>` : ''}</div>`;
   return `<div class="plan-page">${backLink}` + header(
     t('Your plan  /  04', 'আপনার পরিকল্পনা  /  ০৪'),
     t('Your plan', 'আপনার পরিকল্পনা'),
     t('Your finished season plan — numbers, steps, and file.', 'আপনার চূড়ান্ত পরিকল্পনা — সংখ্যা, ধাপ ও ফাইল।'),
   ) + heroCard(current) + calendarCard(current) + field3dCard(current, active3dKey) +
-    numbersCard(current) + checklistCard(current) + summaryCard() + editCard(current) + exportCard() + `</div>`;
+    numbersCard(current) + checklistCard(current) + summaryCard() + (getPlan() ? editCard(current) : '') + exportCard() + `</div>`;
 }
 
 export async function fetchPlanSummary(plan, lang) {
@@ -567,7 +569,7 @@ function schedulePlan3d() {
   clearTimeout(planTimer);
   const version = ++planVersion;
   const host = planHost;
-  const current = getPlan();
+  const current = displayPlan();
   if (!host || !current?.field) return;
   if (!planner3dModule && !hasWebGL()) {
     const wrap = host.closest('.planner3d-stage-wrap');
@@ -583,7 +585,7 @@ function schedulePlan3d() {
       const [mod, soilProfile] = await Promise.all([planner3dPromise, soilProfilePromise]);
       planner3dModule = mod;
       if (version !== planVersion || !host.isConnected || host !== planHost) return;
-      const fresh = getPlan();
+      const fresh = displayPlan();
       const settings = fresh.planting[active3dKey];
       if (!settings) return;
       const { field: planField, polygon: outline } = planFieldInput(fresh);
@@ -627,11 +629,11 @@ function maybeCelebrate(current) {
 }
 
 export function mountPlan() {
-  const current = getPlan();
+  const current = displayPlan();
   if (!current?.field || !current?.rotation) return;
   try {
     const statuses = stepStatus();
-    if (statuses.plan !== 'done' && statuses.field === 'done' && statuses.rotation === 'done' && statuses.planting === 'done') {
+    if (getPlan() && statuses.plan !== 'done' && statuses.field === 'done' && statuses.rotation === 'done' && statuses.planting === 'done') {
       markPlanGenerated({});
     }
   } catch (error) {
@@ -646,18 +648,20 @@ export function mountPlan() {
   const body = document.querySelector('#plan-summary-body');
   if (body) {
     const request = ++summaryRequest;
-    const fresh = getPlan();
+    const fresh = displayPlan();
     fetchPlanSummary(fresh, state.lang).then(
       summary => { if (request === summaryRequest && body.isConnected) body.innerHTML = `<p>${esc(summary)}</p>`; },
       () => { if (request === summaryRequest && body.isConnected) body.innerHTML = `<p>${esc(fallbackSummary(fresh, state.lang))}</p><p class="note">${esc(t('Offline note — AI unavailable', 'অফলাইন নোট — এআই নেই'))}</p>`; },
     );
   }
-  maybeCelebrate(current);
+  if (getPlan()) maybeCelebrate(current);
 }
 
 export function planAction(action, value) {
-  if (action === 'plan-season3d') {
-    const current = getPlan();
+  if (action === 'plan-edit') {
+    if (editReadyPlan()) location.hash = 'planner';
+  } else if (action === 'plan-season3d') {
+    const current = displayPlan();
     if (!current?.planting[value]) return;
     active3dKey = value;
     document.querySelectorAll('[data-action="plan-season3d"]').forEach(chip => {
@@ -669,10 +673,11 @@ export function planAction(action, value) {
     if (layout) layout.innerHTML = planTopViewSVG(current, value, { lang: state.lang, uid: 'hero' });
     schedulePlan3d();
   } else if (action === 'plan-edit-season') {
+    if (!getPlan()) return;
     setPlannerSeason(value);
     location.hash = 'planner';
   } else if (action === 'plan-download') {
-    const current = getPlan();
+    const current = displayPlan();
     if (!current) return;
     const html = buildExportHTML(current, {
       monthly: planMonthly(current), lang: state.lang,

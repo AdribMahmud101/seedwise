@@ -178,7 +178,7 @@ test('checklist derives one sow item per season plus conditional steps, each sho
   }
   const legume = planPage.deriveChecklist(ready('legume')).map(i => i.en);
   assert.deepEqual(legume, [
-    'Jul: transplant Aman at 20×20 cm',
+    'Jul: transplant Aman rice at 20×20 cm',
     'Nov: plant Potato at 60×25 cm',
     'Before potato: soil test for P and K',
     'Mar: sow Mungbean at 30×10 cm',
