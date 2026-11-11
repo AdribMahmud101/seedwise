@@ -214,19 +214,30 @@ export function getCustomPlan() {
     return p && Array.isArray(p.planting) && p.planting.length && p.fieldId === state.fieldId ? p : null;
   } catch { return null; }
 }
-let customSeasonIdx = 0;
+let customSeasonIdx = -1; // -1 = whole year (all crops side by side)
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// Pure: 'Nov–Feb' style season label for a crop from the 12-month calendar.
+export function cropMonths(calendar, crop) {
+  const key = String(crop).toLowerCase().split(' ').pop();
+  const on = (calendar || []).map((m) => Boolean(m.crop && String(m.crop).toLowerCase().includes(key)));
+  if (!on.some(Boolean)) return '';
+  let start = on.findIndex((v, i) => v && !on[(i + 11) % 12]); if (start < 0) start = on.indexOf(true);
+  let end = start; while (on[(end + 1) % 12] && (end + 1) % 12 !== start) end = (end + 1) % 12;
+  return start === end ? MON[start] : `${MON[start]}–${MON[end]}`;
+}
 export function customSeasonToggle() {
   const p = getCustomPlan();
   if (!p || p.mode !== 'rotation' || p.planting.length < 2) return '';
-  const idx = Math.min(customSeasonIdx, p.planting.length - 1);
-  return `<div class="cs-season-toggle" role="group" aria-label="${t('Season shown in 3D', '৩ডি-তে কোন মৌসুম')}"><span>${t('Season', 'মৌসুম')}:</span>${p.planting.map((c, i) => `<button type="button" data-action="custom-season" data-value="${i}" aria-pressed="${i === idx}" class="${i === idx ? 'on' : ''}"><i style="background:${esc(c.color)}"></i>${esc(c.crop)}</button>`).join('')}</div>`;
+  const idx = customSeasonIdx < 0 ? -1 : Math.min(customSeasonIdx, p.planting.length - 1);
+  return `<div class="cs-season-toggle" role="group" aria-label="${t('Season shown in 3D', '৩ডি-তে কোন মৌসুম')}"><span>${t('Show', 'দেখান')}:</span><button type="button" data-action="custom-season" data-value="-1" aria-pressed="${idx < 0}" class="${idx < 0 ? 'on' : ''}">${t('Whole year', 'সারা বছর')}</button>${p.planting.map((c, i) => `<button type="button" data-action="custom-season" data-value="${i}" aria-pressed="${i === idx}" class="${i === idx ? 'on' : ''}"><i style="background:${esc(c.color)}"></i>${esc(c.crop)}${cropMonths(p.calendar, c.crop) ? ` · ${esc(cropMonths(p.calendar, c.crop))}` : ''}</button>`).join('')}${idx < 0 ? `<small class="cs-wy-note">${t('Whole year: each part of the field shows one season’s crop — in reality each crop uses the whole field in its season.', 'সারা বছর: জমির প্রতিটি অংশে এক মৌসুমের ফসল — বাস্তবে প্রতিটি ফসল নিজ মৌসুমে পুরো জমি নেয়।')}</small>` : ''}</div>`;
 }
-export function setCustomSeason(i) { customSeasonIdx = Math.max(0, Number(i) || 0); }
+export function setCustomSeason(i) { const n = Number(i); customSeasonIdx = Number.isFinite(n) ? Math.max(-1, n) : -1; }
 // What the planner 3D draws: a rotation shows one season's crop on the whole field; mixed/hybrid/orchard split the land.
 export function customPlanFor3d() {
   const p = getCustomPlan();
   if (!p) return null;
   if (p.mode !== 'rotation') return p;
+  if (customSeasonIdx < 0) { const share = Math.round(1000 / p.planting.length) / 10; return { ...p, planting: p.planting.map((c) => ({ ...c, sharePct: share, label: `${c.crop} · ${cropMonths(p.calendar, c.crop) || t('its season', 'নিজ মৌসুম')}` })) }; }
   const c = p.planting[Math.min(customSeasonIdx, p.planting.length - 1)];
   return { ...p, planting: [{ ...c, sharePct: 100 }] };
 }

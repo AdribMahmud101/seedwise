@@ -2618,7 +2618,7 @@ function buildCustomPlants(data) {
         quads.forEach(([x, y], q) => { dummy.position.set(x, heightAt(x, -y) + 0.03, -y); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); tintMesh.setMatrixAt(q, dummy.matrix); });
         tintMesh.renderOrder = 2; group.add(tintMesh);
       }
-      const label = customLabelSprite(`${item.crop} · ${item.sharePct}%`, item.color);
+      const label = customLabelSprite(item.label || `${item.crop} · ${item.sharePct}%`, item.color);
       const span = Math.max(bounds.width, bounds.height);
       label.scale.set(span * 0.22, span * 0.055, 1);
       label.position.set(cx, heightAt(cx, -cy) + Math.max(item.heightM, 1) + span * 0.06, -cy);

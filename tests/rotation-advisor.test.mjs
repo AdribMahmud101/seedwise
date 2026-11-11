@@ -52,3 +52,11 @@ test('hybrid colours: two similar greens become clearly different', async () => 
   assert.equal(a, '#2e7d32');
   assert.notEqual(b, '#43a047');
 });
+
+test('season label from calendar wraps the year end', async () => {
+  globalThis.document ??= { addEventListener() {}, dispatchEvent() {} };
+  const { cropMonths } = await import('../src/legacy/advisor.js');
+  const cal = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, crop: [10, 11, 0, 1].includes(i) ? 'Potato' : [2, 3].includes(i) ? 'Mungbean' : null }));
+  assert.equal(cropMonths(cal, 'Potato'), 'Nov–Feb');
+  assert.equal(cropMonths(cal, 'Mungbean'), 'Mar–Apr');
+});
