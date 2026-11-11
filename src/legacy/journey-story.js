@@ -1,7 +1,7 @@
 import { t, esc } from './ui.js';
 import { getPlan, nextStep, stepStatus, allSeasonsReviewed, subscribe, startPlan, confirmField, fieldSnapshot, confirmRotation, rotationSnapshot, confirmPlanting, markPlanGenerated, importPlanJSON, resetPlan } from './journey.js';
 import { guide } from './planty-guide.js';
-import { FIELD_HOWTO_STEPS, clipMarkup, resolveOpenId } from './howto-field.js';
+import { HOWTO_STEPS, clipMarkup, resolveOpenId } from './howto-field.js';
 import { plantyMascot } from './planty.js';
 import { canFinishPlanting, finishNote, showExitPrompt } from './journey-bar.js';
 
@@ -22,7 +22,7 @@ let navigationCallback = null;
 // (field-constraints ticks only when the assumptions dialog is SAVED, never on open)
 const pageActivity = {
   field: { mapChecked: false, areaChecked: false, constraintsSaved: false },
-  rotation: { prioritiesChanged: false, compared: new Set() },
+  rotation: { prioritiesChanged: false, compared: new Set(), constraintsSaved: false },
   plan: { calendarViewed: false, taskChecked: false, downloaded: false },
 };
 
@@ -85,11 +85,20 @@ export function initStoryListeners() {
     // NOTE: opening the assumptions dialog ticks nothing; field-constraints
     // completes ONLY when #profile-form is saved (submit listener below).
     // Check rotation card compare or preview
+    if (target.closest('[data-journey="rotation"]')) {
+      pageActivity.rotation.chosen = true;
+      renderCoach();
+    }
     const rotCard = target.closest('.rotation-card, [data-action="preview-3d"], .disclosure summary');
     if (rotCard) {
       const rotId = rotCard.querySelector('[data-action="preview-3d"]')?.dataset?.value ||
                     rotCard.querySelector('[data-journey="rotation"]')?.dataset?.value;
       if (rotId) pageActivity.rotation.compared.add(rotId);
+      else if (rotCard.classList.contains('rotation-card')) {
+        const cards = [...document.querySelectorAll('#rotation-list .rotation-card')];
+        const index = cards.indexOf(rotCard);
+        if (index < 2) pageActivity.rotation.compared.add(String(index));
+      }
       renderCoach();
     }
     // Check plan calendar viewed
@@ -148,11 +157,14 @@ export function initStoryListeners() {
   // Dialog saves: assumptions saved ticks constraints; area saved ticks area.
   window.addEventListener('submit', (event) => {
     const id = event.target?.id;
-    if (id === 'profile-form' && !pageActivity.field.constraintsSaved) {
+    if (id === 'profile-form' && activePage === 'field' && !pageActivity.field.constraintsSaved) {
       pageActivity.field.constraintsSaved = true;
       renderCoach();
     } else if (id === 'net-area-form' && !pageActivity.field.areaChecked) {
       pageActivity.field.areaChecked = true;
+      renderCoach();
+    } else if (id === 'profile-form' && activePage === 'rotations' && !pageActivity.rotation.constraintsSaved) {
+      pageActivity.rotation.constraintsSaved = true;
       renderCoach();
     }
   }, { capture: true, passive: true });
@@ -201,7 +213,7 @@ export function getPageChecklist(page = activePage) {
     // Rotation: ○ Set what matters (priorities) · ○ Compare the top 2 · ○ Choose a rotation
     const prioritiesSet = pageActivity.rotation.prioritiesChanged || (plan?.rotation?.priorities && Object.values(plan.rotation.priorities).some(v => v > 0));
     const comparedTop2 = pageActivity.rotation.compared.size >= 2 || !!(plan?.rotation);
-    const rotationChosen = plan?.steps.rotation === 'done';
+    const rotationChosen = pageActivity.rotation.chosen || plan?.steps.rotation === 'done';
 
     items.push({
       id: 'rotation-priorities',
@@ -220,6 +232,13 @@ export function getPageChecklist(page = activePage) {
       text: t('Choose a rotation', 'ফসলচক্র বেছে নিন'),
       done: rotationChosen,
       target: '.rotation-card.best [data-journey="rotation"], [data-journey="rotation"]',
+    });
+    items.push({
+      id: 'rotation-constraints',
+      text: t('Check water & budget (optional)', 'পানি ও বাজেট দেখুন (ঐচ্ছিক)'),
+      done: pageActivity.rotation.constraintsSaved,
+      optional: true,
+      target: '[data-action="profile"]',
     });
   } else if (page === 'planner') {
     // Planting: ○ Aman ✓ / Potato ○ / Mungbean ○ (optional) · ○ Finish my plan
@@ -330,7 +349,7 @@ export function renderCoach(container) {
   }
 
   host.className = 'coach-host coach-host--docked';
-  const isHowtoPage = activePage === 'field';
+  const isHowtoPage = !!HOWTO_STEPS[activePage];
   host.innerHTML = `
     <aside class="coach-card" role="region" aria-label="${t('Planty Coach', 'Planty নির্দেশিকা')}" aria-live="polite">
       <div class="coach-header">
@@ -374,12 +393,12 @@ function fieldHowtoItems(checklist, plan) {
   const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const areaText = plan?.field?.areaHa ? `${numLocal(plan.field.areaHa, 2)} ha` : '0.09 ha';
-  return FIELD_HOWTO_STEPS.map(step => {
+  return (HOWTO_STEPS[activePage] || []).map(step => {
     const isDone = !!done[step.id];
     const isOpen = openId === step.id;
     const title = step.id === 'field-area'
       ? `${t(step.title.en, step.title.bn)} (${areaText})`
-      : t(step.title.en, step.title.bn);
+      : `${t(step.title.en, step.title.bn)}${step.optional ? ` (${t('optional', 'ঐচ্ছিক')})` : ''}`;
     return `
       <li class="coach-check-item ${isDone ? 'is-done' : ''} ${isOpen ? 'is-open' : ''}" data-item-id="${step.id}">
         <button type="button" class="coach-item-head" data-coach="toggle" data-id="${step.id}" aria-expanded="${isOpen}">
@@ -445,7 +464,7 @@ function attachCoachEvents(host) {
 // pages keep the single spotlight on the first unchecked item.
 export function runShowMe(customReason = null) {
   const checklist = getPageChecklist(activePage);
-  const firstMissing = checklist.find(item => !item.done);
+  const firstMissing = checklist.find(item => !item.done && !item.optional);
   if (!firstMissing) {
     if (typeof document !== 'undefined') {
       guide.hint(checklist[checklist.length - 1].target, t('Step is complete! Use Continue →', 'ধাপ সম্পন্ন! এগিয়ে যান → চাপুন'));
@@ -453,7 +472,7 @@ export function runShowMe(customReason = null) {
     return;
   }
 
-  if (activePage === 'field') {
+  if (HOWTO_STEPS[activePage]) {
     // The micro-sequence guides the missing action itself, so a Continue
     // reason needs no separate bubble.
     const done = Object.fromEntries(checklist.map(item => [item.id, !!item.done]));
@@ -477,7 +496,8 @@ export function runShowMe(customReason = null) {
 
 // HOWTO Show me: run one sub-step's micro-actions in order with guide.sequence.
 export function runHowtoShowMe(id) {
-  const step = FIELD_HOWTO_STEPS.find(item => item.id === id) ?? FIELD_HOWTO_STEPS[0];
+  const pageSteps = HOWTO_STEPS[activePage] || HOWTO_STEPS.field;
+  const step = pageSteps.find(item => item.id === id) ?? pageSteps[0];
   coachCollapsed = false;
   renderCoach();
   if (typeof document === 'undefined') return;
@@ -548,7 +568,7 @@ export function updateHandOffs(page = activePage) {
 
   const checklist = getPageChecklist(page);
   // Checklist is "otherwise complete" if all items except the final action are done
-  const nonFinalDone = checklist.slice(0, -1).every(item => item.done);
+  const nonFinalDone = checklist.filter(item => !item.optional).slice(0, -1).every(item => item.done);
 
   if (page === 'field') {
     // Hand-off inside/under plot dossier card
@@ -604,7 +624,7 @@ export function handleContinue() {
   if (!plan) return;
 
   const checklist = getPageChecklist(activePage);
-  const firstMissing = checklist.find(item => !item.done);
+  const firstMissing = checklist.find(item => !item.done && !item.optional);
 
   if (firstMissing) {
     // Incomplete: open coach and run Show me with specific reason

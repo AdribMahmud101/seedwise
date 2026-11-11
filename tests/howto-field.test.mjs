@@ -5,7 +5,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   FIELD_HOWTO_STEPS,
+  HOWTO_STEPS,
   HOWTO_IDS,
+  ROTATION_HOWTO_STEPS,
   applyFieldDoneEvent,
   clipMarkup,
   countWords,
@@ -51,6 +53,40 @@ test('sub-step model shape: bilingual, word limits, micro-sequence per control',
   assert.equal(byId['field-use'].micro.length, 1);
 });
 
+test('rotation sub-steps cover priorities, top two, selection, and optional constraints', () => {
+  assert.deepEqual(HOWTO_STEPS.field, FIELD_HOWTO_STEPS);
+  assert.deepEqual(HOWTO_STEPS.rotations, ROTATION_HOWTO_STEPS);
+  assert.deepEqual(ROTATION_HOWTO_STEPS.map(step => step.id), [
+    'rotation-priorities', 'rotation-compare', 'rotation-choose', 'rotation-constraints',
+  ]);
+  for (const step of ROTATION_HOWTO_STEPS) {
+    for (const lang of ['en', 'bn']) {
+      assert.ok(step.title[lang]?.trim());
+      assert.ok(step.why[lang]?.trim());
+      assert.ok(step.how[lang]?.trim());
+      assert.ok(countWords(step.why[lang]) <= 10, `${step.id} why.${lang} ≤10 words`);
+      assert.ok(countWords(step.how[lang]) <= 14, `${step.id} how.${lang} ≤14 words`);
+    }
+    assert.equal(step.clip, `/assets/howto/${step.id}.webp`);
+    assert.equal(step.poster, `/assets/howto/${step.id}.jpg`);
+    assert.ok(step.micro.length);
+    for (const micro of step.micro) {
+      assert.ok(micro.target && micro.text.en && micro.text.bn);
+      assert.ok(['click', 'change', 'none'].includes(micro.action));
+    }
+  }
+  assert.deepEqual(ROTATION_HOWTO_STEPS[0].micro.map(step => step.target), [
+    '#weight-water', '#weight-soil', '#weight-income', '#weight-stability',
+  ]);
+  assert.ok(ROTATION_HOWTO_STEPS[0].micro.every(step => step.action === 'none'));
+  assert.equal(ROTATION_HOWTO_STEPS[1].micro.length, 10);
+  assert.equal(ROTATION_HOWTO_STEPS[2].micro[0].action, 'click');
+  assert.equal(ROTATION_HOWTO_STEPS[3].optional, true);
+  assert.ok(ROTATION_HOWTO_STEPS[3].micro.slice(1).every(step => step.inDialog));
+  assert.ok(ROTATION_HOWTO_STEPS[3].micro.some(step => step.target === '#in-irrigation' && step.action === 'change'));
+  assert.ok(ROTATION_HOWTO_STEPS[3].micro.some(step => step.target === '#in-budget' && step.action === 'change'));
+});
+
 test('done-events: constraints ticks only on save, never on open', () => {
   const fresh = () => ({});
   assert.deepEqual(applyFieldDoneEvent(fresh(), 'map-interact'), { 'field-map': true });
@@ -89,7 +125,7 @@ test('reduced-motion path renders poster still only, never the animated clip', (
 });
 
 test('generated clips + posters exist within size limits', () => {
-  for (const step of FIELD_HOWTO_STEPS) {
+  for (const step of [...FIELD_HOWTO_STEPS, ...ROTATION_HOWTO_STEPS]) {
     for (const [file, limit] of [[step.clip, 250 * 1024], [step.poster, 30 * 1024]]) {
       const path = join(ROOT, 'public', file);
       assert.ok(existsSync(path), `${file} generated`);
