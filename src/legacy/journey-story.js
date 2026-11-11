@@ -250,7 +250,7 @@ function capitalize(s) {
 const STEP_INFO = {
   field: { num: 1, nameEn: 'Field', nameBn: 'জমি', instructionEn: 'Inspect boundary and set water access to begin.', instructionBn: 'সীমানা ও সেচ সুবিধা নির্ধারণ করে শুরু করুন।' },
   rotations: { num: 2, nameEn: 'Rotation', nameBn: 'ফসলচক্র', instructionEn: 'Set priorities and choose the best fit rotation.', instructionBn: 'অগ্রাধিকার নির্ধারণ করে সেরা ফসলচক্র বেছে নিন।' },
-  planner: { num: 3, nameEn: 'Planting', nameBn: 'বপন', instructionEn: 'Check plant counts for each season and mark Looks good.', instructionBn: 'প্রতি মৌসুমের গাছের সংখ্যা দেখে ঠিক আছে চিহ্নিত করুন।' },
+  planner: { num: 3, nameEn: 'Planting', nameBn: 'বপন', instructionEn: 'Each season starts on recommended settings. Check any you like, then Finish.', instructionBn: 'প্রতি মৌসুমে প্রস্তাবিত মাপ আছে। চাইলে দেখে নিন, তারপর শেষ করুন।' },
   plan: { num: 4, nameEn: 'Your plan', nameBn: 'আপনার পরিকল্পনা', instructionEn: 'Review the full season calendar and save your plan.', instructionBn: 'পুরো মৌসুমের ক্যালেন্ডার দেখে পরিকল্পনা সংরক্ষণ করুন।' },
 };
 
