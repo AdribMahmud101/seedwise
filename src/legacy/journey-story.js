@@ -1,7 +1,8 @@
 import { t, esc } from './ui.js';
 import { getPlan, nextStep, stepStatus, allSeasonsReviewed, subscribe, startPlan, confirmField, fieldSnapshot, confirmRotation, rotationSnapshot, confirmPlanting, markPlanGenerated, importPlanJSON, resetPlan } from './journey.js';
 import { guide } from './planty-guide.js';
-import { HOWTO_STEPS, clipMarkup, resolveOpenId } from './howto-field.js';
+import { HOWTO_STEPS } from './howto-registry.js';
+import { clipMarkup, resolveOpenId } from './howto-field.js';
 import { plantyMascot } from './planty.js';
 import { canFinishPlanting, finishNote, showExitPrompt } from './journey-bar.js';
 
@@ -23,7 +24,8 @@ let navigationCallback = null;
 const pageActivity = {
   field: { mapChecked: false, areaChecked: false, constraintsSaved: false },
   rotation: { prioritiesChanged: false, compared: new Set(), constraintsSaved: false },
-  plan: { calendarViewed: false, taskChecked: false, downloaded: false },
+  planner: { seasonOpened: false, spacingChanged: false, seasonSaved: false },
+  plan: { opened: false, calendarViewed: false, taskChecked: false, downloaded: false },
 };
 
 export function getStoryState() {
@@ -101,16 +103,15 @@ export function initStoryListeners() {
       }
       renderCoach();
     }
-    // Check plan calendar viewed
-    if (target.closest('[data-plan-section="calendar"], .plan-calendar-wrap')) {
-      pageActivity.plan.calendarViewed = true;
-      renderCoach();
-    }
     // Check plan export/download clicked
-    if (target.closest('[data-action="export-html"], [data-plan-section="export"], [data-action="print"]')) {
+    if (event.isTrusted && target.closest('#plan-download, [data-action="export-html"], [data-plan-section="export"], [data-action="print"]')) {
       pageActivity.plan.downloaded = true;
       renderCoach();
     }
+    if (event.isTrusted && target.closest('#plan-seasons [role="tab"]')) pageActivity.planner.seasonOpened = true;
+    if (event.isTrusted && target.closest('[data-action="plan-confirm"]')) pageActivity.planner.seasonSaved = true;
+    if (event.isTrusted && target.closest('[data-journey="finish"]')) pageActivity.planner.seasonSaved = true;
+    if (event.isTrusted && target.closest('.plan-card:first-child [data-plans-action="open"]')) pageActivity.plan.opened = true;
   }, { capture: true, passive: true });
 
   // Priority range inputs on #rotations
@@ -123,7 +124,11 @@ export function initStoryListeners() {
 
   // Checklist checkbox changes on #plan
   window.addEventListener('change', (event) => {
-    if (event.target && (event.target.matches('[data-plan-section="checklist"] input[type="checkbox"], .plan-checklist input[type="checkbox"]'))) {
+    if (event.isTrusted && event.target?.matches('#plan-usable, #plan-usable-range, #plan-row, #plan-row-range, #plan-spacing, #plan-spacing-range, .plan-crops input')) {
+      pageActivity.planner.spacingChanged = true;
+      renderCoach();
+    }
+    if (event.isTrusted && event.target && (event.target.matches('#plan-checklist input[type="checkbox"], [data-plan-section="checklist"] input[type="checkbox"], .plan-checklist input[type="checkbox"]'))) {
       if (event.target.checked) {
         pageActivity.plan.taskChecked = true;
         renderCoach();
@@ -241,43 +246,28 @@ export function getPageChecklist(page = activePage) {
       target: '[data-action="profile"]',
     });
   } else if (page === 'planner') {
-    // Planting: ○ Aman ✓ / Potato ○ / Mungbean ○ (optional) · ○ Finish my plan
-    const nonFallow = plan?.rotation?.seasons?.filter(s => s.crop !== 'fallow') ?? [];
-    if (nonFallow.length > 0) {
-      const summaryText = nonFallow.map(s => {
-        const crop = seasonCropName(s);
-        const cropBn = s.cropBn || s.crop;
-        const confirmed = plan?.planting?.[s.key]?.confirmedAt != null;
-        return `${t(crop, cropBn)} ${confirmed ? '✓' : '○'}`;
-      }).join(' / ');
-
-      items.push({
-        id: 'planting-seasons',
-        text: `${summaryText} (${t('optional', 'ঐচ্ছিক')})`,
-        done: allSeasonsReviewed(plan), // optional: never blocks Finish
-        target: '#plan-seasons, [data-action="plan-confirm"]',
-      });
-    } else {
-      items.push({
-        id: 'planting-seasons',
-        text: t('Check each season (optional)', 'প্রতিটি মৌসুম দেখে নিন (ঐচ্ছিক)'),
-        done: allSeasonsReviewed(plan),
-        target: '#plan-seasons, [data-action="plan-confirm"]',
-      });
-    }
     items.push({
-      id: 'planting-finish',
-      text: t('Finish my plan', 'আমার পরিকল্পনা শেষ করুন'),
-      done: plan?.steps.planting === 'done',
-      target: '[data-journey="finish"]',
+      id: 'planting-open-season', text: t('Open a season', 'একটি মৌসুম খুলুন'),
+      done: pageActivity.planner.seasonOpened, target: '#plan-seasons [role="tab"]',
+    }, {
+      id: 'planting-adjust-spacing', text: t('Adjust spacing', 'দূরত্ব ঠিক করুন'),
+      done: pageActivity.planner.spacingChanged, target: '.plan-settings',
+    }, {
+      id: 'planting-save-next', text: t('Save & next', 'সংরক্ষণ করে এগোন'),
+      done: pageActivity.planner.seasonSaved || allSeasonsReviewed(plan), target: '[data-action="plan-confirm"]',
+    }, {
+      id: 'planting-finish', text: t('Finish', 'শেষ করুন'),
+      done: plan?.steps.planting === 'done', target: '[data-journey="finish"]',
     });
-  } else if (page === 'plan') {
-    // Your plan: ○ Read the calendar · ○ Tick your first task · ○ Download your plan
-    const calendarDone = pageActivity.plan.calendarViewed || true; // viewing the page shows calendar
+  } else if (page === 'plans' || page === 'plan') {
+    const calendarDone = pageActivity.plan.calendarViewed;
     const taskDone = pageActivity.plan.taskChecked;
     const downloadDone = pageActivity.plan.downloaded;
 
     items.push({
+      id: 'plan-open', text: t('Open your plan', 'আপনার পরিকল্পনা খুলুন'),
+      done: pageActivity.plan.opened, target: '.plan-card:first-child [data-plans-action="open"]',
+    }, {
       id: 'plan-calendar',
       text: t('Read the calendar', 'ক্যালেন্ডারটি দেখুন'),
       done: calendarDone,
@@ -313,6 +303,7 @@ const STEP_INFO = {
   field: { num: 1, nameEn: 'Field', nameBn: 'জমি', instructionEn: 'Inspect boundary and set water access to begin.', instructionBn: 'সীমানা ও সেচ সুবিধা নির্ধারণ করে শুরু করুন।' },
   rotations: { num: 2, nameEn: 'Rotation', nameBn: 'ফসলচক্র', instructionEn: 'Set priorities and choose the best fit rotation.', instructionBn: 'অগ্রাধিকার নির্ধারণ করে সেরা ফসলচক্র বেছে নিন।' },
   planner: { num: 3, nameEn: 'Planting', nameBn: 'বপন', instructionEn: 'Each season starts on recommended settings. Check any you like, then Finish.', instructionBn: 'প্রতি মৌসুমে প্রস্তাবিত মাপ আছে। চাইলে দেখে নিন, তারপর শেষ করুন।' },
+  plans: { num: 4, nameEn: 'My plans', nameBn: 'আমার পরিকল্পনা', instructionEn: 'Open your plan, review its calendar, and save a copy.', instructionBn: 'পরিকল্পনা খুলে ক্যালেন্ডার দেখুন এবং একটি কপি রাখুন।' },
   plan: { num: 4, nameEn: 'Your plan', nameBn: 'আপনার পরিকল্পনা', instructionEn: 'Review the full season calendar and save your plan.', instructionBn: 'পুরো মৌসুমের ক্যালেন্ডার দেখে পরিকল্পনা সংরক্ষণ করুন।' },
 };
 
@@ -501,13 +492,20 @@ export function runHowtoShowMe(id) {
   coachCollapsed = false;
   renderCoach();
   if (typeof document === 'undefined') return;
-  const steps = step.micro.map(micro => ({
+  const onDone = id === 'plan-calendar' && (activePage === 'plan' || activePage === 'plans')
+    ? () => {
+      pageActivity.plan.calendarViewed = true;
+      renderCoach();
+    }
+    : undefined;
+  const steps = step.micro.map((micro, index) => ({
     target: micro.target,
     text: { en: micro.text.en, bn: micro.text.bn },
     action: micro.action,
     pose: 'pointing',
     timeout: 8000,
     inDialog: !!micro.inDialog,
+    onDone: index === step.micro.length - 1 ? onDone : undefined,
   }));
   guide.sequence(steps);
   watchGuideDialog(steps);

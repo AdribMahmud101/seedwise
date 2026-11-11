@@ -13,6 +13,7 @@ import {
   countWords,
   resolveOpenId,
 } from '../src/legacy/howto-field.js';
+import { HOWTO_STEPS as REGISTRY_STEPS } from '../src/legacy/howto-registry.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -87,6 +88,23 @@ test('rotation sub-steps cover priorities, top two, selection, and optional cons
   assert.ok(ROTATION_HOWTO_STEPS[3].micro.some(step => step.target === '#in-budget' && step.action === 'change'));
 });
 
+test('planting and My plans guidance uses bilingual, bounded copy and real selectors', () => {
+  for (const page of ['planner', 'plans', 'plan']) {
+    assert.ok(REGISTRY_STEPS[page]?.length, `${page} has guidance`);
+    for (const step of REGISTRY_STEPS[page]) {
+      assert.ok(countWords(step.why.en) <= 10 && countWords(step.why.bn) <= 10, `${step.id} why is short`);
+      assert.ok(countWords(step.how.en) <= 14 && countWords(step.how.bn) <= 14, `${step.id} how is short`);
+      assert.ok(step.micro.length && step.micro.every(m => m.target && m.text.en && m.text.bn));
+      assert.ok(step.clip.endsWith(`${step.id}.webp`) && step.poster.endsWith(`${step.id}.jpg`));
+    }
+  }
+  assert.deepEqual(REGISTRY_STEPS.planner.map(step => step.id), [
+    'planting-open-season', 'planting-adjust-spacing', 'planting-save-next', 'planting-finish',
+  ]);
+  assert.deepEqual(REGISTRY_STEPS.plans.map(step => step.id), ['plan-open', 'plan-calendar', 'plan-task', 'plan-download']);
+  assert.ok(REGISTRY_STEPS.planner[1].micro.filter(m => /plan-(usable|row|spacing)-range/.test(m.target)).every(m => m.action === 'none'));
+});
+
 test('done-events: constraints ticks only on save, never on open', () => {
   const fresh = () => ({});
   assert.deepEqual(applyFieldDoneEvent(fresh(), 'map-interact'), { 'field-map': true });
@@ -125,7 +143,7 @@ test('reduced-motion path renders poster still only, never the animated clip', (
 });
 
 test('generated clips + posters exist within size limits', () => {
-  for (const step of [...FIELD_HOWTO_STEPS, ...ROTATION_HOWTO_STEPS]) {
+  for (const step of [...FIELD_HOWTO_STEPS, ...ROTATION_HOWTO_STEPS, ...REGISTRY_STEPS.planner, ...REGISTRY_STEPS.plans]) {
     for (const [file, limit] of [[step.clip, 250 * 1024], [step.poster, 30 * 1024]]) {
       const path = join(ROOT, 'public', file);
       assert.ok(existsSync(path), `${file} generated`);
