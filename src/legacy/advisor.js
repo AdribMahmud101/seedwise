@@ -1,6 +1,6 @@
 // "Plan your own crops" — AI decision helper card for the Rotation studio.
 // Calls /api/rotation-advisor (worker); the verdict is shown exactly as returned (no invented numbers).
-import { t, esc, field, area, state, outlook as outlookPack, floodFields } from './ui.js';
+import { t, esc, field, area, state, outlook as outlookPack, floodFields, nasaBadge } from './ui.js';
 import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { plantyMascot } from './planty.js';
 
@@ -44,7 +44,7 @@ const VERDICT = {
   not_suitable: ['✕', 'Not suitable here', 'এখানে উপযুক্ত নয়', 'no'],
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ui = { mode: 'rotation', crops: [], notes: '', status: 'idle', result: null, error: '', sequence: false, planMode: null };
+const ui = { mode: 'rotation', crops: [], notes: '', status: 'idle', result: null, error: '', sequence: false, planMode: null, checkSteps: [], stepIndex: 0, stepError: false, stream: null };
 let presets = null; // pre-computed ready-made plans (public/data/advisor-presets.json)
 function loadPresets() {
   if (presets !== null || typeof fetch !== 'function') return;
@@ -79,33 +79,38 @@ function cropColor(name) {
   return '#b9c7a3';
 }
 
-function calendarStrip(calendar) {
-  return `<div class="adv-cal" role="list">${calendar.map((m) => {
+function calendarStrip(calendar, stream) {
+  return `<div class="adv-cal" role="list">${calendar.map((m, i) => {
     const fallow = !m.crop || m.stage === 'fallow';
-    return `<span role="listitem" class="adv-cal-cell${fallow ? ' fallow' : ''}" style="${fallow ? '' : `background:${cropColor(m.crop)}`}" title="${esc(MONTHS[m.month - 1])}: ${esc(m.crop || t('Fallow', 'পতিত'))} · ${esc(m.stage)}">
+    return `<span role="listitem" class="adv-cal-cell${fallow ? ' fallow' : ''}${stream.done || i < stream.calendar ? ' shown' : ''}" style="${fallow ? '' : `background:${cropColor(m.crop)}`}" title="${esc(MONTHS[m.month - 1])}: ${esc(m.crop || t('Fallow', 'পতিত'))} · ${esc(m.stage)}">
       <b>${esc(m.crop ? m.crop.split(' ')[0] : '')}</b><small>${esc(MONTHS[m.month - 1])}</small></span>`;
   }).join('')}</div>`;
 }
 
-function list(title, items) {
-  return items?.length ? `<div class="adv-list"><h4>${title}</h4><ul>${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div>` : '';
+function list(title, values, renderItems) {
+  return values?.length ? `<div class="adv-list"><h4>${title}</h4><ul>${renderItems(values)}</ul></div>` : '';
 }
 
 function resultHtml(r) {
   const [mark, en, bn, cls] = VERDICT[r.verdict] || VERDICT.not_suitable;
-  return `<div class="adv-result adv-${cls}" aria-live="polite">
-    <div class="adv-verdict"><span class="adv-mark">${mark}</span><div><strong>${t(en, bn)}</strong><span>${esc(r.title || '')}</span></div>
+  const stream = ui.stream || { done: true, summary: Infinity, calendar: Infinity, list: Infinity };
+  let wordIndex = 0;
+  let listIndex = 0;
+  const renderItems = (values) => values.map((item) => `<li class="adv-stream-item${stream.done || listIndex < stream.list ? ' shown' : ''}" data-stream-index="${listIndex++}">${esc(item)}</li>`).join('');
+  return `<div class="adv-result adv-${cls}${stream.done ? ' stream-done' : ''}" aria-live="polite">
+    ${!stream.done ? `<button type="button" class="adv-stream-skip text-link" data-action="adv-skip-stream">${t('Skip ▸', 'এড়িয়ে যান ▸')}</button>` : ''}
+    <div class="adv-verdict${stream.header ? '' : ' stream-reveal'}"><span class="adv-mark">${mark}</span><div><strong>${t(en, bn)}</strong><span>${esc(r.title || '')}</span></div>
       <span class="adv-conf">${t('Confidence', 'আস্থা')}: ${esc(r.confidence)}</span></div>
-    <p class="adv-summary">${esc(r.summary || '')}</p>
-    ${calendarStrip(r.calendar || [])}
-    <div class="adv-grid">${list(t('Why', 'কেন'), r.reasons)}${list(t('Risks', 'ঝুঁকি'), r.risks)}${list(t("What you'd need", 'যা লাগবে'), r.requirements)}${list(t('Better options for this field', 'এই জমির জন্য ভালো বিকল্প'), r.alternatives)}</div>
-    ${r.evidence?.length ? `<p class="adv-evidence">${t('Evidence', 'প্রমাণ')}: ${r.evidence.map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>`).join(' · ')}</p>` : ''}
-    ${r.verdict !== 'recommended' && (r.dropLine || r.suggestions?.length) ? `<div class="adv-drop"><p><strong>${t('Planty suggests dropping this idea.', 'Planty এই পরিকল্পনা বাদ দিতে বলছে।')}</strong> ${esc(r.dropLine || '')}</p>
+    <p class="adv-summary">${String(r.summary || '').replace(/\S+/g, (word) => `<span class="adv-stream-word${stream.done || wordIndex < stream.summary ? ' shown' : ''}" data-stream-index="${wordIndex++}">${esc(word)}</span>`)}<i class="adv-caret" aria-hidden="true"></i></p>
+    ${calendarStrip(r.calendar || [], stream)}
+    <div class="adv-grid">${list(t('Why', 'কেন'), r.reasons, renderItems)}${list(t('Risks', 'ঝুঁকি'), r.risks, renderItems)}${list(t("What you'd need", 'যা লাগবে'), r.requirements, renderItems)}${list(t('Better options for this field', 'এই জমির জন্য ভালো বিকল্প'), r.alternatives, renderItems)}</div>
+    ${r.evidence?.length ? `<p class="adv-evidence stream-late">${t('Evidence', 'প্রমাণ')}: ${r.evidence.map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>`).join(' · ')}</p>` : ''}
+    ${r.verdict !== 'recommended' && (r.dropLine || r.suggestions?.length) ? `<div class="adv-drop stream-late"><p><strong>${t('Planty suggests dropping this idea.', 'Planty এই পরিকল্পনা বাদ দিতে বলছে।')}</strong> ${esc(r.dropLine || '')}</p>
       ${r.suggestions?.length ? `<p class="adv-drop-label">${t('Crops that suit this field better — tap one to check it:', 'এই জমিতে বেশি মানানসই — যাচাই করতে একটিতে চাপুন:')}</p><div class="adv-suggest">${r.suggestions.map((g, i) => `<button type="button" class="adv-suggest-btn" data-action="adv-try" data-value="${i}"><strong>${esc(g.crops.join(' + '))}</strong><small>${esc(g.line)}</small></button>`).join('')}</div>` : ''}
       <div class="adv-drop-actions">${r.verdict === 'possible_with_conditions' ? `<span class="note">${t('Or keep your idea with the conditions above.', 'অথবা ওপরের শর্ত মেনে নিজের পরিকল্পনা রাখুন।')}</span>` : ''}<button type="button" class="button small" data-action="adv-exit">${t('Exit', 'বন্ধ করুন')}</button></div></div>` : ''}
-    ${r.verdict !== 'not_suitable' && r.planting?.length ? `<div class="adv-use"><button type="button" class="button primary" data-action="adv-use">${t('Use this plan in the planner →', 'এই পরিকল্পনা বপনে ব্যবহার করুন →')}</button><span class="note">${r.planting.map((p) => `${esc(p.crop)} ${p.sharePct}%`).join(' · ')}</span></div>` : ''}
-    <div class="adv-compare"><button type="button" class="button small" data-action="show-rotations">${t('Compare with standard rotations (scores) ↓', 'সাধারণ ফসলচক্রের সঙ্গে তুলনা (স্কোর) ↓')}</button></div>
-    <p class="note adv-note">${t('AI decision helper · experimental · check with your extension officer.', 'এআই সিদ্ধান্ত সহায়ক · পরীক্ষামূলক · কৃষি কর্মকর্তার সঙ্গে মিলিয়ে নিন।')}</p>
+    ${r.verdict !== 'not_suitable' && r.planting?.length ? `<div class="adv-use stream-late"><button type="button" class="button primary" data-action="adv-use">${t('Use this plan in the planner →', 'এই পরিকল্পনা বপনে ব্যবহার করুন →')}</button><span class="note">${r.planting.map((p) => `${esc(p.crop)} ${p.sharePct}%`).join(' · ')}</span></div>` : ''}
+    <div class="adv-compare stream-late"><button type="button" class="button small" data-action="show-rotations">${t('Compare with standard rotations (scores) ↓', 'সাধারণ ফসলচক্রের সঙ্গে তুলনা (স্কোর) ↓')}</button></div>
+    <p class="note adv-note stream-late">${t('AI decision helper · experimental · check with your extension officer.', 'এআই সিদ্ধান্ত সহায়ক · পরীক্ষামূলক · কৃষি কর্মকর্তার সঙ্গে মিলিয়ে নিন।')}</p>
   </div>`;
 }
 
@@ -117,6 +122,86 @@ function presetRow() {
     const [mark, , , cls] = VERDICT[x.verdict] || VERDICT.possible_with_conditions;
     return `<button type="button" class="adv-preset adv-${cls}" data-action="adv-preset" data-value="${i}"><span>${mark}</span><strong>${esc(x.crops.join(x.mode === 'rotation' ? ' → ' : ' + '))}</strong><small>${x.mode === 'rotation' ? t('seasons', 'মৌসুম') : x.mode === 'orchard' ? t('orchard', 'বাগান') : t('together', 'একসাথে')}</small></button>`;
   }).join('')}</div></div>`;
+}
+
+function advisorSteps(context) {
+  return [
+    ...(context.outlook ? [[t('Reading NASA POWER seasonal outlook', 'NASA POWER মৌসুমি পূর্বাভাস দেখা হচ্ছে'), nasaBadge('power')]] : []),
+    ...(context.flood ? [[t('Checking satellite flood history (NASA HLS · Prithvi)', 'স্যাটেলাইট বন্যার ইতিহাস দেখা হচ্ছে (NASA HLS · Prithvi)'), nasaBadge(['hls', 'prithvi'])]] : []),
+    [t('Matching Rangpur research & rotations (agronomy.json)', 'রংপুরের গবেষণা ও ফসলচক্রের সঙ্গে মেলানো হচ্ছে (agronomy.json)'), ''],
+  ];
+}
+
+function checkStepsHtml() {
+  return `<div class="adv-checking" aria-live="polite"><span class="adv-check-planty">${plantyMascot('thinking')}</span><ol>${ui.checkSteps.map(([label, badge], i) => `<li class="${i < ui.stepIndex ? 'done' : i === ui.stepIndex ? ui.stepError ? 'failed' : 'active' : ''}"><span class="adv-step-mark" aria-hidden="true">${i < ui.stepIndex ? '✓' : i === ui.stepIndex ? ui.stepError ? '✕' : '<i></i>' : ''}</span><span>${label}</span>${badge}</li>`).join('')}</ol></div>`;
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function runChecks(context, resultPromise) {
+  ui.checkSteps = advisorSteps(context);
+  ui.stepIndex = 0; ui.stepError = false;
+  rerender();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    ui.stepIndex = resultPromise ? ui.checkSteps.length - 1 : ui.checkSteps.length;
+    rerender();
+    if (resultPromise) {
+      const result = await resultPromise;
+      ui.stepIndex = ui.checkSteps.length;
+      rerender();
+      return result;
+    }
+    return;
+  }
+  for (let i = 0; i < ui.checkSteps.length - 1; i++) {
+    await wait(700);
+    ui.stepIndex = i + 1;
+    rerender();
+  }
+  if (resultPromise) {
+    const result = await resultPromise;
+    ui.stepIndex = ui.checkSteps.length;
+    rerender();
+    return result;
+  }
+  await wait(700);
+  ui.stepIndex = ui.checkSteps.length;
+  rerender();
+}
+
+async function streamResult() {
+  const stream = ui.stream;
+  if (!stream || stream.started || stream.done) return;
+  stream.started = true;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    stream.done = true; rerender(); return;
+  }
+  const summaryCount = document.querySelectorAll('#advisor-card .adv-stream-word').length;
+  const calendarCount = document.querySelectorAll('#advisor-card .adv-cal-cell').length;
+  const listCount = document.querySelectorAll('#advisor-card .adv-stream-item').length;
+  stream.header = true;
+  while (!stream.done && stream.summary < summaryCount) {
+    await wait(25); if (stream.done) break;
+    stream.summary++; syncStream();
+  }
+  while (!stream.done && stream.calendar < calendarCount) {
+    await wait(40); if (stream.done) break;
+    stream.calendar++; syncStream();
+  }
+  while (!stream.done && stream.list < listCount) {
+    await wait(220); if (stream.done) break;
+    stream.list++; syncStream();
+  }
+  if (!stream.done) { stream.done = true; syncStream(); }
+}
+
+function syncStream() {
+  const stream = ui.stream;
+  if (!stream) return;
+  document.querySelectorAll('#advisor-card .adv-stream-word').forEach((el, i) => el.classList.toggle('shown', stream.done || i < stream.summary));
+  document.querySelectorAll('#advisor-card .adv-cal-cell').forEach((el, i) => el.classList.toggle('shown', stream.done || i < stream.calendar));
+  document.querySelectorAll('#advisor-card .adv-stream-item').forEach((el, i) => el.classList.toggle('shown', stream.done || i < stream.list));
+  document.querySelector('#advisor-card .adv-result')?.classList.toggle('stream-done', stream.done);
+  if (stream.done) document.querySelector('#advisor-card .adv-stream-skip')?.remove();
 }
 
 export function advisorCard() {
@@ -135,7 +220,7 @@ export function advisorCard() {
     <div class="adv-actions"><span class="note">${ui.crops.length}/2 ${t('crops', 'ফসল')}</span>
       <button type="button" class="button primary" data-action="adv-check" ${!ui.crops.length || busy ? 'disabled' : ''}>${busy ? t('Planty is checking…', 'Planty দেখছে…') : t('Check with Planty', 'Planty-কে দিয়ে যাচাই')}</button></div>
     ${!ui.result && !revealed ? `<p class="adv-skip"><button type="button" class="text-link" data-action="show-rotations">${t('Not sure? Compare the standard rotations first', 'নিশ্চিত নন? আগে সাধারণ ফসলচক্র তুলনা করুন')}</button></p>` : ''}
-    ${busy ? `<div class="adv-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>` : ''}
+    ${busy ? checkStepsHtml() : ''}
     ${ui.error ? `<p class="adv-error" role="alert">${esc(ui.error)}</p>` : ''}
     ${ui.result ? resultHtml(ui.result) : ''}
   </section>`;
@@ -144,23 +229,30 @@ export function advisorCard() {
 function rerender() {
   const card = document.querySelector('#advisor-card');
   if (card) card.outerHTML = advisorCard();
+  if (ui.result && ui.stream && !ui.stream.started && !ui.stream.done) streamResult();
 }
+const newStream = () => ({ started: false, header: false, done: false, summary: 0, calendar: 0, list: 0 });
 
 export async function advisorAction(action, value) {
   const notes = document.querySelector('#adv-notes');
   if (notes) ui.notes = notes.value;
   if (action === 'adv-use') { useInPlanner(); return; }
+  if (action === 'adv-skip-stream') { if (ui.stream) { ui.stream.done = true; syncStream(); } return; }
   if (action === 'adv-seq') { ui.sequence = value === '1'; ui.result = null; rerender(); return; }
   if (action === 'adv-preset') {
     const x = (presets || []).filter((p) => p.fieldId === state.fieldId && p.verdict === 'recommended')[Number(value)];
     if (!x) return;
     ui.crops = x.crops.slice(0, 2); ui.sequence = x.mode === 'rotation'; ui.planMode = x.mode; ui.error = '';
-    ui.result = { ...x, source: x.source || 'pre-computed' };
-    reveal(); rerender();
-    requestAnimationFrame(() => document.querySelector('#advisor-card .adv-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    ui.result = null; ui.stream = null; ui.status = 'loading';
+    try {
+      await runChecks(fieldContext());
+      ui.result = { ...x, source: x.source || 'pre-computed' }; ui.stream = newStream();
+      reveal();
+      requestAnimationFrame(() => document.querySelector('#advisor-card .adv-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    } finally { ui.status = 'idle'; rerender(); }
     return;
   }
-  if (action === 'adv-exit') { ui.result = null; ui.error = ''; ui.crops = []; rerender(); return; }
+  if (action === 'adv-exit') { ui.result = null; ui.stream = null; ui.error = ''; ui.crops = []; rerender(); return; }
   if (action === 'adv-try') {
     const g = ui.result?.suggestions?.[Number(value)];
     if (!g) return;
@@ -185,16 +277,22 @@ export async function advisorAction(action, value) {
     rerender(); return;
   }
   if (action === 'adv-check' && ui.crops.length) {
-    ui.status = 'loading'; ui.error = ''; ui.result = null; ui.planMode = null; rerender();
+    ui.status = 'loading'; ui.error = ''; ui.result = null; ui.stream = null; ui.planMode = null; rerender();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 40000);
     try {
-      const res = await fetch('/api/rotation-advisor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(advisorRequest(fieldContext())), signal: controller.signal });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) throw new Error(data.error || 'unavailable');
-      ui.result = data;
+      const context = fieldContext();
+      const response = (async () => {
+        const res = await fetch('/api/rotation-advisor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(advisorRequest(context)), signal: controller.signal });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || 'unavailable');
+        return data;
+      })();
+      ui.result = await runChecks(context, response);
+      ui.stream = newStream();
       reveal();
     } catch (e) {
+      ui.stepError = true;
       ui.error = !navigator.onLine
         ? t("Planty can't reach the internet right now — the built-in rotations still work offline.", 'এখন ইন্টারনেট নেই — তৈরি ফসলচক্রগুলো অফলাইনেও কাজ করে।')
         : e.message === 'rate_limited' ? t('Too many checks — please wait a few minutes.', 'অনেকবার যাচাই হয়েছে — কয়েক মিনিট অপেক্ষা করুন।')

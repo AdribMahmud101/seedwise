@@ -1880,6 +1880,41 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
 .adv-seq button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid #cdd8c0; background: #fffef9; font: inherit; font-size: 14px; cursor: pointer; }
 .adv-seq button.on { background: #24392c; color: #f4f7ee; border-color: #24392c; }
 
+/* Advisor staged checks and streamed verdict. */
+.adv-checking { display: flex; align-items: center; gap: 14px; margin: 18px 0 4px; padding: 14px; border: 1px solid #dfe7d2; border-radius: 12px; background: #fbfdf6; }
+.adv-check-planty { flex: none; width: 58px; }
+.adv-checking ol { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.adv-checking li { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: #778278; font-size: 14px; }
+.adv-checking li.active { color: #24392c; font-weight: 600; }
+.adv-checking li.done { color: #4f7d4a; }
+.adv-checking li.failed { color: #a44435; }
+.adv-checking .nasa-badge { margin-left: 2px; }
+.adv-step-mark { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1px solid #aeb9ac; border-radius: 50%; font-size: 13px; font-weight: 700; }
+.adv-checking li.done .adv-step-mark { border-color: #4f7d4a; background: #4f7d4a; color: white; }
+.adv-checking li.failed .adv-step-mark { border-color: #a44435; background: #a44435; color: white; }
+.adv-step-mark i { width: 10px; height: 10px; border: 2px solid #6d9d5f; border-top-color: transparent; border-radius: 50%; animation: adv-spin .7s linear infinite; }
+.adv-stream-skip { display: block; margin: 0 0 8px auto; }
+.adv-verdict.stream-reveal { animation: adv-reveal .45s ease-out both; }
+.adv-stream-word, .adv-stream-item { opacity: 0; }
+.adv-stream-word.shown { opacity: 1; }
+.adv-stream-item { transform: translateY(5px); }
+.adv-stream-item.shown { opacity: 1; transform: none; transition: opacity .25s ease, transform .25s ease; }
+.adv-cal-cell { opacity: 0; transform: scale(.86); }
+.adv-cal-cell.shown { opacity: 1; transform: none; animation: adv-pop .25s ease-out both; }
+.adv-caret { display: none; }
+.adv-result:not(.stream-done) .adv-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: #4f7d4a; animation: adv-blink .8s steps(2, start) infinite; }
+.stream-late { opacity: 0; }
+.stream-done .stream-late { opacity: 1; animation: adv-reveal .35s ease-out both; }
+@keyframes adv-spin { to { transform: rotate(360deg); } }
+@keyframes adv-reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes adv-pop { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: scale(1); } }
+@keyframes adv-blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .adv-step-mark i, .adv-verdict.stream-reveal, .adv-cal-cell.shown, .stream-done .stream-late, .adv-result:not(.stream-done) .adv-caret { animation: none; }
+  .adv-stream-item.shown { transition: none; }
+  .adv-stream-item, .adv-stream-word, .adv-cal-cell, .stream-late { opacity: 1; transform: none; }
+}
+
 /* Compact question panels share the reference's hairlines, muted labels and mono facts. */
 .question-panel {
   --line: #e1e3d6;
