@@ -2317,3 +2317,17 @@
   align-items: center;
   gap: 6px 8px;
 }
+
+/* Card headings with source badges: wrap badges under the title instead of overflowing the rail. */
+.studio-rail h3:has(.nasa-badge) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.studio-rail h3:has(.nasa-badge) .truth {
+  white-space: nowrap;
+}
+.studio-rail {
+  overflow-x: hidden;
+}
