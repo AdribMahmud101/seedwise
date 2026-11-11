@@ -316,8 +316,10 @@ let customSeasonIdx = -1; // -1 = whole year (all crops side by side)
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 // Pure: 'Nov–Feb' style season label for a crop from the 12-month calendar.
 export function cropMonths(calendar, crop) {
-  const key = String(crop).toLowerCase().split(' ').pop();
-  const on = (calendar || []).map((m) => Boolean(m.crop && String(m.crop).toLowerCase().includes(key)));
+  // Match the full name first, then the distinctive first word ("Aman rice" → "aman"); the shared last word ("rice") only as a last resort.
+  const words = String(crop).toLowerCase().trim().split(/\s+/);
+  const has = (key) => (calendar || []).map((m) => Boolean(m.crop && String(m.crop).toLowerCase().includes(key)));
+  const on = [words.join(' '), words[0], words[words.length - 1]].map(has).find((o) => o.some(Boolean)) || [];
   if (!on.some(Boolean)) return '';
   let start = on.findIndex((v, i) => v && !on[(i + 11) % 12]); if (start < 0) start = on.indexOf(true);
   let end = start; while (on[(end + 1) % 12] && (end + 1) % 12 !== start) end = (end + 1) % 12;
