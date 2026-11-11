@@ -41,6 +41,8 @@ let drainTrenchActive = true;
 let canalBlocked = false;
 let selectedNutrient = 'moisture';
 let cachedSoilNutrients = null;
+let cachedSmap = null;
+let cachedWaterTable = null;
 let cachedSoilProfile = null;
 let cachedLowGround = null;
 let cachedS1Water = null; // null = unprobed, false = not found, object = data
@@ -312,6 +314,24 @@ async function getSoilNutrientsData() {
   return cachedSoilNutrients;
 }
 
+// Lazy load NASA SMAP L4 root-zone moisture and the Fan 2017 water-table model
+async function getJsonOnce(url) {
+  try {
+    const res = await fetch(url);
+    return res.ok ? await res.json() : false;
+  } catch (_) {
+    return false;
+  }
+}
+async function getSmapData() {
+  if (cachedSmap === null) cachedSmap = await getJsonOnce('data/smap.json');
+  return cachedSmap;
+}
+async function getWaterTableData() {
+  if (cachedWaterTable === null) cachedWaterTable = await getJsonOnce('data/water-table.json');
+  return cachedWaterTable;
+}
+
 // Lazy load soil profile
 async function getSoilProfileData() {
   if (cachedSoilProfile !== null) return cachedSoilProfile;
@@ -502,9 +522,20 @@ function panelWhatIsUnderMyField() {
   const localPh = rotationTool.soilOverrides?.ph;
   const localOm = rotationTool.soilOverrides?.om;
 
-  // Values:
-  // 1. Moisture: from SMAP or studio
-  const moistureVal = '0.50';
+  // 1. Moisture: NASA SMAP L4 root-zone (0-100 cm) mean over the data year, vs its 2015-present percentile.
+  const smapDays = (cachedSmap?.sites?.[fid]?.daily || []).filter((d) => Number.isFinite(d.RZMC));
+  const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const rzmc = mean(smapDays.map((d) => d.RZMC));
+  const pct = mean(smapDays.map((d) => d.PRMC_PRCNTL).filter(Number.isFinite));
+  const smapYear = smapDays[0]?.date?.slice(0, 4) || '';
+  const moistureVal = rzmc != null ? num(rzmc, 2) : null;
+  const moistureClass = pct == null ? `${smapYear} ${t('average', 'গড়')}`
+    : `${smapYear}: ${pct < 33 ? t('drier than usual', 'স্বাভাবিকের চেয়ে শুকনো') : pct > 66 ? t('wetter than usual', 'স্বাভাবিকের চেয়ে ভেজা') : t('usual', 'স্বাভাবিক')}`;
+  const nasaChip = `<span class="nasa-chip">${t('NASA SMAP', 'নাসা SMAP')}</span>`;
+  // Groundwater: farmer's well reading, else Fan et al. 2017 ~1 km model (yearly median).
+  const modelGw = cachedWaterTable?.sites?.[fid]?.annualDepthM;
+  const gwMonths = cachedWaterTable?.sites?.[fid]?.monthlyDepthM;
+  const gwSpan = Array.isArray(gwMonths) ? `${num(Math.min(...gwMonths), 1)}–${num(Math.max(...gwMonths), 1)} m` : '';
   // 2. pH: local soil tests take precedence over SoilGrids nutrient values.
   const phVal = localPh != null ? localPh : siteNutrients?.ph?.value;
   const phClass = localPh != null ? (phVal < 5.5 ? t('Acidic', 'অম্লীয়') : phVal > 7.5 ? t('Alkaline', 'ক্ষারীয়') : t('Optimal', 'উপযুক্ত')) : nutrientClass('ph');
@@ -527,6 +558,7 @@ function panelWhatIsUnderMyField() {
   // 8. Boron
   const bVal = null;
 
+  const missingLabels = []; // chips without data render nothing; one lab-test note lists them
   function renderChip(key, label, val, unit, standardClass, truthBadge) {
     const isSelected = selectedNutrient === key;
     if (val != null) {
@@ -537,39 +569,37 @@ function panelWhatIsUnderMyField() {
         ${truthBadge}
       </button>`;
     }
-    return `<button type="button" class="nutrient-chip missing ${isSelected ? 'active' : ''}" data-nutrient="${key}">
-      <span class="chip-label">${label}</span>
-      <span class="chip-val chip-enter">${t('Enter soil test', 'মাটি পরীক্ষা লিখুন')}</span>
-      ${truth('UNKNOWN')}
-    </button>`;
+    if (key !== 'moisture') missingLabels.push(label); // moisture is satellite data, not a lab test
+    return '';
   }
 
   return `<section class="panel question-panel panel-left-soil" id="panel-left-soil">
     <div class="panel-header">
       <div class="eyebrow">${t('Question 03 · Soil & nutrients', 'প্রশ্ন ০৩ · মাটি ও পুষ্টি উপাদান')}</div>
       <h3>${t('What is under my field?', 'আমার জমির মাটির নিচে কী আছে?')}</h3>
-      <p class="panel-sub">${t('SoilGrids 250m machine learning baseline + local test calibration.', 'সয়েলগ্রিডস ২৫০মি আঞ্চলিক মডেল ও স্থানীয় মাটি পরীক্ষার সমন্বয়।')}</p>
+      <p class="panel-sub">${t('NASA SMAP soil moisture, SoilGrids 250 m soil map, and your own test.', 'নাসা SMAP মাটির আর্দ্রতা, SoilGrids ২৫০ মি মাটির মানচিত্র, আর আপনার নিজের পরীক্ষা।')}</p>
     </div>
     <div class="panel-body">
       <div class="nutrient-chips-grid">
-        ${renderChip('moisture', t('Moisture', 'আর্দ্রতা'), moistureVal, 'index', t('Adequate', 'পর্যাপ্ত'), truth('MODELED', { source: 'NASA SMAP L4' }))}
+        ${renderChip('moisture', t('Root-zone moisture', 'শিকড় স্তরের আর্দ্রতা'), moistureVal, 'm³/m³', moistureClass, nasaChip)}
         ${renderChip('ph', 'pH', phVal, '', phClass, phTruth)}
         ${renderChip('om', t('OM', 'জৈব পদার্থ'), omVal, '%', omClass, omTruth)}
         ${renderChip('N', t('Nitrogen', 'নাইট্রোজেন (N)'), nVal, '%', nutrientClass('totalN'), soilTruth)}
         ${renderChip('cec', t('CEC', 'ক্যাটায়ন বিনিময় ক্ষমতা (CEC)'), cecVal, 'cmol+/kg', nutrientClass('cec'), soilTruth)}
-        ${renderChip('S', t('Sulfur', 'সালফার (S)'), null, '', '', '')}
-        ${renderChip('P', t('Phosphorus', 'ফসফরাস (P)'), pVal, 'mg/kg', t('Medium', 'মাঝারি'), truth('MODELED'))}
-        ${renderChip('K', t('Potassium', 'পটাশিয়াম (K)'), kVal, 'meq/100g', t('Low', 'কম'), truth('MODELED'))}
-        ${renderChip('Zn', t('Zinc', 'জিংক (Zn)'), znVal, 'mg/kg', t('Low', 'কম'), truth('MODELED'))}
-        ${renderChip('B', t('Boron', 'বোরন (B)'), bVal, 'mg/kg', t('Deficient', 'ঘাটতি'), truth('MODELED'))}
+        ${renderChip('P', t('Phosphorus', 'ফসফরাস'), pVal, 'mg/kg', '', '')}
+        ${renderChip('K', t('Potassium', 'পটাশিয়াম'), kVal, 'meq/100g', '', '')}
+        ${renderChip('S', t('Sulfur', 'সালফার'), null, '', '', '')}
+        ${renderChip('Zn', t('Zinc', 'জিংক'), znVal, 'mg/kg', '', '')}
+        ${renderChip('B', t('Boron', 'বোরন'), bVal, 'mg/kg', '', '')}
       </div>
+      <p class="lab-test-note">${t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')} <strong>${missingLabels.join(' · ')}</strong><span>${t('No open satellite or map data exists for these.', 'এগুলোর কোনো খোলা স্যাটেলাইট বা মানচিত্র তথ্য নেই।')}</span></p>
       <div class="groundwater-row">
-        <span>${t('Groundwater depth:', 'ভূগর্ভস্থ পানির গভীরতা:')} <strong>${localGw != null ? `${localGw} m` : t('Unknown', 'অজানা')}</strong></span>
-        ${localGw != null ? truth('FARMER_REPORTED') : truth('UNKNOWN')}
+        <span>${t('Water table:', 'পানির স্তর:')} <strong>${localGw != null ? `${localGw} m` : modelGw != null ? `~${num(modelGw, 1)} m ${t('below ground', 'মাটির নিচে')}` : t('Unknown', 'অজানা')}</strong>${localGw == null && gwSpan ? ` <small>(${t('through the year', 'সারা বছরে')} ${gwSpan})</small>` : ''}</span>
+        ${localGw != null ? truth('FARMER_REPORTED') : modelGw != null ? truth('MODELED', { source: 'Fan et al. 2017 ~1 km model' }) : truth('UNKNOWN')}
       </div>
       <div class="soil-test-action">
         <button type="button" class="button small" data-action="open-soil-modal">
-          + ${t('Enter local soil test or tubewell depth', 'স্থানীয় মাটি পরীক্ষা বা টিউবওয়েল গভীরতা লিখুন')}
+          + ${t('Add your soil test or well reading', 'আপনার মাটি পরীক্ষা বা কূপের মাপ দিন')}
         </button>
       </div>
     </div>
@@ -768,6 +798,8 @@ export async function mountRotations() {
     getSoilNutrientsData(),
     getLowGroundData(),
     getS1WaterData(),
+    getSmapData(),
+    getWaterTableData(),
   ]);
 
   // Update question panels if rendered

@@ -1348,8 +1348,30 @@ a:hover {
 }
 
 .nutrient-chip.active {
+  background: #eef4ec;
+  color: #1b382e;
   border-color: #173e30;
   box-shadow: 0 0 0 1px #173e30;
+}
+
+.nutrient-chip .nasa-chip {
+  margin-left: 0;
+  margin-top: 2px;
+}
+
+.lab-test-note {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px dashed #cdcfc0;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1b382e;
+  line-height: 1.5;
+}
+
+.lab-test-note span {
+  display: block;
+  color: #6b7a6e;
 }
 
 .nutrient-chip .chip-label {

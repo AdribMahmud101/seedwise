@@ -267,9 +267,13 @@ test('rotation nutrient chips map SoilGrids values, units, classes and missing d
         assert.ok(rendered.includes(t('Estimated · SoilGrids 250 m', 'স্যাটেলাইট অনুমান · SoilGrids 250 m')));
         assert.ok(!rendered.includes('chip-enter'));
       }
-      for (const key of ['P', 'K', 'S', 'Zn', 'B']) {
-        assert.ok(chip(html, key).includes(t('Enter soil test', 'মাটি পরীক্ষা লিখুন')));
-      }
+      // No open data for these: one lab-test note, no failure chips.
+      for (const key of ['P', 'K', 'S', 'Zn', 'B']) assert.ok(!html.includes(`data-nutrient="${key}"`), `${key} chip hidden`);
+      assert.ok(html.includes(t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')));
+      // Real NASA SMAP root-zone moisture and the modelled water table replace the old placeholders.
+      assert.ok(chip(html, 'moisture').includes('nasa-chip'));
+      assert.ok(!chip(html, 'moisture').includes('<strong>0.50</strong>'));
+      assert.ok(html.includes(`m ${t('below ground', 'মাটির নিচে')}</strong>`), 'modelled water table shown');
     }
 
     saveSoilOverrides({ ph: 7.2, om: 3.1 });
@@ -286,9 +290,8 @@ test('rotation nutrient chips map SoilGrids values, units, classes and missing d
     state.customFields = [{ ...earth.fields[0], id: 'custom-soil-test', custom: true }];
     state.fieldId = 'custom-soil-test';
     const missing = rotations();
-    for (const key of ['ph', 'om', 'N', 'cec']) {
-      assert.ok(chip(missing, key).includes(t('Enter soil test', 'মাটি পরীক্ষা লিখুন')));
-    }
+    for (const key of ['ph', 'om', 'N', 'cec']) assert.ok(!missing.includes(`data-nutrient="${key}"`));
+    assert.ok(missing.includes(`${t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')} <strong>pH`));
     state.customFields = [];
   }
 });

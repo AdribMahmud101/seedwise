@@ -245,10 +245,12 @@ describe('STUDIO5B Rotation Tool', () => {
       assert.ok(rendered.includes('Where will water collect?'));
     });
 
-    it('should show "Enter soil test" fallback when nutrient is missing or null', () => {
+    it('lists nutrients without open data in one lab-test note instead of failure chips', () => {
       const rendered = rotationsModule.rotations();
-      // Should show 'Enter soil test' for nutrient chips without data
-      assert.ok(rendered.includes('Enter soil test'));
+      assert.ok(rendered.includes('Needs a lab soil test:'));
+      assert.ok(rendered.includes('Phosphorus · Potassium · Sulfur · Zinc · Boron'));
+      assert.ok(!rendered.includes('nutrient-chip missing'));
+      assert.ok(!rendered.includes("'0.50'") && !rendered.includes('>0.50<'));
     });
   });
 });
