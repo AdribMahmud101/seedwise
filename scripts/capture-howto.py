@@ -2,7 +2,7 @@
 
 Runs the repo's existing headless setup (Python Playwright + Chromium, same as
 tests/planty-guide.browser.py) against a local build (npm run build first),
-performs each field sub-step's micro-sequence with a visible synthetic finger
+performs each field and rotation sub-step with a visible synthetic finger
 dot + ripple, and encodes looping animated WebP clips + poster JPGs into
 public/assets/howto/.
 
@@ -85,6 +85,19 @@ def setup_field_page(context, base):
         page.wait_for_timeout(600)
     page.add_style_tag(content=FINGER_CSS)
     page.evaluate("document.querySelector('.coach-host')?.style.setProperty('display', 'none')")
+    return page, errors
+
+
+def setup_rotation_page(context, base):
+    page, errors = setup_field_page(context, base)
+    field_cta = page.locator('.journey-field-inline [data-journey="field"]')
+    if field_cta.count():
+        field_cta.click()
+        page.wait_for_timeout(500)
+    page.goto(base + '/#rotations')
+    page.wait_for_selector('.priority-box')
+    page.wait_for_timeout(1200)
+    page.add_style_tag(content='#studio-3d-host { display: none !important; }')
     return page, errors
 
 
@@ -333,11 +346,98 @@ def capture_use(page):
     return frames, 250, 1
 
 
+def capture_rotation_priorities(page):
+    page.locator('.priority-box').scroll_into_view_if_needed()
+    page.wait_for_timeout(300)
+    frames = []
+    for selector in ('#weight-water', '#weight-soil', '#weight-income', '#weight-stability'):
+        box = rect(page, selector)
+        x, y = center(box)
+        finger(page, x, y)
+        page.wait_for_timeout(250)
+        frames.append(band_region(shot(page), max(0, box['y'] - 300), 600))
+        page.mouse.click(x, y)
+        page.wait_for_timeout(250)
+        frames.append(band_region(shot(page), max(0, box['y'] - 300), 600))
+    return frames, 260, 0
+
+
+def capture_rotation_compare(page):
+    page.locator('#rotation-list .rotation-card').first.scroll_into_view_if_needed()
+    page.wait_for_timeout(300)
+    frames = []
+    for index in (1, 2):
+        card = page.locator(f'#rotation-list .rotation-card:nth-child({index})')
+        for selector in ('.score', '.timeline-scroll', '.rotation-info > div:nth-child(1)',
+                         '.rotation-info > div:nth-child(2)', '.rotation-cost-badge'):
+            item = card.locator(selector)
+            item.scroll_into_view_if_needed()
+            page.wait_for_timeout(180)
+            box = item.bounding_box()
+            finger(page, *center(box))
+            frames.append(band_region(shot(page)))
+            page.wait_for_timeout(180)
+            frames.append(band_region(shot(page)))
+    return frames, 220, 2
+
+
+def capture_rotation_choose(page):
+    page.locator('#rotation-list .rotation-card.best [data-journey="rotation"], #rotation-list [data-journey="rotation"]').first.scroll_into_view_if_needed()
+    page.wait_for_timeout(350)
+    frames = []
+    button = page.locator('#rotation-list .rotation-card.best [data-journey="rotation"], #rotation-list [data-journey="rotation"]').first
+    finger(page, *center(rect(page, '#rotation-list .rotation-card.best [data-journey="rotation"], #rotation-list [data-journey="rotation"]')))
+    for _ in range(3):
+        page.wait_for_timeout(220)
+        frames.append(band_region(shot(page)))
+    button.click()
+    page.wait_for_timeout(450)
+    frames.append(band_region(shot(page)))
+    return frames, 250, 0
+
+
+def capture_rotation_constraints(page):
+    page.locator('[data-action="profile"]').scroll_into_view_if_needed()
+    page.wait_for_timeout(250)
+    frames = []
+    button = page.locator('[data-action="profile"]')
+    finger(page, *center(rect(page, '[data-action="profile"]')))
+    frames.append(band_region(shot(page)))
+    button.click()
+    page.wait_for_selector('#profile-form')
+    page.wait_for_timeout(350)
+    frames.append(band_region(shot(page)))
+    for selector, value in (('#in-crop', None), ('#in-irrigation', 'limited'), ('#in-budget', 'high')):
+        field = page.locator(selector)
+        field.scroll_into_view_if_needed()
+        box = rect(page, selector)
+        finger(page, *center(box))
+        frames.append(band_region(shot(page)))
+        if value:
+            field.select_option(value)
+        else:
+            field.click()
+        page.wait_for_timeout(250)
+        frames.append(band_region(shot(page)))
+    save = page.locator('#profile-form button.button.primary')
+    save.scroll_into_view_if_needed()
+    finger(page, *center(rect(page, '#profile-form button.button.primary')))
+    frames.append(band_region(shot(page)))
+    save.click()
+    page.wait_for_timeout(400)
+    frames.append(band_region(shot(page)))
+    return frames, 260, 0
+
+
 CLIPS = [
     ('field-map', capture_map),
     ('field-area', capture_area),
     ('field-constraints', capture_constraints),
     ('field-use', capture_use),
+    ('rotation-priorities', capture_rotation_priorities),
+    ('rotation-compare', capture_rotation_compare),
+    ('rotation-choose', capture_rotation_choose),
+    ('rotation-constraints', capture_rotation_constraints),
 ]
 
 
@@ -349,9 +449,10 @@ def main():
     Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
     failures = []
+    clips = [item for item in CLIPS if not sys.argv[1:] or item[0] in sys.argv[1:]]
     try:
         with sync_playwright() as playwright:
-            for clip_id, capture in CLIPS:
+            for clip_id, capture in clips:
                 # Fresh browser per clip: single-process headless shell exits
                 # once its last context closes (same pattern as the guide test).
                 browser = playwright.chromium.launch(
@@ -359,7 +460,8 @@ def main():
                 context = browser.new_context(viewport={'width': VIEW_W, 'height': VIEW_H},
                                               device_scale_factor=DSF, is_mobile=True,
                                               has_touch=True, service_workers='block')
-                page, errors = setup_field_page(context, base)
+                setup = setup_rotation_page if clip_id.startswith('rotation-') else setup_field_page
+                page, errors = setup(context, base)
                 try:
                     frames, duration, poster_idx = capture(page)
                 finally:

@@ -43,11 +43,13 @@ test('checklist state from plan + events per page', () => {
   // 2. Rotations page checklist
   story.setStoryPage('rotations', () => {});
   checklist = story.getPageChecklist('rotations');
-  assert.equal(checklist.length, 3);
+  assert.equal(checklist.length, 4);
   assert.equal(checklist[0].id, 'rotation-priorities');
   assert.equal(checklist[1].id, 'rotation-compare');
   assert.equal(checklist[2].id, 'rotation-choose');
   assert.equal(checklist[2].done, false);
+  assert.equal(checklist[3].id, 'rotation-constraints');
+  assert.equal(checklist[3].optional, true);
 
   // Confirm rotation
   journey.confirmRotation(rotation());
