@@ -22,3 +22,11 @@ test('advisor output: honest decline survives; invented evidence ids dropped; ca
   assert.deepEqual(out.evidence.map(e => e.id), ['barc-frg2024']);
   assert.equal(normaliseAdvice({ verdict: 'maybe' }, sources), null);
 });
+
+test('custom planting spec: shares normalised, colours/models validated', async () => {
+  const { normalisePlanting } = await import('../worker/index.js');
+  const out = normalisePlanting([{ crop: 'Maize', model: 'maize', color: '#3f7f3a', sharePct: 60, rowSpacingCm: 75, withinRowCm: 25 }, { crop: 'Mungbean', model: 'spaceship', color: 'green', sharePct: 60 }]);
+  assert.equal(out[1].model, 'herb');
+  assert.equal(out[1].color, '#5f9e4a');
+  assert.equal(Math.round(out[0].sharePct + out[1].sharePct), 100);
+});

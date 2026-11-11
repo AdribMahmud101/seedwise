@@ -2511,6 +2511,17 @@ export function customStrips(minV, maxV, shares) {
   });
 }
 
+// Pure: is (x, y) inside the field outline (ray casting; outline points as [x, y] or {x, y}).
+export function insideOutline(x, y, outline) {
+  const pts = (outline || []).map((p) => (Array.isArray(p) ? p : [p.x, p.y]));
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 function customTreeParts(item) {
   const h = item.heightM;
   const trunk = new THREE.CylinderGeometry(h * 0.045, h * 0.065, h * 0.45, 7);
@@ -2543,19 +2554,22 @@ function buildCustomPlants(data) {
     const trueRow = item.rowSpacingCm / 100, trueWithin = item.withinRowCm / 100;
     // Readable sampling: trees at true spacing; small plants thinned so a strip holds ≤ ~900 instances.
     const stripArea = fieldArea * ((b - a) / Math.max(1e-6, hi - lo));
-    const thin = tall ? 1 : Math.max(1, Math.sqrt((stripArea / (trueRow * trueWithin)) / 900));
+    const thin = tall ? 1 : Math.max(1, Math.sqrt((stripArea / (trueRow * trueWithin)) / 450));
     const stepA = trueRow * thin, stepB = trueWithin * thin;
     const pts = [];
     const [c0, c1] = alongX ? [bounds.minY, bounds.maxY] : [bounds.minX, bounds.maxX];
     for (let u = a + stepA / 2; u < b; u += stepA) {
       for (let v = c0 + stepB / 2; v < c1; v += stepB) {
         const x = alongX ? u : v, y = alongX ? v : u;
-        const clear = fieldZoneClearance(x, y, zoneGeom, outlineM);
-        if (clear > (tall ? item.heightM * 0.2 : 0.05)) pts.push([x, y]);
+        if (!insideOutline(x, y, outlineM)) continue;
+        const margin = tall ? item.heightM * 0.33 : 0.6;
+        if (!insideOutline(x + margin, y, outlineM) || !insideOutline(x - margin, y, outlineM) || !insideOutline(x, y + margin, outlineM) || !insideOutline(x, y - margin, outlineM)) continue;
+        if (fieldZoneClearance(x, y, zoneGeom, outlineM) <= 0.05) continue;
+        pts.push([x, y]);
       }
     }
     if (!pts.length) return;
-    const display = tall ? 1 : Math.min(4, Math.max(1.6, thin * 0.6)); // small plants enlarged for readability
+    const display = tall ? 1 : Math.min(2.4, Math.max(1.4, thin * 0.35)); // small plants enlarged for readability
     const leaf = new THREE.Color(item.color);
     const fruit = item.fruitColor ? new THREE.Color(item.fruitColor) : null;
     if (tall || item.model === 'shrub') {
