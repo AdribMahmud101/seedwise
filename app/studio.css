@@ -2305,3 +2305,15 @@
   border-right-color: rgba(11, 61, 145, 0.35);
   border-bottom-color: rgba(11, 61, 145, 0.35);
 }
+
+/* Declutter: layer list = one badge per row; numbers + partner badge live in the colour key, on one line. */
+.nasa-layer-row [data-hls-mode],
+.nasa-layer-row [data-photo-source] {
+  display: none;
+}
+.studio-surface-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
