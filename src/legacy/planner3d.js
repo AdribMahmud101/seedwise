@@ -2531,7 +2531,10 @@ export function distinctColors(colors) {
   const hue = (h) => { const c = new THREE.Color(h), o = {}; c.getHSL(o); return o.h * 360; };
   colors.forEach((c, i) => {
     const near = out.some((o) => { const d = Math.abs(hue(o) - hue(c)); return Math.min(d, 360 - d) < 40; });
-    out.push(near ? CUSTOM_CONTRAST.find((p) => !out.includes(p)) || CUSTOM_CONTRAST[i % CUSTOM_CONTRAST.length] : c);
+    if (!near) { out.push(c); return; }
+    // Pick the palette colour whose hue is farthest from every colour already used.
+    const gap = (h) => Math.min(...out.map((o) => { const d = Math.abs(hue(o) - hue(h)); return Math.min(d, 360 - d); }));
+    out.push([...CUSTOM_CONTRAST].sort((x, y) => gap(y) - gap(x))[0]);
   });
   return out;
 }
@@ -2637,7 +2640,7 @@ function buildCustomPlants(data) {
     const fruitShrub = fruit && item.model === 'herb';
     if (tall || item.model === 'shrub' || fruitShrub) {
       const parts = tall ? customTreeParts(item)
-        : { canopy: new THREE.IcosahedronGeometry(item.heightM * 0.5 * display, 1).translate(0, item.heightM * 0.45 * display, 0), canopyR: item.heightM * 0.5 * display, canopyY: item.heightM * 0.45 * display, fruitR: Math.max(0.03, item.heightM * 0.08 * display) };
+        : { canopy: new THREE.IcosahedronGeometry(item.heightM * 0.5 * display, 1).translate(0, item.heightM * 0.45 * display, 0), canopyR: item.heightM * 0.5 * display, canopyY: item.heightM * 0.45 * display, fruitR: Math.max(0.09, item.heightM * 0.16) * display };
       const canopyMesh = new THREE.InstancedMesh(parts.canopy, new THREE.MeshStandardMaterial({ color: leaf, roughness: 0.85, flatShading: true }), pts.length);
       const trunkMesh = parts.trunk ? new THREE.InstancedMesh(parts.trunk, new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.95 }), pts.length) : null;
       const perPlant = fruit ? (tall ? 9 : 4) : 0;
