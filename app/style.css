@@ -4113,3 +4113,41 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .cs-season-toggle button.on { background: #24392c; color: #f4f7ee; border-color: #24392c; }
 .cs-season-toggle i { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
 .cs-wy-note { flex-basis: 100%; color: #5f6f62; font-size: 12px; }
+
+/* Past seasons: reference tokens (bg #F4F4F0, green #355A46), seasons scope only */
+.season-hero {
+  background: linear-gradient(135deg, #355a46, #233d2f);
+  color: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+.season-hero h2 { margin: 8px 0 6px; font-size: 20px; line-height: 1.25; }
+.season-hero p { margin: 0; color: rgba(255,255,255,.85); font-size: 14px; line-height: 1.5; max-width: 60ch; }
+.season-hero-eyebrow { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.season-hero-eyebrow span { background: rgba(255,255,255,.2); padding: 3px 10px; border-radius: 4px; }
+.season-hero-stats { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.season-hero-stats > div { background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 10px 16px; min-width: 128px; text-align: center; }
+.season-hero-stats span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.7); margin-bottom: 2px; }
+.season-hero-stats strong { font-size: 28px; letter-spacing: -.5px; }
+.season-hero-stats small { font-size: 13px; font-weight: 400; color: rgba(255,255,255,.7); margin-left: 2px; }
+.season-hero-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+.season-hero-foot .truth { background: rgba(255,255,255,.16); color: #fff; }
+.data-row.season-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.yearbar { fill: #9db3bd; rx: 3; }
+.yearbar.selected { fill: #355a46; }
+.chart text.yearbar-year { fill: #666; }
+.chart text.yearbar-year.selected { fill: #1a1a1a; font-weight: 700; }
+.chart text.yearbar-val { fill: #1a1a1a; font-size: 11px; }
+.crophist { display: grid; gap: 0; margin-top: 6px; }
+.crophist-year { display: grid; grid-template-columns: 14px 1fr; gap: 10px; position: relative; padding-bottom: 14px; }
+.crophist-year:last-child { padding-bottom: 0; }
+.crophist-year:not(:last-child)::before { content: ""; position: absolute; left: 6px; top: 16px; bottom: 0; width: 2px; background: #e5e5e5; }
+.crophist-dot { width: 12px; height: 12px; border-radius: 50%; background: #c9c9c9; margin-top: 3px; }
+.crophist-dot.current { background: #355a46; box-shadow: 0 0 0 4px rgba(53,90,70,.15); }
+.crophist-head { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.crophist-year p { margin: 2px 0; font-size: 13px; color: var(--muted); }
+@media (max-width: 700px) {
+  .data-row.season-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .season-hero h2 { font-size: 18px; }
+}

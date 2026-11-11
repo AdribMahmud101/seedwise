@@ -9,6 +9,8 @@ import {
   agronomy,
   archive,
   outlook as outlookPack,
+  floodFields as floodPack,
+  graceGroundwater as gracePack,
   persist,
   t,
   deskNo,
@@ -52,7 +54,7 @@ import {
 } from "./powerlive.js";
 import { getSmapSurfaceForMonth } from "./water.js";
 import { netArea, polygonPerimeterM, DEFAULT_NET_INPUTS } from "./netarea.js";
-import { outlookCard } from "./outlook-flood.js";
+import { outlookCard, floodCard, outlookSite, rainVerdict, backtestYears } from "./outlook-flood.js";
 
 export function netInputsFor(fieldId = state.fieldId) {
   const saved = state.netInputs?.[fieldId];
@@ -798,6 +800,108 @@ function home() {
    .join("")}</div>`
   );
 }
+const SEASON_YEARS = [2021, 2022, 2023, 2024, 2025];
+const finiteNum = (v) => typeof v === "number" && Number.isFinite(v);
+
+function daysInMonthStr(monthStr) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(monthStr || ""));
+  if (!m) return 0;
+  return new Date(Number(m[1]), Number(m[2]), 0).getDate();
+}
+
+// Experimental outlook hero: season totals derived from outlook.json monthly
+// mm/day (p50 × days in month). No flood verdict: no forecast data for floods.
+function seasonOutlookHero(fieldId, pack) {
+  const site = outlookSite(pack, fieldId);
+  const rain = site?.rain_mm_day;
+  if (!site || !rain || !Array.isArray(rain.months) || !rain.months.length) return "";
+  const rows = rain.months.filter(
+    (m) => m && finiteNum(m.p50) && finiteNum(m.climatology) && daysInMonthStr(m.month) > 0,
+  );
+  if (!rows.length) return "";
+  const beats = rain.beats_climatology === true;
+  const days = rows.map((m) => daysInMonthStr(m.month));
+  const total = (pick) => rows.reduce((a, m, i) => a + m[pick] * days[i], 0);
+  const p50 = total("p50"), clim = total("climatology");
+  const bandOK = beats && rows.every((m) => finiteNum(m.p10) && finiteNum(m.p90));
+  const verdict = beats ? rainVerdict(p50, clim) : null;
+  const word =
+    { above: ["above usual", "স্বাভাবিকের চেয়ে বেশি"], near: ["near usual", "স্বাভাবিকের কাছাকাছি"], below: ["below usual", "স্বাভাবিকের চেয়ে কম"] }[verdict] || null;
+  const first = rows[0].month, last = rows.at(-1).month;
+  const span = `${monthName(Number(first.slice(5, 7)) - 1)} ${first.slice(0, 4)} – ${monthName(Number(last.slice(5, 7)) - 1)} ${last.slice(0, 4)}`;
+  const years = backtestYears(pack);
+  const sentence = beats && word
+    ? t(`Rain likely ${word[0]}: ${num(p50, 0)} mm likely vs ${num(clim, 0)} mm usual.`, `বৃষ্টি ${word[1]} হতে পারে: সম্ভাব্য ${num(p50, 0)} মিমি বনাম স্বাভাবিক ${num(clim, 0)} মিমি।`)
+    : t("Rain outlook is no better than the monthly average — showing the usual.", "বৃষ্টির আউটলুক মাসিক গড়ের চেয়ে ভালো নয় — স্বাভাবিক মান দেখানো হচ্ছে।");
+  return `<section class="season-hero"><div class="season-hero-eyebrow"><span>${esc(t("Experimental outlook · p10–p90 range", "পরীক্ষামূলক আউটলুক · p10–p90 পরিসর"))}</span>${years ? `<span>${esc(years)}</span>` : ""}</div><h2>${esc(t(`Next 3 months · ${span}`, `পরের ৩ মাস · ${span}`))}</h2><p>${esc(sentence)}${bandOK ? ` ${esc(t(`Range ${num(total("p10"), 0)}–${num(total("p90"), 0)} mm.`, `পরিসর ${num(total("p10"), 0)}–${num(total("p90"), 0)} মিমি।`))}` : ""}</p><div class="season-hero-stats"><div><span>${esc(t("Predicted rain", "সম্ভাব্য বৃষ্টি"))}</span><strong>${num(beats ? p50 : clim, 0)}<small> mm</small></strong></div><div><span>${esc(t("Usual", "সাধারণত"))}</span><strong>${num(clim, 0)}<small> mm</small></strong></div></div><div class="season-hero-foot">${truth("MODELED", { source: "Chronos-Bolt outlook", date: `${first} – ${last}` })} ${nasaBadge("power", `${first} – ${last}`)}</div></section>`;
+}
+
+// Annual fact tiles for the selected archive year, with change vs prior year.
+function annualTiles(archiveMonths, year) {
+  const months = archiveMonths.filter((v) => v.month.startsWith(String(year)));
+  if (!months.length) return "";
+  const prev = archiveMonths.filter((v) => v.month.startsWith(String(year - 1)));
+  const sum = (rows, k) => rows.reduce((a, v) => a + (finiteNum(v[k]) ? v[k] : 0), 0);
+  const avg = (rows, k) => {
+    const vs = rows.map((v) => v[k]).filter(finiteNum);
+    return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : NaN;
+  };
+  const pct = (cur, ref) => (finiteNum(cur) && finiteNum(ref) && ref !== 0 ? ((cur - ref) / Math.abs(ref)) * 100 : NaN);
+  const diff = (cur, ref) => (finiteNum(cur) && finiteNum(ref) ? cur - ref : NaN);
+  const vsPrev = (raw, places, suffix) => {
+    if (!prev.length || !finiteNum(raw)) return t("first archive year", "আর্কাইভের প্রথম বছর");
+    const d = `${raw >= 0 ? "+" : ""}${num(raw, places)}${suffix}`;
+    return t(`${d} vs ${year - 1}`, `${d} বনাম ${year - 1}`);
+  };
+  const rain = sum(months, "rainGpm"), wet = avg(months, "wetness"), temp = avg(months, "tmean"), eto = sum(months, "et0");
+  const defs = [
+    ["rainGpm", t("Annual rainfall", "বার্ষিক বৃষ্টি"), rain, 0, "mm", "rain", months.map((v) => v.rainGpm), colors.rainGpm, "imerg", t("IMERG · yearly total", "IMERG · বছরের মোট"), "REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: String(year), cell: "10km" }, vsPrev(pct(rain, sum(prev, "rainGpm")), 1, "%")],
+    ["wetness", t("Mean soil wetness", "গড় মাটির আর্দ্রতা"), wet, 2, t("index 0–1", "সূচক ০–১"), "water", months.map((v) => v.wetness), colors.wetness, "wetness", t("POWER · yearly average", "POWER · বছরের গড়"), "MODELED", { source: "NASA POWER", date: String(year), cell: "50km" }, vsPrev(diff(wet, avg(prev, "wetness")), 2, "")],
+    ["tmean", t("Mean temperature", "গড় তাপমাত্রা"), temp, 1, "°C", "temp", months.map((v) => v.tmean), colors.tmean, "power", t("POWER · yearly average", "POWER · বছরের গড়"), "MODELED", { source: "NASA POWER", date: String(year), cell: "50km" }, vsPrev(diff(temp, avg(prev, "tmean")), 1, " °C")],
+    ["et0", t("Annual evaporation", "বার্ষিক বাষ্পীভবন"), eto, 0, "mm", "sun", months.map((v) => v.et0), colors.et0, "eto", t("FAO-56 ETo · yearly total", "FAO-56 ETo · বছরের মোট"), "MODELED", { source: "FAO-56 ETo", date: String(year), cell: "50km" }, vsPrev(pct(eto, sum(prev, "et0")), 1, "%")],
+  ];
+  return `<div class="data-row season-tiles">${defs.map(([, label, value, places, unit, symbol, values, color, badge, foot, tag, opts, delta]) => `<article class="data-stat"><div class="stat-top"><span>${label}</span>${icon(symbol)}</div><div class="stat-badge">${finiteNum(value) ? nasaBadge(badge, String(year)) : ""}</div><div class="stat-value"><span class="stat-number">${num(value, places)}<small>${unit}</small></span><span class="stat-status">${esc(delta)}</span></div><div class="stat-spark">${spark(values, color)}</div><div class="stat-foot"><span class="stat-source" title="${esc(foot)}">${foot}</span><div class="stat-truth">${truth(tag, opts)}</div></div></article>`).join("")}</div>`;
+}
+
+// Year-by-year annual rainfall bars (GPM IMERG totals from history.json).
+function yearBars(archiveMonths, year) {
+  const totals = SEASON_YEARS.map((y) => ({
+    y,
+    total: archiveMonths.filter((v) => v.month.startsWith(String(y))).reduce((a, v) => a + (finiteNum(v.rainGpm) ? v.rainGpm : 0), 0),
+  }));
+  if (!totals.every((r) => finiteNum(r.total))) return "";
+  const width = 320, height = 168, left = 40, right = 10, top = 18, bottom = 24;
+  const hi = Math.max(...totals.map((r) => r.total), 1);
+  const slot = (width - left - right) / totals.length, bw = Math.min(44, slot * 0.55);
+  const y = (v) => top + ((hi - v) * (height - top - bottom)) / hi;
+  let svg = "";
+  for (let j = 0; j <= 2; j++) {
+    const v = (hi * j) / 2;
+    svg += `<line class="grid" x1="${left}" y1="${y(v).toFixed(1)}" x2="${width - right}" y2="${y(v).toFixed(1)}"/><text x="${left - 5}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end">${num(v, 0)}</text>`;
+  }
+  totals.forEach((r, i) => {
+    const cx = left + slot * (i + 0.5), sel = r.y === year;
+    svg += `<text x="${cx.toFixed(1)}" y="${(y(r.total) - 5).toFixed(1)}" text-anchor="middle" class="yearbar-val">${num(r.total, 0)}</text><rect x="${(cx - bw / 2).toFixed(1)}" y="${y(r.total).toFixed(1)}" width="${bw.toFixed(1)}" height="${(height - bottom - y(r.total)).toFixed(1)}" class="yearbar${sel ? " selected" : ""}"><title>${r.y} · ${num(r.total, 1)} mm</title></rect><text x="${cx.toFixed(1)}" y="${height - 6}" text-anchor="middle" class="yearbar-year${sel ? " selected" : ""}">${r.y}</text>`;
+  });
+  return `<div class="chart-legend"><span><i class="legend-dot" style="background:#517e8b"></i>GPM IMERG</span><span>mm / year</span></div><div class="chart-frame"><svg class="chart yearbars" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Annual rainfall by year", "বছর অনুযায়ী বার্ষিক বৃষ্টি"))}">${svg}</svg></div>`;
+}
+
+// GRACE groundwater anomaly months (2024 only in the shipped file).
+function gracePanel(fieldId) {
+  const site = gracePack?.sites?.[fieldId];
+  const rows = Array.isArray(site?.monthly) ? site.monthly.filter((r) => r && finiteNum(r.twsAnomalyCm)) : [];
+  if (!rows.length) return "";
+  const span = rows.length > 1 ? `${rows[0].month} – ${rows.at(-1).month}` : rows[0].month;
+  return panel(
+    t("Groundwater storage", "ভূগর্ভস্থ পানির মজুত"),
+    `<p class="note">${t("Total water anomaly against the 2004–2009 average. Negative means less water than that baseline; this is a wide-regional estimate, not a field reading.", "২০০৪–২০০৯ গড়ের তুলনায় মোট পানির ব্যত্যয়। ঋণাত্মক মানে ভিত্তির চেয়ে কম পানি; এটি বিস্তীর্ণ এলাকার অনুমান, জমির নিজস্ব মাপ নয়।")}</p>` +
+      chart([{ label: "GRACE-FO", color: "#6b8ba4", values: rows.map((r) => r.twsAnomalyCm) }], { unit: "cm", description: "Monthly terrestrial water anomaly" }) +
+      `<p class="note">${esc(span)} · ${t("Latest", "সর্বশেষ")} ${esc(rows.at(-1).month)}: <b>${num(rows.at(-1).twsAnomalyCm, 1)} cm</b></p>` +
+      truth("REMOTE_OBSERVED", { source: "NASA GRACE-FO", date: span, cell: "~300km" }),
+    nasaBadge("grace", "2024"),
+  );
+}
+
 function seasonView() {
   const f = field();
   const [deskEn, deskBn] = deskNo(4);
@@ -835,12 +939,19 @@ function seasonView() {
           `<p class="note">${t("Landsat samples in the fixed 900 m window. Cloud-obscured observations leave a gap.", "৯০০ মিটার জানালায় ল্যান্ডস্যাট নমুনা। মেঘে ঢাকা পর্যবেক্ষণ ফাঁকা থাকে।")}</p><div class="table-wrap"><table class="data-table"><thead><tr><th>${t("Acquired", "তারিখ")}</th><th>NDVI</th><th>${t("Clear samples", "পরিষ্কার নমুনা")}</th><th>${t("Coverage", "তথ্যের অবস্থা")}</th></tr></thead><tbody>${f.opticalHistory.map((o) => `<tr><td>${esc(o.date)}</td><td>${o.opticalQA.validFraction >= 0.25 ? num(o.opticalQA.ndvi, 3) : t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</td><td>${num(o.opticalQA.validPixels)} / ${num(o.opticalQA.pixels)}</td><td>${o.opticalQA.validFraction >= 0.25 ? t("Usable", "ব্যবহারযোগ্য") + truth("REMOTE_OBSERVED", { source: "Landsat 8/9", date: o.date, cell: "30m" }) : t("Too little clear cover", "পরিষ্কার অংশ কম") + truth("UNKNOWN", { source: "Landsat 8/9", date: o.date, cell: "30m" })}</td></tr>`).join("")}</tbody></table></div>`, nasaBadge("landsat"),
         )
       : "";
-  const history = state.records.filter(
-    (r) =>
-      r.fieldId === f.id &&
-      r.kind === "harvest" &&
-      r.date.startsWith(String(year)),
-  );
+  const harvests = state.records
+    .filter((r) => r && r.fieldId === f.id && r.kind === "harvest" && typeof r.date === "string")
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const harvestYears = [...new Set(harvests.map((r) => r.date.slice(0, 4)))];
+  const harvestTimeline = harvestYears
+    .map(
+      (hy) =>
+        `<div class="crophist-year"><div class="crophist-dot${hy === String(year) ? " current" : ""}"></div><div><div class="crophist-head">${esc(hy)}${hy === String(year) ? ` · ${esc(t("selected", "নির্বাচিত"))}` : ""}</div>${harvests
+          .filter((r) => r.date.startsWith(hy))
+          .map((r) => `<p>${esc(r.date)} · ${esc(r.variety || cropName(r.crop))} · ${num(r.yieldKg, 1)} kg</p>`)
+          .join("")}</div></div>`,
+    )
+    .join("");
   return (
     header(
       t(`Season archive  /  ${deskEn}`, `মৌসুমের খাতা  /  ${deskBn}`),
@@ -857,17 +968,19 @@ function seasonView() {
       ),
     ) +
     chips() +
+    `<div class="section-space">${seasonOutlookHero(f.id, outlookPack)}</div>` +
     panel(
       t("Choose a month", "মাস বাছুন"),
       select(
         t("Archive year", "রেকর্ডের বছর"),
         "historyYear",
-        [2021, 2022, 2023, 2024, 2025].map((y) => [y, String(y)]),
+        SEASON_YEARS.map((y) => [y, String(y)]),
         year,
       ) + monthControl(year),
       tag("2021–2025", "blue"),
     ) +
     `<div class="section-space">${outlookCard(f.id, outlookPack)}</div>` +
+    `<div class="section-space">${annualTiles(archiveMonths, year)}</div>` +
     stats(months, String(year)) +
     `<div class="notice section-space">${monthName()} ${year} · ${t("Rainfall", "বৃষ্টি")} <b>${num(m.rainGpm, 1)} mm</b> ${truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" })}. ${t("Same-month average in the other four archive years", "আর্কাইভের বাকি চার বছরে একই মাসের গড়")} <b>${num(comparisonMean, 1)} mm</b> ${nasaBadge("imerg", "2021–2025")}. ${t("This is a short historical comparison.", "এটি স্বল্পমেয়াদি ঐতিহাসিক তুলনা।")}</div>` +
     `<div class="grid-equal section-space">${panel(
@@ -916,9 +1029,18 @@ function seasonView() {
      },
    ) +
      `<p class="note">${t("These regional model indices describe relative wetness. A soil probe can supply a local reading.", "এলাকার মডেল থেকে আপেক্ষিক আর্দ্রতা পাওয়া যায়। জমির নিজস্ব মাপের জন্য মাটির সেন্সর ব্যবহার করুন।")}</p>` + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }), nasaBadge("wetness", String(year)),
- )}</div>
- <div class="grid-equal section-space">${panel(t("Dated optical observation", "স্যাটেলাইট পর্যবেক্ষণ"), year === 2024 && img ? `<div class="observation-thumb"><img src="${esc(img.url)}" alt="${t("Dated satellite image near the field", "জমির কাছের ল্যান্ডস্যাট ছবি")}"><div><b>${esc(img.date)}</b><p class="note">${img.sourceLabel ? "Sentinel-2 · 10 m" : "Landsat 8 · 30 m"}</p><p class="note">${esc(img.sceneId)}</p>${Number.isFinite(img.ndvi) ? `<p>NDVI ${num(img.ndvi, 2)}</p>` : ""}<a class="source-link" href="${esc(img.itemUrl)}" target="_blank" rel="noopener">${t("View scene record ↗", "ছবির উৎস ↗")}</a></div></div><p class="note">${t("This scene keeps its acquisition date as you move between months.", "মাস বদলালেও ছবিটি তার আসল তারিখেই দেখানো হয়।")}</p>` : `<p class="note">${t("No optical scene prepared for the selected year.", "এই বছরের স্যাটেলাইট ছবি প্রস্তুত নেই।")}</p>`, year === 2024 && img && !img.sourceLabel ? nasaBadge("landsat", img.date) : "")}
- ${panel(t("What grew here?", "এখানে কী ফসল হয়েছিল?"), `<p class="note">${history.length ? t("Harvests recorded in this year", "এই বছরে লেখা ফসল") : t("No verified harvests are recorded for this field in the selected year. Add a harvest to connect an actual variety and yield to this weather record.", "এই জমির নির্বাচিত বছরের যাচাই করা ফলনের তথ্য নেই। আবহাওয়ার সাথে তুলনা করতে একটি ফলনের রেকর্ড যোগ করুন।")}</p>${history.map((r) => `<p>${esc(r.date)} · ${esc(r.variety || cropName(r.crop))} · ${num(r.yieldKg, 1)} kg</p>`).join("")}<div class="spacer"></div>${button(t("Log a harvest", "ফলন লিখুন"), "new-harvest", "", "add")}`)}</div><div class="section-space">${opticalTable}</div>`
+ )}</div>` +
+ `<div class="section-space">${panel(
+   t("Compare year-by-year", "বছরের সাথে বছর তুলনা"),
+   yearBars(archiveMonths, year) +
+     `<p class="note">${t("Annual GPM IMERG totals. The highlighted bar is the selected year.", "IMERG-এর বার্ষিক মোট। গাঢ় দণ্ডটি নির্বাচিত বছর।")}</p>` +
+     truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2021–2025", cell: "10km" }),
+   nasaBadge("imerg", "2021–2025"),
+ )}</div>` +
+ `<div class="section-space">${floodCard(f.id, floodPack)}</div>` +
+ `<div class="section-space">${gracePanel(f.id)}</div>` +
+ `<div class="grid-equal section-space">${panel(t("Dated optical observation", "স্যাটেলাইট পর্যবেক্ষণ"), year === 2024 && img ? `<div class="observation-thumb"><img src="${esc(img.url)}" alt="${t("Dated satellite image near the field", "জমির কাছের ল্যান্ডস্যাট ছবি")}"><div><b>${esc(img.date)}</b><p class="note">${img.sourceLabel ? "Sentinel-2 · 10 m" : "Landsat 8 · 30 m"}</p><p class="note">${esc(img.sceneId)}</p>${Number.isFinite(img.ndvi) ? `<p>NDVI ${num(img.ndvi, 2)}</p>` : ""}<a class="source-link" href="${esc(img.itemUrl)}" target="_blank" rel="noopener">${t("View scene record ↗", "ছবির উৎস ↗")}</a></div></div><p class="note">${t("This scene keeps its acquisition date as you move between months.", "মাস বদলালেও ছবিটি তার আসল তারিখেই দেখানো হয়।")}</p>` : `<p class="note">${t("No optical scene prepared for the selected year.", "এই বছরের স্যাটেলাইট ছবি প্রস্তুত নেই।")}</p>`, year === 2024 && img && !img.sourceLabel ? nasaBadge("landsat", img.date) : "")}
+ ${panel(t("What grew here?", "এখানে কী ফসল হয়েছিল?"), `<p class="note">${harvests.length ? t("Harvests you recorded, newest first", "আপনার লেখা ফসল, নতুন আগে") : t("No verified harvests are recorded for this field in the selected year. Add a harvest to connect an actual variety and yield to this weather record.", "এই জমির নির্বাচিত বছরের যাচাই করা ফলনের তথ্য নেই। আবহাওয়ার সাথে তুলনা করতে একটি ফলনের রেকর্ড যোগ করুন।")}</p>${harvests.length ? `<div class="crophist">${harvestTimeline}</div>` : ""}<div class="spacer"></div>${button(t("Log a harvest", "ফলন লিখুন"), "new-harvest", "", "add")}`)}</div><div class="section-space">${opticalTable}</div>`
   );
 }
 async function mountMap() {
