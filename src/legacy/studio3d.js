@@ -108,6 +108,9 @@ import {
   computeAutoExaggeration,
   usdaTextureClass,
   easeOutCubic,
+  circuitSettle,
+  assemblyProgress,
+  ASSEMBLY_TOTAL_DURATION_S,
   easeInOutCubic,
   tweenValue,
   interpolateDonutArcs,
@@ -2633,16 +2636,16 @@ function fitPerspective(data, close = false) {
   if (!cameraPersp || !data) return;
   const b = outlineBounds(data.field.outlineM);
   const depth = currentBlock.depth || blockDepthM(b);
-  // Reference look: a low, nearly side-on shot of the block with a touch of
-  // yaw so the far wall peeks and the floating shadow sits visible below.
+  // Reference look: clean presentation with ~30° elevation and ~28° azimuth
+  // showing the long side and the cut face, everything visible with 8–12% margin.
   // Close-up still swings in tighter and higher.
-  const elevationDeg = close ? 22 : 14;
-  const yawDeg = close ? 26 : 10;
+  const elevationDeg = close ? 24 : 30;
+  const yawDeg = close ? 26 : 28;
   const phone = canvasHostEl.dataset.overlaySize === 'narrow';
   const compact = canvasHostEl.dataset.chrome === 'compact';
   const outlineM = phone && currentCutaway > 0.05
     ? currentBlock.ring.map(([x,z]) => [x,-z]) : data.field.outlineM;
-  const margin = close && phone ? 0.14 : isPhone() ? 0.22 : 0.18;
+  const margin = close && phone ? 0.12 : isPhone() ? 0.12 : 0.10;
   const fit = fitCameraToBlock({
     outlineM,
     depthM: depth,
@@ -2650,7 +2653,7 @@ function fitPerspective(data, close = false) {
     aspect: hostAspect(),
     elevationDeg,
     yawDeg,
-    margin: close ? 0.14 : margin,
+    margin: close ? 0.12 : margin,
   });
 
   // STUDIO5P: the default 3D-field framing fills ~70-75 % of the canvas width
@@ -2676,9 +2679,9 @@ function fitPerspective(data, close = false) {
   // phone camera. Compact (~70%) and desktop (~60%) targets are unchanged.
   const solved = close && !compact ? null : solveFramingMultiplier({
     outlineM, depthM: depth, fovDeg: cameraPersp.fov,
-    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.92 : compact ? 0.78 : 0.6,
+    aspect: hostAspect(), elevationDeg, yawDeg, margin, targetFrac: phone ? 0.90 : compact ? 0.76 : 0.62,
     region: space.region, topM: currentBlock.topMax + topSlack,
-    bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 7, maxMult: 8,
+    bottomM: currentBlock.bottomY - depth * 0.02, swayDeg: 2.5, maxMult: 8,
   });
   if (compact) {
     const centreY = Math.max(space.preferredCentreY, space.region.top + solved.heightFrac / 2);
@@ -3166,7 +3169,7 @@ function updateProbeCard() {
 /* --------------------------------------------------- STUDIO5M intro animation */
 
 function triggerIntroAnimation(force = false) {
-  if (!force && shouldSkipIntro({ prefersReducedMotion, isHidden: document.hidden || !isVisible })) return;
+  if (shouldSkipIntro({ prefersReducedMotion, isHidden: document.hidden || !isVisible })) return;
   if (!force) {
     try {
       const key = `ropon_studio_intro_${currentViewMode}`;
@@ -3179,14 +3182,12 @@ function triggerIntroAnimation(force = false) {
 
   const b = outlineBounds(currentData.field.outlineM);
   const depth = currentBlock.depth || blockDepthM(b);
-  const elevationDeg = isCloseView ? 22 : 14;
-  const yawDeg = isCloseView ? 26 : 10;
   const fit = fitPerspective(currentData, isCloseView);
   if (!fit) return;
 
   introAnim = {
     startTime: performance.now(),
-    duration: 3500, // 3.5s total
+    duration: ASSEMBLY_TOTAL_DURATION_S * 1000,
     finalDistance: fit.distance,
     finalTarget: fit.target,
     finalElevationDeg: fit.elevationDeg,
@@ -3194,9 +3195,18 @@ function triggerIntroAnimation(force = false) {
     depth,
   };
 
-  // Immediate start state: land low, crops 0, callouts hidden
+  // Immediate start state: components staggered from small offset (e.g. 0.8m below)
+  const offsetM = Math.min(1.0, Math.max(0.6, depth * 0.25));
   if (blockGroup) {
-    blockGroup.position.y = -depth;
+    blockGroup.position.y = -offsetM;
+    const topMesh = blockGroup.children.find((c) => c.userData.terrain && !c.userData.fadeOverlay);
+    if (topMesh) topMesh.position.y = -offsetM * 0.5;
+  }
+  if (waterMesh) {
+    waterMesh.position.y = -offsetM;
+  }
+  if (edgeTreesGroup) {
+    edgeTreesGroup.scale.set(0.001, 0.001, 0.001);
   }
   if (plantsGroup) {
     const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
@@ -3235,9 +3245,14 @@ function stopIntroAnimation(snapToEnd = true) {
   if (snapToEnd) {
     if (blockGroup) {
       blockGroup.position.y = 0;
+      const topMesh = blockGroup.children.find((c) => c.userData.terrain && !c.userData.fadeOverlay);
+      if (topMesh) topMesh.position.y = 0;
     }
     if (waterMesh) {
       waterMesh.position.y = 0;
+    }
+    if (edgeTreesGroup) {
+      edgeTreesGroup.scale.set(1, 1, 1);
     }
     if (plantsGroup) {
       const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
@@ -3256,7 +3271,12 @@ function stopIntroAnimation(snapToEnd = true) {
     if (topsoilEl) { topsoilEl.style.opacity = "1"; topsoilEl.style.transform = ""; }
     if (rootzoneEl) { rootzoneEl.style.opacity = "1"; rootzoneEl.style.transform = ""; }
     if (aquiferEl) { aquiferEl.style.opacity = "1"; aquiferEl.style.transform = ""; }
-    if (svgLeaders) { svgLeaders.style.opacity = "1"; }
+    if (svgLeaders) {
+      svgLeaders.style.opacity = "1";
+      svgLeaders.querySelectorAll(".callout-leader-line").forEach((l) => {
+        l.style.strokeDashoffset = "0";
+      });
+    }
     if (nodeA) { nodeA.style.opacity = "1"; nodeA.style.transform = ""; }
     if (nodeAp) { nodeAp.style.opacity = "1"; nodeAp.style.transform = ""; }
 
@@ -3282,7 +3302,7 @@ function updateIntroFrame(elapsedMs) {
   const tSec = elapsedMs / 1000;
   const progress = Math.min(1, elapsedMs / introAnim.duration);
 
-  // 1. Camera params: swing 70-90° (default 80°) while descending
+  // 1. Camera params: gentle swing and descent to base camera
   const cam = introCameraParams({
     progress,
     finalDistance: introAnim.finalDistance,
@@ -3296,14 +3316,30 @@ function updateIntroFrame(elapsedMs) {
     controls.update();
   }
 
-  // 2. Land rises in: translate-y from below over the first 1 s
+  // 2. Circuit Assembly staggered bottom-up animation:
+  const offsetM = Math.min(1.0, Math.max(0.6, introAnim.depth * 0.25));
+
+  // Stage 1: deep soil / water slab slides up into place (0.00 -> 0.45 s)
+  const slabP = assemblyProgress(tSec, "slab");
+  const slabSettle = circuitSettle(slabP);
   if (blockGroup) {
-    const landP = Math.min(1, tSec / 1.0);
-    const landEase = easeOutCubic(landP);
-    blockGroup.position.y = -introAnim.depth * (1 - landEase);
+    blockGroup.position.y = -offsetM * (1 - slabSettle);
+  }
+  if (waterMesh) {
+    waterMesh.position.y = -offsetM * 0.5 * (1 - slabSettle);
   }
 
-  // 3. Crops grow up (instance scale 0->1, staggered by row) during 0.6-2.2 s
+  // Stage 4: surface skin arrives and settles (0.45 -> 0.90 s)
+  const surfP = assemblyProgress(tSec, "surface");
+  const surfSettle = circuitSettle(surfP);
+  if (blockGroup) {
+    const topMesh = blockGroup.children.find((c) => c.userData.terrain && !c.userData.fadeOverlay);
+    if (topMesh) {
+      topMesh.position.y = -offsetM * 0.5 * (1 - surfSettle);
+    }
+  }
+
+  // Stage 5: Crops grow from 0 scale with a row-wise stagger (0.60 -> 1.45 s)
   if (plantsGroup) {
     const mesh = plantsGroup.children.find((c) => c.isInstancedMesh);
     if (mesh && mesh.userData.baseMatrices && mesh.userData.rowProgress) {
@@ -3313,7 +3349,7 @@ function updateIntroFrame(elapsedMs) {
       const count = rows.length;
       for (let i = 0; i < count; i++) {
         const offset = i * 16;
-        const scale = sampleRowCropScale(tSec, rows[i], 0.6, 2.2);
+        const scale = sampleRowCropScale(tSec, rows[i], 0.60, 1.45);
         for (let c = 0; c < 12; c++) {
           arr[offset + c] = base[offset + c] * scale;
         }
@@ -3322,68 +3358,67 @@ function updateIntroFrame(elapsedMs) {
     }
   }
 
-  // 4. Soil bands/water table reveal top->bottom during 1.0-2.6 s
-  if (waterMesh) {
-    const waterP = Math.max(0, Math.min(1, (tSec - 1.0) / 1.6));
-    waterMesh.position.y = -introAnim.depth * 0.4 * (1 - easeOutCubic(waterP));
+  // Stage 6: Trees pop in (1.15 -> 1.55 s)
+  if (edgeTreesGroup) {
+    const treeP = assemblyProgress(tSec, "trees");
+    const treeScale = circuitSettle(treeP);
+    edgeTreesGroup.scale.set(treeScale, treeScale, treeScale);
   }
 
-  // 5. Soil callouts + leader lines fade/slide in after 2.6 s (2.6-3.2 s)
+  // Stage 7: A/A' markers + soil pins fade in (1.40 -> 1.75 s)
+  const markersP = assemblyProgress(tSec, "markers");
+  const easeMarkers = easeOutCubic(markersP);
+  const slideOffset = (1 - easeMarkers) * 12;
+
   const topsoilEl = containerEl?.querySelector("#callout-topsoil");
   const rootzoneEl = containerEl?.querySelector("#callout-rootzone");
   const aquiferEl = containerEl?.querySelector("#callout-aquifer");
-  const svgLeaders = containerEl?.querySelector("#svg-callout-leaders");
   const nodeA = containerEl?.querySelector("#node-a");
   const nodeAp = containerEl?.querySelector("#node-ap");
+  const svgLeaders = containerEl?.querySelector("#svg-callout-leaders");
 
-  if (tSec < 2.6) {
-    if (topsoilEl) topsoilEl.style.opacity = "0";
-    if (rootzoneEl) rootzoneEl.style.opacity = "0";
-    if (aquiferEl) aquiferEl.style.opacity = "0";
-    if (svgLeaders) svgLeaders.style.opacity = "0";
-  } else {
-    const calloutP = Math.min(1, (tSec - 2.6) / 0.6);
-    const easeCallout = easeOutCubic(calloutP);
-    const slideOffset = (1 - easeCallout) * 16;
-    if (topsoilEl) {
-      topsoilEl.style.opacity = String(easeCallout);
-      topsoilEl.style.transform = `translateX(${slideOffset}px)`;
-    }
-    if (rootzoneEl) {
-      rootzoneEl.style.opacity = String(easeCallout);
-      rootzoneEl.style.transform = `translateX(${slideOffset}px)`;
-    }
-    if (aquiferEl) {
-      aquiferEl.style.opacity = String(easeCallout);
-      aquiferEl.style.transform = `translateX(${slideOffset}px)`;
-    }
-    if (svgLeaders) {
-      svgLeaders.style.opacity = String(easeCallout);
-    }
+  if (topsoilEl) {
+    topsoilEl.style.opacity = String(easeMarkers);
+    topsoilEl.style.transform = `translateX(${slideOffset}px)`;
+  }
+  if (rootzoneEl) {
+    rootzoneEl.style.opacity = String(easeMarkers);
+    rootzoneEl.style.transform = `translateX(${slideOffset}px)`;
+  }
+  if (aquiferEl) {
+    aquiferEl.style.opacity = String(easeMarkers);
+    aquiferEl.style.transform = `translateX(${slideOffset}px)`;
+  }
+  if (nodeA) {
+    nodeA.style.opacity = String(easeMarkers);
+    nodeA.style.transform = `scale(${0.6 + 0.4 * easeMarkers})`;
+  }
+  if (nodeAp) {
+    nodeAp.style.opacity = String(easeMarkers);
+    nodeAp.style.transform = `scale(${0.6 + 0.4 * easeMarkers})`;
   }
 
-  // A/A' pins pop in last (3.0-3.5 s)
-  if (tSec < 3.0) {
-    if (nodeA) nodeA.style.opacity = "0";
-    if (nodeAp) nodeAp.style.opacity = "0";
-  } else {
-    const pinP = Math.min(1, (tSec - 3.0) / 0.5);
-    const easePin = easeOutCubic(pinP);
-    if (nodeA) {
-      nodeA.style.opacity = String(easePin);
-      nodeA.style.transform = `scale(${0.5 + 0.5 * easePin})`;
-    }
-    if (nodeAp) {
-      nodeAp.style.opacity = String(easePin);
-      nodeAp.style.transform = `scale(${0.5 + 0.5 * easePin})`;
-    }
+  // Stage 8: leader lines draw (stroke-dashoffset) last (1.65 -> 2.10 s)
+  if (svgLeaders) {
+    const leadersP = assemblyProgress(tSec, "leaders");
+    svgLeaders.style.opacity = leadersP > 0 ? "1" : "0";
+    const drawEase = easeOutCubic(leadersP);
+    svgLeaders.querySelectorAll(".callout-leader-line").forEach((line) => {
+      let len = line.__totalLength;
+      if (!len) {
+        try { len = line.getTotalLength() || 100; } catch (e) { len = 100; }
+        line.__totalLength = len;
+        line.style.strokeDasharray = `${len}`;
+      }
+      line.style.strokeDashoffset = `${len * (1 - drawEase)}`;
+    });
   }
 
   sync3DCallouts();
 
   if (progress >= 1.0) {
     stopIntroAnimation(true);
-    // STUDIO5P: fade the idle sway in over 1.5 s from the exact end framing.
+    // Fade idle sway in gently from the exact end framing
     idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
   }
 }

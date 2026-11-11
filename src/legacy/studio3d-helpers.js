@@ -917,12 +917,12 @@ export function idleFloatOffset(timeS, fieldSpanM = 30, isDragging = false, pref
 // ------------------------------------------------- STUDIO5P idle sway helpers
 // Slow horizontal idle motion: the camera yaws around the field centre while the
 // block keeps only a residual vertical float. Pure (no three.js/DOM) — safe to unit test.
-export const IDLE_SWAY_PERIOD_S = 14;
-export const IDLE_SWAY_AMPLITUDE_DEG = 7; // studio ±7° (planner uses ±5°)
-export const IDLE_DOLLY_AMPLITUDE = 0.01; // ±1 % distance breathing
+export const IDLE_SWAY_PERIOD_S = 18; // subtler period (~14–20 s)
+export const IDLE_SWAY_AMPLITUDE_DEG = 2.0; // studio ±2° (reduced to ~1/3 of ±7°)
+export const IDLE_DOLLY_AMPLITUDE = 0.003; // tiny ±0.3% distance breathing
 export const IDLE_RESUME_DELAY_S = 6; // still seconds after input before motion resumes
 export const IDLE_EASE_IN_S = 1.5; // resume ramp duration
-export const IDLE_VERTICAL_SCALE = 0.2; // residual bob, ≤25 % of idleFloatOffset
+export const IDLE_VERTICAL_SCALE = 0.08; // residual bob, tiny vertical drift
 
 // Sinusoidal yaw/dolly/vertical offsets at wall-clock timeS. No gating here —
 // the caller scales by idleResumeGain() so pause/resume stays testable.
@@ -1573,15 +1573,59 @@ export function easeOutCubic(t) {
   return 1 - Math.pow(1 - p, 3);
 }
 
+// Circuit-assembly soft settle curve: smooth ease-out with <= 2% soft settle
+export function circuitSettle(t) {
+  const p = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
+  if (p <= 0) return 0;
+  if (p >= 1) return 1;
+  const ease = 1 - Math.pow(1 - p, 3);
+  // Crests around ~1.015 near t=0.78 and smoothly returns to exactly 1.0 (no bounce > 2%)
+  const settle = 0.3 * Math.sin(p * Math.PI) * Math.pow(p, 2) * (1 - p);
+  return ease + settle;
+}
+
+export const ASSEMBLY_STAGGER_ORDER = [
+  'slab',      // 1. deep soil / water slab
+  'rootzone',  // 2. root-zone band
+  'topsoil',   // 3. topsoil band
+  'surface',   // 4. surface skin
+  'crops',     // 5. crops / plants row-wise stagger
+  'trees',     // 6. trees pop in
+  'markers',   // 7. A/A markers + soil pins fade in
+  'leaders',   // 8. leader lines draw (stroke-dashoffset) last
+];
+
+export const ASSEMBLY_TOTAL_DURATION_S = 2.1; // ~1.8–2.4 s total
+
+export const ASSEMBLY_STAGES = {
+  slab:     { start: 0.00, end: 0.45 },
+  rootzone: { start: 0.15, end: 0.60 },
+  topsoil:  { start: 0.30, end: 0.75 },
+  surface:  { start: 0.45, end: 0.90 },
+  crops:    { start: 0.60, end: 1.45 },
+  trees:    { start: 1.15, end: 1.55 },
+  markers:  { start: 1.40, end: 1.75 },
+  leaders:  { start: 1.65, end: 2.10 },
+};
+
+export function assemblyProgress(tSec, stageName) {
+  const stage = ASSEMBLY_STAGES[stageName];
+  if (!stage) return 1;
+  const t = Number.isFinite(tSec) ? tSec : 0;
+  if (t <= stage.start) return 0;
+  if (t >= stage.end) return 1;
+  return Math.max(0, Math.min(1, (t - stage.start) / (stage.end - stage.start)));
+}
+
 export function introCameraParams({
   progress,
   finalDistance,
   finalTarget,
-  finalElevationDeg = 14,
-  finalYawDeg = 10,
-  swingDeg = 80,
-  heightMult = 1.6,
-  distMult = 1.35,
+  finalElevationDeg = 30,
+  finalYawDeg = 28,
+  swingDeg = 35,
+  heightMult = 1.25,
+  distMult = 1.18,
 }) {
   const p = easeOutCubic(progress);
   const startEl = finalElevationDeg * heightMult;
@@ -1615,16 +1659,16 @@ export function shouldSkipIntro({ prefersReducedMotion = false, isHidden = false
   return Boolean(prefersReducedMotion || isHidden || hasPlayed);
 }
 
-export function sampleRowCropScale(t, rowProgress = 0, startT = 0.6, endT = 2.2) {
+export function sampleRowCropScale(t, rowProgress = 0, startT = 0.6, endT = 1.45) {
   if (t <= startT) return 0;
   if (t >= endT) return 1;
   const duration = endT - startT;
-  // Stagger start by row progress across first ~40% of duration
-  const rowStart = startT + rowProgress * (duration * 0.4);
-  const rowEnd = rowStart + (duration * 0.6);
+  // Stagger start by row progress across first ~35% of duration
+  const rowStart = startT + rowProgress * (duration * 0.35);
+  const rowEnd = rowStart + (duration * 0.65);
   if (t <= rowStart) return 0;
   if (t >= rowEnd) return 1;
-  return easeOutCubic((t - rowStart) / (rowEnd - rowStart));
+  return circuitSettle((t - rowStart) / (rowEnd - rowStart));
 }
 
 // ------------------------------------------------------------- SMOOTH layer-switch tweens
