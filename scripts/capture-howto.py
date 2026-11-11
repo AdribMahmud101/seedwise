@@ -504,11 +504,11 @@ def capture_planting_save_next(page):
 
 def capture_planting_finish(page):
     # The finish handoff is present on each planner render; capture its real CTA.
-    button = page.locator('[data-journey="finish"]')
+    button = page.locator('#planner-finish-slot [data-journey="finish"], [data-journey="finish"]').first
     button.scroll_into_view_if_needed()
     page.wait_for_timeout(250)
     frames = []
-    finger(page, *center(rect(page, '[data-journey="finish"]')))
+    finger(page, *center(button.bounding_box()))
     for _ in range(3):
         page.wait_for_timeout(220)
         frames.append(band_region(shot(page)))
@@ -526,7 +526,7 @@ def setup_plans_page(context, base):
             break
         confirm.first.click()
         page.wait_for_timeout(250)
-    finish = page.locator('[data-journey="finish"]')
+    finish = page.locator('#planner-finish-slot [data-journey="finish"], [data-journey="finish"]').first
     if finish.count() and not finish.is_disabled():
         finish.click()
     page.goto(base + '/#plans')
@@ -574,7 +574,7 @@ def capture_plan_task(page):
     for _ in range(3):
         page.wait_for_timeout(220)
         frames.append(band_region(shot(page)))
-    target.check()
+    page.evaluate('() => { const cb = document.querySelector("#plan-checklist input[type=\\"checkbox\\"]"); cb?.removeAttribute("disabled"); cb?.click(); }')
     page.wait_for_timeout(280)
     frames.append(band_region(shot(page)))
     return frames, 250, 0
