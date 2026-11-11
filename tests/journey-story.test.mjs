@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as journey from '../src/legacy/journey.js';
 import * as story from '../src/legacy/journey-story.js';
+import { guide } from '../src/legacy/planty-guide.js';
 import { state, basePolygon, defaultProfile, defaultPriorities } from '../src/legacy/ui.js';
 
 const storage = new Map();
@@ -43,18 +44,20 @@ test('checklist state from plan + events per page', () => {
   // 2. Rotations page checklist
   story.setStoryPage('rotations', () => {});
   checklist = story.getPageChecklist('rotations');
-  assert.equal(checklist.length, 4);
-  assert.equal(checklist[0].id, 'rotation-priorities');
-  assert.equal(checklist[1].id, 'rotation-compare');
-  assert.equal(checklist[2].id, 'rotation-choose');
-  assert.equal(checklist[2].done, false);
-  assert.equal(checklist[3].id, 'rotation-constraints');
-  assert.equal(checklist[3].optional, true);
+  assert.equal(checklist.length, 5);
+  assert.equal(checklist[0].id, 'rotation-intro');
+  assert.equal(checklist[0].done, false);
+  assert.equal(checklist[1].id, 'rotation-priorities');
+  assert.equal(checklist[2].id, 'rotation-compare');
+  assert.equal(checklist[3].id, 'rotation-choose');
+  assert.equal(checklist[3].done, false);
+  assert.equal(checklist[4].id, 'rotation-constraints');
+  assert.equal(checklist[4].optional, true);
 
   // Confirm rotation
   journey.confirmRotation(rotation());
   checklist = story.getPageChecklist('rotations');
-  assert.equal(checklist[2].done, true);
+  assert.equal(checklist[3].done, true);
 
   // 3. Planner page checklist
   story.setStoryPage('planner', () => {});
@@ -99,6 +102,40 @@ test('Continue behaviour: incomplete triggers show-me target; complete allows ha
   const allowedComplete = story.handleContinue();
   assert.equal(allowedComplete, true);
   assert.equal(navigated.at(-1), 'rotations');
+});
+
+test('rotation intro ticks only after its last Next or an explicit Skip guide', async t => {
+  const originalDocument = globalThis.document;
+  const originalObserver = globalThis.MutationObserver;
+  t.after(() => {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+    if (originalObserver === undefined) delete globalThis.MutationObserver;
+    else globalThis.MutationObserver = originalObserver;
+  });
+  globalThis.document = { querySelector: () => null, body: {} };
+  globalThis.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  let steps;
+  t.mock.method(guide, 'sequence', sequence => { steps = sequence; });
+  for (const event of ['complete', 'skip']) {
+    const coach = await import(`../src/legacy/journey-story.js?intro-test=${event}`);
+    journey.startPlan();
+    journey.confirmField(field());
+    coach.setStoryPage('rotations', () => {});
+    coach.runShowMe();
+    assert.equal(steps.length, 6, 'the first Show me starts the intro');
+    assert.ok(steps.every(step => step.action === 'none'));
+    assert.ok(steps.every(step => step.scrollBehavior === 'instant'));
+    assert.ok(steps.slice(0, -1).every(step => step.onDone === undefined));
+    assert.equal(coach.getPageChecklist('rotations')[0].done, false);
+    if (event === 'complete') steps.at(-1).onDone();
+    else steps[1].onSkip();
+    assert.equal(coach.getPageChecklist('rotations')[0].done, true, event);
+    assert.equal(coach.getPageChecklist('rotations')[3].done, false, 'intro never chooses a rotation');
+  }
 });
 
 test('demo beat sequencer: order, progressive ticks, pause/exit, and own plan untouched', async () => {

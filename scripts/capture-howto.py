@@ -88,6 +88,19 @@ def setup_field_page(context, base):
     return page, errors
 
 
+def setup_rotation_intro_page(context, base):
+    page, errors = setup_field_page(context, base)
+    field_cta = page.locator('.journey-field-inline [data-journey="field"]')
+    if field_cta.count():
+        field_cta.click()
+        page.wait_for_timeout(500)
+    page.goto(base + '/#rotations')
+    page.wait_for_selector('.studio-stage-canvas-host canvas')
+    page.wait_for_timeout(2500)
+    page.add_style_tag(content='#journey-coach-host { display: none !important; }')
+    return page, errors
+
+
 def setup_rotation_page(context, base):
     page, errors = setup_field_page(context, base)
     field_cta = page.locator('.journey-field-inline [data-journey="field"]')
@@ -356,6 +369,25 @@ def capture_use(page):
     return frames, 250, 1
 
 
+def capture_rotation_intro(page):
+    frames = []
+    # 6 targets: 3D stage, month slider, view toggle, soil layers/labels, feature chips, layers button
+    page.evaluate('document.querySelector(\'[data-coach="show-me"][data-id="rotation-intro"]\').click()')
+    previous_text = ''
+    for _ in range(6):
+        page.wait_for_function('''previous => {
+          const root = document.querySelector('.planty-guide--tour');
+          return root && !root.hidden && root.querySelector('[aria-live]').textContent !== previous;
+        }''', arg=previous_text)
+        previous_text = page.locator('.planty-guide [aria-live]').inner_text()
+        for _ in range(2):
+            page.wait_for_timeout(220)
+            frames.append(shot(page))
+        page.locator('[data-guide="next"]').click()
+    assert page.locator('.planty-guide').count() == 0, 'intro must finish after six Next taps'
+    return frames, 667, 0
+
+
 def capture_rotation_priorities(page):
     page.locator('.priority-box').scroll_into_view_if_needed()
     page.wait_for_timeout(300)
@@ -603,6 +635,7 @@ CLIPS = [
     ('field-area', capture_area),
     ('field-constraints', capture_constraints),
     ('field-use', capture_use),
+    ('rotation-intro', capture_rotation_intro),
     ('rotation-priorities', capture_rotation_priorities),
     ('rotation-compare', capture_rotation_compare),
     ('rotation-choose', capture_rotation_choose),
@@ -637,7 +670,7 @@ def main():
                 context = browser.new_context(viewport={'width': VIEW_W, 'height': VIEW_H},
                                               device_scale_factor=DSF, is_mobile=True,
                                               has_touch=True, service_workers='block')
-                setup = setup_rotation_page if clip_id.startswith('rotation-') else setup_planner_page if clip_id.startswith('planting-') else setup_plans_page if clip_id.startswith('plan-') else setup_field_page
+                setup = setup_rotation_intro_page if clip_id == 'rotation-intro' else setup_rotation_page if clip_id.startswith('rotation-') else setup_planner_page if clip_id.startswith('planting-') else setup_plans_page if clip_id.startswith('plan-') else setup_field_page
                 page, errors = setup(context, base)
                 try:
                     frames, duration, poster_idx = capture(page)

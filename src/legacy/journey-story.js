@@ -23,7 +23,7 @@ let navigationCallback = null;
 // (field-constraints ticks only when the assumptions dialog is SAVED, never on open)
 const pageActivity = {
   field: { mapChecked: false, areaChecked: false, constraintsSaved: false },
-  rotation: { prioritiesChanged: false, compared: new Set(), constraintsSaved: false },
+  rotation: { introViewed: false, prioritiesChanged: false, compared: new Set(), constraintsSaved: false },
   planner: { seasonOpened: false, spacingChanged: false, seasonSaved: false },
   plan: { opened: false, calendarViewed: false, taskChecked: false, downloaded: false },
 };
@@ -215,11 +215,18 @@ export function getPageChecklist(page = activePage) {
       target: '[data-journey="field"], .journey-field-inline',
     });
   } else if (page === 'rotations') {
-    // Rotation: ○ Set what matters (priorities) · ○ Compare the top 2 · ○ Choose a rotation
+    // Rotation: ○ Meet your field in 3D · ○ Set what matters (priorities) · ○ Compare the top 2 · ○ Choose a rotation
+    const introDone = pageActivity.rotation.introViewed;
     const prioritiesSet = pageActivity.rotation.prioritiesChanged || (plan?.rotation?.priorities && Object.values(plan.rotation.priorities).some(v => v > 0));
     const comparedTop2 = pageActivity.rotation.compared.size >= 2 || !!(plan?.rotation);
     const rotationChosen = pageActivity.rotation.chosen || plan?.steps.rotation === 'done';
 
+    items.push({
+      id: 'rotation-intro',
+      text: t('Meet your field in 3D', '৩ডি-তে আপনার জমি দেখুন'),
+      done: introDone,
+      target: '#studio-3d-root, #studio-3d-host',
+    });
     items.push({
       id: 'rotation-priorities',
       text: t('Set what matters (priorities)', 'অগ্রাধিকার ঠিক করুন'),
@@ -492,20 +499,28 @@ export function runHowtoShowMe(id) {
   coachCollapsed = false;
   renderCoach();
   if (typeof document === 'undefined') return;
-  const onDone = id === 'plan-calendar' && (activePage === 'plan' || activePage === 'plans')
+  const onDone = (id === 'plan-calendar' && (activePage === 'plan' || activePage === 'plans'))
     ? () => {
       pageActivity.plan.calendarViewed = true;
+      renderCoach();
+    }
+    : (id === 'rotation-intro' && activePage === 'rotations')
+    ? () => {
+      pageActivity.rotation.introViewed = true;
       renderCoach();
     }
     : undefined;
   const steps = step.micro.map((micro, index) => ({
     target: micro.target,
+    targetAll: !!micro.targetAll,
+    scrollBehavior: id === 'rotation-intro' ? 'instant' : undefined,
     text: { en: micro.text.en, bn: micro.text.bn },
     action: micro.action,
     pose: 'pointing',
     timeout: 8000,
     inDialog: !!micro.inDialog,
     onDone: index === step.micro.length - 1 ? onDone : undefined,
+    onSkip: id === 'rotation-intro' ? onDone : undefined,
   }));
   guide.sequence(steps);
   watchGuideDialog(steps);
