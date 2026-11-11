@@ -468,8 +468,6 @@ const MONTH_NAMES_BN = ['জানু', 'ফেব্রু', 'মার্চ',
  * Question Panel 1: "When is the field bare or stressed?"
  */
 function panelWhenBareOrStressed(studioData) {
-  const rotId = getSelectedRotationId();
-  const f = field();
   const monthsData = studioData?.months || [];
 
   // Build 12-month strip
@@ -488,36 +486,36 @@ function panelWhenBareOrStressed(studioData) {
       statusLabel = t('Stressed', 'চাপে');
     }
 
-    return `<div class="month-cell ${statusClass}" title="${MONTH_NAMES_EN[i]}: ${statusLabel}">
-      <span class="month-name">${t(MONTH_NAMES_EN[i], MONTH_NAMES_BN[i])}</span>
-      <span class="month-indicator ${statusClass}"></span>
-      <span class="month-tag">${statusLabel}</span>
-    </div>`;
+    const description = esc(`${t(MONTH_NAMES_EN[i], MONTH_NAMES_BN[i])}: ${statusLabel}`);
+    return `<span class="month-cell ${statusClass}" role="img" aria-label="${description}" title="${description}"></span>`;
   }).join('');
 
   return `<section class="panel question-panel panel-left-rotation" id="panel-left-rotation">
     <div class="panel-header">
       <div class="eyebrow">${t('Question 01 · Seasonal calendar', 'প্রশ্ন ০১ · মৌসুমের ক্যালেন্ডার')}</div>
       <h3>${t('When is the field bare or stressed?', 'জমি কখন খালি বা চাপে থাকে?')} ${nasaBadge(['power', 'imerg'])}</h3>
-      <p class="panel-sub">${t('12-month crop coverage and moisture stress derived from Sentinel-2 & NASA POWER.', 'সেন্টিনেল-২ ও নাসা পাওয়ার তথ্যে ১২ মাসের জমি আচ্ছাদন ও পানির চাপ।')}</p>
+      <p class="panel-sub">${t('Crop cover & stress by month', 'মাস অনুযায়ী ফসলের আচ্ছাদন ও চাপ')}</p>
+      <details class="panel-info"><summary aria-label="${t('Seasonal calendar sources and explanation', 'মৌসুমের ক্যালেন্ডারের উৎস ও ব্যাখ্যা')}">ⓘ</summary><p>${t('12-month crop coverage and moisture stress derived from Sentinel-2 & NASA POWER.', 'সেন্টিনেল-২ ও নাসা পাওয়ার তথ্যে ১২ মাসের জমি আচ্ছাদন ও পানির চাপ।')}</p></details>
     </div>
     <div class="panel-body">
       <div class="month-strip-container">
-        <div class="month-strip-scroll" tabindex="0" role="region" aria-label="${t('12-month seasonal strip, scroll for all months', '১২ মাসের মৌসুমের চিত্র, সব মাস দেখতে স্ক্রল করুন')}"><div class="month-strip" role="group" aria-label="${t('12-month seasonal strip', '১২ মাসের মৌসুমের চিত্র')}">
+        <div class="month-strip cal cells" role="group" aria-label="${t('12-month seasonal strip', '১২ মাসের মৌসুমের চিত্র')}">
           ${monthCells}
-        </div></div>
+        </div>
+        <div class="cal-m" aria-hidden="true">${MONTH_NAMES_EN.map((name, i) => `<span title="${t(name, MONTH_NAMES_BN[i])}">${t(name[0], MONTH_NAMES_BN[i][0])}</span>`).join('')}</div>
         <div class="month-strip-legend">
           <span><span class="month-indicator month-crop"></span> ${t('Covered', 'ফসল')}</span>
-          <span><span class="month-indicator month-stressed"></span> ${t('Moisture stress', 'পানির চাপ')} ${truth('MODELED')}</span>
-          <span><span class="month-indicator month-bare"></span> ${t('Bare/Fallow', 'খালি')} ${truth('REMOTE_OBSERVED')}</span>
+          <span><span class="month-indicator month-stressed"></span> ${t('Stressed', 'চাপে')}</span>
+          <span><span class="month-indicator month-bare"></span> ${t('Bare', 'খালি')}</span>
+          ${truth('MODELED')}
         </div>
       </div>
       <div class="layout-switch-block">
         <span class="eyebrow">${t('3D Planting layout', '৩ডি বপন বিন্যাস')}</span>
         <div class="planting-layout-buttons" role="group">
-          <button type="button" class="btn-layout ${activePlantingLayout === 'rows' ? 'active' : ''}" data-layout="rows">${t('Line rows', 'সারি')}</button>
-          <button type="button" class="btn-layout ${activePlantingLayout === 'beds' ? 'active' : ''}" data-layout="beds">${t('Raised beds', 'উঁচু বেড')}</button>
-          <button type="button" class="btn-layout ${activePlantingLayout === 'drains' ? 'active' : ''}" data-layout="drains">${t('Bund drains', 'আইল নালা')}</button>
+          <button type="button" class="btn-layout ${activePlantingLayout === 'rows' ? 'active' : ''}" aria-pressed="${activePlantingLayout === 'rows'}" data-layout="rows">${t('Line rows', 'সারি')}</button>
+          <button type="button" class="btn-layout ${activePlantingLayout === 'beds' ? 'active' : ''}" aria-pressed="${activePlantingLayout === 'beds'}" data-layout="beds">${t('Raised beds', 'উঁচু বেড')}</button>
+          <button type="button" class="btn-layout ${activePlantingLayout === 'drains' ? 'active' : ''}" aria-pressed="${activePlantingLayout === 'drains'}" data-layout="drains">${t('Bund drains', 'আইল নালা')}</button>
         </div>
       </div>
     </div>
@@ -534,23 +532,26 @@ function panelWhereWillWaterCollect() {
   const lowPercent = siteLg?.stats?.lowPercent ?? 20.3;
   const minElev = siteLg?.stats?.minRelativeMetres ?? -5.1;
   const maxElev = siteLg?.stats?.maxRelativeMetres ?? 5.2;
-  const elevRange = (maxElev - minElev).toFixed(1);
+  const elevRange = maxElev - minElev;
 
   // S1 water flood data if available
   let s1FloodHtml = '';
   if (cachedS1Water && cachedS1Water !== false) {
     const s1Site = cachedS1Water[fid] || cachedS1Water.sites?.[fid] || cachedS1Water;
     if (s1Site && (s1Site.dates || Array.isArray(s1Site))) {
-      const dates = s1Site.dates || s1Site;
+      const dates = (s1Site.dates || s1Site).slice(0, 12);
+      const values = dates.map(d => d.flooded_pct).filter(Number.isFinite);
+      const allZero = dates.length === 12 && values.length === 12 && values.every(value => value === 0);
+      const floodSummary = allZero ? t('0 % every month', 'প্রতি মাসে ০ %')
+        : values.length ? `${num(Math.min(...values))}–${num(Math.max(...values))} %${values.length < 12 ? ` · ${t('partial year', 'আংশিক বছর')}` : ''}`
+        : t('No observations', 'কোনো পর্যবেক্ষণ নেই');
       s1FloodHtml = `<div class="s1-flood-table-wrap">
-        <div class="eyebrow">${t('Sentinel-1 monthly flooded area', 'সেন্টিনেল-১ মাসিক প্লাবিত এলাকা')} ${truth('REMOTE_OBSERVED')}</div>
-        <div class="s1-flood-grid">
-          ${dates.slice(0, 12).map((d) => `
-            <div class="s1-flood-cell">
-              <span class="s1-flood-date">${d.date ? d.date.slice(5) : ''}</span>
-              <strong class="s1-flood-pct">${d.flooded_pct != null ? `${num(d.flooded_pct)}%` : '—'}</strong>
-            </div>
-          `).join('')}
+        <p class="s1-flood-summary">${t('Sentinel-1 flooded area', 'সেন্টিনেল-১ প্লাবিত এলাকা')} ${esc(dates[0]?.date?.slice(0, 4) || '')}: <strong>${floodSummary}</strong></p>
+        <div class="s1-flood-dots" role="group" aria-label="${t('Monthly flooded area', 'মাসিক প্লাবিত এলাকা')}">
+          ${dates.map((d) => {
+            const description = esc(`${d.date || ''}: ${Number.isFinite(d.flooded_pct) ? `${num(d.flooded_pct)} %` : t('No observation', 'পর্যবেক্ষণ নেই')}`);
+            return `<span class="s1-flood-dot${!Number.isFinite(d.flooded_pct) ? ' missing' : d.flooded_pct > 0 ? ' flooded' : ''}" role="img" title="${description}" aria-label="${description}" data-date="${esc(d.date || '')}" data-flooded-pct="${Number.isFinite(d.flooded_pct) ? d.flooded_pct : ''}"></span>`;
+          }).join('')}
         </div>
       </div>`;
     }
@@ -560,30 +561,28 @@ function panelWhereWillWaterCollect() {
     <div class="panel-header">
       <div class="eyebrow">${t('Question 02 · Topography & drainage', 'প্রশ্ন ০২ · ভূ-প্রকৃতি ও নিষ্কাশন')}</div>
       <h3>${t('Where will water collect?', 'পানি কোথায় জমবে?')} ${nasaBadge('nasadem')}</h3>
-      <p class="panel-sub">${t('Low ground and drainage flow based on NASADEM 30m topography.', 'নাসাডেম ৩০মি ভূ-উচ্চতার ভিত্তিতে নিচু জমি ও পানি প্রবাহ।')}</p>
+      <details class="panel-info"><summary aria-label="${t('Water collection sources and explanation', 'পানি জমার উৎস ও ব্যাখ্যা')}">ⓘ</summary><p>${t('Low ground and drainage flow based on NASADEM 30m topography.', 'নাসাডেম ৩০মি ভূ-উচ্চতার ভিত্তিতে নিচু জমি ও পানি প্রবাহ।')} ${truth('MODELED', { source: 'NASADEM 30m' })}</p><p>${t('Sentinel-1 monthly flooded area', 'সেন্টিনেল-১ মাসিক প্লাবিত এলাকা')} ${truth('REMOTE_OBSERVED', { source: 'Sentinel-1 RTC, ESA/Copernicus' })}</p></details>
     </div>
     <div class="panel-body">
       <div class="low-ground-stat-box">
         <div class="stat-item">
-          <span class="stat-lbl">${t('Low-ground share', 'নিচু জমির অংশ')}</span>
-          <span class="stat-val"><strong>${num(lowPercent, 1)}%</strong> ${truth('MODELED', { source: 'NASADEM 30m' })}</span>
+          <span class="stat-lbl">${t('Low ground', 'নিচু জমি')}</span>
+          <span class="stat-val"><strong>${num(lowPercent, 1)} %</strong></span>
         </div>
         <div class="stat-item">
           <span class="stat-lbl">${t('Elevation range', 'উচ্চতার ব্যবধান')}</span>
-          <span class="stat-val">${num(elevRange, 1)} m</span>
+          <span class="stat-val"><strong>${num(elevRange, 1)} m</strong></span>
         </div>
       </div>
       <div class="drain-toggle-row">
         <div class="drain-control-group">
-          <span class="toggle-lbl">${t('Outlet drain:', 'নিষ্কাশন নালা:')}</span>
-          <button type="button" class="btn-drain-toggle ${drainTrenchActive ? 'active' : ''}" id="btn-toggle-drain">
-            ${drainTrenchActive ? t('Open (active)', 'খোলা (সক্রিয়)') : t('Blocked (off)', 'বন্ধ')}
+          <button type="button" class="btn-drain-toggle ${drainTrenchActive ? 'active' : ''}" id="btn-toggle-drain" aria-pressed="${drainTrenchActive}">
+            ${t('Outlet', 'নিষ্কাশন')}: ${drainTrenchActive ? t('Open', 'খোলা') : t('Blocked', 'বন্ধ')}
           </button>
         </div>
         <div class="drain-control-group">
-          <span class="toggle-lbl">${t('Canal outlet:', 'খাল মুখ:')}</span>
-          <button type="button" class="btn-block-toggle ${canalBlocked ? 'blocked' : 'open'}" id="btn-toggle-block">
-            ${canalBlocked ? t('Blocked!', 'আটকে আছে!') : t('Free flow', 'স্বাভাবিক')}
+          <button type="button" class="btn-block-toggle ${canalBlocked ? 'blocked' : 'open'}" id="btn-toggle-block" aria-pressed="${canalBlocked}">
+            ${t('Canal', 'খাল')}: ${canalBlocked ? t('Blocked', 'বন্ধ') : t('Free flow', 'স্বাভাবিক')}
           </button>
         </div>
       </div>
@@ -630,12 +629,12 @@ function panelWhatIsUnderMyField() {
   // 2. pH: local soil tests take precedence over SoilGrids nutrient values.
   const phVal = localPh != null ? localPh : siteNutrients?.ph?.value;
   const phClass = localPh != null ? (phVal < 5.5 ? t('Acidic', 'অম্লীয়') : phVal > 7.5 ? t('Alkaline', 'ক্ষারীয়') : t('Optimal', 'উপযুক্ত')) : nutrientClass('ph');
-  const phTruth = localPh != null ? truth('FARMER_REPORTED') : soilTruth;
+  const phTruth = localPh != null ? truth('FARMER_REPORTED') : '';
 
   // 3. OM: local percent or SoilGrids organic matter converted from g/kg to percent.
   const omVal = localOm != null ? localOm : (siteNutrients?.om?.value != null ? num(siteNutrients.om.value / 10, 2) : null);
   const omClass = localOm != null ? (omVal < 1.5 ? t('Low', 'কম') : omVal > 2.5 ? t('Good', 'ভালো') : t('Medium', 'মাঝারি')) : nutrientClass('om');
-  const omTruth = localOm != null ? truth('FARMER_REPORTED') : soilTruth;
+  const omTruth = localOm != null ? truth('FARMER_REPORTED') : '';
 
   // 4. Nitrogen
   const nVal = siteNutrients?.totalN?.value != null ? num(siteNutrients.totalN.value / 10, 3) : null;
@@ -653,7 +652,7 @@ function panelWhatIsUnderMyField() {
   function renderChip(key, label, val, unit, standardClass, truthBadge) {
     const isSelected = selectedNutrient === key;
     if (val != null) {
-      return `${key === 'moisture' ? '<div class="nasa-moisture-tile">' : ''}<button type="button" class="nutrient-chip ${isSelected ? 'active' : ''}" data-nutrient="${key}">
+      return `${key === 'moisture' ? '<div class="nasa-moisture-tile">' : ''}<button type="button" class="nutrient-chip ${isSelected ? 'active' : ''}" aria-pressed="${isSelected}" data-nutrient="${key}">
         <span class="chip-label">${label}</span>
         <span class="chip-val"><strong>${val}</strong> ${unit}</span>
         <span class="chip-class">${standardClass}</span>
@@ -668,25 +667,27 @@ function panelWhatIsUnderMyField() {
     <div class="panel-header">
       <div class="eyebrow">${t('Question 03 · Soil & nutrients', 'প্রশ্ন ০৩ · মাটি ও পুষ্টি উপাদান')}</div>
       <h3>${t('What is under my field?', 'আমার জমির মাটির নিচে কী আছে?')}</h3>
-      <p class="panel-sub">${t('NASA SMAP soil moisture, SoilGrids 250 m soil map, and your own test.', 'নাসা SMAP মাটির আর্দ্রতা, SoilGrids ২৫০ মি মাটির মানচিত্র, আর আপনার নিজের পরীক্ষা।')}</p>
+      <details class="panel-info"><summary aria-label="${t('Soil sources and explanation', 'মাটির তথ্যের উৎস ও ব্যাখ্যা')}">ⓘ</summary><p>${t('NASA SMAP soil moisture, SoilGrids 250 m soil map, and your own test.', 'নাসা SMAP মাটির আর্দ্রতা, SoilGrids ২৫০ মি মাটির মানচিত্র, আর আপনার নিজের পরীক্ষা।')}</p><p>${t('No open satellite or map data exists for these.', 'এগুলোর কোনো খোলা স্যাটেলাইট বা মানচিত্র তথ্য নেই।')}</p><p>${t('Water table', 'পানির স্তর')}: ${localGw != null ? truth('FARMER_REPORTED') : modelGw != null ? truth('MODELED', { source: 'Fan et al. 2017 ~1 km model' }) : truth('UNKNOWN')}${localGw == null && gwSpan ? ` · ${t('through the year', 'সারা বছরে')} ${gwSpan}` : ''}</p></details>
     </div>
     <div class="panel-body">
+      ${renderChip('moisture', t('Root-zone moisture', 'শিকড় স্তরের আর্দ্রতা'), moistureVal, 'm³/m³', moistureClass, nasaChip)}
+      <div class="soil-estimate-group">
       <div class="nutrient-chips-grid">
-        ${renderChip('moisture', t('Root-zone moisture', 'শিকড় স্তরের আর্দ্রতা'), moistureVal, 'm³/m³', moistureClass, nasaChip)}
         ${renderChip('ph', 'pH', phVal, '', phClass, phTruth)}
         ${renderChip('om', t('OM', 'জৈব পদার্থ'), omVal, '%', omClass, omTruth)}
-        ${renderChip('N', t('Nitrogen', 'নাইট্রোজেন (N)'), nVal, '%', nutrientClass('totalN'), soilTruth)}
-        ${renderChip('cec', t('CEC', 'ক্যাটায়ন বিনিময় ক্ষমতা (CEC)'), cecVal, 'cmol+/kg', nutrientClass('cec'), soilTruth)}
-        ${renderChip('P', t('Phosphorus', 'ফসফরাস'), pVal, 'mg/kg', '', '')}
-        ${renderChip('K', t('Potassium', 'পটাশিয়াম'), kVal, 'meq/100g', '', '')}
-        ${renderChip('S', t('Sulfur', 'সালফার'), null, '', '', '')}
-        ${renderChip('Zn', t('Zinc', 'জিংক'), znVal, 'mg/kg', '', '')}
-        ${renderChip('B', t('Boron', 'বোরন'), bVal, 'mg/kg', '', '')}
+        ${renderChip('N', 'N', nVal, '%', nutrientClass('totalN'), '')}
+        ${renderChip('cec', 'CEC', cecVal, 'cmol+/kg', nutrientClass('cec'), '')}
+        ${renderChip('P', 'P', pVal, 'mg/kg', '', '')}
+        ${renderChip('K', 'K', kVal, 'meq/100g', '', '')}
+        ${renderChip('S', 'S', null, '', '', '')}
+        ${renderChip('Zn', 'Zn', znVal, 'mg/kg', '', '')}
+        ${renderChip('B', 'B', bVal, 'mg/kg', '', '')}
       </div>
-      <p class="lab-test-note">${t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')} <strong>${missingLabels.join(' · ')}</strong><span>${t('No open satellite or map data exists for these.', 'এগুলোর কোনো খোলা স্যাটেলাইট বা মানচিত্র তথ্য নেই।')}</span></p>
+      ${[localPh == null ? phVal : null, localOm == null ? omVal : null, nVal, cecVal].some(value => value != null) ? soilTruth : ''}
+      </div>
+      <p class="lab-test-note">${t('Needs a lab test:', 'ল্যাব মাটি পরীক্ষা দরকার:')} <strong>${missingLabels.join(' · ')}</strong></p>
       <div class="groundwater-row">
-        <span>${t('Water table:', 'পানির স্তর:')} <strong>${localGw != null ? `${localGw} m` : modelGw != null ? `~${num(modelGw, 1)} m ${t('below ground', 'মাটির নিচে')}` : t('Unknown', 'অজানা')}</strong>${localGw == null && gwSpan ? ` <small>(${t('through the year', 'সারা বছরে')} ${gwSpan})</small>` : ''}</span>
-        ${localGw != null ? truth('FARMER_REPORTED') : modelGw != null ? truth('MODELED', { source: 'Fan et al. 2017 ~1 km model' }) : truth('UNKNOWN')}
+        <span>${t('Water table:', 'পানির স্তর:')} <strong>${localGw != null ? `${localGw} m` : modelGw != null ? `~${num(modelGw, 1)} m ${t('below ground', 'মাটির নিচে')}` : t('Unknown', 'অজানা')}</strong></span>
       </div>
       <div class="soil-test-action">
         <button type="button" class="button small" data-action="open-soil-modal">
@@ -959,6 +960,7 @@ function setupQuestionPanelEvents() {
       activePlantingLayout = layout;
       document.querySelectorAll('#panel-left-rotation .btn-layout').forEach((b) => {
         b.classList.toggle('active', b.getAttribute('data-layout') === layout);
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-layout') === layout));
       });
       // Call studio planting layout
       studioModule?.setPlantingLayout?.(layout);
@@ -972,7 +974,8 @@ function setupQuestionPanelEvents() {
     drainBtn.addEventListener('click', () => {
       drainTrenchActive = !drainTrenchActive;
       drainBtn.className = `btn-drain-toggle ${drainTrenchActive ? 'active' : ''}`;
-      drainBtn.textContent = drainTrenchActive ? t('Open (active)', 'খোলা (সক্রিয়)') : t('Blocked (off)', 'বন্ধ');
+      drainBtn.textContent = `${t('Outlet', 'নিষ্কাশন')}: ${drainTrenchActive ? t('Open', 'খোলা') : t('Blocked', 'বন্ধ')}`;
+      drainBtn.setAttribute('aria-pressed', String(drainTrenchActive));
     });
   }
 
@@ -981,7 +984,8 @@ function setupQuestionPanelEvents() {
     blockBtn.addEventListener('click', () => {
       canalBlocked = !canalBlocked;
       blockBtn.className = `btn-block-toggle ${canalBlocked ? 'blocked' : 'open'}`;
-      blockBtn.textContent = canalBlocked ? t('Blocked!', 'আটকে আছে!') : t('Free flow', 'স্বাভাবিক');
+      blockBtn.textContent = `${t('Canal', 'খাল')}: ${canalBlocked ? t('Blocked', 'বন্ধ') : t('Free flow', 'স্বাভাবিক')}`;
+      blockBtn.setAttribute('aria-pressed', String(canalBlocked));
     });
   }
 
@@ -1004,6 +1008,7 @@ function setupQuestionPanelEvents() {
       selectedNutrient = key;
       document.querySelectorAll('#panel-left-soil .nutrient-chip').forEach((c) => {
         c.classList.toggle('active', c === chip);
+        c.setAttribute('aria-pressed', String(c === chip));
       });
     });
   });

@@ -561,7 +561,7 @@ export function initRotationPanels() {
   // Drain & Block toggles
   const setupToggle = (btnId, states) => {
     const btn = document.getElementById(btnId);
-    if (!btn) return;
+    if (!btn || btn.closest('.question-panel')) return;
     let idx = 0;
     btn.addEventListener('click', () => {
       idx = (idx + 1) % states.length;
@@ -580,6 +580,7 @@ export function initRotationPanels() {
 
   // Nutrient chips
   document.querySelectorAll('.nutrient-chip').forEach(chip => {
+    if (chip.closest('.question-panel')) return;
     chip.addEventListener('click', () => {
       document.querySelectorAll('.nutrient-chip').forEach(c => {
         c.className = c === chip ? 'nutrient-chip py-1.5 rounded bg-[#173e30] text-[#fffdf5]' : 'nutrient-chip py-1.5 rounded bg-[#fffdf5] border border-[#cdcfc0] text-[#1b382e]';

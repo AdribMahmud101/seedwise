@@ -981,17 +981,7 @@ a:hover {
   box-sizing: border-box;
 }
 
-@media (min-width: 768px) and (max-width: 1099px) {
-  .rotation-question-panels-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-  .rotation-question-panels-row > *:last-child {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 767px) {
+@media (max-width: 899px) {
   .rotation-question-panels-row {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -1010,7 +1000,7 @@ a:hover {
 .question-panel {
   background: var(--surface, #fffef9);
   border: 1px solid var(--line, #d8dcd0);
-  border-radius: 5px;
+  border-radius: 10px;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -1020,7 +1010,8 @@ a:hover {
 }
 
 .question-panel .panel-header {
-  padding: 17px 20px;
+  position: relative;
+  padding: 18px 48px 18px 18px;
   border-bottom: 1px solid var(--line, #d8dcd0);
   display: flex;
   flex-direction: column;
@@ -1051,7 +1042,8 @@ a:hover {
 }
 
 .question-panel .panel-body {
-  padding: 20px;
+  flex: 1;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1074,36 +1066,31 @@ a:hover {
   min-width: 0;
 }
 
-.month-strip {
+.question-panel .month-strip {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 2px;
-  background: #f0efe8;
-  padding: 4px;
-  border-radius: 4px;
-  border: 1px solid #cdcfc0;
-}
-
-.month-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 3px;
-  padding: 6px 2px;
-  background: #fffdf5;
-  border-radius: 2px;
-  font-size: 12px;
-  text-align: center;
-  min-width: 0;
-  overflow: hidden;
+  height: 34px;
 }
 
-.month-name {
-  font-family: ui-monospace, Consolas, Bangla, monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: #536456;
+.question-panel .month-cell {
+  min-width: 0;
+  border-radius: 5px;
+}
+
+.question-panel .month-cell.month-crop { background: #a5c995; }
+.question-panel .month-cell.month-stressed { background: #e8d46a; }
+.question-panel .month-cell.month-bare {
+  background: repeating-linear-gradient(135deg, #e4e6d9 0 4px, #eff0e6 4px 8px);
+}
+
+.question-panel .cal-m {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px;
+  text-align: center;
+  font: 500 10px ui-monospace, Consolas, Bangla, monospace;
+  color: var(--muted, #6f7a6f);
 }
 
 .month-indicator {
@@ -1114,11 +1101,11 @@ a:hover {
 }
 
 .month-indicator.month-crop {
-  background: #315d42;
+  background: #a5c995;
 }
 
 .month-indicator.month-stressed {
-  background: #b9822d;
+  background: #e8d46a;
 }
 
 .month-indicator.month-bare {
@@ -1155,13 +1142,17 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-top: 0.5rem;
+  margin-top: auto;
+  padding-top: 16px;
 }
 
 .planting-layout-buttons {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  background: var(--sunk, #eff0e6);
+  border-radius: 9px;
 }
 
 .btn-layout {
@@ -1169,8 +1160,8 @@ a:hover {
   min-width: 44px;
   padding: 8px 6px;
   border-radius: 4px;
-  border: 1px solid #cdcfc0;
-  background: #fffdf5;
+  border: 1px solid transparent;
+  background: transparent;
   color: #1b382e;
   font-size: 12px;
   font-weight: 600;
@@ -1191,18 +1182,21 @@ a:hover {
 /* Low ground stat box */
 .low-ground-stat-box {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  background: #f8f6f2;
-  border: 1px solid #e2e4d8;
-  border-radius: 4px;
-  padding: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line, #e1e3d6);
+  border: 1px solid var(--line, #e1e3d6);
+  border-radius: 9px;
+  overflow: hidden;
 }
 
 .stat-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px 12px;
+  background: var(--surface, #fffef9);
 }
 
 .stat-lbl {
@@ -1222,7 +1216,7 @@ a:hover {
 /* Drain toggle row */
 .drain-toggle-row {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1278,7 +1272,7 @@ a:hover {
 
 .show-3d-action .button {
   min-height: 44px;
-  width: 100%;
+  width: fit-content;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1287,45 +1281,25 @@ a:hover {
 
 /* S1 water flood grid */
 .s1-flood-table-wrap {
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.s1-flood-grid {
+  margin-top: auto;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-  background: #f4f6ea;
-  padding: 6px;
-  border-radius: 4px;
-  border: 1px solid #e2e4d8;
-}
-
-.s1-flood-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  gap: 10px;
   font-size: 12px;
+  color: var(--muted, #6f7a6f);
 }
 
-.s1-flood-date {
-  color: #536456;
-  font-family: ui-monospace, Bangla, monospace;
-  font-size: 12px;
-}
-
-.s1-flood-pct {
-  color: #2563eb;
-  font-family: ui-monospace, Bangla, monospace;
-}
+.s1-flood-summary { margin: 0; }
+.s1-flood-summary strong { font-weight: 500; }
+.s1-flood-dots { display: flex; gap: 7px; }
+.s1-flood-dot { width: 6px; height: 6px; border-radius: 50%; background: #cdd2c2; }
+.s1-flood-dot.flooded { background: #2a5f9e; }
+.s1-flood-dot.missing { background: transparent; outline: 1px solid #cdd2c2; }
 
 /* Nutrient chips */
 .nutrient-chips-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .nutrient-chip {
@@ -1688,47 +1662,7 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
   font-size: 13px;
 }
 
-@media (max-width: 480px) {
-  .month-strip {
-    gap: 1px;
-    padding: 2px;
-  }
-  .month-cell {
-    padding: 4px 1px;
-    font-size: 12px;
-  }
-  .month-name {
-    font-size: 12px;
-  }
-  .nutrient-chips-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-
 @media screen {
-  .rotation-question-panels-row {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-    gap: 16px;
-  }
-  .rotation-question-panels-row > *:last-child {
-    grid-column: auto;
-  }
-  .month-strip {
-    min-width: 720px;
-    grid-template-columns: repeat(12, minmax(56px, 1fr));
-  }
-  .month-cell, .month-tag {
-    overflow: visible;
-    white-space: normal;
-    text-overflow: clip;
-  }
-  .question-panel .panel-body, .question-panel .panel-header {
-    padding: 16px;
-  }
-  .s1-flood-grid {
-    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-  }
   .main:has(#rotation-list) .priority-layout {
     grid-template-columns: minmax(240px, 0.8fr) minmax(0, 2fr);
   }
@@ -1760,7 +1694,7 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
     }
   }
   @container workspace (max-width: 40rem) {
-    #rotation-list .rotation-info, .low-ground-stat-box {
+    #rotation-list .rotation-info {
       grid-template-columns: minmax(0, 1fr);
     }
     .rotation-top {
@@ -1945,3 +1879,65 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
 .adv-seq { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .adv-seq button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid #cdd8c0; background: #fffef9; font: inherit; font-size: 14px; cursor: pointer; }
 .adv-seq button.on { background: #24392c; color: #f4f7ee; border-color: #24392c; }
+
+/* Compact question panels share the reference's hairlines, muted labels and mono facts. */
+.question-panel {
+  --line: #e1e3d6;
+  --muted: #6f7a6f;
+  --surface: #fffef9;
+  box-shadow: none;
+}
+.question-panel .panel-header { min-height: 132px; box-sizing: border-box; }
+.question-panel .panel-header .eyebrow { font: 500 10px ui-monospace, Consolas, Bangla, monospace; }
+.question-panel h3 { font-weight: 500; }
+.question-panel .panel-info { font-size: 12px; color: var(--muted); }
+.question-panel .panel-info summary {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 18px;
+}
+.question-panel .panel-info summary::-webkit-details-marker { display: none; }
+.question-panel .panel-info p { margin: 8px 0 0; }
+.question-panel :is(button, summary):focus-visible { outline: 2px solid #315c3d; outline-offset: 2px; }
+.question-panel .month-strip-legend { gap: 7px 10px; font-size: 11px; }
+.question-panel .month-strip-legend > .truth { margin-left: auto; font-size: 10px; }
+.question-panel :is(.btn-drain-toggle, .btn-block-toggle) { border-radius: 999px; padding: 6px 10px; font-family: inherit; font-size: 11px; font-weight: 500; }
+.question-panel .stat-val { font: 500 24px/1.1 ui-monospace, Consolas, Bangla, monospace; }
+.question-panel .stat-val strong { font-weight: 500; }
+.question-panel .soil-estimate-group { display: grid; gap: 8px; }
+.question-panel .soil-estimate-group > .truth { justify-self: start; font-size: 10px; max-width: 100%; white-space: normal; }
+.question-panel .nutrient-chip { min-width: 0; padding: 12px 8px; border-color: var(--line); border-radius: 8px; gap: 6px; }
+.question-panel .nutrient-chip .chip-val { order: -1; color: #1a2a21; font-size: 10px; }
+.question-panel .nutrient-chip .chip-val strong { font-size: 19px; font-weight: 500; }
+.question-panel .nutrient-chip .chip-label { color: var(--muted); font-size: 11px; font-weight: 500; }
+.question-panel .soil-estimate-group .chip-class {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.question-panel .nasa-moisture-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.question-panel .nasa-moisture-tile > .nasa-badge { position: static; margin: 0; }
+.question-panel .nasa-moisture-tile .nutrient-chip { border: 0; background: transparent; box-shadow: none; padding: 0; }
+.question-panel .nasa-moisture-tile .chip-label { order: -2; }
+.question-panel .nasa-moisture-tile .chip-val strong { font-size: 26px; }
+.question-panel .nasa-moisture-tile .chip-class { font-size: 12px; color: #8a5a12; }
+.question-panel .lab-test-note { margin: 0; padding: 0; border: 0; color: var(--muted); font-size: 11px; }
+.question-panel .lab-test-note strong { font-weight: 500; }
+.question-panel .groundwater-row { padding: 0; border: 0; background: transparent; color: var(--muted); }
+.question-panel .soil-test-action { margin-top: auto; }
+.question-panel .soil-test-action .button { justify-content: flex-start; padding: 0; border-color: transparent; background: transparent; font-size: 12px; text-align: left; }
+@media (max-width: 899px) {
+  .question-panel .panel-header { min-height: 0; padding: 16px 48px 16px 16px; }
+}
+@media (min-width: 900px) and (max-width: 1199px), (max-width: 359px) {
+  .question-panel .nutrient-chips-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

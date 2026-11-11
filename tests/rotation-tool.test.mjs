@@ -20,6 +20,29 @@ before(async () => {
 });
 
 describe('STUDIO5B Rotation Tool', () => {
+  it('leaves question-panel controls to their own handlers and still wires legacy controls', () => {
+    const previousDocument = global.document;
+    let inQuestionPanel = true;
+    let listeners = 0;
+    const control = {
+      closest: () => inQuestionPanel ? {} : null,
+      addEventListener: () => { listeners++; },
+    };
+    global.document = {
+      querySelectorAll: selector => selector === '.nutrient-chip' ? [control] : [],
+      getElementById: id => ['btn-toggle-drain', 'btn-toggle-block'].includes(id) ? control : null,
+    };
+    try {
+      rotationTool.initRotationPanels();
+      assert.equal(listeners, 0, 'legacy handlers must not overwrite compact chip labels or states');
+      inQuestionPanel = false;
+      rotationTool.initRotationPanels();
+      assert.equal(listeners, 3, 'legacy drain, canal and nutrient handlers stay available');
+    } finally {
+      global.document = previousDocument;
+    }
+  });
+
   describe('Ranking Reweight', () => {
     it('should map priority keys to engine keys correctly', () => {
       const tests = [
@@ -247,8 +270,8 @@ describe('STUDIO5B Rotation Tool', () => {
 
     it('lists nutrients without open data in one lab-test note instead of failure chips', () => {
       const rendered = rotationsModule.rotations();
-      assert.ok(rendered.includes('Needs a lab soil test:'));
-      assert.ok(rendered.includes('Phosphorus · Potassium · Sulfur · Zinc · Boron'));
+      assert.ok(rendered.includes('Needs a lab test:'));
+      assert.ok(rendered.includes('P · K · S · Zn · B'));
       assert.ok(!rendered.includes('nutrient-chip missing'));
       assert.ok(!rendered.includes("'0.50'") && !rendered.includes('>0.50<'));
     });
