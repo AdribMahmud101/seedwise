@@ -1,4 +1,4 @@
-import { getCustomPlan, clearCustomPlan, customPlanBanner } from './advisor.js';
+import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason } from './advisor.js';
 import {
   state,
   agronomy,
@@ -445,7 +445,7 @@ function schedulePlanner3d() {
         field: field(), polygon: polygon(), agronomy, soilProfile,
         planner: { ...state.planner },
         net: { inputs: netInputsFor(), edited: isNetEdited() },
-        custom: getCustomPlan(),
+        custom: customPlanFor3d(),
       });
     } catch (error) {
       if (version !== plannerVersion) return;
@@ -559,6 +559,7 @@ function plannerAction(action, value) {
     document.querySelector('[name="plantCrop"]:checked')?.focus({ preventScroll: true });
   }
   if (action === 'custom-plan-clear') { clearCustomPlan(); drawPlanner(); return; }
+  if (action === 'custom-season') { setCustomSeason(value); drawPlanner(); return; }
   if (action === 'plan-confirm' && activeSeason()) {
     const plan = seasonPlan();
     const next = nextSeason(plan, activeSeason(plan));

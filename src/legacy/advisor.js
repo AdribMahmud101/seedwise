@@ -139,6 +139,16 @@ export function getCustomPlan() {
     return p && Array.isArray(p.planting) && p.planting.length && p.fieldId === state.fieldId ? p : null;
   } catch { return null; }
 }
+let customSeasonIdx = 0;
+export function setCustomSeason(i) { customSeasonIdx = Math.max(0, Number(i) || 0); }
+// What the planner 3D draws: a rotation shows one season's crop on the whole field; mixed/hybrid/orchard split the land.
+export function customPlanFor3d() {
+  const p = getCustomPlan();
+  if (!p) return null;
+  if (p.mode !== 'rotation') return p;
+  const c = p.planting[Math.min(customSeasonIdx, p.planting.length - 1)];
+  return { ...p, planting: [{ ...c, sharePct: 100 }] };
+}
 export function clearCustomPlan() { try { localStorage.removeItem(CUSTOM_KEY); } catch { /* ignore */ } }
 function useInPlanner() {
   const r = ui.result;
@@ -158,11 +168,14 @@ export function customPlanBanner() {
   if (!p) return '';
   const [mark, en, bn, cls] = VERDICT[p.verdict] || VERDICT.possible_with_conditions;
   const usable = Number(state.planner?.usable) || 88;
+  const rotation = p.mode === 'rotation';
+  const seasonIdx = Math.min(customSeasonIdx, p.planting.length - 1);
   return `<section class="panel adv-plan-banner adv-${cls}" aria-label="${t('Custom plan', 'কাস্টম পরিকল্পনা')}">
     <div class="adv-plan-head"><span class="adv-mark">${mark}</span><div><span class="eyebrow">${t('Custom plan from Rotation studio', 'ফসলচক্র থেকে কাস্টম পরিকল্পনা')} · ${t(en, bn)}</span><h2>${esc(p.title || '')}</h2></div>
       <button type="button" class="button small" data-action="custom-plan-clear">${t('Back to standard planting', 'সাধারণ বপনে ফিরুন')}</button></div>
-    <div class="adv-plan-crops">${p.planting.map((c) => `<div class="adv-plan-crop"><i style="background:${esc(c.color)}"></i><div><strong>${esc(c.crop)}</strong>
-      <small>${c.sharePct}% ${t('of the field', 'জমির')} · ${esc(c.model)} · ${c.rowSpacingCm} × ${c.withinRowCm} cm · ~${customCount(area(), usable, c).toLocaleString()} ${t('plants', 'চারা')}</small></div></div>`).join('')}</div>
+    ${rotation ? `<p class="note">${t('Season rotation: each crop uses the whole field in its own season — pick a season to see it in 3D.', 'মৌসুমি চক্র: প্রতিটি ফসল নিজের মৌসুমে পুরো জমি নেয় — ৩ডি-তে দেখতে মৌসুম বাছুন।')}</p>` : ''}
+    <div class="adv-plan-crops">${p.planting.map((c, i) => `<${rotation ? `button type="button" data-action="custom-season" data-value="${i}" aria-pressed="${i === seasonIdx}"` : 'div'} class="adv-plan-crop${rotation && i === seasonIdx ? ' on' : ''}"><i style="background:${esc(c.color)}"></i><div><strong>${esc(c.crop)}</strong>
+      <small>${rotation ? t('whole field in its season', 'নিজের মৌসুমে পুরো জমি') : `${c.sharePct}% ${t('of the field', 'জমির')}`} · ${esc(c.model)} · ${c.rowSpacingCm} × ${c.withinRowCm} cm · ~${customCount(area(), usable, rotation ? { ...c, sharePct: 100 } : c).toLocaleString()} ${t('plants', 'চারা')}</small></div></${rotation ? 'button' : 'div'}>`).join('')}</div>
     <p class="note">${t('3D shows each crop in its share of the land (generic tree / bush / field-crop models; colours and spacing suggested by AI — general guidance, not measurements). Plant counts use your usable area.', '৩ডি-তে প্রতিটি ফসল তার জমির অংশে (সাধারণ গাছ/ঝোপ/মাঠফসলের মডেল; রং ও দূরত্ব এআই প্রস্তাবিত — সাধারণ নির্দেশনা)।')}</p>
   </section>`;
 }
