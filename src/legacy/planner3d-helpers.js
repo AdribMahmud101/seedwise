@@ -109,6 +109,145 @@ export function canopyVisualHeight(month, fieldSpanM) {
   return h;
 }
 
+export const MAX_PLANTS_PER_FIELD = 3200;
+
+// Cap instance count with honest note if real count exceeds it
+export function capPlantPositions(positions, maxPlants = MAX_PLANTS_PER_FIELD) {
+  if (!Array.isArray(positions)) return { positions: [], totalCount: 0, sampleStep: 1, sampleRatioNote: null };
+  const totalCount = positions.length;
+  if (totalCount <= maxPlants) {
+    return { positions, totalCount, sampleStep: 1, sampleRatioNote: null };
+  }
+  const sampleStep = Math.ceil(totalCount / maxPlants);
+  const sampled = [];
+  for (let i = 0; i < totalCount; i += sampleStep) {
+    sampled.push(positions[i]);
+  }
+  const sampleRatioNote = `showing every ${sampleStep}th plant (${sampled.length} of ${totalCount})`;
+  return { positions: sampled, totalCount, sampleStep, sampleRatioNote };
+}
+
+// Ease functions
+export function easeOutCubic(t) {
+  const p = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
+  return 1 - Math.pow(1 - p, 3);
+}
+
+export function easeInOutCubic(t) {
+  const p = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
+  return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+}
+
+// Map 2D point [x, y] to grid row index along the primary axis
+export function getRowIndex(point, bounds, rowsAlongX = false, rowSpacing = 1) {
+  if (!point || !bounds) return 0;
+  const coord = rowsAlongX ? point[1] : point[0];
+  const minCoord = rowsAlongX ? bounds.minY : bounds.minX;
+  const spacing = rowSpacing > 0 ? rowSpacing : 1;
+  return Math.max(0, Math.floor((coord - minCoord) / spacing));
+}
+
+// Calculate row-staggered transition progress [0..1]
+export function rowStaggerProgress(globalProgress, rowIndex, maxRows = 20, staggerFraction = 0.3) {
+  const p = Math.max(0, Math.min(1, Number.isFinite(globalProgress) ? globalProgress : 0));
+  const safeMax = Math.max(1, maxRows);
+  const rowRatio = Math.max(0, Math.min(1, rowIndex / safeMax));
+  const rowDelay = rowRatio * staggerFraction;
+  const rowDuration = 1 - staggerFraction;
+  if (p <= rowDelay) return 0;
+  if (p >= rowDelay + rowDuration) return 1;
+  return (p - rowDelay) / rowDuration;
+}
+
+// Match plant positions between old and new sets using nearest neighbor
+export function matchPlantPositions(oldPositions, newPositions) {
+  const oldList = Array.isArray(oldPositions) ? oldPositions : [];
+  const newList = Array.isArray(newPositions) ? newPositions : [];
+  const matched = [];
+  const usedOld = new Set();
+
+  for (let i = 0; i < newList.length; i++) {
+    const [nx, ny] = newList[i];
+    let bestOldIdx = -1;
+    let bestDist = Infinity;
+    for (let j = 0; j < oldList.length; j++) {
+      if (usedOld.has(j)) continue;
+      const [ox, oy] = oldList[j];
+      const dist = Math.hypot(nx - ox, ny - oy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestOldIdx = j;
+      }
+    }
+    // Only glide if reasonably close (within 15m), else grow in place
+    if (bestOldIdx >= 0 && bestDist <= 15) {
+      usedOld.add(bestOldIdx);
+      matched.push({
+        type: 'glide',
+        from: oldList[bestOldIdx],
+        to: newList[i],
+        newIndex: i,
+        oldIndex: bestOldIdx,
+      });
+    } else {
+      matched.push({
+        type: 'grow',
+        from: null,
+        to: newList[i],
+        newIndex: i,
+      });
+    }
+  }
+
+  const removed = [];
+  for (let j = 0; j < oldList.length; j++) {
+    if (!usedOld.has(j)) {
+      removed.push({
+        type: 'shrink',
+        from: oldList[j],
+        oldIndex: j,
+      });
+    }
+  }
+
+  return { matched, removed };
+}
+
+// Camera framing for ~85% width fill
+export function computeFieldFraming({ bounds, aspect = 1.5, fovDeg = 38, targetWidthRatio = 0.85, elevationDeg = 24, yawDeg = 14 }) {
+  const b = bounds || { width: 30, height: 30, cx: 0, cy: 0, radius: 15 };
+  const width = Math.max(1, b.width);
+  const height = Math.max(1, b.height);
+  const target = [b.cx, 0, -b.cy];
+  
+  const vFov = (fovDeg * Math.PI) / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+  
+  // To fill ~targetWidthRatio (85%) of viewport width:
+  // Visible width at distance d is 2 * d * tan(hFov / 2).
+  // 2 * d * tan(hFov / 2) * targetWidthRatio >= effectiveSpan.
+  const el = (elevationDeg * Math.PI) / 180;
+  const yaw = (yawDeg * Math.PI) / 180;
+  const effectiveSpan = Math.max(width, height * Math.cos(el));
+  const distance = (effectiveSpan / (2 * Math.tan(hFov / 2) * targetWidthRatio));
+  
+  const safeDistance = Math.max(5, distance);
+  const position = [
+    target[0] + Math.cos(el) * Math.sin(yaw) * safeDistance,
+    target[1] + Math.sin(el) * safeDistance,
+    target[2] + Math.cos(el) * Math.cos(yaw) * safeDistance,
+  ];
+
+  return {
+    target,
+    position,
+    distance: safeDistance,
+    elevationDeg,
+    yawDeg,
+  };
+}
+
+
 // Camera framing: place a perspective camera so the block's bounding sphere fits with a margin.
 // Returns { position: [x,y,z], target: [x,y,z], distance, radius } in world coords.
 export function fitCameraToBlock({ outlineM, depthM = 1.5, fovDeg = 40, aspect = 1.5,
