@@ -94,7 +94,7 @@ function render() {
   document.title = `${title} · Ropon Radar`;
   // Research desk and single Your plan hidden from the nav menu; My plans is always nav 04.
   const nav = pages
-    .filter(([id]) => id !== "research" && id !== "plan")
+    .filter(([id]) => !["research", "plan", "water"].includes(id)) // water hidden by owner; route still works by URL
     .map(
       ([id, en, bn], i) =>
         `<button data-go="${id}" class="nav-item ${id === current[0] ? "active" : ""}" ${id === current[0] ? 'aria-current="page"' : ""} title="${esc(t(en, bn))}">${icon(id)}<span>${t(en, bn)}</span><span class="number">0${i + 1}</span></button>`,
