@@ -130,6 +130,7 @@ import {
   cropStageColor as stageColor,
   fieldFlow, fillAndSpill, interpolateSoil, productivityZones,
   pondingWaterline,
+  fieldInfrastructure, infrastructureAt, distToPolygonEdge,
 } from "./studio3d-helpers.js";
 import {
   smoothOutline,
@@ -223,6 +224,7 @@ let leaderLayoutCache = null;
 let wideLayersOpen = false;
 let stageOverlayCleanup = null;
 let currentSurface = null;
+let infrastructureFeatures = [];
 const surfacePacks = new Map();
 
 /* --- SMOOTH animated surface-layer switching --- */
@@ -989,6 +991,129 @@ function buildBoundaryLine(ringM, heightAt) {
   return line;
 }
 
+const infrastructureNames = () => ({ bund: t('Bund', 'আল'), drain: t('Drain', 'নালা'),
+  path: t('Path', 'চলার পথ'), other: t('Other non-cultivable', 'অন্যান্য অকৃষি জমি') });
+const infrastructureColors = { bund: '#65503b', drain: '#47949e', path: '#c5ab7b', other: '#7c8950' };
+
+export function infrastructureDetailHtml(feature, fieldAreaM2, entered) {
+  return `<h3>${esc(infrastructureNames()[feature.id])}</h3>
+    <p class="studio-feature-source">${t(entered ? 'Entered by farmer' : 'Scenario default', entered ? 'কৃষকের দেওয়া' : 'কাল্পনিক ডিফল্ট')}</p>
+    <dl class="studio-feature-parameters">
+      <dt>${t('Width', 'প্রস্থ')}</dt><dd>${num(feature.widthM, 3)} m</dd>
+      <dt>${t('Length', 'দৈর্ঘ্য')}</dt><dd>${num(feature.lengthM, 2)} m</dd>
+      <dt>${t('Area', 'আয়তন')}</dt><dd>${num(feature.areaM2, 2)} m² · ${num(feature.areaM2 * 247.105381 / 10000, 3)} ${t('decimals', 'শতক')}</dd>
+      <dt>${t('Share of field', 'জমির অংশ')}</dt><dd>${num(fieldAreaM2 > 0 ? feature.areaM2 / fieldAreaM2 * 100 : 0, 2)}%</dd>
+    </dl>
+    <p class="note">${t('Illustrative placement; widths use your field inputs. Areas describe these zones. My field uses perimeter-based deductions for cultivable area.', 'অবস্থান কাল্পনিক; প্রস্থ জমির ইনপুট অনুযায়ী। আয়তন এই অঞ্চলগুলোর। আবাদি জমি গণনায় পরিসীমাভিত্তিক কর্তন হয়।')}</p>
+    <a href="#field" data-feature-edit>${t('Edit on My field', 'আমার জমিতে সম্পাদনা করুন')}</a>`;
+}
+
+function infrastructureFor(data, minimum = 0, renderedOutline = null) {
+  const outline = data.field.outlineM;
+  const triangles = THREE.ShapeUtils.triangulateShape(outline.map(([x, y]) => new THREE.Vector2(x, y)), []);
+  const heightAt = makeHeightAt(data);
+  const rendered = renderedOutline ? { outline: renderedOutline,
+    triangles: THREE.ShapeUtils.triangulateShape(renderedOutline.map(([x, y]) => new THREE.Vector2(x, y)), []) } : null;
+  return fieldInfrastructure(outline, triangles, state.netInputs?.[data.field.id] || {}, (x, y) => heightAt(x, -y), minimum, rendered);
+}
+
+function infrastructureChipsHtml(features) {
+  return features.map(f => `<button type="button" class="studio-feature-chip${openSoilBand === f.id ? ' highlight' : ''}" id="soil-pin-${f.id}" data-soil-pin="${f.id}"
+    aria-expanded="${openSoilBand === f.id}" aria-controls="studio-soil-popover"><i style="background:${infrastructureColors[f.id]}" aria-hidden="true"></i>${esc(infrastructureNames()[f.id])}</button>`).join('');
+}
+
+function refreshInfrastructureDetails(data) {
+  const areaM2 = data.field.areaHa * 10000 || Math.abs(ringSignedArea(data.field.outlineM));
+  const entered = !!state.netInputs?.[data.field.id];
+  const holder = containerEl?.querySelector('[data-feature-details]');
+  if (holder) holder.innerHTML = infrastructureFeatures.map(f => `<div data-soil-detail="${f.id}" ${openSoilBand === f.id ? '' : 'hidden'}>${infrastructureDetailHtml(f, areaM2, entered)}</div>`).join('');
+  const chips = containerEl?.querySelector('.studio-feature-chips');
+  if (chips) chips.innerHTML = infrastructureChipsHtml(infrastructureFeatures);
+  if (infrastructureNames()[openSoilBand]) popoverTrigger = containerEl.querySelector(`#soil-pin-${openSoilBand}`);
+  const note = containerEl?.querySelector('.studio-feature-note');
+  if (note) note.textContent = infrastructureFeatures.some(f => f.id !== 'other' && f.displayWidthM > f.widthM)
+    ? t('Sub-pixel widths enlarged for readability; parameters retain true scale.', 'দেখার সুবিধায় পিক্সেলের চেয়ে সরু প্রস্থ বড় করা হয়েছে; পরামিতি প্রকৃত মাপে।')
+    : t('Widths shown at true scale. Placement is illustrative.', 'প্রস্থ প্রকৃত মাপে। অবস্থান কাল্পনিক।');
+}
+
+function buildInfrastructure(data, heightAt, maxX, renderedOutline) {
+  const span = Math.max(...['width', 'height'].map(k => outlineBounds(data.field.outlineM)[k]));
+  // A single CSS pixel is the only horizontal enlargement; metrics keep physical widths.
+  infrastructureFeatures = infrastructureFor(data, span / Math.max(1, (canvasHostEl?.clientWidth || 600) * 0.65), renderedOutline);
+  refreshInfrastructureDetails(data);
+  const group = new THREE.Group();
+  for (const feature of infrastructureFeatures) {
+    const positions = [], colors = [], water = [], grass = [];
+    const base = new THREE.Color(feature.id === 'drain' ? '#665344' : infrastructureColors[feature.id]);
+    const cross = (x, y) => {
+      if (feature.id === 'bund') return Math.min(1, distToPolygonEdge(x, y, renderedOutline) / feature.displayWidthM);
+      if (feature.id === 'drain') {
+        const a = data.field.outlineM[feature.edgeIndex], b = data.field.outlineM[(feature.edgeIndex + 1) % data.field.outlineM.length];
+        const distance = Math.abs((b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0])) / Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const bund = infrastructureFeatures.find(f => f.id === 'bund')?.displayWidthM || 0;
+        return Math.max(0, Math.min(1, (distance - bund) / feature.displayWidthM));
+      }
+      return 0;
+    };
+    const lift = (x, y) => {
+      const u = cross(x, y);
+      if (feature.id === 'bund') return 0.045 + Math.sin(Math.PI * u) * Math.min(0.3, feature.widthM * 0.6);
+      if (feature.id === 'drain') return 0.035 + Math.pow(Math.abs(u - 0.5) * 2, 3) * 0.18;
+      return 0.045;
+    };
+    const vertex = ([x, y]) => {
+      positions.push(x, heightAt(x, -y) + lift(x, y), -y);
+      const hatch = feature.id === 'other' && ((x + y) % 1.8 + 1.8) % 1.8 < 0.45;
+      const shade = hatch ? 0.65 : 0.92 + Math.sin(x * 21 + y * 17) * 0.08;
+      colors.push(base.r * shade, base.g * shade, base.b * shade);
+      if (feature.id === 'drain') water.push(x, heightAt(x, -y) + 0.075, -y);
+    };
+    const tessellate = (a, b, c, depth = 0) => {
+      const sides = [[a, b, c], [b, c, a], [c, a, b]].sort((s, t) =>
+        Math.hypot(t[0][0] - t[1][0], t[0][1] - t[1][1]) - Math.hypot(s[0][0] - s[1][0], s[0][1] - s[1][1]));
+      const [p, q, r] = sides[0];
+      if (depth < 18 && Math.hypot(p[0] - q[0], p[1] - q[1]) > 1.5) {
+        const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+        tessellate(p, mid, r, depth + 1); tessellate(mid, q, r, depth + 1);
+        return;
+      }
+      const center = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3];
+      for (const edge of [[a, b], [b, c], [c, a]]) [edge[0], edge[1], center].forEach(vertex);
+      if (feature.id === 'bund' && Math.sin(center[0] * 13 + center[1] * 7) > 0.6) {
+        const [x, y] = center, h = heightAt(x, -y) + lift(x, y);
+        const size = Math.min(0.12, feature.displayWidthM * 0.3);
+        grass.push(x - size, h, -y, x + size, h, -y, x, h + 0.12, -y + 0.03);
+      }
+    };
+    for (const polygon of feature.polygons) {
+      const clipped = clipRing(polygon, maxX);
+      for (let i = 1; i < clipped.length - 1; i++) tessellate(clipped[0], clipped[i], clipped[i + 1]);
+    }
+    const meshFor = (array, material) => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(array, 3));
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.userData.infrastructure = feature.id;
+      mesh.visible = feature.id !== 'bund' || showBunds;
+      if (feature.id === openSoilBand && material.emissive) material.emissive.set(0x625027);
+      mesh.renderOrder = 3;
+      group.add(mesh);
+      return mesh;
+    };
+    const soilMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.98, side: THREE.DoubleSide });
+    if (feature.id === 'other') soilMaterial.onBeforeCompile = shader => {
+      shader.vertexShader = 'varying vec2 vInfrastructurePosition;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvInfrastructurePosition = position.xz;');
+      shader.fragmentShader = 'varying vec2 vInfrastructurePosition;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nfloat hatch = step(0.72, fract((vInfrastructurePosition.x + vInfrastructurePosition.y) / 1.4));\ndiffuseColor.rgb *= 1.0 - hatch * 0.35;');
+    };
+    const mesh = meshFor(positions, soilMaterial);
+    mesh.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    if (water.length) meshFor(water, new THREE.MeshPhysicalMaterial({ color: 0x47949e, roughness: 0.18, clearcoat: 1, side: THREE.DoubleSide }));
+    if (grass.length) meshFor(grass, new THREE.MeshStandardMaterial({ color: 0x657747, roughness: 1, side: THREE.DoubleSide }));
+  }
+  return group;
+}
+
 function makeElevationMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: false,
@@ -1206,11 +1331,7 @@ async function buildFieldBlock(data, cutawayFraction) {
   }
 
   // Bunds follow the actual boundary at terrain height; no tree features are supplied.
-  if (showBunds) {
-    const bund = buildBoundaryLine(ringM, heightAt);
-    bund.material.color.set(0x8b784b);
-    blockGroup.add(bund);
-  }
+  blockGroup.add(buildInfrastructure(data, heightAt, effectiveMaxX, smoothedOutline));
 
   // 3D Transect Line A -> A'
   const transect = transectEndpoints(ringM, bounds);
@@ -1706,6 +1827,14 @@ function buildPlantsAndRoots(data, monthIdx) {
   const geom = isFallow
     ? buildFallowResidueGeometry(Math.max(rowSpacing, plantSpacing))
     : buildClumpGeometry(month.cropId, h, Math.max(rowSpacing, plantSpacing), month.stage);
+  // Reserve the full rotated canopy, including maximum instance scale, jitter and wind.
+  const vertices = geom.getAttribute('position');
+  let canopyRadius = 0;
+  for (let i = 0; i < vertices.count; i++) canopyRadius = Math.max(canopyRadius, Math.hypot(vertices.getX(i), vertices.getZ(i)));
+  const clearance = canopyRadius * 1.2 * (month.cropId === 'potato' ? 1.35 : 1) + plantSpacing * 0.13 + h * 0.1;
+  const visibleOutline = currentBlock.ring.map(([x, z]) => [x, -z]);
+  positions = positions.filter(([x, y]) => pointInPolygon(x, y, visibleOutline) && !infrastructureAt(infrastructureFeatures, x, y, clearance));
+  if (!positions.length) { geom.dispose(); return; }
   
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -1804,6 +1933,7 @@ function buildRoots(data, month, heightAt) {
 
   for (let y = bounds.minY + step / 2; y <= bounds.maxY; y += step) {
     if (!pointInPolygon(cutX, y, data.field.outlineM)) continue;
+    if (infrastructureAt(infrastructureFeatures, cutX, y)) continue;
     const z = -y;
     const top = heightAt(cutX, z) + 0.02;
     const len = rootDepth * (0.75 + deterministic(rootIndex, 11) * 0.35);
@@ -2412,7 +2542,7 @@ function applyIdleFloat(timeS, nowMs = performance.now()) {
   idleActiveNow = false;
   if (!floatGroup) return;
   const hidden = typeof document !== "undefined" && document.hidden;
-  if (prefersReducedMotion || hidden || isDragging) {
+  if (prefersReducedMotion || hidden || isDragging || openSoilBand) {
     floatGroup.position.set(0, 0, 0);
     floatGroup.rotation.set(0, 0, 0);
     return;
@@ -2958,6 +3088,7 @@ function sync3DCallouts() {
   placeCallout(otx, heightAt(otx, otz) + 0.55, otz, 'callout-outlet', isWater && sliceU >= 0.88);
 
   // Soil stratigraphic callouts pinned to the front-facing cut wall
+  positionSoilPopover();
   const ringM = (currentBlock.ring || []).map(([x, negZ]) => [x, -negZ]);
   const camPos = activeCamera.position;
   const wallFace = findFrontFacingWallFace(ringM, camPos, cutFraction, currentBlock.effectiveMaxX ?? sx);
@@ -3792,6 +3923,8 @@ function updateSoilDetails(data) {
 }
 
 function updateOverlayLayout() {
+  const featureKey = canvasHostEl?.querySelector('.studio-feature-key');
+  if (featureKey) canvasHostEl.style.setProperty('--studio-feature-key-height', `${featureKey.offsetHeight}px`);
   if (!canvasHostEl || !containerEl) return;
   const width = canvasHostEl.clientWidth;
   const breakpoint = studioOverlayBreakpoint(width, canvasHostEl.clientHeight);
@@ -3850,8 +3983,13 @@ function updateOverlayLayout() {
 
 function highlightSoilBand(band) {
   hoveredBandId = band;
-  containerEl.querySelectorAll('.studio-soil-pin, .studio-callout-legend-item').forEach((el) => {
+  containerEl.querySelectorAll('.studio-soil-pin, .studio-callout-legend-item, .studio-feature-chip').forEach((el) => {
     el.classList.toggle('highlight', (el.dataset.soilPin || el.dataset.band) === band);
+  });
+  blockGroup?.traverse(mesh => {
+    if (mesh.userData.infrastructure && mesh.material?.emissive) {
+      mesh.material.emissive.set(mesh.userData.infrastructure === band ? 0x625027 : 0x000000);
+    }
   });
   requestRender();
 }
@@ -3875,10 +4013,13 @@ function closeSoilPopover(returnFocus = true) {
 
 function openSoilPopover(band, trigger) {
   clearTimeout(soilCloseTimer);
+  if (band === openSoilBand) return;
+  markIdleInput();
   suppressSoilHover = false;
   openSoilBand = band;
   popoverTrigger = trigger;
   containerEl.querySelector('#studio-soil-popover').hidden = false;
+  containerEl.querySelector('#studio-soil-popover').setAttribute('aria-label', infrastructureNames()[band] || t('Soil layer details', 'মাটির স্তরের বিবরণ'));
   containerEl.querySelectorAll('[data-soil-detail]').forEach((el) => { el.hidden = el.dataset.soilDetail !== band; });
   containerEl.querySelectorAll('[data-soil-pin]').forEach((el) => {
     el.setAttribute('aria-expanded', String(el.dataset.soilPin === band));
@@ -3891,12 +4032,15 @@ function positionSoilPopover() {
   if (!openSoilBand || !canvasHostEl) return;
   const popover = containerEl.querySelector('#studio-soil-popover');
   const pin = containerEl.querySelector(`#soil-pin-${openSoilBand}`);
+  if (!pin) return;
   const rect = canvasHostEl.getBoundingClientRect();
   const anchor = pin.getBoundingClientRect();
   // Use the clear region below the controls, including the title and one-time hint.
   const controlsBottom = Math.max(...[...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-compass')]
     .map((el) => el.getBoundingClientRect().bottom - rect.top));
   const bounds = { left: 8, top: controlsBottom + 8, right: rect.width - 8, bottom: rect.height - 8 };
+  const featureKey = canvasHostEl.querySelector('.studio-feature-key');
+  if (infrastructureNames()[openSoilBand] && featureKey) bounds.bottom = Math.min(bounds.bottom, featureKey.getBoundingClientRect().top - rect.top - 8);
   popover.style.width = `${Math.min(320, bounds.right - bounds.left)}px`;
   popover.style.maxHeight = `${Math.max(0, bounds.bottom - bounds.top)}px`;
   const placed = clampStudioPopover({ anchorX: anchor.left - rect.left + anchor.width / 2,
@@ -4070,6 +4214,7 @@ function bindOverlayEvents() {
     const pin = e.target.closest('[data-soil-pin]');
     if (pin) { openSoilPopover(pin.dataset.soilPin, pin); soilPinned = true; }
     if (e.target.closest('[data-close-soil]')) closeSoilPopover();
+    if (e.target.closest('[data-feature-edit]')) closeSoilPopover(false);
     if (e.target.closest('[data-dismiss-touch-hint]')) {
       containerEl.querySelector('.studio-touch-hint').hidden = true;
     }
@@ -4189,6 +4334,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
   rotationOptions = opts.rotations || null;
   activeRotationId = rotationOptions?.find((r) => r.active)?.id || data.rotation.id;
   onRotationSelect = opts.onRotationSelect || null;
+  infrastructureFeatures = infrastructureFor(data);
 
   const m = data.months[currentMonthIdx] || data.months[0];
   const truthTags = data.truth || {};
@@ -4399,9 +4545,14 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
               <span class="studio-pin-label" data-pin-label="${band}">${esc(soilPinLabel(band, calloutData[band]))}</span>
             </div>`).join("")}
         </div>
+        <div class="studio-feature-key" aria-label="${t('Field infrastructure colour key', 'জমির অবকাঠামোর রঙের নির্দেশিকা')}">
+          <div class="studio-feature-chips">${infrastructureChipsHtml(infrastructureFeatures)}</div>
+          <small class="studio-feature-note">${t('Widths shown at true scale. Placement is illustrative.', 'প্রস্থ প্রকৃত মাপে। অবস্থান কাল্পনিক।')}</small>
+        </div>
         <div id="studio-soil-popover" class="studio-soil-popover" role="dialog" aria-label="${t("Soil layer details", "মাটির স্তরের বিবরণ")}" hidden>
           <button type="button" data-close-soil class="studio-popover-close" aria-label="${t("Close", "বন্ধ করুন")}">×</button>
           ${["topsoil", "rootzone", "aquifer"].map((band) => `<div data-soil-detail="${band}" hidden>${soilDetailHtml(band, calloutData[band])}</div>`).join("")}
+          <div data-feature-details>${infrastructureFeatures.map(f => `<div data-soil-detail="${f.id}" hidden>${infrastructureDetailHtml(f, data.field.areaHa * 10000 || Math.abs(ringSignedArea(data.field.outlineM)), !!state.netInputs?.[data.field.id])}</div>`).join('')}</div>
         </div>
 
         <div class="studio-model-caption" aria-hidden="true">
@@ -4958,6 +5109,18 @@ function bindEvents(container) {
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, activeCamera);
       const hits = blockGroup ? raycaster.intersectObjects(blockGroup.children, true) : [];
+      const firstMesh = hits.find(hit => hit.object.isMesh && hit.object.visible);
+      const featureHit = firstMesh?.object.userData.infrastructure ? firstMesh : null;
+      if (featureHit && e.pointerType !== 'touch' && !suppressSoilHover && !soilPinned) {
+        canvas.style.cursor = 'pointer';
+        const id = featureHit.object.userData.infrastructure;
+        openSoilPopover(id, containerEl.querySelector(`#soil-pin-${id}`));
+        return;
+      }
+      if (!featureHit && infrastructureNames()[openSoilBand] && !soilPinned) {
+        clearTimeout(soilCloseTimer);
+        soilCloseTimer = setTimeout(() => { if (!soilPinned) closeSoilPopover(false); }, 300);
+      }
       let nextBand = null;
       if (hits.length > 0) {
         canvas.style.cursor = "pointer";
@@ -5007,6 +5170,10 @@ function bindEvents(container) {
 
     canvas.addEventListener("pointerleave", () => {
       canvas.style.cursor = "default";
+      if (infrastructureNames()[openSoilBand] && !soilPinned) {
+        clearTimeout(soilCloseTimer);
+        soilCloseTimer = setTimeout(() => { if (!soilPinned) closeSoilPopover(false); }, 300);
+      }
       if (openSoilBand) { highlightSoilBand(openSoilBand); return; } // keep the open card's band lit
       if (hoveredBandId !== null) {
         hoveredBandId = null;
@@ -5028,6 +5195,14 @@ function bindEvents(container) {
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, activeCamera);
       const hits = blockGroup ? raycaster.intersectObjects(blockGroup.children, true) : [];
+      const firstMesh = hits.find(hit => hit.object.isMesh && hit.object.visible);
+      const featureHit = firstMesh?.object.userData.infrastructure ? firstMesh : null;
+      if (featureHit) {
+        const id = featureHit.object.userData.infrastructure;
+        openSoilPopover(id, containerEl.querySelector(`#soil-pin-${id}`));
+        soilPinned = true;
+        return;
+      }
       if (hits.length > 0) {
         const pt = hits[0].point;
         const b = currentBlock.bounds;
