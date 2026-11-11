@@ -41,13 +41,16 @@ test('slider and number synchronize both ways, clamp, snap, and retain empty dra
   assert.equal(settings.row, 15);
 });
 
-test('Planty receives current context and explicitly reports the missing AI connection in both languages', async () => {
+test('Planty receives current planner numbers and handles an unavailable API in both languages', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ error: 'not_configured' }, { status: 503 }));
   const counts = { positions: 200000, net: 0.8, seedKg: null };
   const context = plantyContext('field-1', { ...recommendedSettings('rice'), usable: 80 }, counts, 'en');
-  assert.deepEqual(context, { fieldId: 'field-1', crop: 'rice', spacing: { rowCm: 20, withinRowCm: 20 }, usablePercent: 80, counts, lang: 'en' });
-  assert.match(await askPlanty({ question: 'How much seed?', context }), /Planty's AI connection is not set up yet/);
-  assert.match(await askPlanty({ question: 'বীজ কত লাগবে?', context: { ...context, lang: 'bn' } }), /এআই সংযোগ এখনো চালু হয়নি/);
-  assert.equal(context.counts.positions, 200000);
+  assert.equal(context.rowSpacingCm, 20);
+  assert.equal(context.withinRowCm, 20);
+  assert.equal(context.usableAreaPct, 80);
+  assert.match(await askPlanty({ question: 'How much seed?', context }), /planner numbers still work offline/);
+  assert.match(await askPlanty({ question: 'বীজ কত লাগবে?', context: { ...context, lang: 'bn' } }), /অফলাইন/);
+  assert.equal(context.plantCount, 200000);
 });
 
 test('crop handoffs preserve usable area; reset restores recommendations and keyboard focus', () => {
