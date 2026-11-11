@@ -2314,6 +2314,74 @@
   border-bottom-color: rgba(11, 61, 145, 0.35);
 }
 
+/* Compact soil cards use the Rotation Studio reference tokens. */
+.studio-soil-popover .callout-box,
+.studio-callout-legend .callout-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line, #e1e3d6);
+  border-radius: 10px;
+  background: var(--surface, #fffef9);
+  color: var(--fg, #1a2a21);
+  font: 13px/1.4 var(--f-body, system-ui, sans-serif);
+}
+.studio-soil-popover .callout-head,
+.studio-callout-legend .callout-head {
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.studio-soil-popover .callout-title,
+.studio-callout-legend .callout-title {
+  color: var(--fg, #1a2a21);
+  font: 600 15px/1.2 var(--f-body, system-ui, sans-serif);
+}
+.soil-truth,
+.callout-depth {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-strong, #cdd2c2);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--muted, #6f7a6f);
+  font: 500 10px/1.2 var(--f-mono, ui-monospace, monospace);
+  white-space: nowrap;
+}
+.soil-truth.scenario { border-style: dashed; }
+.soil-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.soil-fact {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px;
+  border: 1px solid var(--line, #e1e3d6);
+  border-radius: 8px;
+}
+.soil-fact b { font: 500 17px/1.15 var(--f-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+.soil-fact small,
+.soil-moisture small { color: var(--muted, #6f7a6f); font: 500 10px/1.3 var(--f-mono, ui-monospace, monospace); }
+.soil-fact .soil-gauge,
+.soil-moisture > span { height: 4px; overflow: hidden; border-radius: 99px; background: var(--sunk, #eff0e6); }
+.soil-fact .soil-gauge i,
+.soil-moisture > span i { display: block; height: 100%; border-radius: inherit; background: var(--accent, #315c3d); }
+.soil-moisture { grid-column: 1 / -1; display: grid; gap: 5px; padding: 2px 1px 0; }
+.soil-moisture > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.soil-moisture b { font: 500 11px var(--f-mono, ui-monospace, monospace); }
+.soil-info { position: relative; margin-left: auto; flex: none; }
+.soil-info summary { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line, #e1e3d6); border-radius: 50%; color: var(--muted, #6f7a6f); cursor: pointer; font: 500 13px var(--f-mono, ui-monospace, monospace); list-style: none; }
+.soil-info summary::-webkit-details-marker { display: none; }
+.soil-info > div { position: absolute; z-index: 5; top: calc(100% + 6px); right: 0; width: min(250px, calc(100vw - 56px)); padding: 9px 11px; border: 1px solid var(--line-strong, #cdd2c2); border-radius: 8px; background: var(--surface, #fffef9); box-shadow: 0 8px 22px #1a2a2120; color: var(--muted, #6f7a6f); font-size: 11px; }
+.soil-info p + p { margin-top: 5px; }
+.soil-well-btn { min-height: 28px; min-width: 0; justify-self: start; color: var(--accent, #315c3d); font-size: 11px; }
+.studio-callout-legend { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 10px; }
+.studio-callout-legend-item { min-height: 0; margin: 0; padding: 0; }
+@media (min-width: 900px) {
+  .studio-callout-legend { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* Declutter: layer list = one badge per row; numbers + partner badge live in the colour key, on one line. */
 .nasa-layer-row [data-hls-mode],
 .nasa-layer-row [data-photo-source] {
