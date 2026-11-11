@@ -142,7 +142,7 @@ test("desktop and mobile soil callouts show translated estimates and a separate 
       const soilTag = lang === "en" ? "Estimated · SoilGrids 250 m" : "আনুমানিক · SoilGrids 250 মি";
       const rootTag = lang === "en" ? "Estimated · NASA POWER ~50 km, top ~1 m" : "আনুমানিক · NASA POWER ~50 কিমি, উপরের ~1 মি";
       const cropTag = lang === "en" ? "Scenario" : "কাল্পনিক পরিকল্পনা";
-      for (const value of [rootValue, cropValue, `<small>${soilTag}</small>`, `<small>${rootTag}</small>`, `<small>${cropTag}</small>`]) {
+      for (const value of [rootValue, cropValue, `<p>${soilTag}</p>`, `<p>${rootTag}</p>`, `<p>${cropTag}</p>`]) {
         assert.equal(html.split(value).length - 1, 2, `${lang}: desktop and mobile both show ${value}`);
       }
       assert.doesNotMatch(html, /GWETROOT/);

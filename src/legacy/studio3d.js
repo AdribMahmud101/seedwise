@@ -3976,21 +3976,25 @@ function soilPinLabel(band, detail) {
 }
 
 function soilDetailHtml(band, detail) {
-  const truthLabel = band === "aquifer" && detail.isButton
-    ? t("Unknown — add local reading", "অজানা — স্থানীয় তথ্য দিন") : detail.truthLabel;
-  const title = { topsoil: t("Topsoil", "উপরের মাটি"), rootzone: t("Root zone", "শিকড় স্তর"), aquifer: t("Deep soil & water table", "গভীর মাটি ও পানির স্তর") }[band];
+  const title = { topsoil: t("Topsoil", "উপরের মাটি"), rootzone: t("Root zone", "শিকড় স্তর"), aquifer: t("Deep soil", "গভীর মাটি") }[band];
   const depth = String(detail.eyebrow || "").split(" · ")[0];
   // Only sources that really are NASA get the badge (root zone = NASA POWER soil moisture).
   const nasa = band === "rootzone" ? nasaBadge("wetness") : detail.nasaKey ? nasaBadge(detail.nasaKey, detail.nasaPeriod) : "";
-  return `<div class="callout-box ${band}${nasa ? " has-nasa" : ""}" title="${esc(truthLabel)}">
-    <div class="callout-head"><span class="callout-title">${esc(title)}</span><span class="callout-depth">${esc(depth)}</span>${nasa}</div>
-    <div class="callout-val">${detail.isButton
-      ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
-      : esc(detail.value)}</div>
-    ${detail.isButton ? "" : `<small>${esc(truthLabel)}</small>`}
-    ${detail.nasaValue ? `<div class="callout-val">${esc(detail.nasaValue)}</div><small>${esc(detail.nasaNote)}</small>` : ""}
-    ${detail.askReading ? `<button type="button" class="callout-btn" data-soil-test>${esc(t("Add your well reading", "আপনার কূপের মাপ দিন"))}</button>` : ""}
-    ${detail.cropValue ? `<div class="callout-val callout-crop">${esc(detail.cropValue)}</div><small>${esc(detail.cropTruthLabel)}</small>` : ""}
+  const labels = { FARMER_REPORTED: t("Measured", "মাপা"), MODELED: t("Estimated", "আনুমানিক"), UNKNOWN: t("Unknown", "অজানা") };
+  const truthChip = `<span class="soil-truth">${esc(labels[detail.truth] || detail.truthLabel)}</span>`;
+  const scenarioChip = detail.cropTruth ? `<span class="soil-truth scenario">${esc(t("Scenario", "কাল্পনিক পরিকল্পনা"))}</span>` : "";
+  const fact = (value, label) => value == null ? "" : `<div class="soil-fact"><b>${esc(value)}</b><small>${esc(label)}</small></div>`;
+  const tiles = band === "topsoil"
+    ? `${fact(detail.ph == null ? detail.texture : `pH ${detail.ph}`, detail.ph == null ? t("Texture", "মাটির ধরন") : t("Soil acidity", "মাটির অম্লতা"))}${detail.omPct == null ? "" : fact(`${detail.omPct} %`, t("Organic matter", "জৈব পদার্থ"))}`
+      + (detail.sfmc == null ? "" : `<div class="soil-moisture"><div><small>${esc(t("Surface", "পৃষ্ঠের"))}</small><b>${num(detail.sfmc, 2)} m³/m³</b></div><span><i style="width:${Math.round(detail.sfmc * 100)}%"></i></span></div>`)
+    : band === "rootzone"
+      ? `${detail.gwetroot == null ? fact(t("Unknown", "অজানা"), t("Soil moisture", "মাটির আর্দ্রতা")) : `<div class="soil-fact"><b>${esc(detail.value.match(/: (.*?) \(/)?.[1] || "")} · ${Math.round(Number(detail.gwetroot) * 100)} %</b><small>${esc(t("Soil moisture", "মাটির আর্দ্রতা"))}</small><span class="soil-gauge"><i style="width:${Math.round(Number(detail.gwetroot) * 100)}%"></i></span></div>`}${fact(detail.rootDepthM ? `~${detail.rootDepthM}` : detail.cropName, detail.rootDepthM ? t("Crop root depth", "ফসলের শিকড়ের গভীরতা") : t("Planned crop", "পরিকল্পিত ফসল"))}`
+      : `${fact(detail.gwDepthM != null ? `${Number(detail.gwDepthM).toFixed(1)} m` : detail.modelGwM != null ? `~${Number(detail.modelGwM).toFixed(1)} m` : null, t("Water table", "পানির স্তর"))}${fact(detail.twsAnomalyCm == null ? null : `${detail.twsAnomalyCm < 0 ? "−" : "+"}${Math.abs(detail.twsAnomalyCm).toFixed(1)} cm`, t("Storage vs normal", "স্বাভাবিকের তুলনায় সঞ্চয়"))}`;
+  const provenance = [detail.isButton ? null : detail.value, detail.truthLabel, detail.nasaValue, detail.nasaNote, detail.cropValue, detail.cropTruthLabel].filter(Boolean);
+  return `<div class="callout-box ${band}${nasa ? " has-nasa" : ""}">
+    <div class="callout-head"><span class="callout-title">${esc(title)}</span><span class="callout-depth">${esc(depth)}</span>${truthChip}${scenarioChip}${nasa}<details class="soil-info"><summary aria-label="${esc(t("Source details", "উৎসের বিবরণ"))}" title="${esc(t("Source details", "উৎসের বিবরণ"))}">ⓘ</summary><div>${provenance.map((line) => `<p>${esc(line)}</p>`).join("")}</div></details></div>
+    <div class="soil-tiles">${tiles}</div>
+    ${detail.askReading || detail.isButton ? `<button type="button" class="callout-btn soil-well-btn" data-soil-test>${esc(t("Add your well reading", "আপনার কূপের মাপ দিন"))}</button>` : ""}
   </div>`;
 }
 
