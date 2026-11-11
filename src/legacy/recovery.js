@@ -102,7 +102,7 @@ function emergency() {
   return `<section class="rr-emergency" aria-label="${esc(t("Emergency contacts", "জরুরি নম্বর"))}"><div class="rr-emergency-head"><h2>${t("If anyone is in danger, call first", "কেউ বিপদে থাকলে আগে কল করুন")}</h2><p>${t("Tap a number to call. Planning can wait.", "কল করতে নম্বরে ট্যাপ করুন। পরিকল্পনা পরে হবে।")}</p></div><div class="rr-emergency-nums">${contacts
     .map(
       (c) =>
-        `<a href="tel:${c.num}" class="${c.num === rel.num ? "relevant" : ""}"><span class="rr-emergency-num mono">${num(c.num).replace(/[,٬]/g, "")}</span><span>${word(c.name)}</span>${c.num === rel.num ? `<small>${t("Most useful now", "এখন সবচেয়ে কাজের")}</small>` : ""}</a>`,
+        `<a href="tel:${c.num}" class="${c.num === rel.num ? "relevant" : ""}"><span class="rr-emergency-num mono">${num(Number(c.num), 0).replace(/[,٬]/g, "")}</span><span>${word(c.name)}</span>${c.num === rel.num ? `<small>${t("Most useful now", "এখন সবচেয়ে কাজের")}</small>` : ""}</a>`,
     )
     .join("")}</div><p class="rr-emergency-src">${sources(contacts.map((c) => c.source))}</p></section>`;
 }
@@ -275,7 +275,7 @@ function nextCta(a) {
       "primary",
     );
   const rel = relevantContact();
-  return `<a class="button primary rr-call" href="tel:${rel.num}">${t("Call ", "কল করুন ") + num(rel.num).replace(/[,٬]/g, "")} · ${word(rel.name)}</a>`;
+  return `<a class="button primary rr-call" href="tel:${rel.num}">${t("Call ", "কল করুন ") + num(Number(rel.num), 0).replace(/[,٬]/g, "")} · ${word(rel.name)}</a>`;
 }
 function actions(a) {
   const g = guides[hazard()],
