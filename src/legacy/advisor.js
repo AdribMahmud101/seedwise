@@ -111,9 +111,9 @@ function resultHtml(r) {
 
 function presetRow() {
   loadPresets();
-  const mine = (presets || []).filter((x) => x.fieldId === state.fieldId);
+  const mine = (presets || []).filter((x) => x.fieldId === state.fieldId && x.verdict === 'recommended'); // only green plans are offered one-tap
   if (!mine.length) return '';
-  return `<div class="adv-presets"><span class="adv-presets-label">✦ ${t('Ready-made plans for this field — one tap', 'এই জমির তৈরি পরিকল্পনা — এক চাপে')}</span><div class="adv-presets-row">${mine.map((x, i) => {
+  return `<div class="adv-presets"><span class="adv-presets-label">✦ ${t('Recommended for this field — one tap', 'এই জমির জন্য প্রস্তাবিত — এক চাপে')}</span><div class="adv-presets-row">${mine.map((x, i) => {
     const [mark, , , cls] = VERDICT[x.verdict] || VERDICT.possible_with_conditions;
     return `<button type="button" class="adv-preset adv-${cls}" data-action="adv-preset" data-value="${i}"><span>${mark}</span><strong>${esc(x.crops.join(x.mode === 'rotation' ? ' → ' : ' + '))}</strong><small>${x.mode === 'rotation' ? t('seasons', 'মৌসুম') : x.mode === 'orchard' ? t('orchard', 'বাগান') : t('together', 'একসাথে')}</small></button>`;
   }).join('')}</div></div>`;
@@ -152,7 +152,7 @@ export async function advisorAction(action, value) {
   if (action === 'adv-use') { useInPlanner(); return; }
   if (action === 'adv-seq') { ui.sequence = value === '1'; ui.result = null; rerender(); return; }
   if (action === 'adv-preset') {
-    const x = (presets || []).filter((p) => p.fieldId === state.fieldId)[Number(value)];
+    const x = (presets || []).filter((p) => p.fieldId === state.fieldId && p.verdict === 'recommended')[Number(value)];
     if (!x) return;
     ui.crops = x.crops.slice(0, 2); ui.sequence = x.mode === 'rotation'; ui.planMode = x.mode; ui.error = '';
     ui.result = { ...x, source: x.source || 'pre-computed' };
