@@ -1829,3 +1829,19 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
   .adv-cal { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .adv-conf { margin-left: 0; }
 }
+
+/* Choose-rotation CTA on the field-chip row (right side). */
+.rot-chiprow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rot-chiprow > .field-selector { margin-bottom: 0; }
+.rot-choose-slot { margin-left: auto; }
+.rot-choose-btn { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 52px; padding: 8px 18px; border-radius: 12px; text-align: left; box-shadow: 0 6px 18px rgba(36, 57, 44, 0.22); }
+.rot-choose-main { font-weight: 700; font-size: 15px; }
+.rot-choose-sub { font-size: 12px; opacity: 0.85; display: flex; gap: 8px; align-items: center; }
+.rot-choose-score { padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); }
+.rot-choose-pulse { animation: rot-choose-glow 2.4s ease-in-out infinite; }
+@keyframes rot-choose-glow { 0%, 100% { box-shadow: 0 6px 18px rgba(36, 57, 44, 0.22), 0 0 0 0 rgba(122, 176, 92, 0.45); } 50% { box-shadow: 0 6px 18px rgba(36, 57, 44, 0.22), 0 0 0 8px rgba(122, 176, 92, 0); } }
+@media (prefers-reduced-motion: reduce) { .rot-choose-pulse { animation: none; } }
+@media (max-width: 700px) {
+  .rot-choose-slot { margin-left: 0; width: 100%; }
+  .rot-choose-btn { width: 100%; }
+}

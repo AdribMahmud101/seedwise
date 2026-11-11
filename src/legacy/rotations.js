@@ -210,7 +210,30 @@ function compactRotation(r, i, bestScore) {
 /**
  * Generate ranked rotation cards
  */
+// Prominent "choose" action beside the field chips: acts on the rotation currently previewed.
+function chooseTopCTA() {
+  const id = getSelectedRotationId();
+  const r = ranking().find((x) => x.id === id) || ranking()[0];
+  if (!r) return '';
+  const name = esc(t(r.label, r.bn || r.label));
+  const score = r.score != null ? `<span class="rot-choose-score">${r.score}/100</span>` : '';
+  const plan = getPlan();
+  if (plan) {
+    const ready = plan.steps.field === 'done';
+    return `<button type="button" class="button primary rot-choose-btn${ready ? ' rot-choose-pulse' : ''}" data-journey="rotation" data-value="${esc(r.id)}"${ready ? '' : ` disabled title="${esc(t('Use your field first', 'আগে জমি নিশ্চিত করুন'))}"`}>
+      <span class="rot-choose-main">${t('Choose this rotation →', 'এই ফসলচক্র বেছে নিন →')}</span><span class="rot-choose-sub">${name} ${score}</span></button>`;
+  }
+  return `<button type="button" class="button primary rot-choose-btn" data-action="layout-for" data-value="${esc(r.id)}">
+    <span class="rot-choose-main">${t('Plan planting with this →', 'এটি দিয়ে বপন সাজান →')}</span><span class="rot-choose-sub">${name} ${score}</span></button>`;
+}
+function refreshChooseCTA() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return; // tests / non-DOM
+  const slot = document.querySelector('#rot-choose-slot');
+  if (slot) slot.innerHTML = chooseTopCTA();
+}
+
 function rankedCards() {
+  queueMicrotask(refreshChooseCTA);
   const f = field();
   if (!f?.monthly || !f.monthly.length) {
     return stateEmpty(t('Weather data not loaded for this field', 'এই জমির আবহাওয়ার তথ্য লোড করা নেই'));
@@ -797,7 +820,7 @@ function rotations() {
       button(t('Field constraints', 'জমির শর্ত'), 'profile', '', 'draw') +
         button(t('Field plan', 'জমির পরিকল্পনা'), 'print', 'secondary-action', 'print')
     ) +
-    chips() +
+    `<div class="rot-chiprow">${chips()}<div class="rot-choose-slot" id="rot-choose-slot">${chooseTopCTA()}</div></div>` +
     `<div id="studio-3d-host">${studioSkeletonCard()}</div>` +
     `<div id="rotation-question-panels" class="rotation-question-panels-row">` +
       panelWhenBareOrStressed(null) +
