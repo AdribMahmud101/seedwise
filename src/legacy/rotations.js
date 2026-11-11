@@ -34,6 +34,7 @@ import * as rotationTool from './rotation-tool.js';
 import { outlookSeasonLine } from './outlook-flood.js';
 import { confirmRotation, getPlan, rotationSnapshot, subscribe } from './journey.js';
 import { journeyRotationCTA } from './journey-bar.js';
+import { advisorCard, advisorAction } from './advisor.js';
 
 function syncSeasonRotation(id = getSelectedRotationId()) {
   if (!agronomy || !field() || !getPlan()?.field) return;
@@ -223,9 +224,9 @@ function rankedCards() {
   const topCount = bestScore == null ? 1 : items.filter((r) => r.score === bestScore).length;
   const top = items.slice(0, topCount).map((r, i) => rotationCard(r, i, Boolean(sum && r.score != null), sum, fieldAreaHa, selectedTariff)).join('');
   const others = items.slice(topCount);
-  if (!others.length) return top;
+  if (!others.length) return top + advisorCard();
   const allExpanded = others.every((r) => expandedRotations.has(r.id));
-  return `${top}<section class="rotation-candidates" aria-label="${t('Compare other rotations', 'অন্য ফসলচক্র তুলনা করুন')}">
+  return `${top}${advisorCard()}<section class="rotation-candidates" aria-label="${t('Compare other rotations', 'অন্য ফসলচক্র তুলনা করুন')}">
     <div class="rotation-candidates-heading"><h2>${t(`Compare other rotations (${others.length})`, `অন্য ফসলচক্র তুলনা করুন (${others.length})`)}</h2>
       <button type="button" class="rotation-show-all" data-action="rotation-details" data-value="all" aria-expanded="${allExpanded}">${allExpanded ? t('Hide all', 'সব বন্ধ') : t('Show all', 'সব দেখুন')}</button>
     </div>
@@ -1039,6 +1040,7 @@ function method() {
  * Handle rotation actions
  */
 function rotationAction(action, value) {
+  if (String(action).startsWith('adv-')) return advisorAction(action, value);
   if (action === 'rotation-details') {
     const list = document.querySelector('#rotation-list');
     if (!list) return;
