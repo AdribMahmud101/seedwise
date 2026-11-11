@@ -351,3 +351,8 @@
 body:has(.demo-controls-bar) .coach-host {
   display: none;
 }
+
+/* One Planty at a time: hide the coach while a spotlight step (not a passive hint) is showing. */
+body:has(.planty-guide:not(.planty-guide--hint)) .coach-host {
+  display: none;
+}
