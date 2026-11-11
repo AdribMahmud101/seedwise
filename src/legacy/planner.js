@@ -83,11 +83,20 @@ function seasonTabs(plan = seasonPlan()) {
     return `<div class="plan-season-summary-chip"><b>${seasonLabel(season)}${custom ? ` · ${esc(t(PLANTING[settings.crop].label, PLANTING[settings.crop].bn))} (${t('Custom', 'নিজস্ব')})` : ''}</b><span>${counts} · ${!settings ? t('Fallow', 'পতিত') : settings.confirmedAt ? t('Reviewed ✓', 'যাচাই হয়েছে ✓') : t('Needs review', 'যাচাই বাকি')}</span></div>`;
   }).join('')}</div>`;
 }
+// Next non-fallow season in the rotation's order (the timeline the farmer follows).
+function nextSeason(plan, season) {
+  const seasons = plan.rotation.seasons;
+  return seasons.slice(seasons.indexOf(season) + 1).find(item => item.crop !== 'fallow') || null;
+}
 function seasonConfirmation(plan = seasonPlan()) {
   const season = activeSeason(plan);
   if (!season) return '';
   const confirmed = plan.planting[season.key].confirmedAt;
-  return `<button type="button" class="button primary plan-confirm" data-action="plan-confirm" ${plan.steps.rotation !== 'done' ? 'disabled' : ''}>${confirmed ? t('Reviewed ✓', 'যাচাই হয়েছে ✓') : t('Looks good ✓', 'ঠিক আছে ✓')}</button>${plan.steps.rotation !== 'done' ? `<p class="note"><a href="#rotations">${t('Review your rotation first', 'আগে ফসলচক্র যাচাই করুন')}</a></p>` : ''}`;
+  const next = nextSeason(plan, season);
+  const label = next
+    ? t(`Save & next: ${seasonLabel(next)} · ${monthName(next.sowMonth - 1, true)}–${monthName(next.harvestMonth - 1, true)} →`, `সংরক্ষণ করে পরের মৌসুম: ${seasonLabel(next)} →`)
+    : t('Save & see my plan →', 'সংরক্ষণ করে পুরো পরিকল্পনা দেখুন →');
+  return `<button type="button" class="button primary plan-confirm" data-action="plan-confirm" ${plan.steps.rotation !== 'done' ? 'disabled' : ''}>${confirmed ? '✓ ' : ''}${label}</button>${plan.steps.rotation !== 'done' ? `<p class="note"><a href="#rotations">${t('Review your rotation first', 'আগে ফসলচক্র যাচাই করুন')}</a></p>` : ''}`;
 }
 
 const cropIds = {
@@ -504,8 +513,13 @@ function plannerAction(action, value) {
     document.querySelector('[name="plantCrop"]:checked')?.focus({ preventScroll: true });
   }
   if (action === 'plan-confirm' && activeSeason()) {
+    const plan = seasonPlan();
+    const next = nextSeason(plan, activeSeason(plan));
     saveSeasonPlanting({ confirmedAt: new Date().toISOString() });
     refreshSeasonChrome();
+    // Save moves along the timeline: open the next season, or finish on the last one.
+    if (next) document.querySelector(`#plan-seasons [role="tab"][data-value="${next.key}"]`)?.click();
+    else document.querySelector('[data-journey="finish"]:not(:disabled)')?.click();
     document.querySelector('[data-action="plan-confirm"]')?.focus({ preventScroll: true });
   }
   if (action === 'plan-guide') guide.sequence([

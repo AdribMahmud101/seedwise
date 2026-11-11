@@ -57,7 +57,7 @@ export function canFinishPlanting(plan) {
     }));
 }
 
-// Name the seasons still waiting for "Looks good ✓" so a disabled Finish is never a mystery.
+// Name the seasons still not yet saved so a disabled Finish is never a mystery.
 export function finishNote(plan) {
   const names = { aman: 'Aman rice', boro: 'Boro rice' };
   const left = (plan.rotation?.seasons || []).filter(s => s.crop !== 'fallow' && !plan.planting?.[s.key]?.confirmedAt);

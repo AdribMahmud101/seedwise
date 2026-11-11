@@ -179,7 +179,7 @@ export function getPageChecklist(page = activePage) {
       target: '.rotation-card.best [data-journey="rotation"], [data-journey="rotation"]',
     });
   } else if (page === 'planner') {
-    // Planting: ○ Aman ✓ / Potato ○ / Mungbean ○ (Looks good) · ○ Finish my plan
+    // Planting: ○ Aman ✓ / Potato ○ / Mungbean ○ (optional) · ○ Finish my plan
     const nonFallow = plan?.rotation?.seasons?.filter(s => s.crop !== 'fallow') ?? [];
     if (nonFallow.length > 0) {
       const summaryText = nonFallow.map(s => {
@@ -198,7 +198,7 @@ export function getPageChecklist(page = activePage) {
     } else {
       items.push({
         id: 'planting-seasons',
-        text: t('Review each season (Looks good)', 'প্রতিটি মৌসুম যাচাই করুন (ঠিক আছে)'),
+        text: t('Check each season (optional)', 'প্রতিটি মৌসুম দেখে নিন (ঐচ্ছিক)'),
         done: allSeasonsReviewed(plan),
         target: '#plan-seasons, [data-action="plan-confirm"]',
       });
@@ -445,7 +445,7 @@ export function handleContinue() {
       if (unconfirmed) {
         const crop = seasonCropName(unconfirmed);
         const cropBn = unconfirmed.cropBn || unconfirmed.crop;
-        reason = t(`Mark ${crop} ‘Looks good ✓’ first`, `আগে ${cropBn} ‘ঠিক আছে ✓’ চিহ্নিত করুন`);
+        reason = t(`Check ${crop} first`, `আগে ${cropBn} দেখে নিন`);
       }
     } else if (activePage === 'field') {
       reason = t('Complete field details and click ‘Use this field →’', 'জমির বিবরণ নিশ্চিত করে ‘এই জমি ব্যবহার করুন →’ চাপুন');
@@ -545,7 +545,7 @@ export const DEMO_BEATS = [
     page: 'planner',
     name: 'season-potato',
     target: '[data-action="plan-confirm"]',
-    narrationEn: "Season 1 looks great! Rahim reviews Season 2 (Potato) and marks Looks good.",
+    narrationEn: "Season 1 looks great! Rahim reviews Season 2 (Potato) and taps Save & next.",
     narrationBn: "প্রথম মৌসুম প্রস্তুত! রহিম দ্বিতীয় মৌসুম (আলু) দেখে ঠিক আছে চিহ্নিত করছেন।",
     pose: 'pointing',
     action: async () => {},
