@@ -8,6 +8,8 @@ import {
   computeFieldZones, buildZoneGeometry, pointInFieldZones, zonePopoverData,
   drainSurfacePolygons,
   fieldZoneClearance,
+  plannerMeasurementAnchors, plannerSpacingAnchors,
+  measurementWidthLabel, measurementEdgeLabel, spacingMeasurementLabel,
 } from '../src/legacy/planner3d-helpers.js';
 import { capacity } from '../src/legacy/engine.js';
 
@@ -205,4 +207,94 @@ test('plant footprints have clearance from each visible zone', () => {
   assert.equal(fieldZoneClearance(0, 0, geom, rect), 0);
   assert.ok(Math.abs(fieldZoneClearance(0, 1, geom, rect) - 0.75) < 1e-8);
   assert.equal(fieldZoneClearance(0, -9.9, geom, rect), 0);
+});
+
+test('dimension anchors span the drawn width while labels state the real width', () => {
+  for (const boundary of [rect, [...rect].reverse()]) {
+    const zones = computeFieldZones(boundary, widths, { drainEdgeIndex: 0 });
+    const geom = buildZoneGeometry(boundary, widths, { drainEdgeIndex: 0, display: true });
+    const markers = plannerMeasurementAnchors(boundary, zones, geom);
+    assert.equal(markers.length, 4);
+    // The 0.1 m drain is enlarged to 0.4 m on a 40 m span: the marker spans
+    // the drawn ribbon, the label keeps the real width.
+    for (const [id, label, drawn] of [['bund', '0.4 m', 0.4], ['drain', '0.1 m', 0.4], ['path', '0.5 m', 0.5]]) {
+      const marker = markers.find((m) => m.id === id);
+      assert.equal(marker.label, label);
+      assert.ok(Math.abs(Math.hypot(marker.b[0] - marker.a[0], marker.b[1] - marker.a[1]) - drawn) < 1e-6);
+      for (const fraction of [0.1, 0.5, 0.9]) {
+        assert.equal(pointInFieldZones(
+          marker.a[0] + (marker.b[0] - marker.a[0]) * fraction,
+          marker.a[1] + (marker.b[1] - marker.a[1]) * fraction, geom, boundary), id);
+      }
+    }
+    assert.equal(markers.find((m) => m.id === 'edge').label, '40 m');
+  }
+  assert.deepEqual(plannerMeasurementAnchors([], null, null), []);
+  assert.deepEqual(plannerMeasurementAnchors(rect, computeFieldZones(rect,
+    { bundWidthM: 0, drainWidthM: 0, pathWidthM: 0, otherDecimals: 0 }), null)
+    .map((m) => m.id), ['edge']);
+});
+
+test('dimension labels keep real widths with units and never round to zero', () => {
+  assert.equal(measurementWidthLabel(0.4), '0.4 m');
+  assert.equal(measurementWidthLabel(0.1), '0.1 m');
+  assert.equal(measurementWidthLabel(0.0005), '0.0005 m');
+  assert.equal(measurementEdgeLabel(24.84), '24.8 m');
+  assert.equal(measurementEdgeLabel(40), '40 m');
+  assert.equal(spacingMeasurementLabel('row', 20), '↔ 20 cm');
+  assert.equal(spacingMeasurementLabel('plant', 20), '↕ 20 cm');
+});
+
+test('rotated dimensions stay perpendicular and concave strips keep full cross-sections', () => {
+  const angle = Math.PI / 7;
+  const rotate = ([x, y]) => [x * Math.cos(angle) - y * Math.sin(angle), x * Math.sin(angle) + y * Math.cos(angle)];
+  const boundary = rect.map(rotate);
+  const zones = computeFieldZones(boundary, widths, { drainEdgeIndex: 0 });
+  const geom = buildZoneGeometry(boundary, widths, { drainEdgeIndex: 0, display: true });
+  const markers = plannerMeasurementAnchors(boundary, zones, geom);
+  const path = markers.find((m) => m.id === 'path');
+  const along = [Math.cos(angle), Math.sin(angle)];
+  assert.ok(Math.abs((path.b[0] - path.a[0]) * along[0] + (path.b[1] - path.a[1]) * along[1]) < 1e-8);
+  const concave = [[0, 0], [20, 0], [20, 8], [8, 8], [8, 20], [0, 20]];
+  const czones = computeFieldZones(concave, widths, { drainEdgeIndex: 0 });
+  const cgeom = buildZoneGeometry(concave, widths, { drainEdgeIndex: 0, display: true });
+  for (const marker of plannerMeasurementAnchors(concave, czones, cgeom).filter((m) => m.id !== 'edge')) {
+    for (const fraction of [0.1, 0.5, 0.9]) {
+      assert.equal(pointInFieldZones(
+        marker.a[0] + (marker.b[0] - marker.a[0]) * fraction,
+        marker.a[1] + (marker.b[1] - marker.a[1]) * fraction, cgeom, concave), marker.id);
+    }
+  }
+  const empty = { ...cgeom, bundWidthM: 0, drain: null, path: null, other: null };
+  assert.deepEqual(plannerMeasurementAnchors(concave, czones, empty).map((m) => m.id), ['edge']);
+});
+
+test('spacing markers sit on a clear planted patch and track the sliders', () => {
+  const geom = buildZoneGeometry(rect, widths, { drainEdgeIndex: 0, display: true });
+  const markers = plannerSpacingAnchors(rect, 20, 20, geom, 100);
+  assert.equal(markers.length, 2);
+  const row = markers.find((m) => m.id === 'row-spacing');
+  const plant = markers.find((m) => m.id === 'plant-spacing');
+  assert.equal(row.label, '↔ 20 cm');
+  assert.equal(plant.label, '↕ 20 cm');
+  assert.deepEqual(row.a, plant.a);
+  const layout = plannerRowLayout(rect, 20, 20, 100, geom);
+  assert.ok(Math.abs(Math.hypot(row.b[0] - row.a[0], row.b[1] - row.a[1]) - layout.spacingY) < 1e-6);
+  assert.ok(Math.abs(Math.hypot(plant.b[0] - plant.a[0], plant.b[1] - plant.a[1]) - layout.spacingX) < 1e-6);
+  for (const marker of markers) {
+    for (const fraction of [0, 0.5, 1]) {
+      const x = marker.a[0] + (marker.b[0] - marker.a[0]) * fraction;
+      const y = marker.a[1] + (marker.b[1] - marker.a[1]) * fraction;
+      assert.ok(pointInPolygon(x, y, rect));
+      assert.equal(pointInFieldZones(x, y, geom, rect), null);
+    }
+  }
+  // Slider moves change the labels and the drawn spans.
+  const moved = plannerSpacingAnchors(rect, 30, 25, geom, 100);
+  assert.equal(moved.find((m) => m.id === 'row-spacing').label, '↔ 30 cm');
+  assert.equal(moved.find((m) => m.id === 'plant-spacing').label, '↕ 25 cm');
+  const movedLayout = plannerRowLayout(rect, 30, 25, 100, geom);
+  assert.ok(Math.abs(Math.hypot(moved[0].b[0] - moved[0].a[0], moved[0].b[1] - moved[0].a[1]) - movedLayout.spacingY) < 1e-6);
+  assert.deepEqual(plannerSpacingAnchors(rect, 1, 20, geom), []);
+  assert.deepEqual(plannerSpacingAnchors([], 20, 20, geom), []);
 });

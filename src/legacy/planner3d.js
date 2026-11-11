@@ -14,6 +14,7 @@ import {
   computeFieldZones, buildZoneGeometry, pickDrainEdge, zonePopoverData,
   drainSurfacePolygons,
   fieldZoneClearance,
+  plannerMeasurementAnchors, plannerSpacingAnchors,
   easeOutCubic, easeInOutCubic,
 } from "./planner3d-helpers.js";
 import { t, num } from "./ui.js";
@@ -70,6 +71,12 @@ let zonePopoverEl = null;
 let zoneLegendEl = null;
 let zoneTapStart = null;
 let lastZoneHoverMs = 0;
+
+// Scale (dimension) annotations: screen-space SVG projected from 3D anchors.
+let measurementsVisible = true;
+let measurementAnchors = [];
+let measurementLayoutCache = null;
+let measurementSvgEl = null;
 
 // Crop-specific botanical config for enhanced realism
 const CROP_CONFIG = Object.freeze({
@@ -1256,7 +1263,6 @@ function renderZoneLegend() {
   const entries = ["bund", "drain", "path", "other"]
     .map((kind) => [kind, model.zones[kind]])
     .filter(([, zone]) => zone);
-  if (!entries.length) return;
   const el = document.createElement("div");
   el.className = "zone-legend";
   el.setAttribute("role", "group");
@@ -1275,6 +1281,20 @@ function renderZoneLegend() {
     });
     el.appendChild(chip);
   }
+  const measureChip = document.createElement("button");
+  measureChip.type = "button";
+  measureChip.dataset.measurements = "toggle";
+  measureChip.setAttribute("aria-pressed", String(measurementsVisible));
+  measureChip.textContent = t("Measurements", "মাপ");
+  measureChip.addEventListener("click", (event) => {
+    event.stopPropagation();
+    measurementsVisible = !measurementsVisible;
+    measureChip.setAttribute("aria-pressed", String(measurementsVisible));
+    measurementLayoutCache = null;
+    syncPlannerMeasurements();
+    requestRender();
+  });
+  el.appendChild(measureChip);
   const footer = wrap.querySelector(".planner3d-footer");
   if (footer) footer.prepend(el);
   else {
@@ -1319,6 +1339,122 @@ function bindZonePicking() {
     if (canvasHostEl) canvasHostEl.style.cursor = "";
     applyZoneHighlight();
   });
+}
+
+/* ------------------------------------------- scale (dimension) annotations */
+
+function measurementTitle(id) {
+  if (id === "edge") return t("Field edge", "জমির ধার");
+  if (id === "row-spacing") return t("Row spacing", "সারির দূরত্ব");
+  if (id === "plant-spacing") return t("Within-row spacing", "সারিতে গাছের দূরত্ব");
+  if (id === "bund") return t("Bund", "আল");
+  if (id === "drain") return t("Drain", "নালা");
+  if (id === "path") return t("Path", "রাস্তা");
+  return id;
+}
+
+function ensureMeasurementOverlay() {
+  if (!canvasHostEl) return;
+  if (measurementSvgEl?.isConnected && measurementSvgEl.parentElement === canvasHostEl) return;
+  measurementSvgEl?.remove();
+  measurementSvgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  measurementSvgEl.setAttribute("class", "planner3d-measurements");
+  measurementSvgEl.setAttribute("aria-label", t("Field measurements", "জমির মাপ"));
+  canvasHostEl.appendChild(measurementSvgEl);
+  measurementLayoutCache = null;
+}
+
+// Recompute anchors after every rebuild so spacing markers track the sliders.
+function updateMeasurementAnchors() {
+  measurementLayoutCache = null;
+  if (!currentData) {
+    measurementAnchors = [];
+    return;
+  }
+  const outlineM = currentData.field?.outlineM || [];
+  const zones = currentZoneModel?.zones || null;
+  const geom = currentZoneModel?.geom || null;
+  const markers = plannerMeasurementAnchors(outlineM, zones, geom);
+  const planner = currentData.planner || {};
+  markers.push(...plannerSpacingAnchors(outlineM, planner.row, planner.spacing, geom, planner.usable));
+  measurementAnchors = markers;
+}
+
+// Screen-space dimension overlay projected from 3D anchors. Stability follows
+// the soil-pin approach: the SVG is rewritten only when the layout key changes
+// or an endpoint moved more than half a CSS pixel, so markers glide with the
+// camera instead of trembling. Anchors behind the camera, off-screen, or
+// occluded by the field block are hidden; labels de-overlap each other.
+function syncPlannerMeasurements() {
+  const overlay = measurementSvgEl;
+  if (!overlay?.isConnected || !activeCamera || !currentData || !blockGroup || !canvasHostEl) return;
+  overlay.hidden = !measurementsVisible;
+  if (!measurementsVisible) {
+    overlay.replaceChildren();
+    return;
+  }
+  const width = Math.max(1, canvasHostEl.clientWidth || 600);
+  const height = Math.max(1, canvasHostEl.clientHeight || 400);
+  const heightAt = makeHeightAt(currentData);
+  floatGroup?.updateWorldMatrix(true, true);
+  activeCamera.updateMatrixWorld();
+  const raycaster = new THREE.Raycaster();
+  const project = (point, id) => {
+    const [x, y] = point;
+    const world = new THREE.Vector3(x, heightAt(x, -y) + (["bund", "edge"].includes(id) ? 0.36 : 0.065), -y);
+    floatGroup?.localToWorld(world);
+    const camSpace = world.clone().applyMatrix4(activeCamera.matrixWorldInverse);
+    if (camSpace.z >= -0.01) return null;
+    const p = world.clone().project(activeCamera);
+    if (Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || p.z > 1 || p.z < -1) return null;
+    return { x: (p.x * 0.5 + 0.5) * width, y: (0.5 - p.y * 0.5) * height, ndc: p, world };
+  };
+  const projected = measurementAnchors.map((m) => ({ ...m,
+    a: project(m.a, m.id), b: project(m.b, m.id),
+    center: project(m.a.map((v, i) => (v + m.b[i]) / 2), m.id),
+  })).filter((m) => m.a && m.b && m.center);
+  const wrap = canvasHostEl.closest(".planner3d-stage-wrap") || canvasHostEl;
+  const rect = canvasHostEl.getBoundingClientRect();
+  const obstacles = [...wrap.querySelectorAll(".zone-popover")]
+    .map((el) => el.getBoundingClientRect()).filter((r) => r.width && r.height)
+    .map((r) => ({ left: r.left - rect.left, right: r.right - rect.left,
+      top: r.top - rect.top, bottom: r.bottom - rect.top }));
+  const key = JSON.stringify([width, height, projected.map((m) => [m.id, m.label]), obstacles]);
+  const cached = measurementLayoutCache;
+  if (cached?.key === key && cached.projected.length === projected.length &&
+      projected.every((m, i) => ["a", "b"].every((end) =>
+        Math.hypot(m[end].x - cached.projected[i][end].x, m[end].y - cached.projected[i][end].y) <= 0.5))) return;
+  const visible = projected.filter((m) => ["a", "b", "center"].every((end) => {
+    const anchor = m[end];
+    raycaster.setFromCamera(new THREE.Vector2(anchor.ndc.x, anchor.ndc.y), activeCamera);
+    const distance = anchor.world.distanceTo(raycaster.ray.origin);
+    return !raycaster.intersectObjects(blockGroup.children, true).some((hit) =>
+      hit.object.visible && hit.object.isMesh && hit.distance < distance - 0.12);
+  }));
+  const labels = [];
+  const overlaps = (a, b) => a.left < b.right + 4 && a.right > b.left - 4 && a.top < b.bottom + 4 && a.bottom > b.top - 4;
+  overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  overlay.innerHTML = `<defs><marker id="planner3d-dimension-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 0 L 5 3 L 1 6" fill="none" stroke="currentColor"/></marker></defs>` + visible.map((m) => {
+    const textWidth = Math.max(42, m.label.length * 7 + 8);
+    let label = null;
+    for (const [dx, dy] of [[0, -18], [0, 25], [55, -18], [-55, -18], [0, -42], [0, 49]]) {
+      const x = Math.max(textWidth / 2 + 8, Math.min(width - textWidth / 2 - 8, m.center.x + dx));
+      const y = Math.max(18, Math.min(height - 12, m.center.y + dy));
+      const box = { left: x - textWidth / 2, right: x + textWidth / 2, top: y - 12, bottom: y + 4 };
+      if (![...obstacles, ...labels].some((r) => overlaps(box, r))) {
+        label = { x, y, ...box };
+        labels.push(box);
+        break;
+      }
+    }
+    if (!label) return "";
+    return `<g data-measurement="${m.id}"><title>${escHtml(measurementTitle(m.id))}: ${escHtml(m.label)}</title>` +
+      `<line class="planner3d-dimension-halo" x1="${m.a.x}" y1="${m.a.y}" x2="${m.b.x}" y2="${m.b.y}"/>` +
+      `<line class="planner3d-dimension-line" x1="${m.a.x}" y1="${m.a.y}" x2="${m.b.x}" y2="${m.b.y}" marker-start="url(#planner3d-dimension-arrow)" marker-end="url(#planner3d-dimension-arrow)"/>` +
+      `<path class="planner3d-dimension-leader" d="M${m.center.x},${m.center.y} L${label.x},${label.y + 4}"/>` +
+      `<text x="${label.x}" y="${label.y}">${escHtml(m.label)}</text></g>`;
+  }).join("");
+  measurementLayoutCache = { key, projected };
 }
 
 function mergeClumpParts(parts) {
@@ -2052,6 +2188,7 @@ function initThree(host) {
   host.appendChild(canvas);
   canvasHostEl = host;
   bindZonePicking();
+  ensureMeasurementOverlay();
   resizeObserver?.disconnect();
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(onResize);
@@ -2218,6 +2355,7 @@ function requestRender() {
     if (!renderer || !scene || !activeCamera || !isVisible) return;
     controls.update();
     renderer.render(scene, activeCamera);
+    syncPlannerMeasurements();
   });
 }
 
@@ -2244,6 +2382,7 @@ function startAnimation() {
     if (!introAnim) applyIdleFloat(time / 1000);
     else restoreIdleCamera();
     renderer.render(scene, activeCamera);
+    syncPlannerMeasurements();
     restoreIdleCamera();
   };
   animFrameId = requestAnimationFrame(loop);
@@ -2338,6 +2477,7 @@ export async function mountPlanner3d(host, input) {
   }
   
   buildShadow(data);
+  updateMeasurementAnchors();
   if (refit || isTopView !== (input.planner.view === "top")) setPlanner3dView(input.planner.view);
   updateShadowLight();
   host.closest(".planner3d-stage-wrap").classList.add("planner3d-ready");
@@ -2359,6 +2499,11 @@ export function disposePlanner3d() {
   disposeZones();
   zoneLegendEl?.remove();
   zoneLegendEl = null;
+  measurementSvgEl?.remove();
+  measurementSvgEl = null;
+  measurementAnchors = [];
+  measurementLayoutCache = null;
+  measurementsVisible = true;
   currentZoneModel = null;
   lastZoneKey = null;
   if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);

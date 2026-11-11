@@ -1,0 +1,35 @@
+{
+  "chrome": "158.0.8127.18",
+  "desktop": {
+    "viewport": [
+      1366,
+      768
+    ],
+    "scale": 1,
+    "labels": {
+      "bund": "0.4 m",
+      "drain": "0.1 m",
+      "path": "0.5 m",
+      "edge": "35.5 m",
+      "row-spacing": "\u2194 20 cm",
+      "plant-spacing": "\u2195 20 cm"
+    },
+    "consoleErrors": []
+  },
+  "phone": {
+    "viewport": [
+      412,
+      915
+    ],
+    "scale": 2.625,
+    "labels": {
+      "bund": "0.4 m",
+      "drain": "0.1 m",
+      "path": "0.5 m",
+      "edge": "35.5 m",
+      "row-spacing": "\u2194 20 cm",
+      "plant-spacing": "\u2195 20 cm"
+    },
+    "consoleErrors": []
+  }
+}

@@ -161,7 +161,8 @@ def check_renderer(browser, base):
       await rig.planner.mountPlanner3d(rig.host,rig.input);
     }""")
     assert page.evaluate("rig.active().filter(o => o.isMesh && (o.userData.zoneKind || o.geometry.type==='TubeGeometry')).length") == 0
-    assert page.locator('.zone-legend').count() == 0
+    assert page.locator('[data-zone-kind]').count() == 0
+    assert page.locator('[data-measurements]').count() == 1
     page.evaluate("""async () => {
       rig.input.net = null;
       rig.input.net = {inputs:{bundWidthM:.4,drainWidthM:.1,pathWidthM:.5,otherDecimals:0},edited:false};
