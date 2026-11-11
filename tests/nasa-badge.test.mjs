@@ -130,8 +130,8 @@ test('HLS checks render real seasonal field averages separately from Sentinel de
         assert.ok(legend.includes(date));
         assert.match(legend, /partner-chip/);
         const layer = html.split(`value="${mode}"`)[1].split('data-hls-mode')[0];
-        assert.match(layer, /partner-chip/);
-        assert.doesNotMatch(layer, />NASA[^<]*<\/button>/);
+        // Layer row leads with the NASA HLS check; the ESA partner badge stays in the colour key.
+        assert.match(layer, />NASA HLS<\/button>/);
       }
     }
     const edited = structuredClone(fixture);
