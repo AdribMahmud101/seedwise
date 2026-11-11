@@ -356,3 +356,15 @@ body:has(.demo-controls-bar) .coach-host {
 body:has(.planty-guide:not(.planty-guide--hint)) .coach-host {
   display: none;
 }
+
+/* Plot dossier: during a journey "Use this field →" replaces "Explore rotations" (same spot, one primary action). */
+.field-card:has(.journey-field-inline) .field-recommend [data-go="rotations"] {
+  display: none;
+}
+.field-card .journey-field-inline {
+  padding: 0 0 16px;
+}
+.field-card .journey-field-inline .journey-field-cta {
+  width: 100%;
+  justify-content: center;
+}
