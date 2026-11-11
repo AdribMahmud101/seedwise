@@ -2,6 +2,7 @@ import { t, esc } from './ui.js';
 import { getPlan, nextStep, stepStatus, allSeasonsReviewed, subscribe, startPlan, confirmField, fieldSnapshot, confirmRotation, rotationSnapshot, confirmPlanting, markPlanGenerated, importPlanJSON, resetPlan } from './journey.js';
 import { guide } from './planty-guide.js';
 import { plantyMascot } from './planty.js';
+import { canFinishPlanting, finishNote } from './journey-bar.js';
 
 // Season label: keep Aman and Boro distinct (both are rice).
 const seasonCropName = (s) => ({ aman: 'Aman rice', boro: 'Boro rice' })[s.crop] || (s.crop ? s.crop[0].toUpperCase() + s.crop.slice(1) : '');
@@ -190,8 +191,8 @@ export function getPageChecklist(page = activePage) {
 
       items.push({
         id: 'planting-seasons',
-        text: `${summaryText} (${t('Looks good', 'ঠিক আছে')})`,
-        done: allSeasonsReviewed(plan),
+        text: `${summaryText} (${t('optional', 'ঐচ্ছিক')})`,
+        done: allSeasonsReviewed(plan), // optional: never blocks Finish
         target: '#plan-seasons, [data-action="plan-confirm"]',
       });
     } else {
@@ -410,14 +411,14 @@ export function updateHandOffs(page = activePage) {
     // Finish CTA under season tabs
     const finishSlot = document.querySelector('#planner-finish-slot') || document.querySelector('#journey-finish-slot');
     if (finishSlot) {
-      const canFinish = allSeasonsReviewed(plan);
+      const canFinish = canFinishPlanting(plan);
       const isPulse = canFinish && plan.steps.planting !== 'done';
       finishSlot.innerHTML = `
         <div class="journey-handoff journey-planner-finish">
           <button type="button" class="button primary ${isPulse ? 'journey-cta-pulse' : ''}" data-journey="finish"${canFinish ? '' : ' disabled'}>
             ${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}
           </button>
-          ${canFinish ? '' : `<p class="note">${t('Mark each season Looks good ✓ to finish', 'প্রতি মৌসুমকে ঠিক আছে ✓ চিহ্নিত করে শেষ করুন')}</p>`}
+          ${finishNote(plan) ? `<p class="note">${finishNote(plan)}</p>` : ''}
         </div>
       `;
     }
@@ -440,7 +441,7 @@ export function handleContinue() {
     let reason = null;
     if (activePage === 'planner') {
       const seasons = plan?.rotation?.seasons?.filter(s => s.crop !== 'fallow') ?? [];
-      const unconfirmed = seasons.find(s => !plan.planting[s.key]?.confirmedAt);
+      const unconfirmed = canFinishPlanting(plan) ? null : seasons.find(s => !plan.planting[s.key]?.confirmedAt);
       if (unconfirmed) {
         const crop = seasonCropName(unconfirmed);
         const cropBn = unconfirmed.cropBn || unconfirmed.crop;

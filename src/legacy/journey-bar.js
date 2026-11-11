@@ -49,23 +49,29 @@ export function journeyRotationCTA(id) {
 }
 
 export function canFinishPlanting(plan) {
-  return !!(plan?.steps.rotation === 'done' && allSeasonsReviewed(plan));
+  // One choice = one rotation. Seasons start on recommended settings; reviewing each is optional.
+  return !!(plan?.steps.rotation === 'done' && plan.rotation?.seasons.some(s => s.crop !== 'fallow') &&
+    plan.rotation.seasons.filter(s => s.crop !== 'fallow').every(s => {
+      const v = plan.planting?.[s.key];
+      return v && [v.rowSpacingCm, v.withinRowCm, v.usableAreaPct].every(n => Number.isFinite(n) && n > 0) && v.usableAreaPct <= 100;
+    }));
 }
 
 // Name the seasons still waiting for "Looks good ✓" so a disabled Finish is never a mystery.
-function finishNote(plan) {
+export function finishNote(plan) {
   const names = { aman: 'Aman rice', boro: 'Boro rice' };
   const left = (plan.rotation?.seasons || []).filter(s => s.crop !== 'fallow' && !plan.planting?.[s.key]?.confirmedAt);
-  if (plan.steps?.rotation !== 'done' || !left.length) return t('Choose a rotation and review every season to finish.', 'শেষ করতে ফসলচক্র বেছে প্রতিটি মৌসুম যাচাই করুন।');
+  if (plan.steps?.rotation !== 'done') return t('Choose a rotation first.', 'আগে একটি ফসলচক্র বেছে নিন।');
+  if (!left.length) return '';
   const en = left.map(s => names[s.crop] || s.crop[0].toUpperCase() + s.crop.slice(1)).join(', ');
   const bn = left.map(s => s.cropBn || s.crop).join(', ');
-  return t(`Still to review: ${en}. Open each tab and tap “Looks good ✓”.`, `এখনও যাচাই বাকি: ${bn}। প্রতিটি ট্যাব খুলে “ঠিক আছে ✓” চাপুন।`);
+  return t(`Optional: check ${en} — or finish now with the recommended settings.`, `ঐচ্ছিক: ${bn} দেখে নিন — অথবা প্রস্তাবিত মাপ নিয়েই এখন শেষ করুন।`);
 }
 
 export function journeyFinishCTA() {
   const plan = getPlan();
   if (!plan) return '';
-  return `<div class="journey-handoff"><button type="button" class="button primary" data-journey="finish"${canFinishPlanting(plan) ? '' : ' disabled'}>${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}</button>${canFinishPlanting(plan) ? '' : `<p class="note">${finishNote(plan)}</p>`}</div>`;
+  return `<div class="journey-handoff"><button type="button" class="button primary" data-journey="finish"${canFinishPlanting(plan) ? '' : ' disabled'}>${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}</button>${finishNote(plan) ? `<p class="note">${finishNote(plan)}</p>` : ''}</div>`;
 }
 
 const reviewKey = plan => JSON.stringify([plan.updatedAt, plan.reviews]);

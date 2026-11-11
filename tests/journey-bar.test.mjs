@@ -42,22 +42,21 @@ test('steps render todo/current/done/review with accessible jump links', () => {
   assert.equal(bar.journeyBar('clinic'), '');
 });
 
-test('finish requires a chosen rotation and all seasons confirmed', () => {
+test('finish needs one chosen rotation; season review is optional', () => {
   journey.startPlan();
   assert.match(bar.journeyFinishCTA(), /disabled/);
   journey.confirmField(field());
   assert.equal(bar.canFinishPlanting(journey.getPlan()), false);
   journey.confirmRotation(rotation());
-  // Rotation chosen but no seasons confirmed yet
-  assert.equal(bar.canFinishPlanting(journey.getPlan()), false);
-  assert.match(bar.journeyFinishCTA(), /disabled/);
-  // Confirm all seasons
-  journey.confirmPlanting();
+  // One rotation chosen: finish is available on recommended settings; season review is optional
   assert.equal(bar.canFinishPlanting(journey.getPlan()), true);
   assert.doesNotMatch(bar.journeyFinishCTA(), /disabled/);
-  // Unconfirm one season
+  assert.match(bar.journeyFinishCTA(), /Optional: check/);
+  journey.confirmPlanting();
+  assert.doesNotMatch(bar.journeyFinishCTA(), /Optional: check/);
+  // Invalid settings still block finishing
   const plan = journey.getPlan();
-  plan.planting[plan.rotation.seasons[0].key].confirmedAt = null;
+  plan.planting[plan.rotation.seasons.find(s => s.crop !== 'fallow').key].usableAreaPct = 0;
   assert.equal(bar.canFinishPlanting(plan), false);
   // Field change invalidates planting
   journey.confirmField({ ...field(), constraints: { ...defaultProfile(), irrigation: 'none' } });
@@ -144,7 +143,7 @@ test('hand-offs confirm snapshots, celebrate, and show hints after the destinati
   } finally { globalThis.document = oldDocument; }
 });
 
-test('finish CTA enables live after confirming the last season', async t => {
+test('optional-season note clears live after reviewing the last season', async t => {
   const oldDocument = globalThis.document;
   globalThis.document = { querySelector: selector => selector === '#journey-finish-slot' ? { innerHTML: '' } : null };
   try {
@@ -158,10 +157,11 @@ test('finish CTA enables live after confirming the last season', async t => {
       journey.setPlanting(seasons[i].key, { ...plan.planting[seasons[i].key], confirmedAt: new Date().toISOString() });
     }
     bar.mountJourney('planner', () => {}, () => false);
-    assert.match(bar.journeyFinishCTA(), /disabled/);
+    assert.doesNotMatch(bar.journeyFinishCTA(), /disabled/);
+    assert.match(bar.journeyFinishCTA(), /Optional: check/);
     // Confirm the last season
     journey.setPlanting(seasons[seasons.length - 1].key, { ...plan.planting[seasons[seasons.length - 1].key], confirmedAt: new Date().toISOString() });
-    assert.doesNotMatch(bar.journeyFinishCTA(), /disabled/);
+    assert.doesNotMatch(bar.journeyFinishCTA(), /disabled|Optional: check/);
   } finally { globalThis.document = oldDocument; }
 });
 
