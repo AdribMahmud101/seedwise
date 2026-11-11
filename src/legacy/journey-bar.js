@@ -3,6 +3,7 @@ import { getPlan, startPlan, demoPlan, confirmField, fieldSnapshot, confirmRotat
   rotationSnapshot, confirmPlanting, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
+import { setStoryPage, handleContinue, startRahimDemo, updateHandOffs, renderCoach } from './journey-story.js';
 
 const steps = [
   ['field', 'field', 'Field', 'জমি'],
@@ -101,6 +102,7 @@ export function mountJourney(page, go, planPageExists) {
   hasPlanPage = planPageExists;
   clearTimeout(handoffTimer);
   refreshJourney();
+  setStoryPage(page, go);
   topbarObserver?.disconnect();
   const topbar = document.querySelector('.topbar');
   const shell = document.querySelector('.journey-shell');
@@ -152,13 +154,17 @@ export async function journeyAction(action, value) {
     } else if (action === 'demo') {
       if (demoLoading) return;
       demoLoading = true;
-      try { await demoPlan(); } finally { demoLoading = false; }
-      dismissed.clear();
-      jump('field');
+      try {
+        dismissed.clear();
+        await startRahimDemo();
+      } finally { demoLoading = false; }
     } else if (action === 'jump') jump(value);
     else if (action === 'continue') {
-      const step = nextStep() ?? 'plan';
-      jump(steps.find(item => item[0] === step)[1]);
+      const allowed = handleContinue();
+      if (allowed) {
+        const step = nextStep() ?? 'plan';
+        jump(steps.find(item => item[0] === step)[1]);
+      }
     } else if (action === 'field') {
       confirmField(fieldSnapshot(field(), polygon(), profile()));
       handoff('rotations', t('Field confirmed!', 'জমি নিশ্চিত হয়েছে!'), '#rotation-list',
