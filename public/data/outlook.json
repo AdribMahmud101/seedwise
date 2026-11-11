@@ -1,0 +1,372 @@
+{
+ "model": "amazon/chronos-bolt-small (Chronos-Bolt) \u2014 fine-tuned and base variants on NASA POWER monthly, Rangpur grid",
+ "source": "NASA POWER monthly (PRECTOTCORR, T2M, T2M_MAX/MIN, GWETROOT); ETo = FAO-56 Hargreaves",
+ "trained_through": "2026-10-01",
+ "backtest": {
+  "train_cutoff": "2018-12-01",
+  "origins": [
+   "2019-01-01",
+   "2025-09-01"
+  ],
+  "n": 81,
+  "skill_vs_climatology": {
+   "rain_mm_day": {
+    "model": "fine-tuned",
+    "h1": 0.272,
+    "h2": 0.281,
+    "h3": 0.265
+   },
+   "t2m_c": {
+    "model": "base",
+    "h1": 0.109,
+    "h2": 0.063,
+    "h3": 0.04
+   },
+   "eto_mm_day": {
+    "model": "base",
+    "h1": 0.182,
+    "h2": 0.207,
+    "h3": 0.189
+   },
+   "gwetroot": {
+    "model": "base",
+    "h1": 0.68,
+    "h2": 0.597,
+    "h3": 0.606
+   }
+  },
+  "note": "skill = 1 \u2212 MAE(model)/MAE(same-month climatology), rolling monthly origins, models never saw backtest months"
+ },
+ "sites": {
+  "mithapukur": {
+   "rain_mm_day": {
+    "model": "fine-tuned",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 0,
+      "p50": 0.245,
+      "p90": 1.02,
+      "climatology": 0.1
+     },
+     {
+      "month": "2026-12",
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.212,
+      "climatology": 0.04
+     },
+     {
+      "month": "2027-01",
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.445,
+      "climatology": 0.06
+     }
+    ]
+   },
+   "t2m_c": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 20.774,
+      "p50": 22.002,
+      "p90": 23.065,
+      "climatology": 21.83
+     },
+     {
+      "month": "2026-12",
+      "p10": 16.752,
+      "p50": 17.875,
+      "p90": 18.91,
+      "climatology": 18.12
+     },
+     {
+      "month": "2027-01",
+      "p10": 16.276,
+      "p50": 17.255,
+      "p90": 18.274,
+      "climatology": 17.295
+     }
+    ]
+   },
+   "eto_mm_day": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 3.039,
+      "p50": 3.262,
+      "p90": 3.557,
+      "climatology": 3.758
+     },
+     {
+      "month": "2026-12",
+      "p10": 2.926,
+      "p50": 3.129,
+      "p90": 3.413,
+      "climatology": 3.226
+     },
+     {
+      "month": "2027-01",
+      "p10": 2.82,
+      "p50": 3.114,
+      "p90": 3.526,
+      "climatology": 3.484
+     }
+    ]
+   },
+   "gwetroot": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 0.464,
+      "p50": 0.544,
+      "p90": 0.646,
+      "climatology": 0.67
+     },
+     {
+      "month": "2026-12",
+      "p10": 0.398,
+      "p50": 0.476,
+      "p90": 0.59,
+      "climatology": 0.55
+     },
+     {
+      "month": "2027-01",
+      "p10": 0.37,
+      "p50": 0.446,
+      "p90": 0.559,
+      "climatology": 0.49
+     }
+    ]
+   }
+  },
+  "pirganj": {
+   "rain_mm_day": {
+    "model": "fine-tuned",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 0,
+      "p50": 0.245,
+      "p90": 1.02,
+      "climatology": 0.1
+     },
+     {
+      "month": "2026-12",
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.212,
+      "climatology": 0.04
+     },
+     {
+      "month": "2027-01",
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.445,
+      "climatology": 0.06
+     }
+    ]
+   },
+   "t2m_c": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 20.774,
+      "p50": 22.002,
+      "p90": 23.065,
+      "climatology": 21.83
+     },
+     {
+      "month": "2026-12",
+      "p10": 16.752,
+      "p50": 17.875,
+      "p90": 18.91,
+      "climatology": 18.12
+     },
+     {
+      "month": "2027-01",
+      "p10": 16.276,
+      "p50": 17.255,
+      "p90": 18.274,
+      "climatology": 17.295
+     }
+    ]
+   },
+   "eto_mm_day": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 3.042,
+      "p50": 3.265,
+      "p90": 3.56,
+      "climatology": 3.762
+     },
+     {
+      "month": "2026-12",
+      "p10": 2.929,
+      "p50": 3.132,
+      "p90": 3.416,
+      "climatology": 3.229
+     },
+     {
+      "month": "2027-01",
+      "p10": 2.823,
+      "p50": 3.117,
+      "p90": 3.529,
+      "climatology": 3.488
+     }
+    ]
+   },
+   "gwetroot": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 0.464,
+      "p50": 0.544,
+      "p90": 0.646,
+      "climatology": 0.67
+     },
+     {
+      "month": "2026-12",
+      "p10": 0.398,
+      "p50": 0.476,
+      "p90": 0.59,
+      "climatology": 0.55
+     },
+     {
+      "month": "2027-01",
+      "p10": 0.37,
+      "p50": 0.446,
+      "p90": 0.559,
+      "climatology": 0.49
+     }
+    ]
+   }
+  },
+  "gangachara": {
+   "rain_mm_day": {
+    "model": "fine-tuned",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 0,
+      "p50": 0.166,
+      "p90": 1.015,
+      "climatology": 0.09
+     },
+     {
+      "month": "2026-12",
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.274,
+      "climatology": 0.03
+     },
+     {
+      "month": "2027-01",
+      "p10": 0,
+      "p50": 0,
+      "p90": 0.626,
+      "climatology": 0.075
+     }
+    ]
+   },
+   "t2m_c": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 20.532,
+      "p50": 21.743,
+      "p90": 22.792,
+      "climatology": 21.5
+     },
+     {
+      "month": "2026-12",
+      "p10": 16.647,
+      "p50": 17.763,
+      "p90": 18.781,
+      "climatology": 17.62
+     },
+     {
+      "month": "2027-01",
+      "p10": 16.074,
+      "p50": 17.039,
+      "p90": 18.023,
+      "climatology": 16.765
+     }
+    ]
+   },
+   "eto_mm_day": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 2.982,
+      "p50": 3.196,
+      "p90": 3.459,
+      "climatology": 3.672
+     },
+     {
+      "month": "2026-12",
+      "p10": 2.887,
+      "p50": 3.092,
+      "p90": 3.37,
+      "climatology": 3.18
+     },
+     {
+      "month": "2027-01",
+      "p10": 2.779,
+      "p50": 3.083,
+      "p90": 3.491,
+      "climatology": 3.398
+     }
+    ]
+   },
+   "gwetroot": {
+    "model": "base",
+    "beats_climatology": true,
+    "months": [
+     {
+      "month": "2026-11",
+      "p10": 0.471,
+      "p50": 0.539,
+      "p90": 0.629,
+      "climatology": 0.63
+     },
+     {
+      "month": "2026-12",
+      "p10": 0.401,
+      "p50": 0.466,
+      "p90": 0.566,
+      "climatology": 0.52
+     },
+     {
+      "month": "2027-01",
+      "p10": 0.371,
+      "p50": 0.436,
+      "p90": 0.537,
+      "climatology": 0.47
+     }
+    ]
+   }
+  }
+ }
+}

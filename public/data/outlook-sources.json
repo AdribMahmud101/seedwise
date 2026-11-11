@@ -1,0 +1,163 @@
+{
+ "source": "NASA POWER monthly (AG community) via power.larc.nasa.gov API",
+ "params": "PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT",
+ "eto": "FAO-56 Hargreaves from T2M/T2M_MAX/T2M_MIN + extraterrestrial radiation",
+ "points": [
+  {
+   "point": "mithapukur",
+   "lat": 25.54,
+   "lon": 89.27,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.27&latitude=25.54&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "mithapukur",
+   "lat": 25.54,
+   "lon": 89.27,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.27&latitude=25.54&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "pirganj",
+   "lat": 25.5,
+   "lon": 89.22,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.22&latitude=25.5&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "pirganj",
+   "lat": 25.5,
+   "lon": 89.22,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.22&latitude=25.5&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "gangachara",
+   "lat": 25.85,
+   "lon": 89.2,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.2&latitude=25.85&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "gangachara",
+   "lat": 25.85,
+   "lon": 89.2,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.2&latitude=25.85&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_25.25_88.75",
+   "lat": 25.25,
+   "lon": 88.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=88.75&latitude=25.25&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_25.25_88.75",
+   "lat": 25.25,
+   "lon": 88.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=88.75&latitude=25.25&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_25.25_89.25",
+   "lat": 25.25,
+   "lon": 89.25,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.25&latitude=25.25&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_25.25_89.25",
+   "lat": 25.25,
+   "lon": 89.25,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.25&latitude=25.25&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_25.25_89.75",
+   "lat": 25.25,
+   "lon": 89.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.75&latitude=25.25&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_25.25_89.75",
+   "lat": 25.25,
+   "lon": 89.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.75&latitude=25.25&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_25.75_88.75",
+   "lat": 25.75,
+   "lon": 88.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=88.75&latitude=25.75&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_25.75_88.75",
+   "lat": 25.75,
+   "lon": 88.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=88.75&latitude=25.75&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_25.75_89.25",
+   "lat": 25.75,
+   "lon": 89.25,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.25&latitude=25.75&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_25.75_89.25",
+   "lat": 25.75,
+   "lon": 89.25,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.25&latitude=25.75&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_25.75_89.75",
+   "lat": 25.75,
+   "lon": 89.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.75&latitude=25.75&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_25.75_89.75",
+   "lat": 25.75,
+   "lon": 89.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.75&latitude=25.75&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_26.25_88.75",
+   "lat": 26.25,
+   "lon": 88.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=88.75&latitude=26.25&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_26.25_88.75",
+   "lat": 26.25,
+   "lon": 88.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=88.75&latitude=26.25&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_26.25_89.25",
+   "lat": 26.25,
+   "lon": 89.25,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.25&latitude=26.25&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_26.25_89.25",
+   "lat": 26.25,
+   "lon": 89.25,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.25&latitude=26.25&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  },
+  {
+   "point": "grid_26.25_89.75",
+   "lat": 26.25,
+   "lon": 89.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.75&latitude=26.25&start=1981&end=2025&format=JSON"
+  },
+  {
+   "point": "grid_26.25_89.75",
+   "lat": 26.25,
+   "lon": 89.75,
+   "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT&community=AG&longitude=89.75&latitude=26.25&start=20260101&end=20261111&format=JSON",
+   "kind": "daily\u2192monthly top-up"
+  }
+ ]
+}
