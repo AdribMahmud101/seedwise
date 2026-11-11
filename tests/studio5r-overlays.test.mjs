@@ -45,8 +45,9 @@ test('pins expose disclosure state and bilingual details remain outside the canv
     for (const lang of ['en', 'bn']) {
       state.lang = lang;
       const html = studio3dHtml(fixture);
-      assert.equal((html.match(/data-soil-pin=/g) || []).length, 6);
-      assert.equal((html.match(/aria-expanded="false" aria-controls="studio-soil-popover"/g) || []).length, 6);
+      assert.equal((html.match(/data-soil-pin="(?:topsoil|rootzone|aquifer)"/g) || []).length, 6);
+      const pins = html.match(/<button[^>]*data-soil-pin=[^>]*>/g) || [];
+      for (const pin of pins) assert.match(pin, /aria-expanded="false" aria-controls="studio-soil-popover"/);
       assert.equal((html.match(/id="studio-soil-popover"/g) || []).length, 1);
       assert.ok(html.indexOf('class="studio-soil-layers"') > html.indexOf('class="studio-model-caption"'));
       assert.match(html, /role="tablist"/);

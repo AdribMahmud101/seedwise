@@ -1,5 +1,134 @@
 // Pure helpers for the 3D field studio. No three.js, no DOM — safe to unit test.
 import { projectWgs84ToUtm45N } from "./spatial.js";
+import { netArea } from './netarea.js';
+
+export function lowestFieldEdge(outline, elevationAt) {
+  let best = 0, lowest = Infinity;
+  outline.forEach((a, i) => {
+    const b = outline[(i + 1) % outline.length];
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-8) return;
+    const heights = Array.from({ length: 9 }, (_, j) => elevationAt(
+      a[0] + (b[0] - a[0]) * j / 8, a[1] + (b[1] - a[1]) * j / 8,
+    )).filter(Number.isFinite);
+    const mean = heights.length ? heights.reduce((sum, h) => sum + h, 0) / heights.length : Infinity;
+    if (mean < lowest) { lowest = mean; best = i; }
+  });
+  return best;
+}
+
+// Partition convex field fragments without overlaps; supports concave fields via their triangles.
+function partitionInfrastructure(polygons, clip) {
+  let inside = polygons, outside = [];
+  for (let i = 0; i < clip.length && inside.length; i++) {
+    const a = clip[i], b = clip[(i + 1) % clip.length];
+    const distance = ([x, y]) => (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    const half = (poly, sign) => {
+      const result = [];
+      poly.forEach((p, j) => {
+        const q = poly[(j + 1) % poly.length], dp = distance(p) * sign, dq = distance(q) * sign;
+        if (dp >= 0) result.push(p);
+        if ((dp >= 0) !== (dq >= 0)) {
+          const t = dp / (dp - dq);
+          result.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+        }
+      });
+      return result;
+    };
+    outside.push(...inside.map(p => half(p, -1)).filter(p => Math.abs(ringSignedArea(p)) > 1e-8));
+    inside = inside.map(p => half(p, 1)).filter(p => Math.abs(ringSignedArea(p)) > 1e-8);
+  }
+  return { inside, outside };
+}
+
+export function fieldInfrastructure(outline, triangles, inputs, elevationAt, minWidthM = 0, rendered = null) {
+  if (outline.length < 3) return [];
+  const bounds = outlineBounds(outline), fieldArea = Math.abs(ringSignedArea(outline));
+  const perimeter = outline.reduce((sum, a, i) => {
+    const b = outline[(i + 1) % outline.length];
+    return sum + Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }, 0);
+  const normalized = netArea(fieldArea / 10000, perimeter, inputs).inputs;
+  const edgeIndex = lowestFieldEdge(outline, elevationAt);
+  let frame = null;
+  outline.forEach((a, i) => {
+    const b = outline[(i + 1) % outline.length];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (length < 1e-8) return;
+    const ux = (b[0] - a[0]) / length, uy = (b[1] - a[1]) / length;
+    const along = outline.map(([x, y]) => x * ux + y * uy), across = outline.map(([x, y]) => -x * uy + y * ux);
+    const minU = Math.min(...along), maxU = Math.max(...along), minV = Math.min(...across), maxV = Math.max(...across);
+    const area = (maxU - minU) * (maxV - minV);
+    if (!frame || area < frame.area - 1e-6) frame = { area,
+      axis: maxU - minU >= maxV - minV ? [ux, uy] : [-uy, ux],
+      center: [ux * (minU + maxU) / 2 - uy * (minV + maxV) / 2, uy * (minU + maxU) / 2 + ux * (minV + maxV) / 2] };
+  });
+  if (!frame) return [];
+  const rectangle = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  const strip = (i, width, offset, boundary = outline) => {
+    const a = boundary[i], b = boundary[(i + 1) % boundary.length];
+    const winding = Math.sign(ringSignedArea(boundary));
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (length < 1e-8) return [];
+    const nx = -(b[1] - a[1]) / length * winding, ny = (b[0] - a[0]) / length * winding;
+    const points = [a, b, b, a].map((p, j) => [p[0] + nx * (offset + (j > 1 ? width : 0)), p[1] + ny * (offset + (j > 1 ? width : 0))]);
+    return winding < 0 ? points.reverse() : points;
+  };
+  const definitions = [
+    { id: 'bund', widthM: normalized.bundWidthM },
+    { id: 'drain', widthM: normalized.drainWidthM, edgeIndex },
+    { id: 'path', widthM: normalized.pathWidthM },
+    { id: 'other', widthM: 0, targetAreaM2: Math.min(fieldArea, normalized.otherDecimals * (10000 / 247.105381)) },
+  ].filter(f => f.widthM > 0 || f.targetAreaM2 > 0);
+  const initial = triangles.map(ids => ids.map(i => outline[i]));
+  const polygonArea = polygons => polygons.reduce((sum, poly) => sum + Math.abs(ringSignedArea(poly)), 0);
+  const layout = (minimum, shape = null) => {
+    const boundary = shape?.outline || outline;
+    let available = shape ? shape.triangles.map(ids => ids.map(i => boundary[i])) : initial;
+    return definitions.map(definition => {
+      const displayWidthM = definition.widthM > 0 ? Math.max(definition.widthM, minimum) : 0;
+      const feature = { ...definition, displayWidthM, polygons: [] };
+      let clips;
+      if (feature.id === 'bund') clips = boundary.map((_, i) => strip(i, displayWidthM, 0, boundary));
+      if (feature.id === 'drain') clips = [strip(edgeIndex, displayWidthM, normalized.bundWidthM > 0 ? Math.max(normalized.bundWidthM, minimum) : 0)];
+      if (feature.id === 'path') {
+        const reach = Math.hypot(bounds.width, bounds.height);
+        clips = [[[-reach, -displayWidthM / 2], [reach, -displayWidthM / 2], [reach, displayWidthM / 2], [-reach, displayWidthM / 2]]
+          .map(([along, across]) => [frame.center[0] + frame.axis[0] * along - frame.axis[1] * across, frame.center[1] + frame.axis[1] * along + frame.axis[0] * across])];
+      }
+      if (feature.id === 'other') {
+        let low = 0, high = Math.max(bounds.width, bounds.height);
+        for (let j = 0; j < 40; j++) {
+          const size = (low + high) / 2;
+          const clip = rectangle(bounds.maxX - size, bounds.maxY - size, bounds.maxX, bounds.maxY);
+          if (polygonArea(partitionInfrastructure(available, clip).inside) < feature.targetAreaM2) low = size; else high = size;
+        }
+        clips = [rectangle(bounds.maxX - high, bounds.maxY - high, bounds.maxX, bounds.maxY)];
+        feature.displayWidthM = high;
+      }
+      for (const clip of clips.filter(c => c.length)) {
+        const split = partitionInfrastructure(available, clip);
+        feature.polygons.push(...split.inside);
+        available = split.outside;
+      }
+      feature.areaM2 = polygonArea(feature.polygons);
+      feature.lengthM = feature.id === 'bund' ? perimeter : feature.widthM > 0 ? feature.areaM2 / feature.widthM : feature.displayWidthM;
+      if (feature.id === 'other') feature.widthM = feature.displayWidthM;
+      return feature;
+    });
+  };
+  const physical = layout(0);
+  const features = !(minWidthM > 0) && !rendered ? physical : layout(minWidthM, rendered)
+    .map((display, i) => ({ ...display, widthM: physical[i].widthM, lengthM: physical[i].lengthM, areaM2: physical[i].areaM2 }));
+  return features.filter(f => f.areaM2 > 1e-8).map(f => ({ ...f, polygonBounds: f.polygons.map(outlineBounds) }));
+}
+
+export function infrastructureAt(features, x, y, clearanceM = 0) {
+  return features.find(feature => feature.polygons.some((poly, i) => {
+    const bounds = feature.polygonBounds[i];
+    if (x < bounds.minX - clearanceM || x > bounds.maxX + clearanceM || y < bounds.minY - clearanceM || y > bounds.maxY + clearanceM) return false;
+    return pointInPolygon(x, y, poly) || (clearanceM > 0 && distToPolygonEdge(x, y, poly) < clearanceM);
+  })) || null;
+}
 
 export function outlineBounds(outlineM) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
