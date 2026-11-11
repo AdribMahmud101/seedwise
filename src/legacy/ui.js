@@ -40,16 +40,16 @@ delete saved.month; // month is view state: always open on the default month, ne
 const state = { ...structuredClone(defaults), ...saved };
 for (const key of ["weights", "planner", "clinic", "tabs", "water"])
   state[key] = { ...defaults[key], ...saved[key] };
-let earth, agronomy, archive, smap;
+let earth, agronomy, archive, smap, hlsField;
 async function loadData() {
   const responses = await Promise.all(
-    ["data/earth-data.json", "data/agronomy.json", "data/history.json", "data/smap.json"].map(
+    ["data/earth-data.json", "data/agronomy.json", "data/history.json", "data/smap.json", "data/hls-field.json"].map(
       (path) => fetch(new URL(path, document.baseURI)),
     ),
   );
   if (responses.some((r) => !r.ok))
     throw new Error("The prepared data could not be loaded.");
-  [earth, agronomy, archive, smap] = await Promise.all(
+  [earth, agronomy, archive, smap, hlsField] = await Promise.all(
     responses.map((r) => r.json()),
   );
   if (!allFields().some((f) => f.id === state.fieldId))
@@ -84,6 +84,21 @@ function esc(value) {
 
 // Facts and links: public/data/earth-data.json, smap.json and spec/13,18 source registers.
 const nasaSources = {
+  hls: {
+    label: ['NASA HLS', 'নাসা HLS'],
+    name: ['NASA HLS (Harmonized Landsat Sentinel-2)', 'নাসা HLS (সমন্বিত Landsat Sentinel-2)'],
+    line: ["NASA's 30 m satellite record checks this field's average greenness/moisture.", 'নাসার ৩০ মি স্যাটেলাইট তথ্য এই মাঠের গড় সবুজভাব/আর্দ্রতা যাচাই করে।'],
+    res: ['30 m', '৩০ মি'],
+    url: 'https://www.earthdata.nasa.gov/data/projects/hls',
+  },
+  sentinel2: {
+    agency: 'ESA',
+    label: ['ESA · Space Apps partner', 'ESA · Space Apps সহযোগী'],
+    name: ['ESA Copernicus Sentinel-2', 'ESA কোপার্নিকাস Sentinel-2'],
+    line: ['10–20 m detail inside the field from ESA, a NASA Space Apps partner agency.', 'মাঠের ভেতরের ১০–২০ মি বিস্তারিত তথ্য ESA থেকে, নাসা Space Apps-এর সহযোগী সংস্থা।'],
+    res: ['10–20 m', '১০–২০ মি'],
+    url: 'https://sentiwiki.copernicus.eu/web/s2-mission',
+  },
   power: {
     label: ['NASA POWER', 'নাসা POWER'],
     name: ['NASA POWER / MERRA-2', 'নাসা POWER / MERRA-2'],
@@ -140,9 +155,15 @@ function nasaBadge(keys, period = '2024') {
   const entries = [...new Set(Array.isArray(keys) ? keys : [keys])]
     .filter(key => Object.hasOwn(nasaSources, key)).map(key => nasaSources[key]);
   if (!entries.length) return '';
+  // Keep partner provenance separate even if a caller requests several agencies.
+  if (entries.length > 1 && entries.some(entry => entry.agency === 'ESA')) {
+    return nasaBadge(keys.filter(key => nasaSources[key]?.agency !== 'ESA'), period) + nasaBadge('sentinel2', period);
+  }
   const id = `nasa-source-${++nasaBadgeId}`;
   const label = entries.length === 1 ? t(...entries[0].label) : t('NASA', 'নাসা');
-  return `<span class="nasa-badge"><button type="button" class="nasa-chip" aria-expanded="false" aria-controls="${id}" aria-haspopup="dialog" aria-label="${esc(t('NASA data sources', 'নাসার তথ্যসূত্র'))}">${esc(label)}</button><span class="nasa-popover" id="${id}" popover="manual" role="dialog" aria-label="${esc(t('NASA data sources', 'নাসার তথ্যসূত্র'))}" tabindex="-1">${entries.map(entry => `<span class="nasa-source"><strong>${esc(t(...entry.name))}</strong><span>${esc(t(...entry.line))}</span><small>${esc(t(...entry.res))} · ${esc(entry.period ? t(...entry.period) : period)}</small><a href="${esc(entry.url)}" target="_blank" rel="noopener">${t('Source ↗', 'উৎস ↗')}</a></span>`).join('')}</span></span>`;
+  const partner = entries[0].agency === 'ESA';
+  const ariaLabel = partner ? t('ESA data source', 'ESA তথ্যসূত্র') : t('NASA data sources', 'নাসার তথ্যসূত্র');
+  return `<span class="nasa-badge"><button type="button" class="nasa-chip${partner ? ' partner-chip' : ''}" aria-expanded="false" aria-controls="${id}" aria-haspopup="dialog" aria-label="${esc(ariaLabel)}">${esc(label)}</button><span class="nasa-popover" id="${id}" popover="manual" role="dialog" aria-label="${esc(ariaLabel)}" tabindex="-1">${entries.map(entry => `<span class="nasa-source"><strong>${esc(t(...entry.name))}</strong><span>${esc(t(...entry.line))}</span><small>${esc(t(...entry.res))} · ${esc(entry.period ? t(...entry.period) : period)}</small><a href="${esc(entry.url)}" target="_blank" rel="noopener">${t('Source ↗', 'উৎস ↗')}</a></span>`).join('')}</span></span>`;
 }
 
 function initNasaBadges() {
@@ -622,6 +643,7 @@ export {
   agronomy,
   archive,
   smap,
+  hlsField,
   loadData,
   persist,
   t,

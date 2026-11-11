@@ -101,6 +101,9 @@ Checks before every release:
 
 Known limits:
 
+- NASA HLS v2 field checks: https://www.earthdata.nasa.gov/data/projects/hls — native 30 m NDVI/NDMI means over traced outlines, separate from the Sentinel detail. Fmask and retrieval receipts are in `public/data/hls-field.json`.
+- ESA Sentinel-2 mission: https://sentiwiki.copernicus.eu/web/s2-mission — the former `/web/sentinel/missions/sentinel-2` URL returned 404 on 2026-11-11. ESA is a NASA Space Apps partner agency: https://www.spaceappschallenge.org/blog/explore-the-next-frontier-at-the-2026-nasa-space-apps-challenge/ . The ESA pill identifies the partner source; it does not mark Sentinel-2 as NASA data.
+
 - The 28 Nov 2022 date is exact only around the three pilot sites; if Esri retires release 64776 the URL must be re-pointed.
 - Esri has no photos deeper than zoom 18 over Rangpur.
 - Sentinel-2 is 10 m, so it looks soft up close; only two dates are stored (30 MB tile budget).

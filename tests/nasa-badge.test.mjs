@@ -30,11 +30,11 @@ test('NASA badge has unique accessible popup controls and source links', () => {
   state.lang = 'en';
 });
 
-test('non-NASA sources never produce a badge', () => {
-  for (const key of ['sentinel2', 'sentinel1', 'soilgrids', 'esri', 'fan2017', 'ffwc', 'barc', 'brri']) {
+test('sources without NASA or partner provenance never produce a badge', () => {
+  for (const key of ['sentinel1', 'soilgrids', 'esri', 'fan2017', 'ffwc', 'barc', 'brri']) {
     assert.equal(nasaBadge(key), '');
   }
-  assert.equal(nasaBadge(['soilgrids', 'sentinel2']), '');
+  assert.match(nasaBadge(['soilgrids', 'sentinel2']), /partner-chip/);
 });
 
 test('registry URLs are recorded in shipped data or the source register', async () => {
@@ -86,20 +86,75 @@ test('rendered source badges distinguish Landsat from Sentinel and retain the SM
   }
 });
 
-test('studio terrain layers have one source badge; Sentinel and SoilGrids layers have none', async () => {
+test('studio terrain has NASA badges; Sentinel has partner badges; SoilGrids has none', async () => {
   const { readFile } = await import('node:fs/promises');
   const { studio3dHtml, setSurfaceMode } = await import('../src/legacy/studio3d.js');
   const fixture = JSON.parse(await readFile(new URL('./fixtures/studio-data.json', import.meta.url)));
   try {
-    for (const mode of ['elevation', 'hypso', 'water', 'ponding', 'ndvi', 'moisture', 'fertility', 'photo', 'crops']) {
+    for (const mode of ['elevation', 'hypso', 'water', 'ponding', 'ndvi', 'moisture', 'productivity', 'fertility', 'photo', 'crops']) {
       setSurfaceMode(mode);
       const html = studio3dHtml(fixture);
       const surfaceSource = html.match(/<span data-surface-nasa>([\s\S]*?)<\/span>\s*<\/div>/)[1];
       const nasa = ['elevation', 'hypso', 'water', 'ponding'].includes(mode);
+      const partner = ['ndvi', 'moisture', 'productivity'].includes(mode);
       assert.equal((surfaceSource.match(/class="nasa-chip"/g) || []).length, nasa ? 1 : 0, mode);
       if (nasa) assert.match(surfaceSource, /NASADEM elevation/);
+      if (partner) assert.match(surfaceSource, /partner-chip/);
+      if (partner) assert.doesNotMatch(surfaceSource, /NASA HLS/);
       const ids = [...html.matchAll(/id="(nasa-source-\d+)"/g)].map(match => match[1]);
       assert.equal(new Set(ids).size, ids.length);
     }
   } finally { setSurfaceMode('crops'); }
+});
+
+test('HLS checks render real seasonal field averages separately from Sentinel detail', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { loadData } = await import('../src/legacy/ui.js');
+  const { studio3dHtml, setSurfaceMode } = await import('../src/legacy/studio3d.js');
+  const fixture = JSON.parse(await readFile(new URL('./fixtures/studio-data.json', import.meta.url)));
+  const originalFetch = globalThis.fetch;
+  globalThis.document = { baseURI: new URL('../public/', import.meta.url).href };
+  globalThis.fetch = async url => ({ ok: true, json: async () => JSON.parse(await readFile(url, 'utf8')) });
+  await loadData();
+  try {
+    for (const [month, ndvi, ndmi, date] of [[2, '0.72', '0.36', '2024-03-09'], [10, '0.79', '0.36', '2024-11-09']]) {
+      for (const mode of ['ndvi', 'moisture', 'productivity']) {
+        setSurfaceMode(mode);
+        const html = studio3dHtml(fixture, month);
+        const row = html.split(`<div data-hls-mode="${mode}">`)[1].split('</div>')[0];
+        assert.ok(row.includes(mode === 'moisture' ? `NDMI ${ndmi}` : `NDVI ${ndvi}`));
+        assert.ok(row.includes(date));
+        assert.match(row, />NASA HLS<\/button>/);
+        const legend = html.split('<div class="studio-surface-provenance">')[1].split('</div>')[0];
+        assert.match(legend, /Field average/);
+        assert.ok(legend.includes(date));
+        assert.match(legend, /partner-chip/);
+        const layer = html.split(`value="${mode}"`)[1].split('data-hls-mode')[0];
+        assert.match(layer, /partner-chip/);
+        assert.doesNotMatch(layer, />NASA[^<]*<\/button>/);
+      }
+    }
+    const edited = structuredClone(fixture);
+    edited.field.boundary = 'farmer';
+    const html = studio3dHtml(edited, 10);
+    assert.match(html, /HLS average unavailable for edited boundary/);
+    assert.doesNotMatch(html, /Field average NDVI/);
+    // Missing November never silently substitutes March or a zero value.
+    const pack = (await import('../src/legacy/ui.js')).hlsField;
+    const observation = pack.sites.mithapukur.observations[1];
+    const saved = structuredClone(observation);
+    try {
+      Object.assign(observation, { ndvi: null, ndmi: null, cellCount: 0, date: null, reason: 'No clear field cells' });
+      const missing = studio3dHtml(fixture, 10);
+      assert.match(missing, /NASA HLS unavailable · 2024-11-09 · No clear field cells/);
+      assert.doesNotMatch(missing, /Field average NDVI|>NASA HLS<\/button>/);
+    } finally { Object.assign(observation, saved); }
+    state.lang = 'bn';
+    assert.match(studio3dHtml(fixture, 10), /মাঠের গড় NDVI/);
+  } finally {
+    state.lang = 'en';
+    setSurfaceMode('crops');
+    globalThis.fetch = originalFetch;
+    delete globalThis.document;
+  }
 });
