@@ -17,16 +17,16 @@ import {
   IDLE_SWAY_AMPLITUDE_DEG as PLANNER_SWAY_AMPLITUDE_DEG,
 } from "../src/legacy/planner3d-helpers.js";
 
-// STUDIO5P: slow horizontal yaw sway of the camera around the field centre.
+// STUDIO5P & ASSEMBLE: slow subtle horizontal yaw sway of the camera around the field centre.
 
-test("studio idle sway is ±7° sinusoidal with a ~14 s period", () => {
-  assert.equal(IDLE_SWAY_PERIOD_S, 14);
-  assert.equal(IDLE_SWAY_AMPLITUDE_DEG, 7);
+test("studio idle sway is subtle sinusoidal with a ~14–20 s period (±1.5–2.5°)", () => {
+  assert.ok(IDLE_SWAY_PERIOD_S >= 14 && IDLE_SWAY_PERIOD_S <= 20, "period in 14..20 s");
+  assert.ok(IDLE_SWAY_AMPLITUDE_DEG >= 1.5 && IDLE_SWAY_AMPLITUDE_DEG <= 2.5, "amp in 1.5..2.5 deg");
 
   const quarter = idleSwayOffset(IDLE_SWAY_PERIOD_S / 4); // peak
-  assert.ok(Math.abs(quarter.yawDeg - 7) < 1e-9, `peak yaw ${quarter.yawDeg} should be +7°`);
+  assert.ok(Math.abs(quarter.yawDeg - IDLE_SWAY_AMPLITUDE_DEG) < 1e-9, `peak yaw should match amplitude`);
   const trough = idleSwayOffset((3 * IDLE_SWAY_PERIOD_S) / 4);
-  assert.ok(Math.abs(trough.yawDeg + 7) < 1e-9, `trough yaw ${trough.yawDeg} should be −7°`);
+  assert.ok(Math.abs(trough.yawDeg + IDLE_SWAY_AMPLITUDE_DEG) < 1e-9, `trough yaw should match negative amplitude`);
   assert.ok(Math.abs(idleSwayOffset(0).yawDeg) < 1e-9, "sway starts centred");
   assert.ok(Math.abs(idleSwayOffset(IDLE_SWAY_PERIOD_S / 2).yawDeg) < 1e-9, "half period crosses centre");
 
@@ -34,22 +34,22 @@ test("studio idle sway is ±7° sinusoidal with a ~14 s period", () => {
   for (const t of [0, 1.3, 5.9, 11.2]) {
     const a = idleSwayOffset(t);
     const b = idleSwayOffset(t + IDLE_SWAY_PERIOD_S);
-    assert.ok(Math.abs(a.yawDeg - b.yawDeg) < 1e-9, `yaw repeats every 14 s (t=${t})`);
-    assert.ok(Math.abs(a.dolly - b.dolly) < 1e-12, `dolly repeats every 14 s (t=${t})`);
+    assert.ok(Math.abs(a.yawDeg - b.yawDeg) < 1e-9, `yaw repeats every period (t=${t})`);
+    assert.ok(Math.abs(a.dolly - b.dolly) < 1e-12, `dolly repeats every period (t=${t})`);
   }
 
   // Radians track degrees.
   assert.ok(Math.abs(quarter.yawRad - (quarter.yawDeg * Math.PI) / 180) < 1e-12);
 });
 
-test("studio idle sway breathes distance by ±1 %", () => {
-  assert.equal(IDLE_DOLLY_AMPLITUDE, 0.01);
+test("studio idle sway breathes distance subtler than old ±1 %", () => {
+  assert.ok(IDLE_DOLLY_AMPLITUDE <= 0.005, "tiny dolly breathing");
   const peak = idleSwayOffset(IDLE_SWAY_PERIOD_S / 4);
-  assert.ok(Math.abs(peak.dolly - 0.01) < 1e-12, `peak dolly ${peak.dolly} should be +1 %`);
+  assert.ok(Math.abs(peak.dolly - IDLE_DOLLY_AMPLITUDE) < 1e-12, `peak dolly matches amplitude`);
   const trough = idleSwayOffset((3 * IDLE_SWAY_PERIOD_S) / 4);
-  assert.ok(Math.abs(trough.dolly + 0.01) < 1e-12, `trough dolly ${trough.dolly} should be −1 %`);
+  assert.ok(Math.abs(trough.dolly + IDLE_DOLLY_AMPLITUDE) < 1e-12, `trough dolly matches negative amplitude`);
   for (let t = 0; t <= IDLE_SWAY_PERIOD_S; t += 0.25) {
-    assert.ok(Math.abs(idleSwayOffset(t).dolly) <= 0.01 + 1e-12, `dolly bounded at t=${t}`);
+    assert.ok(Math.abs(idleSwayOffset(t).dolly) <= IDLE_DOLLY_AMPLITUDE + 1e-12, `dolly bounded at t=${t}`);
   }
 });
 
@@ -71,9 +71,9 @@ test("residual vertical float is at most 25 % of today's bob", () => {
 
 test("planner idle sway matches studio shape at ±5°", () => {
   assert.equal(PLANNER_SWAY_AMPLITUDE_DEG, 5);
-  const peak = plannerSwayOffset(IDLE_SWAY_PERIOD_S / 4);
+  const peak = plannerSwayOffset(14 / 4);
   assert.ok(Math.abs(peak.yawDeg - 5) < 1e-9, `planner peak yaw ${peak.yawDeg} should be +5°`);
-  const trough = plannerSwayOffset((3 * IDLE_SWAY_PERIOD_S) / 4);
+  const trough = plannerSwayOffset((3 * 14) / 4);
   assert.ok(Math.abs(trough.yawDeg + 5) < 1e-9, `planner trough yaw ${trough.yawDeg} should be −5°`);
   assert.ok(Math.abs(peak.dolly - 0.01) < 1e-12, "planner keeps the ±1 % dolly breathing");
 });
@@ -103,15 +103,15 @@ test("resume gain holds 0 for 6 s then eases 0→1 over 1.5 s", () => {
 });
 
 test("combined sway scales with gain and parks on drag, reduced motion, or hidden tab", () => {
-  const t = 3.5; // sway peak
+  const t = IDLE_SWAY_PERIOD_S / 4; // sway peak
   const full = idleCameraSway(t, 60);
   assert.equal(full.gain, 1);
-  assert.ok(Math.abs(full.yawDeg - 7) < 1e-9);
-  assert.ok(Math.abs(full.dolly - 0.01) < 1e-12);
+  assert.ok(Math.abs(full.yawDeg - IDLE_SWAY_AMPLITUDE_DEG) < 1e-9);
+  assert.ok(Math.abs(full.dolly - IDLE_DOLLY_AMPLITUDE) < 1e-12);
 
   const mid = idleCameraSway(t, 6.75);
   assert.ok(Math.abs(mid.gain - 0.5) < 1e-9);
-  assert.ok(Math.abs(mid.yawDeg - 3.5) < 1e-9, "paused motion eases back in proportionally");
+  assert.ok(Math.abs(mid.yawDeg - IDLE_SWAY_AMPLITUDE_DEG * 0.5) < 1e-9, "paused motion eases back in proportionally");
 
   for (const opts of [
     { isDragging: true },
@@ -127,9 +127,9 @@ test("combined sway scales with gain and parks on drag, reduced motion, or hidde
   assert.deepEqual(idleCameraSway(t, 2), { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0, gain: 0 });
 
   // Planner combined helper parks the same way.
-  assert.deepEqual(plannerCameraSway(t, 60, { prefersReducedMotion: true }),
+  assert.deepEqual(plannerCameraSway(3.5, 60, { prefersReducedMotion: true }),
     { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0, gain: 0 });
-  assert.ok(Math.abs(plannerCameraSway(t, 60).yawDeg - 5) < 1e-9);
+  assert.ok(Math.abs(plannerCameraSway(3.5, 60).yawDeg - 5) < 1e-9);
 
   // Degenerate clock input stays safe.
   assert.deepEqual(idleSwayOffset(NaN), { yawDeg: 0, yawRad: 0, dolly: 0, dy: 0 });

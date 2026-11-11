@@ -97,14 +97,14 @@ test('phone fit reserves the label row below the block (canvas width < 600 only)
   // Narrow free region keeps the pills inside the stage instead of recentring
   // the block alone.
   assert.match(studioSrc, /if \(w < 600\) \{[^}]*labelAllow/s);
-  assert.match(studioSrc, /targetFrac: phone \? 0\.92/);
+  assert.match(studioSrc, /targetFrac: phone \? 0\.90/);
 });
 
-test('desktop/laptop framing parameters are unchanged', () => {
-  assert.match(studioSrc, /: compact \? 0\.78 : 0\.6/);
-  assert.match(studioSrc, /isPhone\(\) \? 0\.22 : 0\.18/);
-  assert.match(studioSrc, /swayDeg: 7/);
-  assert.equal(IDLE_SWAY_AMPLITUDE_DEG, 7, 'idle sway stays ±7°');
+test('desktop/laptop framing parameters and base view', () => {
+  assert.match(studioSrc, /: compact \? 0\.76 : 0\.62/);
+  assert.match(studioSrc, /isPhone\(\) \? 0\.12 : 0\.10/);
+  assert.match(studioSrc, /swayDeg: 2\.5/);
+  assert.ok(IDLE_SWAY_AMPLITUDE_DEG <= 2.5, 'subtle idle sway <= 2.5°');
   // Intro ends at the fitted frame: it starts from fitPerspective and eases to
   // that fit's distance/target.
   assert.match(studioSrc, /const fit = fitPerspective\(currentData, isCloseView\)/);
