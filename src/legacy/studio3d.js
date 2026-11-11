@@ -164,6 +164,8 @@ let openSoilBand = null;
 let popoverTrigger = null;
 let restoringPopoverFocus = false;
 let suppressSoilHover = false;
+let soilPinned = false; // click pins the card; hover-opened cards close on hover-out
+let soilCloseTimer = 0;
 let overlayEvents = null;
 let hintShown = false;
 let leaderLayoutCache = null;
@@ -3720,7 +3722,9 @@ function highlightSoilBand(band) {
 }
 
 function closeSoilPopover(returnFocus = true) {
+  clearTimeout(soilCloseTimer);
   if (!openSoilBand) return;
+  soilPinned = false;
   suppressSoilHover = true;
   openSoilBand = null;
   containerEl.querySelector('#studio-soil-popover').hidden = true;
@@ -3735,6 +3739,7 @@ function closeSoilPopover(returnFocus = true) {
 }
 
 function openSoilPopover(band, trigger) {
+  clearTimeout(soilCloseTimer);
   suppressSoilHover = false;
   openSoilBand = band;
   popoverTrigger = trigger;
@@ -3894,7 +3899,8 @@ function bindOverlayEvents() {
   }, options);
   containerEl.addEventListener('pointerover', (e) => {
     const pin = e.target.closest('[data-soil-pin]');
-    if (pin && e.pointerType !== 'touch' && !suppressSoilHover) openSoilPopover(pin.dataset.soilPin, pin);
+    if (e.target.closest('#studio-soil-popover')) clearTimeout(soilCloseTimer);
+    if (pin && e.pointerType !== 'touch' && !suppressSoilHover && !(soilPinned && openSoilBand)) openSoilPopover(pin.dataset.soilPin, pin);
     const row = e.target.closest('.studio-callout-legend-item');
     if (row) highlightSoilBand(row.dataset.band);
   }, options);
@@ -3905,6 +3911,12 @@ function bindOverlayEvents() {
   containerEl.addEventListener('pointerout', (e) => {
     const row = e.target.closest('.studio-callout-legend-item');
     if (row && !row.contains(e.relatedTarget)) highlightSoilBand(openSoilBand);
+    const from = e.target.closest('[data-soil-pin], #studio-soil-popover');
+    if (from && e.pointerType !== 'touch' && openSoilBand && !soilPinned
+        && !e.relatedTarget?.closest?.('[data-soil-pin], #studio-soil-popover')) {
+      clearTimeout(soilCloseTimer);
+      soilCloseTimer = setTimeout(() => { if (!soilPinned) closeSoilPopover(false); }, 300);
+    }
   }, options);
   containerEl.addEventListener('focusout', () => {
     if (!openSoilBand) highlightSoilBand(null);
@@ -3921,7 +3933,7 @@ function bindOverlayEvents() {
   }, options);
   containerEl.addEventListener('click', (e) => {
     const pin = e.target.closest('[data-soil-pin]');
-    if (pin) openSoilPopover(pin.dataset.soilPin, pin);
+    if (pin) { openSoilPopover(pin.dataset.soilPin, pin); soilPinned = true; }
     if (e.target.closest('[data-close-soil]')) closeSoilPopover();
     if (e.target.closest('[data-dismiss-touch-hint]')) {
       containerEl.querySelector('.studio-touch-hint').hidden = true;
@@ -4820,6 +4832,7 @@ function bindEvents(container) {
         canvas.style.cursor = "default";
       }
 
+      if (openSoilBand) nextBand = openSoilBand; // card open: highlight follows the card
       if (nextBand !== hoveredBandId) {
         hoveredBandId = nextBand;
         // Highlight corresponding callouts in DOM
@@ -4851,6 +4864,7 @@ function bindEvents(container) {
 
     canvas.addEventListener("pointerleave", () => {
       canvas.style.cursor = "default";
+      if (openSoilBand) { highlightSoilBand(openSoilBand); return; } // keep the open card's band lit
       if (hoveredBandId !== null) {
         hoveredBandId = null;
         containerEl.querySelectorAll('.studio-soil-pin, .studio-callout-legend-item').forEach((el) => {
