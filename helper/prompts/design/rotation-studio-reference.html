@@ -1,0 +1,922 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Rotation Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@500&display=swap">
+<style>
+/* Layout: app shell with left nav; workspace = scenarios + priorities | 3D field viewer + rotation detail | field inspector */
+:root{
+  --bg:#f5f4ed; --surface:#fffef9; --surface-2:#faf9f1; --sunk:#eff0e6; --line:#e1e3d6; --line-strong:#cdd2c2;
+  --fg:#1a2a21; --fg-2:#43534a; --muted:#6f7a6f;
+  --accent:#315c3d; --accent-hover:#274c32; --accent-ink:#fffef9; --accent-soft:#edf2e2; --accent-line:#bfd3b4; --deep:#173e30; --deep-ink:#fffef9;
+  --nasa-bg:#0d3b8e; --nasa-fg:#ffffff;
+  --warn:#8a5a12; --warn-bg:#fcf2df; --warn-line:#ecd29b;
+  --info:#2a5f9e; --info-bg:#e6eefa;
+  --stage-seed:#a9d27f; --stage-grow:#3f8f48; --stage-ripe:#d8b548; --stage-bare:#b39a76;
+  --c-aman:#a5c995; --c-boro:#8ec4b3; --c-potato:#dcbf95; --c-pulse:#c3d98e; --c-mustard:#e8d46a; --c-rest:#e4e6d9; --on-crop:#1a2a21;
+  --viewer-a:#f3f2e7; --viewer-b:#e4e7d6;
+  --shadow:0 1px 1px rgba(26,42,33,.04),0 12px 30px -18px rgba(26,42,33,.22);
+  --f-display:'Newsreader','Iowan Old Style',Georgia,serif;
+  --f-body:'Inter','Noto Sans Bengali',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+h1,h2,h3,h4,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* shell */
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px;padding:20px 14px;background:var(--surface);border-right:1px solid var(--line)}
+.brand{display:flex;gap:11px;align-items:center;padding:0 6px}
+.logo{width:36px;height:36px;border-radius:9px;background:var(--deep);color:var(--deep-ink);display:grid;place-items:center}
+.brand b{display:block;font:500 20px/1.1 var(--f-display);letter-spacing:-.01em}
+.brand span{font-size:12px;color:var(--muted)}
+.side .eyebrow{padding:0 8px}
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:-10px}
+.nav button{display:flex;align-items:center;gap:11px;border:0;background:none;text-align:left;padding:9px 10px;border-radius:9px;color:var(--fg-2);font-weight:500}
+.nav button:hover{background:var(--surface-2)}
+.nav button[aria-current="page"]{background:var(--deep);color:var(--deep-ink);font-weight:500}
+.side-foot{margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--line);display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.side-foot b{color:var(--fg-2);font-weight:600;display:flex;gap:7px;align-items:center}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.main{min-width:0}
+
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.crumb{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.crumb b{color:var(--fg);font-weight:600}
+.tb-brand{display:none;align-items:center;gap:8px;font:500 16px var(--f-display)}
+.steps{display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:center}
+.step{display:flex;align-items:center;gap:9px;padding:6px 12px 6px 7px;border-radius:999px;font-weight:500;color:var(--muted);font-size:13px;white-space:nowrap}
+.step i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:500 11px var(--f-mono);font-style:normal;border:1.5px solid var(--line-strong)}
+.step.done{color:var(--fg-2)} .step.done i{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.step.cur{background:var(--accent-soft);color:var(--deep);font-weight:600} .step.cur i{background:var(--deep);border-color:var(--deep);color:var(--deep-ink)}
+.step.warn i{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+.step-line{width:28px;height:1.5px;background:var(--line-strong);flex:none}
+.tb-right{display:flex;align-items:center;gap:12px;margin-left:auto}
+.hist{font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.lang{display:inline-flex;background:var(--sunk);border-radius:9px;padding:3px}
+.lang button{border:0;background:none;padding:4px 10px;border-radius:7px;font-weight:600;font-size:12.5px;color:var(--muted)}
+.lang button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);font-weight:600;font-size:13px;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--surface-2);border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.ghost{border-color:transparent;background:none;color:var(--fg-2)}
+.btn.ghost:hover{background:var(--sunk)}
+.link{border:0;background:none;color:var(--muted);font-weight:500;padding:6px}
+
+.content{padding:30px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));max-width:1760px;margin:0 auto;display:grid;gap:22px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.head h1{font:500 46px/1.04 var(--f-display);letter-spacing:-.03em;margin:10px 0 8px}
+.head p{color:var(--muted);max-width:52ch}
+.head-actions{display:flex;gap:10px;flex-wrap:wrap}
+.fields{display:inline-flex;background:var(--sunk);border-radius:11px;padding:4px;gap:2px;flex-wrap:wrap}
+.fields button{border:0;background:none;padding:7px 14px;border-radius:8px;font-weight:600;color:var(--muted);display:flex;gap:8px;align-items:center}
+.fields button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.fields button[aria-pressed="true"]::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+
+/* workspace grid */
+.ws{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.col-l,.col-c,.col-r{display:contents}
+.viewer{grid-column:1/-1;order:1}.detail{grid-column:1/-1;order:2}.rot{order:3}.pri{order:4}.insp{grid-column:1/-1;order:5}
+@media (min-width:1560px){
+  .ws{grid-template-columns:292px minmax(0,1fr) 340px}
+  .col-l,.col-c,.col-r{display:flex;flex-direction:column;gap:20px;min-width:0}
+  .viewer,.detail,.rot,.pri,.insp{grid-column:auto;order:0}
+}
+@media (max-width:820px){.ws{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px 0}
+.card-h h2{font:500 21px/1.2 var(--f-display);letter-spacing:-.01em}
+
+/* source tags */
+.tag{display:inline-flex;align-items:center;gap:5px;font:500 10.5px/1 var(--f-mono);letter-spacing:.04em;padding:4px 7px;border-radius:5px;white-space:nowrap;vertical-align:middle}
+.tag.nasa{background:var(--nasa-bg);color:var(--nasa-fg);font-weight:500}
+.tag.est{border:1px solid var(--line-strong);color:var(--muted)}
+.tag.scn{border:1px dashed var(--line-strong);color:var(--muted)}
+.tag.meas{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
+
+/* scenarios */
+.rot .list{display:grid;padding:10px}
+.sc{display:grid;grid-template-columns:22px 1fr auto;gap:2px 10px;align-items:center;text-align:left;border:1px solid transparent;background:none;border-radius:11px;padding:11px 10px}
+.sc:hover{background:var(--surface-2)}
+.sc[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line)}
+.sc .n{font:500 11px var(--f-mono);color:var(--muted);grid-row:1/3;align-self:start;padding-top:3px}
+.sc .t{font-weight:600;line-height:1.25}
+.sc .q{font:500 11.5px var(--f-mono);color:var(--muted);grid-column:2;display:flex;flex-wrap:wrap;gap:2px 5px;align-items:center}
+.sc .sco{grid-column:3;grid-row:1/3;text-align:right;font:500 26px/1 var(--f-display)}
+.sc .sco small{font:500 11px var(--f-mono);color:var(--muted)}
+.sc .bar{grid-column:2/4;height:4px;border-radius:2px;background:var(--sunk);margin-top:8px;overflow:hidden}
+.sc .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.sc[aria-pressed="true"] .bar{background:var(--surface)}
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:6px}
+.pill.good{background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.note-s{font-size:12px;color:var(--muted);padding:0 18px 14px}
+
+/* priorities */
+.pri .rows{display:grid;gap:14px;padding:14px 18px 6px}
+.pr-row{display:grid;gap:6px}
+.pr-top{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:500}
+.pr-top span{display:flex;gap:8px;align-items:center;color:var(--fg-2)}
+.pr-top b{font:500 13px var(--f-mono);min-width:1.4em;text-align:right}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;margin:0;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--accent) var(--p,50%),var(--line-strong) var(--p,50%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);margin-top:-6px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line-strong)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--accent)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.presets{display:flex;gap:8px;padding:8px 18px 4px}
+.chip{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:5px 12px;font-weight:600;font-size:12.5px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.assump{margin:10px 18px 0;padding:14px 0 16px;border-top:1px solid var(--line);display:grid;gap:8px}
+.assump div{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.assump dt,.assump dd{margin:0}
+.assump dt{color:var(--muted)}
+.assump dd{font:500 13px var(--f-mono)}
+
+/* viewer */
+.viewer{overflow:visible}
+.v-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;background:var(--sunk);border-radius:9px;padding:3px}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:7px;font-weight:600;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--deep);color:var(--deep-ink)}
+.v-head .sp{flex:1}
+.rel{position:relative}
+.pop{position:absolute;top:calc(100% + 8px);left:0;z-index:15;width:min(320px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow),0 20px 40px -12px rgba(0,0,0,.25);padding:8px}
+.pop label{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:500}
+.pop label:hover{background:var(--surface-2)}
+.pop label .tag{margin-left:auto}
+.pop input{accent-color:var(--accent);margin:0}
+.stage{position:relative;aspect-ratio:16/8.2;min-height:300px;background:radial-gradient(120% 90% at 50% 20%,var(--viewer-a),var(--viewer-b));overflow:hidden}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage-chip{position:absolute;top:12px;right:12px;display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:500 12px var(--f-mono);box-shadow:var(--shadow)}
+.stage-chip i{width:9px;height:9px;border-radius:50%}
+.strata{position:absolute;left:12px;bottom:12px;display:flex;gap:6px;flex-wrap:wrap}
+.strata button{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-weight:600;font-size:12px;box-shadow:var(--shadow)}
+.strata button i{width:10px;height:10px;border-radius:3px}
+.strata button:hover,.strata button:focus-visible{border-color:var(--accent)}
+.scale-note{position:absolute;right:12px;bottom:12px;font:500 10.5px var(--f-mono);color:var(--muted);text-align:right;max-width:210px}
+.tl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:start;padding:14px 16px;border-top:1px solid var(--line)}
+.play{width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.play:hover{background:var(--accent-hover)}
+.months{display:grid;grid-template-columns:repeat(12,1fr);font:500 11px var(--f-mono);color:var(--muted);margin-top:2px}
+.months span{text-align:center}
+.months span.on{color:var(--accent);font-weight:500}
+.legend{display:flex;gap:16px;flex-wrap:wrap;padding:0 16px 14px;font-size:12.5px;color:var(--fg-2)}
+.legend span{display:flex;gap:7px;align-items:center;opacity:.55}
+.legend span.on{opacity:1;font-weight:600}
+.legend i{width:11px;height:11px;border-radius:3px}
+.legend em{margin-left:auto;font:500 11px var(--f-mono);color:var(--muted);font-style:normal}
+.probe{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line)}
+.probe div{background:var(--surface);padding:11px 16px;display:grid;gap:2px}
+.probe small{font:500 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.probe b{font:500 14px var(--f-mono)}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px 28px;padding:16px;border-top:1px solid var(--line)}
+.ctrl{display:grid;gap:5px}
+.ctrl .top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.ctrl .top b{font:500 13px var(--f-mono)}
+.ctrl small{color:var(--muted);font-size:12px}
+.checks{display:flex;flex-direction:column;gap:9px;justify-content:center}
+.checks label{display:flex;gap:9px;align-items:center;font-weight:500;cursor:pointer}
+.checks input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+
+/* detail */
+.detail{padding:22px}
+.d-top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+.d-top h2{font:500 36px/1.08 var(--f-display);letter-spacing:-.025em;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;margin:10px 0 0}
+.d-top h2 .ar{color:var(--muted);font-weight:500}
+.d-tags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ring{position:relative;width:76px;height:76px;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;align-content:center;text-align:center;font:500 22px/1 var(--f-display)}
+.ring b small{display:block;font:500 10px var(--f-mono);color:var(--muted);margin-top:2px}
+.calw{margin-top:22px}
+.cal-title{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.cal{position:relative;display:grid;grid-template-columns:repeat(12,1fr);gap:3px;height:42px}
+.cal .seg-c{display:flex;align-items:center;padding:0 10px;border-radius:7px;font-weight:600;font-size:12.5px;color:var(--on-crop);overflow:hidden;white-space:nowrap}
+.cal .seg-c[data-crop=aman]{background:var(--c-aman)} .cal .seg-c[data-crop=boro]{background:var(--c-boro)}
+.cal .seg-c[data-crop=potato]{background:var(--c-potato)} .cal .seg-c[data-crop=pulse]{background:var(--c-pulse)}
+.cal .seg-c[data-crop=mustard]{background:var(--c-mustard)}
+.cal .seg-c[data-crop=rest],.cal .seg-c[data-crop=fallow]{background:repeating-linear-gradient(135deg,var(--c-rest) 0 6px,transparent 6px 12px),var(--sunk);color:var(--muted)}
+.now{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--fg);border-radius:1px;transition:left .2s;pointer-events:none}
+.now::before{content:"";position:absolute;top:-1px;left:-3px;width:8px;height:8px;border-radius:50%;background:var(--fg)}
+.cal-m{display:grid;grid-template-columns:repeat(12,1fr);font:500 11px var(--f-mono);color:var(--muted);margin-top:6px;gap:3px}
+.cal-m span{text-align:center}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:22px}
+.fact{background:var(--surface);padding:14px 16px;display:grid;gap:6px;align-content:start}
+.fact small{font:500 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fact b{font:500 22px/1.1 var(--f-display);letter-spacing:-.01em}
+.fact span{color:var(--muted);font-size:12.5px}
+.review{display:flex;gap:10px;align-items:flex-start;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--fg);border-radius:10px;padding:11px 14px;margin-top:14px;font-size:13px}
+.review .pill{flex:none;background:transparent;padding:2px 0;color:var(--warn)}
+.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px;margin-top:22px}
+.why h3{font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.why p{max-width:60ch}
+details.ev{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+details.ev summary{cursor:pointer;font-weight:600;color:var(--fg-2);display:flex;gap:8px;align-items:center;list-style:none}
+details.ev summary::-webkit-details-marker{display:none}
+details.ev summary::before{content:"▸";transition:transform .15s}
+details.ev[open] summary::before{transform:rotate(90deg)}
+details.ev p{margin-top:8px;color:var(--muted);max-width:64ch}
+.d-act{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+.d-act .l{display:flex;gap:6px;flex-wrap:wrap}
+.btn.big{padding:11px 22px;font-size:14px}
+
+/* inspector */
+.insp .tabs{display:grid;grid-template-columns:repeat(3,1fr);margin:14px 14px 0;background:var(--sunk);border-radius:10px;padding:3px}
+.insp .tabs button{border:0;background:none;padding:7px 4px;border-radius:8px;font-weight:600;font-size:13px;color:var(--muted)}
+.insp .tabs button[aria-selected="true"]{background:var(--deep);color:var(--deep-ink)}
+.panel{padding:16px 18px 18px;display:grid;gap:14px}
+.panel h3{font:500 19px/1.2 var(--f-display);letter-spacing:-.01em}
+.panel .sub{color:var(--muted);font-size:12.5px;margin-top:-8px}
+.strat{display:grid;gap:8px}
+.layer{display:grid;grid-template-columns:6px 1fr;gap:12px;text-align:left;border:1px solid var(--line);border-radius:10px;padding:11px 12px 11px 0;background:var(--surface);overflow:hidden}
+.layer:hover,.layer:focus-visible{border-color:var(--accent)}
+.layer::before{content:"";background:var(--lc);margin:-11px 0}
+.layer .l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.layer b{font-weight:600}
+.layer small{font:500 11px var(--f-mono);color:var(--muted)}
+.layer p{font-size:12.5px;color:var(--fg-2);margin-top:3px}
+.layer p.m{color:var(--muted)}
+.nut{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nut div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;background:var(--surface-2)}
+.nut small{font:500 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nut b{font:500 18px/1.2 var(--f-display)}
+.nut b i{font:500 11px var(--f-mono);font-style:normal;color:var(--muted);margin-left:3px}
+.nut em{font-style:normal;font-size:12px;font-weight:600}
+.nut .ok{color:var(--accent)} .nut .mid{color:var(--warn)}
+.nut .wide{grid-column:1/-1}
+.nut .src{margin-top:4px}
+.callout{border:1px dashed var(--line-strong);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--muted)}
+.callout b{color:var(--fg);display:block;font-weight:600;margin-bottom:2px}
+.row2{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.row2:last-of-type{border-bottom:0}
+.row2 span{color:var(--muted)}
+.stat2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat2 div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat2 small{display:block;font:500 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.stat2 b{font:500 22px var(--f-display)}
+.state{font:500 12px var(--f-mono);padding:5px 9px;border-radius:6px;background:var(--accent-soft);color:var(--accent)}
+.s1{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:74px;margin-top:2px}
+.s1 div{display:grid;gap:4px;justify-items:center;align-content:end;height:100%}
+.s1 i{display:block;width:100%;height:3px;border-radius:2px;background:var(--info)}
+.s1 small{font:500 9.5px var(--f-mono);color:var(--muted)}
+.cells{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cells div{border:1px solid var(--line);border-radius:9px;padding:8px 6px;display:grid;gap:3px;justify-items:center;text-align:center;font-size:11.5px;background:var(--surface-2)}
+.cells b{font:500 11px var(--f-mono);color:var(--muted)}
+.cells i{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+.cells .stress i{background:var(--stage-ripe)} .cells .covered i{background:var(--stage-grow)} .cells .bare i{background:var(--stage-bare)}
+.cells .none{opacity:.55}
+.key{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.key span{display:flex;gap:6px;align-items:center}
+.key i{width:8px;height:8px;border-radius:50%}
+.seg.full{display:grid;grid-template-columns:repeat(3,1fr)}
+.seg.full button{padding:7px 4px}
+.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:4px}
+
+@media (max-width:1100px){.steps{order:3;flex-basis:100%;justify-content:flex-start;overflow-x:auto}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)} .side{display:none} .tb-brand{display:flex}
+  .head h1{font-size:32px}
+}
+@media (max-width:560px){
+  .crumb,.hist,.link{display:none}
+  .d-top{flex-direction:column-reverse}
+  .detail{padding:18px 16px}
+  .cal .seg-c{padding:0 6px;font-size:11px}
+  .step span{display:none}.step.cur span{display:inline}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <aside class="side" aria-label="Field workspace">
+    <div class="brand">
+      <span class="logo"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21v-8"/><path d="M12 13c0-4.5 3-7 8-7 0 4.5-3 7-8 7z"/><path d="M12 16c0-3-2-5-7-5 0 3 2 5 7 5z"/></svg></span>
+      <div><b>Ropon Radar</b><span lang="bn">রোপণ রাডার</span></div>
+    </div>
+    <div class="eyebrow">Field workspace</div>
+    <nav class="nav" aria-label="Sections">
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/></svg>My field</button>
+      <button type="button" aria-current="page"><svg class="ic" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 0 1-14.6 5.9M3.5 12a8.5 8.5 0 0 1 14.6-5.9"/><path d="M18 2.5v4h-4M6 21.5v-4h4"/></svg>Rotation studio</button>
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21v-8"/><path d="M12 13c0-4.5 3-7 8-7 0 4.5-3 7-8 7z"/><path d="M12 16c0-3-2-5-7-5 0 3 2 5 7 5z"/></svg>Planting planner</button>
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>My plans</button>
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5M12 7.5V12l3 2"/></svg>Past seasons</button>
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>Crop clinic</button>
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>Water &amp; resilience</button>
+      <button type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>Disaster recovery</button>
+    </nav>
+    <div class="side-foot">
+      <b><span class="pulse"></span>Rangpur field lab</b>
+      <span>Bangladesh · Three prepared sites</span>
+      <span class="mono">24°–27° N · Field edition 01</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="tb-brand"><span class="logo" style="width:28px;height:28px;border-radius:8px"><svg class="ic" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 21v-8"/><path d="M12 13c0-4.5 3-7 8-7 0 4.5-3 7-8 7z"/><path d="M12 16c0-3-2-5-7-5 0 3 2 5 7 5z"/></svg></span>Ropon Radar</span>
+      <div class="crumb">Rangpur &nbsp;/&nbsp; <b>Rotation studio</b></div>
+      <div class="steps" aria-label="Progress">
+        <div class="step done"><i>✓</i><span>Field</span></div><span class="step-line"></span>
+        <div class="step cur" aria-current="step"><i>✓</i><span>Rotation</span></div><span class="step-line"></span>
+        <div class="step warn"><i>!</i><span>Planting</span></div><span class="step-line"></span>
+        <div class="step"><i>4</i><span>My plans</span></div>
+      </div>
+      <div class="tb-right">
+        <span class="hist">Historical data · 2024</span>
+        <div class="lang" role="group" aria-label="Language"><button type="button" aria-pressed="true" id="lEn">EN</button><button type="button" aria-pressed="false" id="lBn" lang="bn">বাংলা</button></div>
+        <button class="btn primary" type="button">Continue <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <button class="link" type="button">Exit plan</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="head">
+        <div>
+          <div class="eyebrow">Decision studio</div>
+          <h1>Rotation studio</h1>
+          <p>Set what matters to you. Compare a whole year of crops, including the familiar rotation.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Field constraints</button>
+          <button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 9V3h12v6M6 18H4v-8h16v8h-2M7 14h10v7H7z"/></svg>Field plan</button>
+        </div>
+      </section>
+
+      <div class="fields" role="group" aria-label="Field site" id="fieldTabs">
+        <button type="button" aria-pressed="false">Mithapukur</button>
+        <button type="button" aria-pressed="true">Pirganj</button>
+        <button type="button" aria-pressed="false">Gangachara</button>
+      </div>
+
+      <div class="ws">
+        <div class="col-l">
+          <section class="card rot" aria-labelledby="rotH">
+            <div class="card-h"><h2 id="rotH">Rotation scenarios</h2><span class="tag scn">○ Scenario</span></div>
+            <div class="list" id="scList"></div>
+            <p class="note-s">Fit points out of 100, against your priorities.</p>
+          </section>
+
+          <section class="card pri" aria-labelledby="priH">
+            <div class="card-h"><h2 id="priH">My priorities</h2></div>
+            <div class="rows" id="priRows"></div>
+            <div class="presets" id="presets">
+              <button class="chip" type="button" data-p="bal" aria-pressed="false">Balanced</button>
+              <button class="chip" type="button" data-p="wat" aria-pressed="false">Save water</button>
+            </div>
+            <p class="note-s" style="padding-top:8px">0 ignores a goal. 5 gives it the greatest weight. If all are zero, scores stay blank.</p>
+            <dl class="assump">
+              <div class="eyebrow" style="margin-bottom:2px">Field assumptions</div>
+              <div><dt>Aman harvest</dt><dd>2026-11-10</dd></div>
+              <div><dt>Flood delay</dt><dd>0 d <span class="tag meas">✓ Measured · by farmer</span></dd></div>
+              <div><dt>Unit</dt><dd>Hectare</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <div class="col-c">
+          <section class="card viewer" aria-label="Field viewer">
+            <div class="v-head">
+              <div class="seg" role="group" aria-label="View" id="modeSeg">
+                <button type="button" aria-pressed="true" data-m="3d">3D</button>
+                <button type="button" aria-pressed="false" data-m="slice">Slice</button>
+                <button type="button" aria-pressed="false" data-m="top">Top</button>
+              </div>
+              <div class="rel">
+                <button class="btn" type="button" id="layBtn" aria-expanded="false" aria-controls="layPop"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>Layers</button>
+                <div class="pop" id="layPop" hidden></div>
+              </div>
+              <span class="sp"></span>
+              <span class="tag nasa">NASADEM 30 m</span>
+              <span class="mono" style="font-size:12px;color:var(--muted)">Illustrative crops · not observed</span>
+            </div>
+
+            <div class="stage" id="stage">
+              <canvas id="cv" role="img" aria-label="Field block showing crop season, soil layers and water table"></canvas>
+              <div class="stage-chip" id="stageChip"></div>
+              <div class="strata" id="strata">
+                <button type="button" data-k="top"><i style="background:#4b3020"></i>Topsoil</button>
+                <button type="button" data-k="root"><i style="background:#7b4d2b"></i>Root zone</button>
+                <button type="button" data-k="deep"><i style="background:#2f6ea6"></i>Deep soil</button>
+              </div>
+              <div class="scale-note">Bund and drain drawn wider for readability. Layer depths not to scale.</div>
+            </div>
+
+            <div class="tl">
+              <button class="play" type="button" id="play" aria-label="Play the year"><svg class="ic" viewBox="0 0 24 24" id="playIc" style="fill:currentColor;stroke:none"><path d="M8 5v14l11-7z"/></svg></button>
+              <div>
+                <input type="range" id="mo" min="0" max="11" step="1" value="10" aria-label="Month of the cycle">
+                <div class="months" id="monthLbl"></div>
+              </div>
+            </div>
+            <div class="legend" id="legend"></div>
+
+            <div class="probe" aria-label="Point probe">
+              <div><small>Probe · A</small><b>25.5006°N, 89.2211°E</b></div>
+              <div><small>Elevation</small><b>−0.01 m</b></div>
+              <div><small>Ponding</small><b>2 cm</b></div>
+              <div><small>NDVI</small><b>0.69</b></div>
+            </div>
+
+            <div class="ctrls">
+              <div class="ctrl">
+                <div class="top"><span>Terrain height <span class="tag nasa">NASA</span></span><b id="reV">4.5×</b></div>
+                <input type="range" id="re" min="1" max="8" step="0.5" value="4.5" aria-label="Vertical relief scale">
+                <small>True scale · NASADEM ~30 m, flat at plot scale</small>
+              </div>
+              <div class="ctrl">
+                <div class="top"><span>Rainfall / flood <span class="tag scn">○ Scenario</span></span><b id="raV">45 mm</b></div>
+                <input type="range" id="ra" min="0" max="240" step="5" value="45" aria-label="Rainfall scenario in millimetres">
+                <small style="display:flex;justify-content:space-between"><span>0 mm (dry spell)</span><span>240 mm (deluge)</span></small>
+              </div>
+              <div class="checks">
+                <label><input type="checkbox" id="ckRoots" checked>Show roots</label>
+                <label><input type="checkbox" id="ckBunds" checked>Show bunds</label>
+                <label><input type="checkbox" id="ckSurr">Show surroundings</label>
+              </div>
+            </div>
+          </section>
+
+          <section class="card detail" aria-live="polite" id="detail"></section>
+        </div>
+
+        <div class="col-r">
+          <section class="card insp" aria-label="Field inspector">
+            <div class="tabs" role="tablist" id="tabs">
+              <button type="button" role="tab" id="t-soil" aria-selected="true" aria-controls="p-soil" data-t="soil">Soil</button>
+              <button type="button" role="tab" id="t-water" aria-selected="false" aria-controls="p-water" data-t="water" tabindex="-1">Water</button>
+              <button type="button" role="tab" id="t-season" aria-selected="false" aria-controls="p-season" data-t="season" tabindex="-1">Seasons</button>
+            </div>
+
+            <div class="panel" role="tabpanel" id="p-soil" aria-labelledby="t-soil">
+              <div><h3>What is under my field?</h3></div>
+              <p class="sub">NASA SMAP soil moisture, SoilGrids 250 m soil map, and your own test.</p>
+              <div class="strat">
+                <button class="layer" type="button" data-k="top" style="--lc:#4b3020">
+                  <div><div class="l1"><b>Topsoil</b><small>0–15 cm</small><span class="tag nasa">NASA SMAP</span></div>
+                  <p><b style="font-weight:600">Clay loam</b> · pH 6.0 · OM 3.17%</p>
+                  <p>Surface moisture 0.19 m³/m³ (top 5 cm) · Nov 2024 average</p>
+                  <p class="m">Estimated · SoilGrids 250 m. SMAP L4, 9 km regional estimate.</p></div>
+                </button>
+                <button class="layer" type="button" data-k="root" style="--lc:#7b4d2b">
+                  <div><div class="l1"><b>Root zone</b><small>15–60 cm</small><span class="tag nasa">NASA POWER</span></div>
+                  <p>Soil moisture: wet (80% of saturation)</p>
+                  <p>Planned: Potato (Bring a pulse into the cycle) · roots ~0.1 m</p>
+                  <p class="m">Estimated · NASA POWER ~50 km, top ~1 m. Scenario.</p></div>
+                </button>
+                <button class="layer" type="button" data-k="deep" style="--lc:#2f6ea6">
+                  <div><div class="l1"><b>Deep soil &amp; water table</b><small>&gt;120 cm</small><span class="tag nasa">NASA GRACE-FO</span></div>
+                  <p>Water table ~0.8 m below ground (model)</p>
+                  <p>Regional water storage +16.1 cm vs normal (Nov 2024), GRACE-FO ~300 km</p>
+                  <p class="m">Estimated · Fan et al. 2017 model, ~1 km, monthly average. Baseline 2004–2009, not well depth.</p></div>
+                </button>
+              </div>
+              <div class="nut">
+                <div class="wide" style="border-color:var(--accent-line);background:var(--accent-soft)"><small>Root-zone moisture <span class="tag nasa">NASA SMAP</span></small><b>0.24 <i>m³/m³</i></b><em class="mid">2024: drier than usual</em></div>
+                <div><small>pH</small><b>6.05</b><em class="mid">Medium</em><span class="tag est src">◈ Estimated · SoilGrids 250 m</span></div>
+                <div><small>OM</small><b>2.67<i>%</i></b><em class="mid">Medium</em><span class="tag est src">◈ Estimated · SoilGrids 250 m</span></div>
+                <div><small>Nitrogen</small><b>0.159<i>%</i></b><em class="ok">Optimum</em><span class="tag est src">◈ Estimated · SoilGrids 250 m</span></div>
+                <div><small>CEC</small><b>19.55<i>cmol+/kg</i></b><em class="mid">Medium</em><span class="tag est src">◈ Estimated · SoilGrids 250 m</span></div>
+              </div>
+              <div class="callout"><b>Needs a lab soil test: Phosphorus · Potassium · Sulfur · Zinc · Boron</b>No open satellite or map data exists for these.</div>
+              <div class="row2"><span>Water table: ~1.7 m below ground (through the year 0–4 m)</span><span class="tag est">◈ Estimated</span></div>
+              <button class="btn" type="button" style="justify-content:center">+ Add your soil test or well reading</button>
+            </div>
+
+            <div class="panel" role="tabpanel" id="p-water" aria-labelledby="t-water" hidden>
+              <div><h3>Where will water collect?</h3></div>
+              <p class="sub">Low ground and drainage flow based on NASADEM 30 m topography.</p>
+              <div class="stat2">
+                <div><small>Low-ground share</small><b>17.6%</b><span class="tag est" style="margin-top:6px">◈ Estimated</span></div>
+                <div><small>Elevation range</small><b>— m</b></div>
+              </div>
+              <div>
+                <div class="row2"><span>Outlet drain</span><span class="state">Open (active)</span></div>
+                <div class="row2"><span>Canal outlet</span><span class="mono" style="font-size:12.5px">Free flow</span></div>
+              </div>
+              <button class="btn primary" type="button" id="showWater" style="justify-content:center"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Show on 3D</button>
+              <div>
+                <div class="eyebrow" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">Sentinel-1 monthly flooded area <span class="tag est">◈ Estimated</span></div>
+                <div class="s1" id="s1"></div>
+                <p class="sub" style="margin-top:8px">0% flooded area in all 12 monthly passes.</p>
+              </div>
+            </div>
+
+            <div class="panel" role="tabpanel" id="p-season" aria-labelledby="t-season" hidden>
+              <div><h3>When is the field bare or stressed?</h3></div>
+              <p class="sub">12-month crop coverage and moisture stress from Sentinel-2 &amp; NASA POWER.</p>
+              <div class="cells" id="cells"></div>
+              <div class="key"><span><i style="background:var(--stage-grow)"></i>Covered</span><span><i style="background:var(--stage-ripe)"></i>Moisture stress <span class="tag est">◈ Est.</span></span><span><i style="background:var(--stage-bare)"></i>Bare / fallow <span class="tag est">◈ Est.</span></span></div>
+              <div>
+                <div class="eyebrow" style="margin-bottom:8px">3D planting layout</div>
+                <div class="seg full" role="group" aria-label="Planting layout" id="layout">
+                  <button type="button" data-l="rows" aria-pressed="true">Line rows</button>
+                  <button type="button" data-l="beds" aria-pressed="false">Raised beds</button>
+                  <button type="button" data-l="drains" aria-pressed="false">Bund drains</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="foot"><span>Pirganj</span><span>NASA Earth observations · Bangladesh field research</span></div>
+    </main>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var root=document.documentElement;
+function css(n){return getComputedStyle(root).getPropertyValue(n).trim()}
+
+var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var CROP={aman:'Aman rice',boro:'Boro rice',potato:'Potato',pulse:'Mungbean',mustard:'Mustard',rest:'Rest',fallow:'Fallow'};
+var SHORT={aman:'Aman',boro:'Boro',potato:'Potato',pulse:'Pulse',mustard:'Mustard',rest:'Rest',fallow:'Fallow'};
+var STAGE={seed:'seedling',grow:'growing',ripe:'ripening',bare:'bare'};
+function cal(a){return a.map(function(s){var p=s.split(':');return {c:p[0],s:p[1]}})}
+
+var SC=[
+ {name:'Bring a pulse into the cycle',theme:'Legume diversification',seq:['Short Aman','Potato','Mungbean'],score:49,delta:null,
+  cal:cal(['potato:ripe','potato:ripe','pulse:grow','pulse:ripe','rest:bare','rest:bare','aman:seed','aman:grow','aman:grow','aman:ripe','potato:grow','potato:grow']),
+  why:'A Gangachara experiment supports this sequence. Returning legume residues can support the soil.',
+  check:'Potato still needs inputs. Mungbean needs a suitable window and drainage.',
+  cost:'৳4,914',costNote:'per season · 15.4 hrs @ 45,000 L/hr',review:true,status:'Conditional'},
+ {name:'Make the winter gap count',theme:'Winter crop',seq:['Aman rice','Mustard','Boro rice'],score:47,delta:-2,
+  cal:cal(['mustard:grow','mustard:ripe','boro:seed','boro:grow','boro:grow','boro:ripe','aman:seed','aman:grow','aman:grow','aman:ripe','mustard:seed','mustard:grow'])},
+ {name:'Keep the familiar rhythm',theme:'Familiar rotation',seq:['Aman rice','Fallow','Boro rice'],score:40,delta:-9,
+  cal:cal(['boro:seed','boro:grow','boro:grow','boro:grow','boro:ripe','boro:ripe','aman:seed','aman:grow','aman:grow','aman:ripe','fallow:bare','fallow:bare'])},
+ {name:'Plan for a potato harvest',theme:'Potato first',seq:['Aman rice','Potato','Boro rice'],score:30,delta:-19,review:true,
+  cal:cal(['potato:ripe','boro:seed','boro:grow','boro:grow','boro:ripe','boro:ripe','aman:seed','aman:grow','aman:grow','aman:ripe','potato:grow','potato:grow'])}
+];
+
+var PRI=[
+ {k:'water',label:'Save irrigation water',v:3,ic:'<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'},
+ {k:'om',label:'Strengthen soil organic matter',v:3,ic:'<path d="M12 21v-8"/><path d="M12 13c0-4.5 3-7 8-7 0 4.5-3 7-8 7z"/><path d="M12 16c0-3-2-5-7-5 0 3 2 5 7 5z"/>'},
+ {k:'inc',label:'Maximize net household income',v:3,ic:'<path d="M4 7h16v11H4zM8 7V4h8v3M12 11v4"/>'},
+ {k:'stab',label:'Yield stability across weather',v:1,ic:'<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>'}
+];
+var PRESETS={bal:[3,3,3,3],wat:[5,3,2,1]};
+
+var LAYERS={
+ crop:{n:'Crop season (3D plants)',src:'NASA',pat:'rows'},
+ photo:{n:'High-res photo (Esri / Sentinel)',src:null,pat:'rows',base:'#76804a'},
+ ndvi:{n:'Greenness (NDVI grid)',src:'NASA HLS',pat:'blobs',base:'#4f9a46',blobs:['#2f7d3a','#8bc15a','#c9d35a']},
+ ndmi:{n:'Moisture (NDMI)',src:'NASA HLS',pat:'blobs',base:'#4f8fa8',blobs:['#2c6f95','#7cb9c4','#b5d7cf']},
+ flow:{n:'Water flow & ponding',src:'NASA',pat:'flow',base:'#8aa19b'},
+ elev:{n:'Elevation & contours',src:'NASA',pat:'contour',base:'#c4b389'},
+ prod:{n:'Productivity zones',src:'NASA HLS',pat:'blobs',base:'#7fae5a',blobs:['#3f8a4a','#b8c75a','#d9a64a']},
+ fert:{n:'Soil fertility (SoilGrids)',src:null,pat:'blobs',base:'#b58f55',blobs:['#8f6a3a','#cfae6b','#a07a46']}
+};
+var BLOBS=[[.24,.32,.30,.34],[.72,.62,.32,.36],[.5,.88,.22,.2]];
+var SOIL={top:'#4b3020',root:'#7b4d2b',deep:'#a97a4c',water:'#2f6ea6'};
+
+var st={mode:'3d',layer:'crop',month:10,sc:0,hl:null,relief:4.5,rain:45,roots:true,bunds:true,surr:false,layout:'rows',playing:false};
+var chosen={},saved={};
+
+/* ---------- scenario list ---------- */
+function renderList(){
+  var el=$('#scList');
+  el.innerHTML=SC.map(function(s,i){
+    return '<button type="button" class="sc" data-i="'+i+'" aria-pressed="'+(i===st.sc)+'">'+
+      '<span class="n">0'+(i+1)+'</span><span class="t">'+s.name+'</span>'+
+      '<span class="sco">'+s.score+'<small>/100</small></span>'+
+      '<span class="q">'+s.seq.join(' → ')+(s.delta?' · '+String(s.delta).replace('-','−')+' pts':'')+'</span>'+
+      '<span class="bar"><i style="width:'+s.score+'%"></i></span></button>';
+  }).join('');
+  $$('.sc',el).forEach(function(b){b.addEventListener('click',function(){st.sc=+b.dataset.i;renderList();renderDetail();sync()})});
+}
+
+/* ---------- priorities ---------- */
+function fillRange(r){r.style.setProperty('--p',((r.value-r.min)/(r.max-r.min)*100)+'%')}
+function renderPri(){
+  $('#priRows').innerHTML=PRI.map(function(p,i){
+    return '<div class="pr-row"><div class="pr-top"><span><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px">'+p.ic+'</svg>'+p.label+'</span><b id="pv'+i+'">'+p.v+'</b></div>'+
+      '<input type="range" min="0" max="5" step="1" value="'+p.v+'" data-i="'+i+'" aria-label="'+p.label+'"></div>';
+  }).join('');
+  $$('#priRows input').forEach(function(r){fillRange(r);r.addEventListener('input',function(){
+    var i=+r.dataset.i;PRI[i].v=+r.value;$('#pv'+i).textContent=r.value;fillRange(r);syncPresets();
+  })});
+}
+function syncPresets(){
+  var cur=PRI.map(function(p){return p.v}).join();
+  $$('#presets .chip').forEach(function(c){c.setAttribute('aria-pressed',PRESETS[c.dataset.p].join()===cur)});
+}
+$$('#presets .chip').forEach(function(c){c.addEventListener('click',function(){
+  PRESETS[c.dataset.p].forEach(function(v,i){PRI[i].v=v});renderPri();syncPresets();
+})});
+
+/* ---------- detail ---------- */
+function runs(c){
+  var out=[],i=0;
+  while(i<12){var j=i;while(j+1<12&&c[j+1].c===c[i].c)j++;out.push({c:c[i].c,a:i,n:j-i+1});i=j+1}
+  return out;
+}
+function renderDetail(){
+  var s=SC[st.sc],i=st.sc,C=2*Math.PI*30,off=C*(1-s.score/100);
+  var seq=s.seq.map(function(x,k){return (k?'<span class="ar">→</span>':'')+'<span>'+x+'</span>'}).join('');
+  var segs=runs(s.cal).map(function(r){
+    return '<div class="seg-c" data-crop="'+r.c+'" style="grid-column:'+(r.a+1)+' / span '+r.n+'">'+SHORT[r.c]+'</div>';
+  }).join('');
+  var top=i===0?'<span class="pill good">Best fit for your priorities · '+s.score+'/100</span>':'<span class="pill" style="background:var(--sunk);color:var(--muted)">'+String(s.delta).replace('-','−')+' points vs. the top rotation</span>';
+  var status=s.status?'<span class="pill warn">'+s.status+'</span>':'';
+  var rain=i===0?'Nov–Jan rain likely above usual':'Not yet reviewed';
+  var facts='<div class="facts">'+
+    '<div class="fact"><small>Irrigation cost</small><b>'+(s.cost||'Not yet calculated')+'</b><span>'+(s.costNote||'Pump tariff applies once calculated')+'</span>'+(s.cost?'<span><span class="tag nasa">NASA</span> <span class="tag scn">○ Scenario</span></span>':'')+'</div>'+
+    '<div class="fact"><small>Rain outlook</small><b style="font-size:17px;line-height:1.25">'+rain+'</b>'+(i===0?'<span><span class="tag est">◈ Estimated</span></span>':'<span>No outlook for this rotation</span>')+'</div>'+
+    '<div class="fact"><small>Rotation theme</small><b style="font-size:17px;line-height:1.25">'+s.theme+'</b><span>Pirganj · Hectare</span></div></div>';
+  var review=s.review?'<div class="review"><span class="pill">Needs review</span><span>The selected low budget does not fit the higher-input potato stage.</span></div>':'';
+  var why='<div class="why"><div><h3>Why it fits</h3><p>'+(s.why||'Not yet reviewed for this field.')+'</p></div><div><h3>What to check</h3><p>'+(s.check||'Not yet reviewed for this field.')+'</p></div></div>';
+  var ch=chosen[i],sv=saved[i];
+  $('#detail').innerHTML=
+    '<div class="d-top"><div><div class="d-tags"><span class="eyebrow">Rotation 0'+(i+1)+'</span>'+top+status+'</div><h2>'+seq+'</h2></div>'+
+    '<div class="ring"><svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="30" fill="none" stroke="var(--sunk)" stroke-width="7"/><circle cx="36" cy="36" r="30" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'"/></svg><b><span>'+s.score+'<small>/ 100</small></span></b></div></div>'+
+    '<div class="calw"><div class="cal-title"><span class="eyebrow">Crop calendar</span><span class="tag scn">○ Scenario</span></div>'+
+    '<div class="cal" id="cal">'+segs+'<span class="now" id="now"></span></div>'+
+    '<div class="cal-m">'+MONTHS.map(function(m){return '<span>'+m+'</span>'}).join('')+'</div></div>'+
+    facts+review+why+
+    '<details class="ev"><summary>See the evidence and score breakdown</summary><p>Fit points weigh each rotation against your four priorities. A priority set to 0 is ignored and 5 gives it the greatest weight. Scores stay blank when all four are zero.</p></details>'+
+    '<div class="d-act"><div class="l">'+
+    '<button class="btn ghost" type="button" id="pv3d"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Preview in 3D</button>'+
+    '<button class="btn ghost" type="button" id="svPlan"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg>'+(sv?'Saved ✓':'Save plan')+'</button>'+
+    '<button class="btn ghost" type="button"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Plan planting</button></div>'+
+    '<button class="btn primary big" type="button" id="choose">'+(ch?'Chosen ✓':'Choose this rotation →')+'</button></div>';
+  $('#pv3d').addEventListener('click',function(){setMode('3d');$('#stage').scrollIntoView({behavior:'smooth',block:'center'})});
+  $('#svPlan').addEventListener('click',function(){saved[i]=!saved[i];renderDetail();sync()});
+  $('#choose').addEventListener('click',function(){chosen={};chosen[i]=true;renderDetail();sync()});
+}
+
+/* ---------- viewer UI ---------- */
+function setMode(m){st.mode=m;$$('#modeSeg button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.m===m)});draw()}
+$$('#modeSeg button').forEach(function(b){b.addEventListener('click',function(){setMode(b.dataset.m)})});
+
+function renderLayers(){
+  $('#layPop').innerHTML=Object.keys(LAYERS).map(function(k){
+    var L=LAYERS[k];
+    return '<label><input type="radio" name="lay" value="'+k+'"'+(k===st.layer?' checked':'')+'>'+L.n+(L.src?'<span class="tag nasa">'+L.src+'</span>':'')+'</label>';
+  }).join('');
+  $$('#layPop input').forEach(function(r){r.addEventListener('change',function(){st.layer=r.value;sync();$('#layPop').hidden=true;$('#layBtn').setAttribute('aria-expanded','false')})});
+}
+$('#layBtn').addEventListener('click',function(){
+  var h=$('#layPop').hidden;$('#layPop').hidden=!h;this.setAttribute('aria-expanded',String(h));
+});
+document.addEventListener('click',function(e){if(!e.target.closest('.rel')){$('#layPop').hidden=true;$('#layBtn').setAttribute('aria-expanded','false')}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){$('#layPop').hidden=true;$('#layBtn').setAttribute('aria-expanded','false')}});
+
+$('#monthLbl').innerHTML=MONTHS.map(function(m){return '<span>'+m+'</span>'}).join('');
+var mo=$('#mo');
+mo.addEventListener('input',function(){st.month=+mo.value;sync()});
+var timer=null;
+$('#play').addEventListener('click',function(){
+  st.playing=!st.playing;
+  $('#playIc').innerHTML=st.playing?'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>':'<path d="M8 5v14l11-7z"/>';
+  $('#play').setAttribute('aria-label',st.playing?'Pause':'Play the year');
+  clearInterval(timer);
+  if(st.playing)timer=setInterval(function(){st.month=(st.month+1)%12;sync()},750);
+});
+
+$('#re').addEventListener('input',function(){st.relief=+this.value;$('#reV').textContent=this.value+'×';fillRange(this);draw()});
+$('#ra').addEventListener('input',function(){st.rain=+this.value;$('#raV').textContent=this.value+' mm';fillRange(this);draw()});
+$('#ckRoots').addEventListener('change',function(){st.roots=this.checked;draw()});
+$('#ckBunds').addEventListener('change',function(){st.bunds=this.checked;draw()});
+$('#ckSurr').addEventListener('change',function(){st.surr=this.checked;draw()});
+$$('#strata button, .layer').forEach(function(b){
+  ['mouseenter','focus'].forEach(function(ev){b.addEventListener(ev,function(){st.hl=b.dataset.k;draw()})});
+  ['mouseleave','blur'].forEach(function(ev){b.addEventListener(ev,function(){st.hl=null;draw()})});
+});
+
+/* ---------- inspector ---------- */
+function setTab(t){
+  $$('#tabs button').forEach(function(b){var on=b.dataset.t===t;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1});
+  ['soil','water','season'].forEach(function(k){$('#p-'+k).hidden=k!==t});
+}
+$$('#tabs button').forEach(function(b){
+  b.addEventListener('click',function(){setTab(b.dataset.t)});
+  b.addEventListener('keydown',function(e){
+    var order=['soil','water','season'],i=order.indexOf(b.dataset.t);
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){var n=order[(i+(e.key==='ArrowRight'?1:2))%3];setTab(n);$('#t-'+n).focus()}
+  });
+});
+$('#showWater').addEventListener('click',function(){st.layer='flow';renderLayers();setMode('3d');sync();$('#stage').scrollIntoView({behavior:'smooth',block:'center'})});
+$('#s1').innerHTML=['01-11','02-16','03-11','04-16','05-10','06-15','07-09','08-14','09-19','10-25','11-18','12-12'].map(function(d){return '<div><i></i><small>'+d+'</small></div>'}).join('');
+var CELLS=[['Jan','stress','Stressed'],['Feb','stress','Stressed'],['Mar','stress','Stressed'],['Apr','stress','Stressed'],['May','bare','Bare'],['Jun','bare','Bare'],['Jul','covered','Aman rice'],['Aug','covered','Aman rice'],['Sep','covered','Aman rice'],['Oct','none','—'],['Nov','none','—'],['Dec','none','—']];
+$('#cells').innerHTML=CELLS.map(function(c){return '<div class="'+c[1]+'"><b>'+c[0]+'</b><i></i><span>'+c[2]+'</span></div>'}).join('');
+$$('#layout button').forEach(function(b){b.addEventListener('click',function(){
+  st.layout=b.dataset.l;$$('#layout button').forEach(function(x){x.setAttribute('aria-pressed',x===b)});draw();
+})});
+$$('#fieldTabs button').forEach(function(b){b.addEventListener('click',function(){$$('#fieldTabs button').forEach(function(x){x.setAttribute('aria-pressed',x===b)})})});
+$('#lEn').addEventListener('click',function(){$('#lEn').setAttribute('aria-pressed','true');$('#lBn').setAttribute('aria-pressed','false')});
+$('#lBn').addEventListener('click',function(){$('#lBn').setAttribute('aria-pressed','true');$('#lEn').setAttribute('aria-pressed','false')});
+
+/* ---------- sync ---------- */
+function cur(){return SC[st.sc].cal[st.month]}
+function sync(){
+  mo.value=st.month;fillRange(mo);
+  $$('#monthLbl span').forEach(function(s,i){s.classList.toggle('on',i===st.month)});
+  var c=cur(),col=css('--stage-'+c.s);
+  $('#stageChip').innerHTML='<i style="background:'+col+'"></i>'+MONTHS[st.month]+' · '+CROP[c.c]+' · '+STAGE[c.s];
+  var now=$('#now');if(now)now.style.left='calc('+((st.month+.5)/12*100)+'% - 1px)';
+  if(st.layer==='crop'){
+    $('#legend').innerHTML=['seed','grow','ripe','bare'].map(function(k){
+      return '<span class="'+(k===c.s?'on':'')+'"><i style="background:var(--stage-'+k+')"></i>'+({seed:'Seedling / establishing',grow:'Growing / full canopy',ripe:'Ripening / harvest',bare:'Bare / fallow'})[k]+'</span>';
+    }).join('')+'<em>Illustrative crop and growth stage from the rotation plan</em>';
+  }else{
+    $('#legend').innerHTML='<span class="on"><i style="background:'+LAYERS[st.layer].base+'"></i>'+LAYERS[st.layer].n+'</span><em>Choose Crop season to see the plan again</em>';
+  }
+  $$('#layPop input').forEach(function(r){r.checked=r.value===st.layer});
+  draw();
+}
+
+/* ---------- canvas ---------- */
+var cv=$('#cv'),ctx=cv.getContext('2d'),W=0,H=0,DPR=1;
+function resize(){
+  var r=cv.parentElement.getBoundingClientRect();W=r.width;H=r.height;DPR=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);draw();
+}
+function shade(hex,f,a){
+  var n=parseInt(hex.slice(1),16),r=Math.min(255,(n>>16)*f),g=Math.min(255,((n>>8)&255)*f),b=Math.min(255,(n&255)*f);
+  return a==null?'rgb('+(r|0)+','+(g|0)+','+(b|0)+')':'rgba('+(r|0)+','+(g|0)+','+(b|0)+','+a+')';
+}
+function poly(pts,fill,stroke,lw){
+  ctx.beginPath();pts.forEach(function(p,i){i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])});ctx.closePath();
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||1;ctx.stroke()}
+}
+function line(a,b,col,lw,dash){
+  ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.strokeStyle=col;ctx.lineWidth=lw;
+  ctx.setLineDash(dash||[]);ctx.stroke();ctx.setLineDash([]);
+}
+function rng(seed){var s=seed;return function(){s=(s*16807)%2147483647;return (s-1)/2147483646}}
+function speckle(Pf,seed,n,z0,z1){
+  var r=rng(seed);
+  for(var i=0;i<n;i++){
+    var p=Pf(r(),z0+(z1-z0)*r());
+    ctx.fillStyle=r()>.5?'rgba(0,0,0,.18)':'rgba(255,255,255,.10)';
+    ctx.fillRect(p[0],p[1],1.6,1.6);
+  }
+}
+function stageCol(s){return css('--stage-'+s)}
+
+function paintSurface(Q,k){
+  var L=LAYERS[st.layer],c=cur(),base=st.layer==='crop'?stageCol(c.s):L.base,lw=k*.007;
+  ctx.save();
+  var quad=[Q(0,0),Q(1,0),Q(1,1),Q(0,1)];
+  poly(quad,base);
+  ctx.beginPath();quad.forEach(function(p,i){i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])});ctx.closePath();ctx.clip();
+  var rowCol=st.layer==='crop'&&c.s!=='bare'?shade(base,.66):shade(base,.82);
+  if(L.pat==='rows'){
+    var N=st.layout==='beds'?9:16,bare=st.layer==='crop'&&c.s==='bare';
+    for(var i=0;i<N;i++){
+      if(st.layout==='beds'){
+        var v0=i/N,v1=(i+.62)/N;
+        poly([Q(0,v0),Q(1,v0),Q(1,v1),Q(0,v1)],shade(base,bare?.9:.72,.55));
+      }else{
+        var v=(i+.5)/N;line(Q(0,v),Q(1,v),rowCol,bare?lw*.6:lw*1.5);
+        if(!bare&&c.s!=='seed'){line(Q(0,v),Q(1,v),shade(base,1.18,.55),lw*.5)}
+      }
+    }
+  }else if(L.pat==='blobs'){
+    BLOBS.forEach(function(b,bi){
+      var pts=[];for(var a=0;a<28;a++){var t=a/28*Math.PI*2;pts.push(Q(b[0]+Math.cos(t)*b[2],b[1]+Math.sin(t)*b[3]))}
+      poly(pts,shade(L.blobs[bi],1,.62));
+    });
+    for(var j=0;j<14;j++){var vv=(j+.5)/14;line(Q(0,vv),Q(1,vv),shade(base,.8,.25),lw*.8)}
+  }else if(L.pat==='flow'){
+    for(var f=0;f<3;f++){
+      ctx.beginPath();
+      for(var q=0;q<=24;q++){var vv2=q/24,uu=.2+f*.28+.07*Math.sin(vv2*7+f*2),p=Q(uu,vv2);q?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])}
+      ctx.strokeStyle='rgba(44,106,168,.85)';ctx.lineWidth=k*(.016-f*.003);ctx.lineCap='round';ctx.stroke();
+    }
+    var pp=[];for(var a2=0;a2<28;a2++){var t2=a2/28*Math.PI*2;pp.push(Q(.78+Math.cos(t2)*.14,.8+Math.sin(t2)*.13))}
+    poly(pp,'rgba(44,106,168,.55)');
+  }else if(L.pat==='contour'){
+    [.14,.28,.42,.58,.78].forEach(function(rr){
+      ctx.beginPath();
+      for(var a3=0;a3<=40;a3++){var t3=a3/40*Math.PI*2,p3=Q(.64+Math.cos(t3)*rr*1.15,.4+Math.sin(t3)*rr*.8);a3?ctx.lineTo(p3[0],p3[1]):ctx.moveTo(p3[0],p3[1])}
+      ctx.strokeStyle='rgba(120,92,48,.75)';ctx.lineWidth=k*.005;ctx.stroke();
+    });
+  }
+  if(st.layout==='drains'){line(Q(0,.04),Q(1,.04),'rgba(44,106,168,.9)',k*.012);line(Q(0,.96),Q(1,.96),'rgba(44,106,168,.9)',k*.012)}
+  if(st.rain>120){
+    var rr2=.06+((st.rain-120)/120)*.22,pw=[];
+    for(var a4=0;a4<30;a4++){var t4=a4/30*Math.PI*2;pw.push(Q(.78+Math.cos(t4)*rr2*1.3,.78+Math.sin(t4)*rr2))}
+    poly(pw,'rgba(59,132,196,.55)','rgba(59,132,196,.9)',1);
+  }
+  ctx.restore();
+  if(st.bunds){poly(quad,null,'rgba(232,218,176,.95)',k*.016);poly(quad,null,'rgba(0,0,0,.18)',1)}
+}
+
+function marker(p,t){
+  ctx.beginPath();ctx.arc(p[0],p[1],10,0,Math.PI*2);ctx.fillStyle=css('--surface');ctx.fill();
+  ctx.lineWidth=1.5;ctx.strokeStyle=css('--fg');ctx.stroke();
+  ctx.fillStyle=css('--fg');ctx.font='600 11px '+css('--f-body');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,p[0],p[1]+.5);
+}
+function dimLabel(a,b,text,perp){
+  var ang=Math.atan2(b[1]-a[1],b[0]-a[0]),mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+  line(a,b,css('--muted'),1);
+  ctx.save();ctx.translate(mx,my);ctx.rotate(ang);
+  var w=ctx.measureText(text).width;ctx.font='500 11.5px '+css('--f-mono');w=ctx.measureText(text).width;
+  ctx.fillStyle=css('--surface');ctx.fillRect(-w/2-6,-9,w+12,18);
+  ctx.fillStyle=css('--fg-2');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,0,.5);ctx.restore();
+}
+function bands(){return [{k:'deep',a:0,b:.14,c:SOIL.water},{k:'deep',a:.14,b:.5,c:SOIL.deep},{k:'root',a:.5,b:.8,c:SOIL.root},{k:'top',a:.8,b:1,c:SOIL.top}]}
+function dimA(k){return st.hl&&st.hl!==k?.35:1}
+function rootLen(){var s=cur().s;return s==='seed'?.35:s==='grow'?.75:s==='ripe'?.95:0}
+
+function draw3d(){
+  var a=1,b=.62,Hh=.2+st.relief*.045,
+      s=Math.min(W*.6/((a+b)*.866),(H*.74)/((a+b)*.5+Hh));
+  var ox=W/2-((a-b)/2)*.866*s,totalV=(a+b)*.5*s+Hh*s,oy=(H-totalV)/2+Hh*s+4;
+  function P(x,y,z){return [ox+(x-y)*.866*s,oy+(x+y)*.5*s-z*s]}
+  var T=function(u,v){return P(u*a,v*b,Hh)};
+  if(st.surr){
+    var g=1.5;poly([P(-g*.4,-g*.4,0),P(a+g*.4,-g*.4,0),P(a+g*.4,b+g*.4,0),P(-g*.4,b+g*.4,0)],'rgba(120,150,110,.18)','rgba(120,150,110,.35)',1);
+    for(var i=1;i<8;i++){var t=-g*.4+i*(a+g*.8)/8;line(P(t,-g*.4,0),P(t,b+g*.4,0),'rgba(120,150,110,.18)',1)}
+  }
+  var faces=[{n:'R',f:function(u,z){return P(a,u*b,z)},sh:.78},{n:'L',f:function(u,z){return P(u*a,b,z)},sh:.62}];
+  faces.forEach(function(F,fi){
+    bands().forEach(function(bd,bi){
+      ctx.globalAlpha=dimA(bd.k);
+      var z0=Hh*bd.a,z1=Hh*bd.b;
+      poly([F.f(0,z1),F.f(1,z1),F.f(1,z0),F.f(0,z0)],shade(bd.c,F.sh));
+      speckle(F.f,fi*31+bi*7+3,34,z0,z1);
+      ctx.globalAlpha=1;
+    });
+    bands().forEach(function(bd){var z=Hh*bd.b;line(F.f(0,z),F.f(1,z),'rgba(0,0,0,.28)',1)});
+    if(st.roots&&rootLen()>0){
+      var bandH=Hh*.3,r=rng(77+fi);
+      ctx.globalAlpha=dimA('root');
+      for(var q=1;q<26;q++){var u=q/26,len=bandH*rootLen()*(.55+r()*.45),p0=F.f(u,Hh*.8),p1=F.f(u,Hh*.8-len);line(p0,p1,'rgba(236,222,186,.55)',1)}
+      ctx.globalAlpha=1;
+    }
+    poly([F.f(0,Hh),F.f(1,Hh),F.f(1,0),F.f(0,0)],null,'rgba(0,0,0,.35)',1);
+  });
+  paintSurface(T,s*1.2);
+  var A=T(.18,.5),A2=T(.82,.5);line(A,A2,'rgba(255,255,255,.7)',1.2,[5,4]);marker(A,'A');marker(A2,'A′');
+  var o=-.08;dimLabel(P(0,o,Hh),P(a,o,Hh),'46.2 m');
+}
+function drawSlice(){
+  var x0=W*.07,x1=W*.93,yT=H*.3,yB=H*.84,hh=yB-yT;
+  var labels={top:'Topsoil · 0–15 cm',root:'Root zone · 15–60 cm',deep:'Deep soil & water table · >120 cm'};
+  var done={};
+  bands().forEach(function(bd,bi){
+    var y0=yB-hh*bd.b,y1=yB-hh*bd.a;
+    ctx.globalAlpha=dimA(bd.k);ctx.fillStyle=bd.c;ctx.fillRect(x0,y0,x1-x0,y1-y0);
+    speckle(function(u,z){return [x0+u*(x1-x0),yB-hh*z]},bi*13+5,220,bd.a,bd.b);
+    ctx.globalAlpha=1;
+    if(!done[bd.k]&&bd.b-bd.a>.2){
+      done[bd.k]=1;ctx.fillStyle='rgba(255,255,255,.92)';ctx.font='600 12.5px '+css('--f-body');ctx.textAlign='left';ctx.textBaseline='middle';
+      ctx.fillText(labels[bd.k],x0+14,(y0+y1)/2);
+    }
+    line([x0,y0],[x1,y0],'rgba(0,0,0,.3)',1);
+  });
+  if(st.roots&&rootLen()>0){
+    var r=rng(9),bandTop=yT+hh*.2,bandH=hh*.3;
+    for(var i=1;i<70;i++){var x=x0+(x1-x0)*i/70;line([x,bandTop],[x,bandTop+bandH*rootLen()*(.5+r()*.5)],'rgba(236,222,186,.5)',1)}
+  }
+  var c=cur(),pl=c.s==='bare'?4:c.s==='seed'?14:c.s==='grow'?34:40,col=stageCol(c.s),rr=rng(4);
+  for(var j=0;j<90;j++){var xx=x0+(x1-x0)*(j+.5)/90,hgt=pl*(.75+rr()*.4);line([xx,yT],[xx,yT-hgt],col,2.2)}
+  line([x0,yT],[x1,yT],stageCol('bare'),2);
+  var wy=yB-hh*.14;line([x0,wy],[x1,wy],'rgba(150,200,245,.95)',1.5,[7,5]);
+  ctx.fillStyle='rgba(190,224,250,.95)';ctx.font='500 11.5px '+css('--f-mono');ctx.textAlign='right';ctx.fillText('Water table ≈ 0.8 m (model)',x1-12,wy-10);
+  ctx.fillStyle=css('--fg-2');ctx.font='600 12px '+css('--f-body');ctx.textAlign='left';ctx.fillText('A',x0,yT-pl-26);ctx.textAlign='right';ctx.fillText('A′',x1,yT-pl-26);
+  ctx.textAlign='left';ctx.fillStyle=css('--muted');ctx.font='500 11px '+css('--f-mono');ctx.fillText('CROSS-SECTION A–A′',x0+22,yT-pl-26);
+}
+function drawTop(){
+  var fw=Math.min(W*.8,H*.74*1.7),fh=fw/1.7,x0=(W-fw)/2,y0=(H-fh)/2-6;
+  var Q=function(u,v){return [x0+u*fw,y0+v*fh]};
+  paintSurface(Q,fw*.5);
+  var A=Q(.18,.5),A2=Q(.82,.5);line(A,A2,'rgba(255,255,255,.8)',1.4,[6,5]);marker(A,'A');marker(A2,'A′');
+  var by=y0+fh+16;line([x0,by],[x0+fw,by],css('--muted'),1);line([x0,by-4],[x0,by+4],css('--muted'),1);line([x0+fw,by-4],[x0+fw,by+4],css('--muted'),1);
+  ctx.font='500 11.5px '+css('--f-mono');var tw=ctx.measureText('46.2 m').width;
+  ctx.fillStyle=css('--surface');ctx.fillRect(W/2-tw/2-6,by-9,tw+12,18);ctx.fillStyle=css('--fg-2');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('46.2 m',W/2,by+.5);
+  ctx.fillStyle=css('--muted');ctx.fillText('N ↑',x0+fw+22,y0+10);
+}
+function draw(){
+  if(!W)return;
+  ctx.clearRect(0,0,W,H);
+  if(st.mode==='3d')draw3d();else if(st.mode==='slice')drawSlice();else drawTop();
+}
+if(window.ResizeObserver)new ResizeObserver(resize).observe($('#stage'));else window.addEventListener('resize',resize);
+
+
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){draw()});
+
+renderList();renderPri();renderDetail();renderLayers();
+fillRange($('#re'));fillRange($('#ra'));
+resize();sync();
+})();
+</script>
+
+</body></html>

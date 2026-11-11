@@ -1,0 +1,10 @@
+# UIREF-A · Clean, low-clutter 3D soil-layer cards (Topsoil / Root zone / Deep soil) — FAST, ≤ 20 min
+
+Reference design (owner's pick for responsiveness + low clutter): `helper/prompts/design/rotation-studio-reference.html` — open it, read its CSS tokens (--bg, --fg, --fg-2, --muted, --line, --accent*, --nasa-bg, --f-display/--f-body/--f-mono, card/fact/chip/legend patterns). Port those design choices: generous whitespace, one strong number per card, small muted labels, mono units, thin hairline borders, pill chips, no paragraphs.
+Target: the soil detail cards in the Rotation studio 3D side panel/popover (`soilDetailHtml` in `src/legacy/studio3d.js`, data from `buildCalloutData` in studio3d-helpers.js) — today each card stacks 4–6 lines of text (judges won't read). Redesign each card as:
+- Header row: layer name + depth chip (0–15 cm) + ONE NASA badge (keep `nasaBadge(...)` popups — sources stay accessible there).
+- 1–2 "fact tiles" max: big value + tiny label, e.g. Topsoil → "pH 6.1" · "OM 3.0 %" + small moisture bar "Surface 0.19 m³/m³"; Root zone → a moisture gauge bar "Wet · 80 %" + "Potato roots ~0.1 m"; Deep soil → "Water table ~1.0 m" + "Storage −49 cm vs normal".
+- Provenance (SoilGrids 250 m, Fan 2017 ~1 km, GRACE-FO ~300 km, baselines) moves into a single "ⓘ" toggle/tooltip per card (hidden by default), not visible lines. Keep truth labels as small chips (Estimated / Scenario / Measured).
+- "Add your well reading" as a small text button.
+Keep all numbers identical (no data changes). Mobile first (412 px: cards stack, tiles 2-up), laptop 3 cards in a row if space. Respect existing popover/hover behaviour and tests (update text expectations only where structure changed).
+Acceptance: eslint no-undef clean on changed src (`npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --parser-options=ecmaVersion:latest --rule 'no-undef:error' <files>`); `npm test` ALL pass; `npm run build`. Commit within 20 minutes; screenshots optional. Never touch package-lock/node_modules/secrets. Do NOT edit rotations.js / rotation-tool.css (another card).
