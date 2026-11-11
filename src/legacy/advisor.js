@@ -195,11 +195,27 @@ export function customPlanFor3d() {
   return { ...p, planting: [{ ...c, sharePct: 100 }] };
 }
 export function clearCustomPlan() { try { localStorage.removeItem(CUSTOM_KEY); } catch { /* ignore */ } }
+// Same rule as the planner 3D (distinctColors): crops whose hues are within 40° get the farthest palette colour.
+const CONTRAST = ['#2f8f46', '#d29a1e', '#b5523b', '#2f6f9f', '#7a4fa0'];
+function hueOf(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+export function distinctHexes(colors) {
+  const out = [];
+  const gap = (h) => Math.min(...out.map((o) => { const x = Math.abs(hueOf(o) - hueOf(h)); return Math.min(x, 360 - x); }));
+  colors.forEach((c) => { out.push(out.length && gap(c) < 40 ? [...CONTRAST].sort((x, y) => gap(y) - gap(x))[0] : c); });
+  return out;
+}
 function useInPlanner() {
   const r = ui.result;
   if (!r?.planting?.length || r.verdict === 'not_suitable') return;
   // Mode follows the auto-detected category (two crops together = mixed land split; one crop = whole field).
   const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: advisorRequest({}).mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
+  if (plan.mode !== 'rotation') { const cs = distinctHexes(plan.planting.map((c) => c.color)); plan.planting = plan.planting.map((c, i) => ({ ...c, color: cs[i] })); }
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
   location.hash = '#planner';
 }

@@ -44,3 +44,11 @@ test('decide-first: categories from up to 2 crops; scored list hidden until reve
   assert.equal(s.length, 2);
   assert.deepEqual(s[0].crops, ['Potato', 'Strawberry']);
 });
+
+test('hybrid colours: two similar greens become clearly different', async () => {
+  globalThis.document ??= { addEventListener() {}, dispatchEvent() {} };
+  const { distinctHexes } = await import('../src/legacy/advisor.js');
+  const [a, b] = distinctHexes(['#2e7d32', '#43a047']);
+  assert.equal(a, '#2e7d32');
+  assert.notEqual(b, '#43a047');
+});
