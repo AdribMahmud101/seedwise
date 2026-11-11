@@ -1,7 +1,6 @@
 import { t, esc, state, field, polygon, profile, agronomy, toast, repaint } from './ui.js';
 import { getPlan, startPlan, demoPlan, confirmField, fieldSnapshot, confirmRotation,
-  rotationSnapshot, confirmPlanting, stepStatus, nextStep, reviewReasons, subscribe } from './journey.js';
-import { PLANTING } from './engine.js';
+  rotationSnapshot, confirmPlanting, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 
@@ -49,17 +48,13 @@ export function journeyRotationCTA(id) {
 }
 
 export function canFinishPlanting(plan) {
-  return !!(plan?.steps.rotation === 'done' && plan.rotation?.seasons.length && plan.rotation.seasons.every(season => {
-    const settings = plan.planting[season.key];
-    return settings && Object.hasOwn(PLANTING, settings.crop) &&
-      [settings.rowSpacingCm, settings.withinRowCm, settings.usableAreaPct].every(value => Number.isFinite(value) && value > 0) && settings.usableAreaPct <= 100;
-  }));
+  return !!(plan?.steps.rotation === 'done' && allSeasonsReviewed(plan));
 }
 
 export function journeyFinishCTA() {
   const plan = getPlan();
   if (!plan) return '';
-  return `<div class="journey-handoff"><button type="button" class="button primary" data-journey="finish"${canFinishPlanting(plan) ? '' : ' disabled'}>${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}</button>${canFinishPlanting(plan) ? '' : `<p class="note">${t('Choose a rotation and set planting for every season.', 'ফসলচক্র বেছে নিয়ে প্রতি মৌসুমের বপনের মাপ দিন।')}</p>`}</div>`;
+  return `<div class="journey-handoff"><button type="button" class="button primary" data-journey="finish"${canFinishPlanting(plan) ? '' : ' disabled'}>${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}</button>${canFinishPlanting(plan) ? '' : `<p class="note">${t('Mark each season Looks good ✓ to finish', 'প্রতি মৌসুমকে ঠিক আছে ✓ চিহ্নিত করে শেষ করুন')}</p>`}</div>`;
 }
 
 const reviewKey = plan => JSON.stringify([plan.updatedAt, plan.reviews]);
@@ -172,7 +167,7 @@ export async function journeyAction(action, value) {
       if (getPlan()?.steps.field !== 'done') return;
       confirmRotation(rotationSnapshot(value, state.weights, agronomy));
       handoff('planner', t('Rotation chosen!', 'ফসলচক্র বেছে নেওয়া হয়েছে!'),
-        '.plan-season-tabs, [role="tablist"][aria-label*="Season"], .plan-crops, #plant-controls',
+        '#plan-seasons',
         t('Set planting for each season', 'প্রতি মৌসুমের বপনের মাপ দিন'));
     } else if (action === 'finish') {
       if (!canFinishPlanting(getPlan())) return;

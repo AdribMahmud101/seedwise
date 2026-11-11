@@ -318,6 +318,16 @@ export function resetPlan() {
   notify();
 }
 
+// Check if all non-fallow seasons in the rotation have been confirmed (confirmedAt set)
+export function allSeasonsReviewed(plan) {
+  if (!plan?.rotation) return false;
+  const nonFallowSeasons = plan.rotation.seasons.filter(season => season.crop !== 'fallow');
+  return nonFallowSeasons.length > 0 && nonFallowSeasons.every(season => {
+    const settings = plan.planting[season.key];
+    return settings && settings.confirmedAt !== null;
+  });
+}
+
 export async function demoPlan() {
   const ui = await import('./ui.js');
   const [earth, agronomy] = await Promise.all([

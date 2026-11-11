@@ -58,7 +58,7 @@ test('three season tabs follow rotation labels, dates and locked crops in both l
   assert.match(html, /class="plan-locked-crop"/);
   assert.doesNotMatch(html, /name="plantCrop"/);
   assert.match(html, /Looks good ✓/);
-  assert.match(html, /planner-journey-slot/);
+  assert.match(html, /journey-finish-slot/);
   assert.match(html, /planner-finish-slot/);
   assert.equal(state.planner.crop, 'rice');
   state.lang = 'bn';

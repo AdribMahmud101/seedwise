@@ -42,19 +42,24 @@ test('steps render todo/current/done/review with accessible jump links', () => {
   assert.equal(bar.journeyBar('clinic'), '');
 });
 
-test('finish requires a chosen rotation and valid settings for every season', () => {
+test('finish requires a chosen rotation and all seasons confirmed', () => {
   journey.startPlan();
   assert.match(bar.journeyFinishCTA(), /disabled/);
   journey.confirmField(field());
   assert.equal(bar.canFinishPlanting(journey.getPlan()), false);
   journey.confirmRotation(rotation());
+  // Rotation chosen but no seasons confirmed yet
+  assert.equal(bar.canFinishPlanting(journey.getPlan()), false);
+  assert.match(bar.journeyFinishCTA(), /disabled/);
+  // Confirm all seasons
+  journey.confirmPlanting();
   assert.equal(bar.canFinishPlanting(journey.getPlan()), true);
   assert.doesNotMatch(bar.journeyFinishCTA(), /disabled/);
+  // Unconfirm one season
   const plan = journey.getPlan();
-  delete plan.planting[plan.rotation.seasons[1].key];
+  plan.planting[plan.rotation.seasons[0].key].confirmedAt = null;
   assert.equal(bar.canFinishPlanting(plan), false);
-  plan.planting[plan.rotation.seasons[0].key].usableAreaPct = 0;
-  assert.equal(bar.canFinishPlanting(plan), false);
+  // Field change invalidates planting
   journey.confirmField({ ...field(), constraints: { ...defaultProfile(), irrigation: 'none' } });
   assert.match(bar.journeyFinishCTA(), /disabled/);
 });
@@ -128,11 +133,35 @@ test('hand-offs confirm snapshots, celebrate, and show hints after the destinati
     assert.equal(destinations.at(-1), 'planner');
     bar.mountJourney('planner', navigate, () => true);
     t.mock.timers.tick(900);
+    assert.equal(hint.mock.calls[1].arguments[0], '#plan-seasons');
     assert.match(hint.mock.calls[1].arguments[1], /each season/);
+    // Need to confirm all seasons before finish
+    journey.confirmPlanting();
     await bar.journeyAction('finish');
     assert.equal(journey.stepStatus().planting, 'done');
     assert.equal(destinations.at(-1), 'plan');
     assert.equal(celebrate.mock.calls.length, 3);
+  } finally { globalThis.document = oldDocument; }
+});
+
+test('finish CTA enables live after confirming the last season', async t => {
+  const oldDocument = globalThis.document;
+  globalThis.document = { querySelector: selector => selector === '#journey-finish-slot' ? { innerHTML: '' } : null };
+  try {
+    journey.startPlan();
+    journey.confirmField(field());
+    journey.confirmRotation(rotation());
+    const plan = journey.getPlan();
+    const seasons = plan.rotation.seasons.filter(s => s.crop !== 'fallow');
+    // Confirm all but one season
+    for (let i = 0; i < seasons.length - 1; i++) {
+      journey.setPlanting(seasons[i].key, { ...plan.planting[seasons[i].key], confirmedAt: new Date().toISOString() });
+    }
+    bar.mountJourney('planner', () => {}, () => false);
+    assert.match(bar.journeyFinishCTA(), /disabled/);
+    // Confirm the last season
+    journey.setPlanting(seasons[seasons.length - 1].key, { ...plan.planting[seasons[seasons.length - 1].key], confirmedAt: new Date().toISOString() });
+    assert.doesNotMatch(bar.journeyFinishCTA(), /disabled/);
   } finally { globalThis.document = oldDocument; }
 });
 
