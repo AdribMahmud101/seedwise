@@ -30,10 +30,11 @@ import { getCachedPower } from './powerlive.js';
 import { rotationEvidence } from './engine.js';
 import { setPlantCrop } from './planner.js';
 import * as rotationTool from './rotation-tool.js';
-import { confirmRotation, getPlan, rotationSnapshot } from './journey.js';
+import { confirmRotation, getPlan, rotationSnapshot, subscribe } from './journey.js';
+import { journeyRotationCTA } from './journey-bar.js';
 
 function syncSeasonRotation(id = getSelectedRotationId()) {
-  if (!agronomy || !field()) return;
+  if (!agronomy || !field() || !getPlan()?.field) return;
   try {
     confirmRotation(rotationSnapshot(id, state.weights, agronomy));
   } catch (error) {
@@ -46,6 +47,11 @@ let studioOpened = false;
 let studioModule = null;
 let activeRotationId = null;
 let previewedRotationId = null;
+let confirmedRotationId = getPlan()?.rotation?.id;
+subscribe(plan => {
+  if (plan?.rotation?.id !== confirmedRotationId) activeRotationId = null;
+  confirmedRotationId = plan?.rotation?.id;
+});
 let studioDataModule = null;
 let activePlantingLayout = 'rows';
 let drainTrenchActive = true;
@@ -187,6 +193,7 @@ function rankedCards() {
             ${button(t('Plan planting', 'বপন সাজান'), 'layout-for', 'small', 'right', r.id)}
           </div>
         </div>
+        ${r.id === getSelectedRotationId() ? journeyRotationCTA(r.id) : ''}
       </article>`;
     })
     .join('');
@@ -291,9 +298,9 @@ function rotationOptionsFor(activeId) {
  * Get selected rotation ID
  */
 export function getSelectedRotationId() {
+  if (activeRotationId) return activeRotationId;
   const plan = getPlan();
   if (plan?.rotation && plan.field.id === field()?.id) return plan.rotation.id;
-  if (activeRotationId) return activeRotationId;
   const items = ranking();
   return items.length > 0 ? items[0].id : 'mustard';
 }
@@ -692,7 +699,7 @@ export async function openStudio3d() {
       onRotationSelect: (id) => {
         if (id === getSelectedRotationId()) return;
         activeRotationId = id;
-        syncSeasonRotation(id);
+        document.querySelector('#rotation-list').innerHTML = rankedCards();
         openStudio3d();
       },
     };
@@ -806,7 +813,6 @@ function rotations() {
  * Lifecycle hook
  */
 export async function mountRotations() {
-  if (!getPlan()?.rotation) syncSeasonRotation();
   // Pre-load data for question panels
   await Promise.all([
     getSoilProfileData(),
@@ -987,7 +993,7 @@ function method() {
 function rotationAction(action, value) {
   if (action === 'preview-3d') {
     activeRotationId = value;
-    syncSeasonRotation(value);
+    document.querySelector('#rotation-list').innerHTML = rankedCards();
     openStudio3d();
     document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -1006,7 +1012,7 @@ function rotationAction(action, value) {
     }
     state.weights = weights;
     persist();
-    syncSeasonRotation();
+    if (getPlan()?.steps.rotation === 'done') syncSeasonRotation();
     repaint();
   }
   if (action === 'score-method') method();
@@ -1068,7 +1074,7 @@ function rotationInput(el) {
   if (el.dataset.weight) {
     state.weights[mapPriorityKey(el.dataset.weight)] = +el.value;
     persist();
-    syncSeasonRotation();
+    if (getPlan()?.steps.rotation === 'done') syncSeasonRotation();
     document.querySelector(`#value-${el.dataset.weight}`).textContent = num(+el.value);
     document.querySelector('#rotation-list').innerHTML = rankedCards();
   }

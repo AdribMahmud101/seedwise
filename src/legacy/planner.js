@@ -22,6 +22,7 @@ import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerContr
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
 import { getPlan, setPlanting } from './journey.js';
+import { journeyFinishCTA } from './journey-bar.js';
 
 let plannerSeasonKey = null;
 function plannerSeason(plan, crop) {
@@ -135,6 +136,7 @@ function planner() {
       button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
     ) +
     chips() +
+    `<div id="journey-finish-slot">${journeyFinishCTA()}</div>` +
     `<div class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
  <div class="planner3d-stage-wrap">
  <div class="planner3d-toolbar"><div class="planner3d-view-toggle" role="group" aria-label="${t('Field view', 'জমির দৃশ্য')}">

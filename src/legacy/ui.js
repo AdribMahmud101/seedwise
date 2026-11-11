@@ -65,6 +65,7 @@ async function loadData() {
   }
 }
 function syncSeasonField() {
+  if (!getPlan()?.field) return;
   const selected = field();
   if (!selected) return;
   const snapshot = fieldSnapshot(selected, polygon(), profile());

@@ -1,4 +1,5 @@
 import "./style.css";
+import "./journey.css";
 import "./recovery.css";
 import "./labels.css";
 import "./lowground.css";

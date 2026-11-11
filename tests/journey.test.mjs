@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as journey from '../src/legacy/journey.js';
 import { areaHa, capacity, rotationEvidence, STRATEGIES } from '../src/legacy/engine.js';
 import { recommendedSettings } from '../src/legacy/planner-controls.js';
-import { basePolygon, defaultPriorities, defaultProfile, fieldName, state, persist, loadData, setProfile } from '../src/legacy/ui.js';
+import { basePolygon, defaultPriorities, defaultProfile, fieldName, state, persist, loadData, setProfile, field as selectedField, polygon, profile } from '../src/legacy/ui.js';
 
 const earth = JSON.parse(readFileSync(new URL('../public/data/earth-data.json', import.meta.url)));
 const agronomy = JSON.parse(readFileSync(new URL('../public/data/agronomy.json', import.meta.url)));
@@ -285,6 +285,9 @@ test('field persistence and planner/rotation hooks preserve page state and sync 
   t.mock.method(globalThis, 'fetch', async input => Response.json(String(input).includes('agronomy') ? agronomy : earth));
   try {
     await loadData();
+    assert.equal(journey.getPlan(), null);
+    journey.startPlan();
+    journey.confirmField(journey.fieldSnapshot(selectedField(), polygon(), profile()));
     persist();
     assert.equal(journey.getPlan().field.id, state.fieldId);
     const { rotationAction, getSelectedRotationId, mountRotations } = await import('../src/legacy/rotations.js');
