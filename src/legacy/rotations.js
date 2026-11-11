@@ -1121,6 +1121,7 @@ function rotationAction(action, value) {
   if (action === 'save-rotation') {
     const r = ranking().find((v) => v.id === value);
     if (!r) return;
+    state.planner.rotation = { fieldId: state.fieldId, id: value };
     activeRotationId = value;
     syncSeasonRotation(value);
     const item = {
@@ -1155,6 +1156,8 @@ function rotationAction(action, value) {
       );
   }
   if (action === 'layout-for') {
+    state.planner.rotation = { fieldId: state.fieldId, id: value };
+    persist();
     activeRotationId = value;
     syncSeasonRotation(value);
     const crop = {

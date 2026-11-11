@@ -87,7 +87,7 @@ export function plans() {
     const seasons = p.rotation?.seasons ?? [];
     const names = state.lang === 'bn' ? MONTH_BN : MONTH_EN;
     const chips = seasons.map(season =>
-      `<span class="plan-chip plan-chip--compact plan-crop-${esc(season.crop)}">${cropGlyph(season.crop)}<span><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b><small>${esc(names[season.sowMonth - 1])}–${esc(names[season.harvestMonth - 1])}</small></span></span>`).join('');
+      `<span class="plan-chip plan-chip--compact plan-crop-${esc(season.crop)}">${cropGlyph(season.crop)}<span><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b><small>${esc(names[season.sowMonth - 1])}–${esc(names[season.harvestMonth - 1])}${p.rotation.customPlan ? ` · ${num(p.planting[season.key].rowSpacingCm)} × ${num(p.planting[season.key].withinRowCm)} cm` : ''}</small></span></span>`).join('');
 
     return `
       <article class="plan-card ${isHighlighted ? 'plan-card--highlighted' : ''}" data-plan-id="${esc(entry.id)}" data-plan-status="${esc(entry.status)}">
