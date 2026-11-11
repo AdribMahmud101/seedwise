@@ -223,9 +223,10 @@ test('rotation nutrient chips map SoilGrids values, units, classes and missing d
   const { rotations, mountRotations } = await import('../src/legacy/rotations.js');
   const { saveSoilOverrides, resetSoilOverrides } = await import('../src/legacy/rotation-tool.js');
   const baseURI = new URL('../public/', import.meta.url).href;
+  const floodData = JSON.parse(readFileSync(new URL('../public/data/s1-water.json', import.meta.url), 'utf8'));
   context.mock.method(globalThis, 'fetch', async (url) => {
     const path = new URL(url, baseURI);
-    return { ok: true, json: async () => JSON.parse(readFileSync(path, 'utf8')) };
+    return { ok: true, json: async () => path.pathname.endsWith('/s1-water.json') ? floodData : JSON.parse(readFileSync(path, 'utf8')) };
   });
   globalThis.document = {
     baseURI,
@@ -264,12 +265,23 @@ test('rotation nutrient chips map SoilGrids values, units, classes and missing d
         const rendered = chip(html, key);
         assert.ok(rendered.includes(`<strong>${value}</strong> ${unit}`), `${siteId}.${key} value/unit in ${lang}`);
         assert.ok(rendered.includes(`<span class="chip-class">${nutrients[sourceKey].class_en}</span>`));
-        assert.ok(rendered.includes(t('Estimated · SoilGrids 250 m', 'স্যাটেলাইট অনুমান · SoilGrids 250 m')));
+        assert.ok(!rendered.includes('SoilGrids 250 m'), 'soil estimates share one group source');
         assert.ok(!rendered.includes('chip-enter'));
       }
       // No open data for these: one lab-test note, no failure chips.
       for (const key of ['P', 'K', 'S', 'Zn', 'B']) assert.ok(!html.includes(`data-nutrient="${key}"`), `${key} chip hidden`);
-      assert.ok(html.includes(t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')));
+      assert.ok(html.includes(t('Needs a lab test:', 'ল্যাব মাটি পরীক্ষা দরকার:')));
+      const soilPanel = html.split('id="panel-left-soil"')[1].split('</section>')[0];
+      const soilGroup = soilPanel.split('class="soil-estimate-group"')[1].split('class="lab-test-note"')[0];
+      assert.equal((soilGroup.match(/class="truth /g) || []).length, 1);
+      assert.ok(soilGroup.includes(t('Estimated · SoilGrids 250 m', 'স্যাটেলাইট অনুমান · SoilGrids 250 m')));
+      assert.ok(soilPanel.includes('P · K · S · Zn · B'));
+      assert.equal((html.match(/class="month-cell /g) || []).length, 12);
+      assert.ok(!html.includes('month-strip-scroll'));
+      assert.equal((html.match(/class="s1-flood-dot(?: |")/g) || []).length, 12);
+      assert.ok(html.includes(t('0 % every month', 'প্রতি মাসে ০ %')));
+      assert.ok(html.includes(`${num(siteId === 'mithapukur' ? 10.3 : siteId === 'pirganj' ? 14 : 9.1, 1)} m</strong>`), 'elevation range stays numeric');
+      assert.equal((html.match(/class="panel-info"/g) || []).length, 3);
       // Real NASA SMAP root-zone moisture and the modelled water table replace the old placeholders.
       const moistureTile = html.match(/<div class="nasa-moisture-tile">([\s\S]*?)<\/div>/)?.[1];
       assert.ok(moistureTile?.includes('nasa-chip'));
@@ -293,7 +305,21 @@ test('rotation nutrient chips map SoilGrids values, units, classes and missing d
     state.fieldId = 'custom-soil-test';
     const missing = rotations();
     for (const key of ['ph', 'om', 'N', 'cec']) assert.ok(!missing.includes(`data-nutrient="${key}"`));
-    assert.ok(missing.includes(`${t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')} <strong>pH`));
+    assert.ok(missing.includes(`${t('Needs a lab test:', 'ল্যাব মাটি পরীক্ষা দরকার:')} <strong>pH`));
     state.customFields = [];
   }
+
+  state.lang = 'en';
+  state.fieldId = 'mithapukur';
+  const dates = floodData.mithapukur.dates;
+  dates[0].flooded_pct = 18;
+  assert.ok(rotations().includes('0–18 %'));
+  assert.ok(rotations().includes('data-flooded-pct="18"'));
+  dates[0].flooded_pct = null;
+  const partial = rotations();
+  assert.ok(!partial.includes('0 % every month'));
+  assert.ok(partial.includes('partial year'));
+  assert.ok(partial.includes('s1-flood-dot missing'));
+  dates.forEach(date => { date.flooded_pct = null; });
+  assert.ok(rotations().includes('No observations'));
 });
