@@ -22,6 +22,8 @@ import {
   toast,
 } from './ui.js';
 import { PLANTING, capacity } from './engine.js';
+import { outlook as outlookPack, floodFields } from './ui.js';
+import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext } from './planner-controls.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
@@ -430,7 +432,9 @@ function disposePlanner() {
 
 function mountPlanner() {
   disposePlanty?.();
-  disposePlanty = mountPlanty(() => plantyContext(field().id, state.planner, estimate(), state.lang, { fieldName: fieldName(), month: state.month + 1 }));
+  disposePlanty = mountPlanty(() => plantyContext(field().id, state.planner, estimate(), state.lang, { fieldName: fieldName(), month: state.month + 1,
+    outlook: outlookSummaryLine(field().id, outlookPack, state.lang),
+    flood: floodSummaryLine(field().id, floodFields, state.lang) }));
   document.querySelector('#plant-controls').onsubmit = event => event.preventDefault();
   document.querySelector('#plan-seasons').onkeydown = event => {
     if (event.target.getAttribute('role') !== 'tab' || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;

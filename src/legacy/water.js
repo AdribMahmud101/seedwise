@@ -3,6 +3,7 @@ import {
   state,
   agronomy,
   smap,
+  floodFields,
   persist,
   t,
   deskNo,
@@ -31,6 +32,7 @@ import {
   stateEmpty,
 } from "./ui.js";
 import { STRATEGIES } from "./engine.js";
+import { floodCard } from "./outlook-flood.js";
 import { landscapePanel, initLandscapeObserver, disposeLandscape } from "./landscape3d.js";
 
 // Helper function to get SMAP surface moisture for a field and month
@@ -156,7 +158,8 @@ function water() {
       ["soil", t("AEZ soil reference", "AEZ মাটির তথ্য")],
       ["hazard", t("Disaster recovery", "দুর্যোগের পর করণীয়")],
     ]) +
-    (id === "soil" ? soil() : id === "hazard" ? hazard() : budget())
+    (id === "soil" ? soil() : id === "hazard" ? hazard() : budget()) +
+    `<div class="section-space">${floodCard(state.fieldId, floodFields)}</div>`
   );
 }
 function budgetNumbers() {

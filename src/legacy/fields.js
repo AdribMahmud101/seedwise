@@ -8,6 +8,7 @@ import {
   allFields,
   agronomy,
   archive,
+  outlook as outlookPack,
   persist,
   t,
   deskNo,
@@ -50,6 +51,7 @@ import {
 } from "./powerlive.js";
 import { getSmapSurfaceForMonth } from "./water.js";
 import { netArea, polygonPerimeterM, DEFAULT_NET_INPUTS } from "./netarea.js";
+import { outlookCard } from "./outlook-flood.js";
 
 function netInputsFor(fieldId = state.fieldId) {
   const saved = state.netInputs?.[fieldId];
@@ -860,6 +862,7 @@ function seasonView() {
       ) + monthControl(year),
       tag("2021–2025", "blue"),
     ) +
+    `<div class="section-space">${outlookCard(f.id, outlookPack)}</div>` +
     stats(months, String(year)) +
     `<div class="notice section-space">${monthName()} ${year} · ${t("Rainfall", "বৃষ্টি")} <b>${num(m.rainGpm, 1)} mm</b> ${truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" })}. ${t("Same-month average in the other four archive years", "আর্কাইভের বাকি চার বছরে একই মাসের গড়")} <b>${num(comparisonMean, 1)} mm</b> ${nasaBadge("imerg", "2021–2025")}. ${t("This is a short historical comparison.", "এটি স্বল্পমেয়াদি ঐতিহাসিক তুলনা।")}</div>` +
     `<div class="grid-equal section-space">${panel(

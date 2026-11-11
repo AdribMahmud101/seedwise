@@ -3,6 +3,7 @@ import {
   state,
   agronomy,
   archive,
+  floodFields,
   persist,
   t,
   deskNo,
@@ -29,6 +30,7 @@ import {
   exampleBanner,
 } from "./ui.js";
 import { mean } from "./engine.js";
+import { floodCard } from "./outlook-flood.js";
 import { setPlantCrop } from "./planner.js";
 import {
   defaultAssessment,
@@ -389,7 +391,7 @@ function recovery() {
     `<div class="rr-intro"><span>${icon("recovery", 23)}</span><p>${t("Choose the situation you want to plan for. Conditions below come from you. This page does not monitor active emergencies.", "কোন পরিস্থিতির পরিকল্পনা চান বাছুন। নিচের পরিস্থিতি আপনার দেওয়া তথ্য। এখানে চলমান দুর্যোগ পর্যবেক্ষণ করা হয় না।")}</p></div>${hazardCards()}
  ${a.example ? exampleBanner() : ""}
  <div class="rr-assessment">${assessment(a)}${actions(a)}</div>${planting(a, r)}
- <div class="rr-bottom">${trees(a, r)}${panel(t("4. Keep a recovery plan", "৪. পরিকল্পনা রাখুন"), `<p class="note">${t("Save this assessment on this device, or take a printed plan to your extension officer. Revisit it when conditions change.", "এই ডিভাইসে যাচাই সংরক্ষণ করুন বা ছাপিয়ে কৃষি কর্মকর্তার কাছে নিন। অবস্থা বদলালে আবার দেখুন।")}</p><div class="rr-save-actions">${button(t("Save assessment", "যাচাই সংরক্ষণ"), "rr-save", "primary", "save")}${button(t("Preview / print", "দেখুন / ছাপুন"), "rr-print", "", "print")}${button(t("Export JSON", "JSON নিন"), "rr-export", "ghost small", "download")}</div>${saved ? `<p class="note rr-saved">${t("Last saved", "শেষ সংরক্ষণ")} ${date(saved.assessment.date)} · ${saved.assessment.example ? t("Example", "নমুনা") : t("Your assessment", "আপনার যাচাই")} ${button(t("View saved copy", "সংরক্ষিত কপি"), "rr-saved", "ghost small")}</p>` : ""}<div class="rr-linked">${goButton(t("Check water demand", "পানির চাহিদা দেখুন"), "water", "small")}${goButton(t("Log crop or soil evidence", "ফসল বা মাটির তথ্য লিখুন"), "research", "small")}${hazard() === "flood" && !r.reasons.length ? button(t("Use delay in rotation comparison", "ফসলচক্রে দেরি প্রয়োগ"), "rr-rotation", "small") : ""}</div>`)}</div>${evidence(a)}`
+ <div class="rr-bottom">${trees(a, r)}${panel(t("4. Keep a recovery plan", "৪. পরিকল্পনা রাখুন"), `<p class="note">${t("Save this assessment on this device, or take a printed plan to your extension officer. Revisit it when conditions change.", "এই ডিভাইসে যাচাই সংরক্ষণ করুন বা ছাপিয়ে কৃষি কর্মকর্তার কাছে নিন। অবস্থা বদলালে আবার দেখুন।")}</p><div class="rr-save-actions">${button(t("Save assessment", "যাচাই সংরক্ষণ"), "rr-save", "primary", "save")}${button(t("Preview / print", "দেখুন / ছাপুন"), "rr-print", "", "print")}${button(t("Export JSON", "JSON নিন"), "rr-export", "ghost small", "download")}</div>${saved ? `<p class="note rr-saved">${t("Last saved", "শেষ সংরক্ষণ")} ${date(saved.assessment.date)} · ${saved.assessment.example ? t("Example", "নমুনা") : t("Your assessment", "আপনার যাচাই")} ${button(t("View saved copy", "সংরক্ষিত কপি"), "rr-saved", "ghost small")}</p>` : ""}<div class="rr-linked">${goButton(t("Check water demand", "পানির চাহিদা দেখুন"), "water", "small")}${goButton(t("Log crop or soil evidence", "ফসল বা মাটির তথ্য লিখুন"), "research", "small")}${hazard() === "flood" && !r.reasons.length ? button(t("Use delay in rotation comparison", "ফসলচক্রে দেরি প্রয়োগ"), "rr-rotation", "small") : ""}</div>`)}</div>${evidence(a)}<div class="section-space">${floodCard(state.fieldId, floodFields)}</div>`
   );
 }
 function recoveryChange(el) {

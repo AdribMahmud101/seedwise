@@ -42,7 +42,17 @@ const state = { ...structuredClone(defaults), ...saved };
 for (const key of ["weights", "planner", "clinic", "tabs", "water"])
   state[key] = { ...defaults[key], ...saved[key] };
 let earth, agronomy, archive, smap, hlsField;
+let outlook = null, floodFields = null;
 let lastSeasonField = null;
+async function loadPack(path) {
+  try {
+    const response = await fetch(new URL(path, document.baseURI));
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
 async function loadData() {
   const responses = await Promise.all(
     ["data/earth-data.json", "data/agronomy.json", "data/history.json", "data/smap.json", "data/hls-field.json"].map(
@@ -54,6 +64,11 @@ async function loadData() {
   [earth, agronomy, archive, smap, hlsField] = await Promise.all(
     responses.map((r) => r.json()),
   );
+  // Optional ML packs: outlook + flood cards hide when these are missing or offline.
+  [outlook, floodFields] = await Promise.all([
+    loadPack("data/outlook.json"),
+    loadPack("data/flood-fields.json"),
+  ]);
   if (!allFields().some((f) => f.id === state.fieldId))
     state.fieldId = "mithapukur";
   applySeasonPlan(getPlan());
@@ -199,6 +214,13 @@ const nasaSources = {
     line: ['Dated images show crop greenness here where clouds allow a clear view.', 'তারিখসহ ছবিতে মেঘমুক্ত অংশে এখানকার ফসলের সবুজভাব দেখা যায়।'],
     res: ['30 m', '৩০ মি'],
     url: 'https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2',
+  },
+  prithvi: {
+    label: ['NASA–IBM Prithvi', 'নাসা–IBM Prithvi'],
+    name: ['NASA–IBM Prithvi-EO-2.0 water model', 'নাসা–IBM Prithvi-EO-2.0 পানির মডেল'],
+    line: ['An experimental AI model maps surface water in NASA satellite scenes.', 'একটি পরীক্ষামূলক AI মডেল নাসার স্যাটেলাইট ছবিতে ভূপৃষ্ঠের পানি চিহ্নিত করে।'],
+    res: ['30 m HLS scenes', '৩০ মি HLS ছবি'],
+    url: 'https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL',
   },
 };
 let nasaBadgeId = 0;
@@ -747,6 +769,8 @@ export {
   archive,
   smap,
   hlsField,
+  outlook,
+  floodFields,
   loadData,
   persist,
   t,

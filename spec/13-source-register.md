@@ -30,6 +30,7 @@
 | S24 | NASA POWER parameter dictionary | https://power.larc.nasa.gov/parameters/ |
 | S25 | NASA Earthdata | https://www.earthdata.nasa.gov/ |
 | S26 | NASA JPL GRACE / GRACE-FO mascons RL06.3Mv04; total water storage anomalies, 2004–2009 baseline, ~300 km effective resolution | https://grace.jpl.nasa.gov/data/get-data/jpl_global_mascons/ |
+| S27 | NASA–IBM Prithvi-EO-2.0-300M-TL foundation model; fine-tuned water head in `public/data/flood-fields.json`, card in `docs/models/prithvi-flood-MODEL_CARD.md` | https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL |
 
 ## B. Evidence shipped in the core app [CORE `public/data/*.json`]
 

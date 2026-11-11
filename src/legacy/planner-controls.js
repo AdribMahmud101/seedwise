@@ -42,9 +42,13 @@ export function plantyContext(fieldId, planner, counts, lang, details = {}) {
     withinRowCm: planner.crop === 'mustard' ? null : planner.spacing,
     usableAreaPct: planner.usable, areaHa: counts.net, plantCount: counts.positions, seedKg: counts.seedKg,
     month: details.month, lang,
+    ...(details.outlook ? { outlook: details.outlook } : {}),
+    ...(details.flood ? { flood: details.flood } : {}),
     truthLabels: {
       rowSpacingCm: 'FARMER_REPORTED', withinRowCm: 'FARMER_REPORTED', usableAreaPct: 'SCENARIO',
       areaHa: 'SCENARIO', plantCount: 'SCENARIO', seedKg: 'SCENARIO',
+      ...(details.outlook ? { outlook: 'MODELED' } : {}),
+      ...(details.flood ? { flood: 'MODELED' } : {}),
     },
   };
 }
