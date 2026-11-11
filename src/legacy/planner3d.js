@@ -1444,6 +1444,7 @@ function updateMeasurementAnchors() {
 function syncPlannerMeasurements() {
   const overlay = measurementSvgEl;
   if (!overlay?.isConnected || !activeCamera || !currentData || !blockGroup || !canvasHostEl) return;
+  const customMode = Boolean(currentData.custom?.planting?.length);
   overlay.hidden = !measurementsVisible;
   if (!measurementsVisible) {
     overlay.replaceChildren();
@@ -1465,7 +1466,7 @@ function syncPlannerMeasurements() {
     if (Math.abs(p.x) > 1 || Math.abs(p.y) > 1 || p.z > 1 || p.z < -1) return null;
     return { x: (p.x * 0.5 + 0.5) * width, y: (0.5 - p.y * 0.5) * height, ndc: p, world };
   };
-  const projected = measurementAnchors.map((m) => ({ ...m,
+  const projected = measurementAnchors.filter((m) => !(customMode && /row|plant|spacing|within/i.test(String(m.id)))).map((m) => ({ ...m,
     a: project(m.a, m.id), b: project(m.b, m.id),
     center: project(m.a.map((v, i) => (v + m.b[i]) / 2), m.id),
   })).filter((m) => m.a && m.b && m.center);
@@ -2527,8 +2528,9 @@ const CUSTOM_CONTRAST = ['#2f8f46', '#d29a1e', '#b5523b', '#2f6f9f', '#7a4fa0'];
 export function distinctColors(colors) {
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   const out = [];
+  const hue = (h) => { const c = new THREE.Color(h), o = {}; c.getHSL(o); return o.h * 360; };
   colors.forEach((c, i) => {
-    const near = out.some((o) => { const a = rgb(o), b = rgb(c); return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 0.28; });
+    const near = out.some((o) => { const d = Math.abs(hue(o) - hue(c)); return Math.min(d, 360 - d) < 40; });
     out.push(near ? CUSTOM_CONTRAST.find((p) => !out.includes(p)) || CUSTOM_CONTRAST[i % CUSTOM_CONTRAST.length] : c);
   });
   return out;
@@ -2601,10 +2603,18 @@ function buildCustomPlants(data) {
       const [c0g, c1g] = alongX ? [bounds.minY, bounds.maxY] : [bounds.minX, bounds.maxX];
       const w = b - a, d = c1g - c0g, cu = (a + b) / 2, cv = (c0g + c1g) / 2;
       const cx = alongX ? cu : cv, cy = alongX ? cv : cu;
-      const tint = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? w : d, alongX ? d : w),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(item.color), transparent: true, opacity: 0.16, depthWrite: false }));
-      tint.rotation.x = -Math.PI / 2; tint.position.set(cx, heightAt(cx, -cy) + 0.03, -cy); tint.renderOrder = 2;
-      group.add(tint);
+      // Tint only cells inside the outline (0.8 m grid) so the colour never spills past the field edge.
+      const cell = 0.8, quads = [];
+      for (let u = a; u < b; u += cell) for (let v = c0g; v < c1g; v += cell) {
+        const x = alongX ? u + cell / 2 : v + cell / 2, y = alongX ? v + cell / 2 : u + cell / 2;
+        if (insideOutline(x, y, outlineM)) quads.push([x, y]);
+      }
+      if (quads.length) {
+        const tintMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(cell, cell).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: new THREE.Color(item.color), transparent: true, opacity: 0.22, depthWrite: false }), quads.length);
+        quads.forEach(([x, y], q) => { dummy.position.set(x, heightAt(x, -y) + 0.03, -y); dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); tintMesh.setMatrixAt(q, dummy.matrix); });
+        tintMesh.renderOrder = 2; group.add(tintMesh);
+      }
       const label = customLabelSprite(`${item.crop} · ${item.sharePct}%`, item.color);
       const span = Math.max(bounds.width, bounds.height);
       label.scale.set(span * 0.22, span * 0.055, 1);
@@ -2622,8 +2632,10 @@ function buildCustomPlants(data) {
     if (!pts.length) return;
     const display = tall ? 1 : Math.min(2.4, Math.max(1.4, thin * 0.35)); // small plants enlarged for readability
     const leaf = new THREE.Color(item.color);
-    const fruit = item.fruitColor ? new THREE.Color(item.fruitColor) : null;
-    if (tall || item.model === 'shrub') {
+    const fruitHex = item.fruitColor || (/straw|berry|tomato|chilli|chili|pepper/i.test(item.crop) ? '#d23a3a' : /mango|papaya/i.test(item.crop) ? '#e8b23a' : /banana|lemon|lime/i.test(item.crop) ? '#e8d23a' : null);
+    const fruit = fruitHex ? new THREE.Color(fruitHex) : null;
+    const fruitShrub = fruit && item.model === 'herb';
+    if (tall || item.model === 'shrub' || fruitShrub) {
       const parts = tall ? customTreeParts(item)
         : { canopy: new THREE.IcosahedronGeometry(item.heightM * 0.5 * display, 1).translate(0, item.heightM * 0.45 * display, 0), canopyR: item.heightM * 0.5 * display, canopyY: item.heightM * 0.45 * display, fruitR: Math.max(0.03, item.heightM * 0.08 * display) };
       const canopyMesh = new THREE.InstancedMesh(parts.canopy, new THREE.MeshStandardMaterial({ color: leaf, roughness: 0.85, flatShading: true }), pts.length);
