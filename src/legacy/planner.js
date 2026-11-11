@@ -3,7 +3,10 @@ import {
   agronomy,
   persist,
   t,
+  esc,
   num,
+  monthName,
+  cropName,
   field,
   fieldName,
   polygon,
@@ -16,6 +19,7 @@ import {
   chips,
   sources,
   repaint,
+  toast,
 } from './ui.js';
 import { PLANTING, capacity } from './engine.js';
 import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext } from './planner-controls.js';
@@ -25,26 +29,65 @@ import { getPlan, setPlanting } from './journey.js';
 import { journeyFinishCTA } from './journey-bar.js';
 
 let plannerSeasonKey = null;
-function plannerSeason(plan, crop) {
-  const seasons = plan.rotation.seasons;
-  const matching = seasons.filter(season => plan.planting[season.key].crop === crop);
-  return matching.find(season => season.key === plannerSeasonKey) ?? matching[0] ??
-    seasons.find(season => season.key === plannerSeasonKey) ?? seasons[0];
-}
-
-function syncSeasonPlanting() {
+let plannerPlanId = null;
+function seasonPlan() {
   const plan = getPlan();
-  if (!plan?.rotation || plan.field.id !== field()?.id) return;
-  const crop = state.planner.crop;
-  // shortcut: no season selector yet; crop matches select a season, otherwise edits stay on the current season.
-  const season = plannerSeason(plan, crop);
-  plannerSeasonKey = season.key;
+  return plan?.rotation?.confirmedAt && plan.field.id === field()?.id ? plan : null;
+}
+function activeSeason(plan = seasonPlan()) {
+  if (!plan) return null;
+  if (plannerPlanId !== plan.id) {
+    plannerPlanId = plan.id;
+    plannerSeasonKey = null;
+  }
+  const seasons = plan.rotation.seasons.filter(season => season.crop !== 'fallow');
+  const season = seasons.find(season => season.key === plannerSeasonKey) ?? seasons[0];
+  plannerSeasonKey = season?.key ?? null;
+  return season;
+}
+const seasonCrop = season => ['aman', 'boro'].includes(season.crop) ? 'rice' : season.crop;
+function loadSeason(season, plan) {
+  const settings = plan.planting[season.key];
+  Object.assign(state.planner, { crop: settings.crop, row: settings.rowSpacingCm,
+    spacing: settings.withinRowCm, usable: settings.usableAreaPct });
+}
+function saveSeasonPlanting(extra = {}) {
+  const season = activeSeason();
+  if (!season) return;
   try {
-    setPlanting(season.key, { crop, rowSpacingCm: state.planner.row,
-      withinRowCm: state.planner.spacing, usableAreaPct: state.planner.usable });
+    return setPlanting(season.key, { crop: state.planner.crop, rowSpacingCm: state.planner.row,
+      withinRowCm: state.planner.spacing, usableAreaPct: state.planner.usable, ...extra });
   } catch (error) {
     console.warn('Season planting could not be saved', error);
+    toast(t('Season settings could not be saved. Please try again.', 'মৌসুমের মাপ সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'));
   }
+}
+
+function seasonLabel(season) {
+  return esc(t(season.crop === 'fallow' ? 'Fallow' : cropName(season.crop), season.cropBn));
+}
+function seasonTabs(plan = seasonPlan()) {
+  if (!plan) return `<p class="note plan-rotation-note"><a href="#rotations">${t('Choose a rotation first to plan every season', 'প্রতি মৌসুমের পরিকল্পনা করতে আগে ফসলচক্র বাছুন')}</a></p>`;
+  const selected = activeSeason(plan);
+  return `<div class="plan-season-tabs" role="tablist" aria-label="${t('Rotation seasons', 'ফসলচক্রের মৌসুম')}">${plan.rotation.seasons.map((season, index) => {
+    const fallow = season.crop === 'fallow';
+    const checked = plan.planting[season.key]?.confirmedAt;
+    const active = selected?.key === season.key;
+    return `<button type="button" id="plan-season-tab-${index}" role="tab" data-action="plan-season" data-value="${esc(season.key)}" aria-controls="plan-season-panel" aria-selected="${active}" tabindex="${active ? 0 : -1}" ${fallow ? 'disabled' : ''}><span>${String.fromCodePoint(0x2460 + index)} ${seasonLabel(season)} · ${monthName(season.sowMonth - 1, true)}–${monthName(season.harvestMonth - 1, true)}</span>${checked ? `<span class="plan-season-check" aria-label="${t('Reviewed', 'যাচাই করা হয়েছে')}">✓</span>` : ''}</button>`;
+  }).join('')}</div><div class="plan-season-summary" role="region" tabindex="0" aria-label="${t('Season estimates and review status', 'মৌসুমের হিসাব ও যাচাইয়ের অবস্থা')}">${plan.rotation.seasons.map(season => {
+    const settings = plan.planting[season.key];
+    const custom = settings && (settings.custom || settings.crop !== seasonCrop(season));
+    const counts = !settings ? t('No planting', 'বপন নেই') : settings.crop === 'mustard'
+      ? `${num(settings.counts.seedKg, 1)} ${t('kg seed', 'কেজি বীজ')}`
+      : `${num(settings.counts.plants)} ${settings.crop === 'rice' ? t('hills', 'গোছা') : t('plants', 'গাছ')}`;
+    return `<div class="plan-season-summary-chip"><b>${seasonLabel(season)}${custom ? ` · ${esc(t(PLANTING[settings.crop].label, PLANTING[settings.crop].bn))} (${t('Custom', 'নিজস্ব')})` : ''}</b><span>${counts} · ${!settings ? t('Fallow', 'পতিত') : settings.confirmedAt ? t('Reviewed ✓', 'যাচাই হয়েছে ✓') : t('Needs review', 'যাচাই বাকি')}</span></div>`;
+  }).join('')}</div>`;
+}
+function seasonConfirmation(plan = seasonPlan()) {
+  const season = activeSeason(plan);
+  if (!season) return '';
+  const confirmed = plan.planting[season.key].confirmedAt;
+  return `<button type="button" class="button primary plan-confirm" data-action="plan-confirm" ${plan.steps.rotation !== 'done' ? 'disabled' : ''}>${confirmed ? t('Reviewed ✓', 'যাচাই হয়েছে ✓') : t('Looks good ✓', 'ঠিক আছে ✓')}</button>${plan.steps.rotation !== 'done' ? `<p class="note"><a href="#rotations">${t('Review your rotation first', 'আগে ফসলচক্র যাচাই করুন')}</a></p>` : ''}`;
 }
 
 const cropIds = {
@@ -57,7 +100,7 @@ function setPlantCrop(id) {
   if (!Object.hasOwn(PLANTING, id)) return;
   Object.assign(state.planner, { ...recommendedSettings(id), usable: state.planner.usable });
   persist();
-  syncSeasonPlanting();
+  saveSeasonPlanting({ custom: true });
 }
 function cropIcon(crop) {
   const shapes = {
@@ -79,11 +122,15 @@ function numericControl(name, label, unit) {
 }
 function plannerSettings() {
   const p = state.planner;
+  const plan = seasonPlan();
+  const season = activeSeason(plan);
+  const settings = season && plan.planting[season.key];
+  const locked = settings && !settings.custom && settings.crop === seasonCrop(season);
   return `<section class="panel plan-settings"><div class="panel-header"><div><span class="eyebrow">${t('MAKE IT YOUR FIELD', 'নিজের জমির মাপ দিন')}</span><h2>${t('Planting settings', 'বপনের মাপ')}</h2></div></div><div class="panel-body">
-    <form id="plant-controls"><fieldset class="plan-crops"><legend>${t('Choose your crop', 'আপনার ফসল বাছুন')}</legend><div class="plan-crop-grid">${Object.entries(PLANTING).map(([id, crop]) => `<label class="plan-crop"><input type="radio" name="plantCrop" value="${id}" ${id === p.crop ? 'checked' : ''}><span>${cropIcon(id)}<span>${t(crop.label, crop.bn)}</span></span></label>`).join('')}</div></fieldset>
+    <form id="plant-controls">${locked ? `<div class="plan-locked-crop"><div>${cropIcon(p.crop)}<b>${seasonLabel(season)}</b></div><button type="button" class="plan-change-crop" data-action="plan-change-crop">${t('Change crop', 'ফসল বদলান')}</button></div>` : `<fieldset class="plan-crops"><legend>${season ? t('Custom crop', 'নিজস্ব ফসল') : t('Choose your crop', 'আপনার ফসল বাছুন')}</legend><div class="plan-crop-grid">${Object.entries(PLANTING).map(([id, crop]) => `<label class="plan-crop"><input type="radio" name="plantCrop" value="${id}" ${id === p.crop ? 'checked' : ''}><span>${cropIcon(id)}<span>${t(crop.label, crop.bn)}</span></span></label>`).join('')}</div></fieldset>`}
     ${numericControl('usable', t('Usable area', 'চাষযোগ্য জমি'), '%')}
     ${p.crop === 'mustard' ? `<p class="plan-broadcast note">${t('Broadcast sowing · no rows. Seed uses the published 7 kg/ha reference rate.', 'ছিটিয়ে বপন · সারি নেই। প্রকাশিত ৭ কেজি/হেক্টর হার ধরে বীজের হিসাব।')}</p>` : numericControl('row', t('Row spacing', 'সারির দূরত্ব'), 'cm') + numericControl('spacing', t('Within-row spacing', 'গাছের দূরত্ব'), 'cm')}
-    <button type="button" class="plan-reset" data-action="plan-reset">↺ ${t('Reset to recommended', 'প্রস্তাবিত মাপে ফিরুন')}</button></form></div></section>`;
+    <button type="button" class="plan-reset" data-action="plan-reset">↺ ${t('Reset to recommended', 'প্রস্তাবিত মাপে ফিরুন')}</button><div class="plan-season-confirmation">${seasonConfirmation(plan)}</div></form></div></section>`;
 }
 function resultNumber(key, value, places = 0) {
   return `<span data-plan-number="${key}" data-value="${value}" data-places="${places}">${num(value, places)}</span>`;
@@ -111,14 +158,9 @@ function plannerResult() {
 }
 function planner() {
   const p = state.planner;
-  const plan = getPlan();
-  if (plan?.rotation && plan.field.id === field()?.id) {
-    const season = plannerSeason(plan, p.crop);
-    plannerSeasonKey = season.key;
-    const settings = plan.planting[season.key];
-    Object.assign(p, { crop: settings.crop, row: settings.rowSpacingCm,
-      spacing: settings.withinRowCm, usable: settings.usableAreaPct });
-  }
+  const plan = seasonPlan();
+  const season = activeSeason(plan);
+  if (season) loadSeason(season, plan);
   if (!Object.hasOwn(PLANTING, p.crop)) Object.assign(p, recommendedSettings('rice'));
   for (const name of ['usable', 'row', 'spacing']) {
     if (p.crop === 'mustard' && name !== 'usable') continue;
@@ -136,8 +178,8 @@ function planner() {
       button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
     ) +
     chips() +
-    `<div id="journey-finish-slot">${journeyFinishCTA()}</div>` +
-    `<div class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
+    `<div id="journey-finish-slot">${journeyFinishCTA()}</div><section id="plan-seasons">${seasonTabs(plan)}</section>
+    <div id="plan-season-panel" ${season ? `role="tabpanel" aria-labelledby="plan-season-tab-${plan.rotation.seasons.indexOf(season)}"` : ''} class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
  <div class="planner3d-stage-wrap">
  <div class="planner3d-toolbar"><div class="planner3d-view-toggle" role="group" aria-label="${t('Field view', 'জমির দৃশ্য')}">
  <button type="button" class="planner3d-view-btn ${p.view !== 'top' ? 'active' : ''}" data-action="plan-view" data-value="3d" aria-pressed="${p.view !== 'top'}">${t('3D', '৩ডি')}</button>
@@ -147,7 +189,7 @@ function planner() {
  <div class="planner3d-footer"><span class="planner3d-crop-chip">${t('Illustrative · rows drawn at readable scale', 'কাল্পনিক · বোঝার সুবিধায় সারি বড় করে দেখানো')}</span><span class="note planner3d-fallback-note">${t('2D fallback · flat ground · drag to rotate', '২ডি বিকল্প · সমতল জমি · ঘোরাতে টানুন')}</span></div></div></section>
  <section class="panel plan-live" aria-label="${t('Live planting results', 'বপনের সরাসরি হিসাব')}"><div id="plan-estimate" role="status" aria-live="polite" aria-atomic="true">${plannerResult()}</div></section>
  ${plannerSettings()}</div>${plantyPanel(p)}</div>
- <div class="section-space">${panel(t('Read the estimate', 'হিসাব বুঝুন'), `<p class="note">${t('Usable area reserves room for paths, drains or a tree border. Row crops use usable square metres divided by row × plant spacing. Broadcast mustard uses BARI Shorisha-14’s reference seed rate. The model draws representative plants. Rice is counted in hills.', 'আইল, নালা ও গাছের জন্য জমি বাদ দিয়ে চাষযোগ্য অংশ ঠিক করুন। সারির ফসলে চাষযোগ্য বর্গমিটারকে দুই দূরত্বের গুণফল দিয়ে ভাগ করা হয়। ছিটানো সরিষায় বারি সরিষা-১৪ এর বীজের হার ধরা হয়। ধানের হিসাব গোছায়।')}</p>`)}</div>`
+ <div id="planner-finish-slot"></div><div class="section-space">${panel(t('Read the estimate', 'হিসাব বুঝুন'), `<p class="note">${t('Usable area reserves room for paths, drains or a tree border. Row crops use usable square metres divided by row × plant spacing. Broadcast mustard uses BARI Shorisha-14’s reference seed rate. The model draws representative plants. Rice is counted in hills.', 'আইল, নালা ও গাছের জন্য জমি বাদ দিয়ে চাষযোগ্য অংশ ঠিক করুন। সারির ফসলে চাষযোগ্য বর্গমিটারকে দুই দূরত্বের গুণফল দিয়ে ভাগ করা হয়। ছিটানো সরিষায় বারি সরিষা-১৪ এর বীজের হার ধরা হয়। ধানের হিসাব গোছায়।')}</p>`)}</div>`
   );
 }
 function drawPlanner() {
@@ -376,6 +418,15 @@ function mountPlanner() {
   disposePlanty?.();
   disposePlanty = mountPlanty(() => plantyContext(field().id, state.planner, estimate(), state.lang, { fieldName: fieldName(), month: state.month + 1 }));
   document.querySelector('#plant-controls').onsubmit = event => event.preventDefault();
+  document.querySelector('#plan-seasons').onkeydown = event => {
+    if (event.target.getAttribute('role') !== 'tab' || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = [...document.querySelectorAll('.plan-season-tabs [role="tab"]:not(:disabled)')];
+    const index = tabs.indexOf(event.target);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    event.preventDefault();
+    plannerAction('plan-season', tabs[next].dataset.value);
+  };
   const cv = document.querySelector('#plant-model');
   if (!cv) return;
   plannerHost = cv.parentElement;
@@ -404,9 +455,61 @@ function mountPlanner() {
     persist();
   };
 }
+function refreshSeasonChrome() {
+  const plan = seasonPlan();
+  const host = document.querySelector('#plan-seasons');
+  if (host) {
+    const scroll = ['.plan-season-tabs', '.plan-season-summary'].map(selector => [selector, host.querySelector(selector)?.scrollLeft ?? 0]);
+    host.innerHTML = seasonTabs(plan);
+    for (const [selector, left] of scroll) {
+      const strip = host.querySelector(selector);
+      if (strip) strip.scrollLeft = left;
+    }
+  }
+  const confirmation = document.querySelector('.plan-season-confirmation');
+  if (confirmation) confirmation.innerHTML = seasonConfirmation(plan);
+  const season = activeSeason(plan);
+  if (season) document.querySelector('#plan-season-panel')?.setAttribute('aria-labelledby',
+    `plan-season-tab-${plan.rotation.seasons.indexOf(season)}`);
+}
+function refreshPlannerSettings() {
+  const host = document.querySelector('.plan-settings');
+  if (!host) { repaint(); return; }
+  // Keep the canvas host mounted so planner3d can transition between crops.
+  host.outerHTML = plannerSettings();
+  document.querySelector('#plant-controls').onsubmit = event => event.preventDefault();
+  refreshSeasonChrome();
+  updatePlannerResults();
+}
+function focusSeasonTab() {
+  const tab = document.querySelector('.plan-season-tabs [aria-selected="true"]');
+  tab?.focus({ preventScroll: true });
+  tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
 function plannerAction(action, value) {
+  if (action === 'plan-season') {
+    const plan = seasonPlan();
+    activeSeason(plan);
+    const season = plan?.rotation.seasons.find(item => item.key === value && item.crop !== 'fallow');
+    if (!season) return;
+    plannerSeasonKey = season.key;
+    loadSeason(season, plan);
+    persist();
+    refreshPlannerSettings();
+    focusSeasonTab();
+  }
+  if (action === 'plan-change-crop' && activeSeason()) {
+    if (!saveSeasonPlanting({ custom: true })) return;
+    refreshPlannerSettings();
+    document.querySelector('[name="plantCrop"]:checked')?.focus({ preventScroll: true });
+  }
+  if (action === 'plan-confirm' && activeSeason()) {
+    saveSeasonPlanting({ confirmedAt: new Date().toISOString() });
+    refreshSeasonChrome();
+    document.querySelector('[data-action="plan-confirm"]')?.focus({ preventScroll: true });
+  }
   if (action === 'plan-guide') guide.sequence([
-    { target: '.plan-crop-grid', text: { en: 'Choose a crop. Planty will walk through your planting settings.', bn: 'একটি ফসল বাছুন। Planty আপনার বপনের মাপ দেখাবে।' }, pose: 'pointing', action: 'click' },
+    { target: '.plan-crop-grid, .plan-locked-crop', text: { en: 'Review your crop. Planty will walk through your planting settings.', bn: 'আপনার ফসল দেখুন। Planty আপনার বপনের মাপ দেখাবে।' }, pose: 'pointing', action: 'click' },
     { target: '#plan-row-range', text: { en: 'Try changing the distance between rows.', bn: 'সারির দূরত্ব বদলে দেখুন।' }, pose: 'thinking', action: 'input', timeout: 1200 },
     { target: '.planty-launch', text: { en: 'Ask Planty about your current crop and settings.', bn: 'আপনার ফসল ও মাপ নিয়ে Planty-কে প্রশ্ন করুন।' }, pose: 'happy', action: 'click',
       onDone: () => guide.celebrate({ en: 'You’re ready to plan your planting!', bn: 'আপনি বপনের পরিকল্পনা করতে প্রস্তুত!' }) },
@@ -414,8 +517,8 @@ function plannerAction(action, value) {
   if (action === 'plan-reset') {
     Object.assign(state.planner, recommendedSettings(state.planner.crop));
     persist();
-    syncSeasonPlanting();
-    repaint();
+    saveSeasonPlanting();
+    refreshPlannerSettings();
     document.querySelector('.plan-reset')?.focus({ preventScroll: true });
   }
   if (action === 'plan-view') {
@@ -433,8 +536,9 @@ function plannerAction(action, value) {
   if (action === 'plan-zoom') planner3dModule?.zoomPlanner3d(Number(value));
 }
 function updatePlannerResults() {
-  cancelAnimationFrame(resultFrame);
   const host = document.querySelector('#plan-estimate');
+  if (!host) return;
+  cancelAnimationFrame(resultFrame);
   const previous = new Map([...host.querySelectorAll('[data-plan-number]')].map(el => [el.dataset.planNumber, Number(el.dataset.display ?? el.dataset.value)]));
   host.innerHTML = plannerResult();
   const numbers = [...host.querySelectorAll('[data-plan-number]')];
@@ -469,20 +573,22 @@ function plannerInput(el) {
   if (el.type === 'number' && (el.value === '' || Number(el.value) < min || Number(el.value) > max)) return;
   if (syncPlannerControl(el, state.planner) === null) return;
   persist();
-  syncSeasonPlanting();
+  saveSeasonPlanting();
+  refreshSeasonChrome();
   updatePlannerResults();
 }
 function plannerChange(el) {
   if (!el.closest('#plant-controls')) return;
   if (el.name === 'plantCrop') {
     setPlantCrop(el.value);
-    repaint();
+    refreshPlannerSettings();
     document.querySelector(`[name="plantCrop"][value="${state.planner.crop}"]`)?.focus({ preventScroll: true });
   } else {
     if (el.value === '' || !Number.isFinite(Number(el.value))) el.value = state.planner[el.name];
     syncPlannerControl(el, state.planner);
     persist();
-    syncSeasonPlanting();
+    saveSeasonPlanting();
+    refreshSeasonChrome();
     updatePlannerResults();
   }
 }

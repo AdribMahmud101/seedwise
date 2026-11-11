@@ -28,7 +28,7 @@ import {
 } from './ui.js';
 import { getCachedPower } from './powerlive.js';
 import { rotationEvidence } from './engine.js';
-import { setPlantCrop } from './planner.js';
+import { plannerAction, setPlantCrop } from './planner.js';
 import * as rotationTool from './rotation-tool.js';
 import { confirmRotation, getPlan, rotationSnapshot, subscribe } from './journey.js';
 import { journeyRotationCTA } from './journey-bar.js';
@@ -1055,14 +1055,17 @@ function rotationAction(action, value) {
   if (action === 'layout-for') {
     activeRotationId = value;
     syncSeasonRotation(value);
-    setPlantCrop(
-      {
+    const crop = {
         baseline: 'rice',
         mustard: 'mustard',
         potato: 'potato',
         legume: 'mungbean',
-      }[value]
-    );
+      }[value];
+    const plan = getPlan();
+    const season = plan?.rotation?.id === value && plan.rotation.seasons.find(item =>
+      item.crop === crop || (crop === 'rice' && item.crop === 'aman'));
+    if (season) plannerAction('plan-season', season.key);
+    else setPlantCrop(crop);
     location.hash = 'planner';
   }
 }

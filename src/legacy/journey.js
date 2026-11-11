@@ -61,7 +61,7 @@ function validateRotation(rotation) {
   const keys = new Set();
   for (const season of rotation.seasons) {
     requireValid(object(season) && text(season.key) && !keys.has(season.key) &&
-      text(season.crop) && Object.hasOwn(PLANTING, plannerCrop(season.crop)) && text(season.cropBn) &&
+      text(season.crop) && (season.crop === 'fallow' || Object.hasOwn(PLANTING, plannerCrop(season.crop))) && text(season.cropBn) &&
       [season.sowMonth, season.harvestMonth].every(n => Number.isInteger(n) && n >= 1 && n <= 12));
     keys.add(season.key);
   }
@@ -86,13 +86,14 @@ function validatePlan(plan) {
     requireValid(plan.field !== null);
     validateRotation(plan.rotation);
   }
-  const keys = plan.rotation?.seasons.map(season => season.key) ?? [];
+  const keys = plan.rotation?.seasons.filter(season => season.crop !== 'fallow').map(season => season.key) ?? [];
   requireValid(same(Object.keys(plan.planting).sort(), [...keys].sort()));
   for (const settings of Object.values(plan.planting)) {
     requireValid(object(settings) && Object.hasOwn(PLANTING, settings.crop) &&
       positive(settings.rowSpacingCm) && positive(settings.withinRowCm) &&
       positive(settings.usableAreaPct) && settings.usableAreaPct <= 100 &&
-      (settings.variety === undefined || text(settings.variety)) && timestamp(settings.confirmedAt) &&
+      (settings.variety === undefined || text(settings.variety)) &&
+      (settings.custom === undefined || typeof settings.custom === 'boolean') && timestamp(settings.confirmedAt) &&
       object(settings.counts));
     const expected = countsFor(plan.field, settings);
     requireValid(settings.counts.plants === expected.plants && settings.counts.seedKg === expected.seedKg);
@@ -129,20 +130,21 @@ export function rotationSnapshot(id, priorities, agronomy) {
   for (let offset = 0; offset < 12; offset++) {
     const index = (start + offset) % 12;
     const calendarCrop = strategy.months[index];
-    if (calendarCrop === 'fallow' || strategy.months[(index + 11) % 12] === calendarCrop) continue;
+    if (strategy.months[(index + 11) % 12] === calendarCrop) continue;
     const crop = calendarCrop === 'pulse' ? 'mungbean' : calendarCrop;
     const record = agronomy.crops.find(item => item.id === crop);
-    if (!record) throw new RangeError(`Missing crop data: ${crop}`);
+    if (!record && crop !== 'fallow') throw new RangeError(`Missing crop data: ${crop}`);
     let end = index;
     while (end < index + 11 && strategy.months[(end + 1) % 12] === calendarCrop) end++;
-    seasons.push({ key: crop, crop, cropBn: record.bn, sowMonth: index + 1, harvestMonth: end % 12 + 1 });
+    seasons.push({ key: crop === 'fallow' ? `fallow-${index + 1}` : crop, crop,
+      cropBn: record?.bn ?? 'পতিত', sowMonth: index + 1, harvestMonth: end % 12 + 1 });
   }
   return { id, name: strategy.crops.filter(crop => crop !== 'Fallow').join(' → '),
     priorities: copy(priorities), seasons };
 }
 
 function plantingDefaults(plan) {
-  return Object.fromEntries(plan.rotation.seasons.map(season => {
+  return Object.fromEntries(plan.rotation.seasons.filter(season => season.crop !== 'fallow').map(season => {
     const defaults = recommendedSettings(plannerCrop(season.crop));
     const settings = { crop: defaults.crop, rowSpacingCm: defaults.row, withinRowCm: defaults.spacing,
       usableAreaPct: defaults.usable, confirmedAt: null };
@@ -171,6 +173,7 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
       plan.steps.field = 'done';
       for (const settings of Object.values(plan.planting)) settings.counts = countsFor(plan.field, settings);
       if (changed) {
+        for (const settings of Object.values(plan.planting)) settings.confirmedAt = null;
         const reason = { en: 'field changed', bn: 'জমি পরিবর্তিত হয়েছে' };
         if (plan.rotation) { plan.steps.rotation = 'review'; plan.reviews.rotation = reason; }
         if (plan.rotation) { plan.steps.planting = 'review'; plan.reviews.planting = reason; }
@@ -182,9 +185,12 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
     const old = plan.rotation;
     const value = { ...copy(action.value), confirmedAt: old?.confirmedAt ?? now };
     validateRotation(value);
-    const changed = old && (old.id !== value.id || old.name !== value.name || !same(old.seasons, value.seasons));
+    // Adding fallow chips to older snapshots must preserve reviewed crop settings.
+    const plantedSeasons = rotation => rotation.seasons.filter(season => season.crop !== 'fallow');
+    const changed = old && (old.id !== value.id || old.name !== value.name || !same(plantedSeasons(old), plantedSeasons(value)));
+    const calendarChanged = old && !same(old.seasons, value.seasons);
     const prioritiesChanged = old && !same(old.priorities, value.priorities);
-    if (!old || changed || prioritiesChanged || plan.steps.rotation !== 'done') {
+    if (!old || changed || calendarChanged || prioritiesChanged || plan.steps.rotation !== 'done') {
       plan.rotation = { ...value, confirmedAt: now };
       plan.steps.rotation = 'done';
       delete plan.reviews.rotation;
@@ -203,7 +209,7 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
     requireValid(plan.rotation && Object.hasOwn(plan.planting, action.key));
     const old = plan.planting[action.key];
     const settings = { ...old };
-    for (const key of ['crop', 'rowSpacingCm', 'withinRowCm', 'usableAreaPct', 'variety']) {
+    for (const key of ['crop', 'rowSpacingCm', 'withinRowCm', 'usableAreaPct', 'variety', 'custom']) {
       if (Object.hasOwn(action.value, key)) settings[key] = action.value[key];
     }
     requireValid(Object.hasOwn(PLANTING, settings.crop));
@@ -214,6 +220,20 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
       const reason = { en: `planting settings changed: ${action.key}`, bn: `বপনের মাপ পরিবর্তিত: ${action.key}` };
       review(plan, 'planting', reason);
       review(plan, 'plan', reason);
+    }
+    if (Object.hasOwn(action.value, 'confirmedAt')) {
+      requireValid(timestamp(action.value.confirmedAt));
+      if (action.value.confirmedAt !== null && plan.steps.rotation !== 'done') throw new Error('Confirm the rotation first');
+      settings.confirmedAt = action.value.confirmedAt;
+      plan.planting[action.key] = settings;
+      if (Object.values(plan.planting).every(item => date(item.confirmedAt))) {
+        plan.steps.planting = 'done';
+        delete plan.reviews.planting;
+      } else if (plan.steps.planting === 'done') {
+        const reason = { en: `planting needs review: ${action.key}`, bn: `বপনের মাপ যাচাই করুন: ${action.key}` };
+        review(plan, 'planting', reason);
+        review(plan, 'plan', reason);
+      }
     }
   } else if (action.type === 'confirmPlanting') {
     if (plan.steps.rotation !== 'done') throw new Error('Confirm the rotation first');
