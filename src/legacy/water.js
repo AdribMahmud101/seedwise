@@ -1,4 +1,5 @@
 import {
+  nasaBadge,
   state,
   agronomy,
   smap,
@@ -131,7 +132,7 @@ function smapCard() {
     <p>${sentence}</p>
     <p class="note">${truth('REMOTE_OBSERVED', { source: 'NASA SMAP L4', cell: '~9 km', date: '2024 monthly' })} · ${t("model + satellite", "মডেল + স্যাটেলাইট")}</p>
     <p class="note">${t("This is a regional cell, not your field. A soil probe or AWD pipe gives your field's real value.", "এটি একটি আঞ্চলিক কোষ, আপনার জমির নয়। মাটি পরীক্ষা বা AWD পাইপ আপনার জমির সঠিক মান দেয়।")} <a href="#research" class="source-link">${t("Research lab logger", "গবেষণা ল্যাব লগার")}</a></p>`,
-    tag(t("Estimated", "স্যাটেলাইট অনুমান"), ""),
+    tag(t("Estimated", "স্যাটেলাইট অনুমান"), "") + nasaBadge("smap"),
   );
 }
 
@@ -226,7 +227,7 @@ function budget() {
  <div class="form-field wide"><b>${t("Aquifer accounting assumptions", "ভূগর্ভস্থ পানির হিসাবের অনুমান")}</b><span class="form-help">${t("Leave unknown recharge or area blank. Rainfall alone cannot supply these values.", "পুনর্ভরণ বা এলাকা জানা না থাকলে ফাঁকা রাখুন। শুধু বৃষ্টি থেকে এগুলো পাওয়া যায় না।")}</span></div>
  ${input(t("Recharge (mm/year)", "পুনর্ভরণ (মিমি/বছর)"), "recharge", w.recharge, 'min="0" max="5000" step="any" placeholder="—"')}${input(t("Aquifer accounting area (ha)", "হিসাবের এলাকা (হেক্টর)"), "aquiferArea", w.aquiferArea, 'min=".001" max="100000000" step="any" placeholder="—"')}${input(t("Farm allocation of recharge (%)", "খামারের বরাদ্দ (%)"), "allocated", w.allocated, 'min="0" max="100"')}${input(t("Other allocated withdrawals (m³/year)", "অন্যান্য উত্তোলন (ঘনমিটার/বছর)"), "other", w.other, 'min="0" step="any"')}${input(t("Replay years", "পুনরাবৃত্ত বছর"), "years", w.years, 'min="1" max="30"')}</form>`,
   )}
- ${panel(t("Groundwater scenario", "ভূগর্ভস্থ পানির দৃশ্য"), `<div id="water-result">${budgetResult()}</div><div class="spacer"></div>${monthControl()}<p class="note">${sources(["fao56", "power", "gpm"])}</p>`, tag(t("Scenario", "অনুমান"), "amber"))}
+ ${panel(t("Groundwater scenario", "ভূগর্ভস্থ পানির দৃশ্য"), `<div id="water-result">${budgetResult()}</div><div class="spacer"></div>${monthControl()}<p class="note">${sources(["fao56", "power", "gpm"])}</p>`, tag(t("Scenario", "অনুমান"), "amber") + nasaBadge(["imerg", "eto"]))}
  ${smapCard()}</div>`;
 }
 function soil() {

@@ -1,4 +1,5 @@
 import {
+  nasaBadge,
   state,
   agronomy,
   persist,
@@ -150,7 +151,7 @@ function rankedCards() {
           <div class="rank-num">${String(i + 1).padStart(2, '0')}</div>
           <div>
             <div class="eyebrow">${r.id === 'baseline' ? t('Existing rotation', 'বর্তমান ফসলচক্র') : t(r.intent, r.bn)}</div>
-            <h2>${esc(t(r.crops.join(' → '), r.bnCrops?.join(' → ') || ''))}</h2>
+            <h2>${esc(t(r.crops.join(' → '), r.bnCrops?.join(' → ') || ''))} ${nasaBadge(['imerg', 'eto'])}</h2>
           </div>
           <div class="score">${r.score == null ? '—' : num(r.score)}<small>/100</small> ${r.score != null ? truth('SCENARIO') : ''}</div>
         </div>
@@ -407,7 +408,7 @@ function panelWhenBareOrStressed(studioData) {
   return `<section class="panel question-panel panel-left-rotation" id="panel-left-rotation">
     <div class="panel-header">
       <div class="eyebrow">${t('Question 01 · Seasonal calendar', 'প্রশ্ন ০১ · মৌসুমের ক্যালেন্ডার')}</div>
-      <h3>${t('When is the field bare or stressed?', 'জমি কখন খালি বা চাপে থাকে?')}</h3>
+      <h3>${t('When is the field bare or stressed?', 'জমি কখন খালি বা চাপে থাকে?')} ${nasaBadge(['power', 'imerg'])}</h3>
       <p class="panel-sub">${t('12-month crop coverage and moisture stress derived from Sentinel-2 & NASA POWER.', 'সেন্টিনেল-২ ও নাসা পাওয়ার তথ্যে ১২ মাসের জমি আচ্ছাদন ও পানির চাপ।')}</p>
     </div>
     <div class="panel-body">
@@ -468,7 +469,7 @@ function panelWhereWillWaterCollect() {
   return `<section class="panel question-panel panel-left-water" id="panel-left-water">
     <div class="panel-header">
       <div class="eyebrow">${t('Question 02 · Topography & drainage', 'প্রশ্ন ০২ · ভূ-প্রকৃতি ও নিষ্কাশন')}</div>
-      <h3>${t('Where will water collect?', 'পানি কোথায় জমবে?')}</h3>
+      <h3>${t('Where will water collect?', 'পানি কোথায় জমবে?')} ${nasaBadge('nasadem')}</h3>
       <p class="panel-sub">${t('Low ground and drainage flow based on NASADEM 30m topography.', 'নাসাডেম ৩০মি ভূ-উচ্চতার ভিত্তিতে নিচু জমি ও পানি প্রবাহ।')}</p>
     </div>
     <div class="panel-body">
@@ -531,7 +532,7 @@ function panelWhatIsUnderMyField() {
   const moistureVal = rzmc != null ? num(rzmc, 2) : null;
   const moistureClass = pct == null ? `${smapYear} ${t('average', 'গড়')}`
     : `${smapYear}: ${pct < 33 ? t('drier than usual', 'স্বাভাবিকের চেয়ে শুকনো') : pct > 66 ? t('wetter than usual', 'স্বাভাবিকের চেয়ে ভেজা') : t('usual', 'স্বাভাবিক')}`;
-  const nasaChip = `<span class="nasa-chip">${t('NASA SMAP', 'নাসা SMAP')}</span>`;
+  const nasaChip = nasaBadge('smap', smapYear);
   // Groundwater: farmer's well reading, else Fan et al. 2017 ~1 km model (yearly median).
   const modelGw = cachedWaterTable?.sites?.[fid]?.annualDepthM;
   const gwMonths = cachedWaterTable?.sites?.[fid]?.monthlyDepthM;
@@ -562,12 +563,12 @@ function panelWhatIsUnderMyField() {
   function renderChip(key, label, val, unit, standardClass, truthBadge) {
     const isSelected = selectedNutrient === key;
     if (val != null) {
-      return `<button type="button" class="nutrient-chip ${isSelected ? 'active' : ''}" data-nutrient="${key}">
+      return `${key === 'moisture' ? '<div class="nasa-moisture-tile">' : ''}<button type="button" class="nutrient-chip ${isSelected ? 'active' : ''}" data-nutrient="${key}">
         <span class="chip-label">${label}</span>
         <span class="chip-val"><strong>${val}</strong> ${unit}</span>
         <span class="chip-class">${standardClass}</span>
-        ${truthBadge}
-      </button>`;
+        ${key === 'moisture' ? '' : truthBadge}
+      </button>${key === 'moisture' ? truthBadge + '</div>' : ''}`;
     }
     if (key !== 'moisture') missingLabels.push(label); // moisture is satellite data, not a lab test
     return '';

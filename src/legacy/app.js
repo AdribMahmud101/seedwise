@@ -1,6 +1,7 @@
 import { boundaryAction, boundarySubmit } from "./boundary.js";
 import { fieldReport, printReport } from "./report.js";
 import {
+  initNasaBadges,
   state,
   earth,
   agronomy,
@@ -119,6 +120,8 @@ function navigate(id) {
   }
   location.hash = id;
 }
+initNasaBadges();
+
 document.addEventListener("click", (event) => {
   const el = event.target.closest("button,a");
   if (!el) return;

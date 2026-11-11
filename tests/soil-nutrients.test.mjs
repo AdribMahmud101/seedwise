@@ -271,7 +271,9 @@ test('rotation nutrient chips map SoilGrids values, units, classes and missing d
       for (const key of ['P', 'K', 'S', 'Zn', 'B']) assert.ok(!html.includes(`data-nutrient="${key}"`), `${key} chip hidden`);
       assert.ok(html.includes(t('Needs a lab soil test:', 'ল্যাব মাটি পরীক্ষা দরকার:')));
       // Real NASA SMAP root-zone moisture and the modelled water table replace the old placeholders.
-      assert.ok(chip(html, 'moisture').includes('nasa-chip'));
+      const moistureTile = html.match(/<div class="nasa-moisture-tile">([\s\S]*?)<\/div>/)?.[1];
+      assert.ok(moistureTile?.includes('nasa-chip'));
+      assert.ok(!chip(html, 'moisture').includes('<button'), 'source button stays outside nutrient button');
       assert.ok(!chip(html, 'moisture').includes('<strong>0.50</strong>'));
       assert.ok(html.includes(`m ${t('below ground', 'মাটির নিচে')}</strong>`), 'modelled water table shown');
     }

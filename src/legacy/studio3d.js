@@ -51,7 +51,7 @@ async function loadSoilNutrientsData() {
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { state, t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
+import { nasaBadge, state, t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
 import {
   outlineBounds,
   plantPositionsInPolygon,
@@ -3654,9 +3654,9 @@ function soilDetailHtml(band, detail) {
   const title = { topsoil: t("Topsoil", "উপরের মাটি"), rootzone: t("Root zone", "শিকড় স্তর"), aquifer: t("Deep soil & water table", "গভীর মাটি ও পানির স্তর") }[band];
   const depth = String(detail.eyebrow || "").split(" · ")[0];
   // Only sources that really are NASA get the badge (root zone = NASA POWER soil moisture).
-  const nasa = band === "rootzone" ? t("NASA soil moisture", "নাসার মাটির আর্দ্রতা") : "";
+  const nasa = band === "rootzone" ? nasaBadge("wetness") : "";
   return `<div class="callout-box ${band}${nasa ? " has-nasa" : ""}" title="${esc(truthLabel)}">
-    <div class="callout-head"><span class="callout-title">${esc(title)}</span><span class="callout-depth">${esc(depth)}</span>${nasa ? `<span class="nasa-chip">${esc(nasa)}</span>` : ""}</div>
+    <div class="callout-head"><span class="callout-title">${esc(title)}</span><span class="callout-depth">${esc(depth)}</span>${nasa}</div>
     <div class="callout-val">${detail.isButton
       ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
       : esc(detail.value)}</div>
@@ -4119,8 +4119,8 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentSurfaceMode === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI)", "আর্দ্রতা (NDMI)")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water flow & ponding", "পানির প্রবাহ ও জমা পানি")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water flow & ponding", "পানির প্রবাহ ও জমা পানি")}</span></label>${nasaBadge("nasadem")}</div>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>${nasaBadge("nasadem")}</div>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="productivity" ${currentSurfaceMode === "productivity" ? "checked" : ""}><span>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="fertility" ${currentSurfaceMode === "fertility" ? "checked" : ""}><span>${t("Soil fertility (SoilGrids)", "মাটির উর্বরতা (SoilGrids)")}</span></label>
         </div>
@@ -4135,7 +4135,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
       </section>
 
       <section class="studio-rail-section">
-        <h3>${t("Field Observation", "মাঠ পর্যবেক্ষণ")} ${truth(truthTags.vegetation || "REMOTE_OBSERVED")}</h3>
+        <h3>${t("Field Observation", "মাঠ পর্যবেক্ষণ")} ${(data.vegetation || []).some(observation => observation.source === "Landsat") ? nasaBadge("landsat") : ""} ${truth(truthTags.vegetation || "REMOTE_OBSERVED")}</h3>
         <div class="studio-obs-row">
           <div>
             <div class="studio-obs-label">${t("NDVI Vegetation Index", "NDVI সবুজভাব")}</div>
@@ -4151,7 +4151,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
       </section>
 
       <section class="studio-rail-section">
-        <h3>${t("Weather & Water Need", "আবহাওয়া ও পানির চাহিদা")} ${truth(truthTags.weather || "MODELED")}</h3>
+        <h3>${t("Weather & Water Need", "আবহাওয়া ও পানির চাহিদা")} ${nasaBadge(["power", "imerg"])} ${truth(truthTags.weather || "MODELED")}</h3>
         <div class="studio-weather-grid">
           <div class="studio-weather-item"><dt>${t("Rainfall", "বৃষ্টি")}</dt><dd>${num(m.rainMm, 1)} <small>mm</small></dd></div>
           <div class="studio-weather-item"><dt>${t("Mean Temp", "তাপমাত্রা")}</dt><dd>${num(m.tmeanC, 1)} <small>°C</small></dd></div>
@@ -4214,6 +4214,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
               <option value="productivity" ${currentSurfaceMode === "productivity" ? "selected" : ""}>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</option>
               <option value="fertility" ${currentSurfaceMode === "fertility" ? "selected" : ""}>${t("Soil fertility (SoilGrids)", "মাটির উর্বরতা (SoilGrids)")}</option>
             </select>
+            <span data-surface-nasa>${['elevation', 'hypso', 'water', 'ponding'].includes(currentSurfaceMode) ? nasaBadge('nasadem') : ''}</span>
           </div>
 
           <div class="studio-slice-card">
@@ -4344,7 +4345,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
       <div class="studio-dock-deck">
         <div class="studio-dock-item">
           <div class="studio-dock-head">
-            <label for="studio-height-slider-stage">${t("Terrain height", "ভূমির উচ্চতা")}</label>
+            <label for="studio-height-slider-stage">${t("Terrain height", "ভূমির উচ্চতা")}</label>${nasaBadge("nasadem")}
             <output id="studio-height-output-stage" class="mono">${num(heightExaggeration, 0)}×</output>
           </div>
           <input type="range" id="studio-height-slider-stage" min="1" max="4.5" step="0.25" value="${heightExaggeration}" aria-label="${t("Terrain height exaggeration", "ভূমির উচ্চতা বাড়ানো")}">
@@ -5056,6 +5057,8 @@ export function setSurfaceMode(mode) {
   if (containerEl) {
     const select = containerEl.querySelector("#select-surface-mode");
     if (select && select.value !== currentSurfaceMode) select.value = currentSurfaceMode;
+    const source = containerEl.querySelector('[data-surface-nasa]');
+    if (source) source.innerHTML = ['elevation', 'hypso', 'water', 'ponding'].includes(currentSurfaceMode) ? nasaBadge('nasadem') : '';
     containerEl.querySelectorAll('input[name="studio-layer"]').forEach((r) => {
       r.checked = r.value === currentSurfaceMode;
     });

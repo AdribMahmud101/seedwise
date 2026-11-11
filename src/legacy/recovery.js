@@ -1,4 +1,5 @@
 import {
+  nasaBadge,
   state,
   agronomy,
   archive,
@@ -326,7 +327,7 @@ function evidence(a) {
     );
   const rain = rows.map((x) => x.rainGpm).filter(Number.isFinite),
     wet = rows.map((x) => x.rootWetness).filter(Number.isFinite);
-  return `<details class="rr-details rr-evidence"><summary>${t("What can the NASA record tell us here?", "নাসার তথ্য এখানে কী বলতে পারে?")}</summary><div class="rr-evidence-grid"><div><span class="eyebrow">2021–2025 · ${monthName(+m - 1)}</span><h3>${num(Math.min(...rain), 1)}–${num(Math.max(...rain), 1)} mm</h3><p class="note">${t("Monthly IMERG rain range across five years", "পাঁচ বছরের মাসিক IMERG বৃষ্টির সীমা")}</p></div><div><span class="eyebrow">NASA POWER · GWETROOT</span><h3>${num(mean(wet), 2)}</h3><p class="note">${t("Mean regional root-zone wetness index · 0–1", "আঞ্চলিক শিকড়ের আর্দ্রতা সূচকের গড় · ০–১")}</p></div></div><p class="note">${t("Historical regional context. These data cannot establish today’s field moisture, safe access, contamination or a replanting date. Add a local observation and check the latest advisory.", "এগুলো এলাকার পুরনো তথ্য। আজকের আর্দ্রতা, নিরাপদ প্রবেশ, দূষণ বা পুনরায় বপনের দিন এগুলো দিয়ে নিশ্চিত হয় না। স্থানীয় পর্যবেক্ষণ যোগ করুন ও বর্তমান নির্দেশনা দেখুন।")}</p>${sources(["gpm", "power"])} ${goButton(t("Log a field observation", "মাঠের তথ্য লিখুন"), "research", "small")}</details>`;
+  return `<details class="rr-details rr-evidence"><summary>${t("What can the NASA record tell us here?", "নাসার তথ্য এখানে কী বলতে পারে?")} ${nasaBadge(["imerg", "wetness"], "2021–2025")}</summary><div class="rr-evidence-grid"><div><span class="eyebrow">2021–2025 · ${monthName(+m - 1)}</span><h3>${num(Math.min(...rain), 1)}–${num(Math.max(...rain), 1)} mm</h3><p class="note">${t("Monthly IMERG rain range across five years", "পাঁচ বছরের মাসিক IMERG বৃষ্টির সীমা")}</p></div><div><span class="eyebrow">NASA POWER · GWETROOT</span><h3>${num(mean(wet), 2)}</h3><p class="note">${t("Mean regional root-zone wetness index · 0–1", "আঞ্চলিক শিকড়ের আর্দ্রতা সূচকের গড় · ০–১")}</p></div></div><p class="note">${t("Historical regional context. These data cannot establish today’s field moisture, safe access, contamination or a replanting date. Add a local observation and check the latest advisory.", "এগুলো এলাকার পুরনো তথ্য। আজকের আর্দ্রতা, নিরাপদ প্রবেশ, দূষণ বা পুনরায় বপনের দিন এগুলো দিয়ে নিশ্চিত হয় না। স্থানীয় পর্যবেক্ষণ যোগ করুন ও বর্তমান নির্দেশনা দেখুন।")}</p>${sources(["gpm", "power"])} ${goButton(t("Log a field observation", "মাঠের তথ্য লিখুন"), "research", "small")}</details>`;
 }
 function snapshot() {
   const a = draft(),

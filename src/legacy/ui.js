@@ -81,6 +81,141 @@ function esc(value) {
       ],
   );
 }
+
+// Facts and links: public/data/earth-data.json, smap.json and spec/13,18 source registers.
+const nasaSources = {
+  power: {
+    label: ['NASA POWER', 'নাসা POWER'],
+    name: ['NASA POWER / MERRA-2', 'নাসা POWER / MERRA-2'],
+    line: ['Regional weather helps estimate heat and water stress here.', 'এলাকার আবহাওয়া এখানে তাপ ও পানির চাপ বুঝতে সাহায্য করে।'],
+    res: ['~50 km regional grid', '~৫০ কিমি আঞ্চলিক গ্রিড'],
+    url: 'https://power.larc.nasa.gov/docs/services/api/temporal/daily/',
+  },
+  wetness: {
+    label: ['NASA POWER', 'নাসা POWER'],
+    name: ['NASA POWER soil wetness', 'নাসা POWER মাটির আর্দ্রতা'],
+    line: ['A regional 0–1 index estimates how wet the soil is here.', 'আঞ্চলিক ০–১ সূচক এখানে মাটি কতটা ভেজা তার অনুমান দেয়।'],
+    res: ['~50 km regional grid', '~৫০ কিমি আঞ্চলিক গ্রিড'],
+    url: 'https://power.larc.nasa.gov/docs/services/api/temporal/daily/',
+  },
+  eto: {
+    label: ['NASA POWER', 'নাসা POWER'],
+    name: ['FAO-56 ETo from NASA POWER', 'নাসা POWER থেকে FAO-56 ETo'],
+    line: ['Weather-based evaporation helps estimate crop water needs here.', 'আবহাওয়া থেকে হিসাব করা বাষ্পীভবন এখানে ফসলের পানির চাহিদা বুঝতে সাহায্য করে।'],
+    res: ['~50 km weather inputs', '~৫০ কিমি আবহাওয়ার তথ্য'],
+    url: 'https://power.larc.nasa.gov/docs/services/api/temporal/daily/',
+  },
+  imerg: {
+    label: ['NASA IMERG', 'নাসা IMERG'],
+    name: ['NASA GPM IMERG', 'নাসা GPM IMERG'],
+    line: ['Satellite rainfall estimates how much water rain gives crops here.', 'স্যাটেলাইটের বৃষ্টির হিসাব এখানে ফসল বৃষ্টি থেকে কত পানি পায় তা বোঝায়।'],
+    res: ['0.1° (~10 km)', '০.১° (~১০ কিমি)'],
+    url: 'https://gpm.nasa.gov/data/imerg',
+  },
+  smap: {
+    label: ['NASA SMAP', 'নাসা SMAP'],
+    name: ['NASA SMAP L4 soil moisture', 'নাসা SMAP L4 মাটির আর্দ্রতা'],
+    line: ['Satellite and model data estimate water in the surface and root zone here.', 'স্যাটেলাইট ও মডেল এখানে মাটির উপরিভাগ ও শিকড় স্তরের পানির অনুমান দেয়।'],
+    res: ['~9 km regional grid', '~৯ কিমি আঞ্চলিক গ্রিড'],
+    url: 'https://nsidc.org/data/spl4smgp/versions/8',
+  },
+  nasadem: {
+    label: ['NASA', 'নাসা'],
+    name: ['NASADEM elevation', 'NASADEM ভূমির উচ্চতা'],
+    line: ['Terrain height helps estimate low ground and where water may collect here.', 'ভূমির উচ্চতা এখানে নিচু জায়গা ও কোথায় পানি জমতে পারে তা বুঝতে সাহায্য করে।'],
+    res: ['30 m', '৩০ মি'],
+    url: 'https://planetarycomputer.microsoft.com/dataset/nasadem',
+    period: ['2000 terrain survey', '২০০০ ভূমি জরিপ'],
+  },
+  landsat: {
+    label: ['NASA Landsat', 'নাসা Landsat'],
+    name: ['NASA/USGS Landsat Collection 2 Level 2', 'নাসা/USGS Landsat Collection 2 Level 2'],
+    line: ['Dated images show crop greenness here where clouds allow a clear view.', 'তারিখসহ ছবিতে মেঘমুক্ত অংশে এখানকার ফসলের সবুজভাব দেখা যায়।'],
+    res: ['30 m', '৩০ মি'],
+    url: 'https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2',
+  },
+};
+let nasaBadgeId = 0;
+function nasaBadge(keys, period = '2024') {
+  const entries = [...new Set(Array.isArray(keys) ? keys : [keys])]
+    .filter(key => Object.hasOwn(nasaSources, key)).map(key => nasaSources[key]);
+  if (!entries.length) return '';
+  const id = `nasa-source-${++nasaBadgeId}`;
+  const label = entries.length === 1 ? t(...entries[0].label) : t('NASA', 'নাসা');
+  return `<span class="nasa-badge"><button type="button" class="nasa-chip" aria-expanded="false" aria-controls="${id}" aria-haspopup="dialog" aria-label="${esc(t('NASA data sources', 'নাসার তথ্যসূত্র'))}">${esc(label)}</button><span class="nasa-popover" id="${id}" popover="manual" role="dialog" aria-label="${esc(t('NASA data sources', 'নাসার তথ্যসূত্র'))}" tabindex="-1">${entries.map(entry => `<span class="nasa-source"><strong>${esc(t(...entry.name))}</strong><span>${esc(t(...entry.line))}</span><small>${esc(t(...entry.res))} · ${esc(entry.period ? t(...entry.period) : period)}</small><a href="${esc(entry.url)}" target="_blank" rel="noopener">${t('Source ↗', 'উৎস ↗')}</a></span>`).join('')}</span></span>`;
+}
+
+function initNasaBadges() {
+  let active = null, pinned = false, timer;
+  const position = () => {
+    if (!active) return;
+    if (!active.isConnected) return closePopup();
+    const button = active.previousElementSibling;
+    const rect = button.getBoundingClientRect();
+    const width = active.offsetWidth, height = active.offsetHeight;
+    active.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+    active.style.top = `${Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - height - 8))}px`;
+  };
+  const closePopup = (restoreFocus = false) => {
+    clearTimeout(timer);
+    if (!active) return;
+    const button = active.previousElementSibling;
+    if (active.matches(':popover-open')) active.hidePopover();
+    button.setAttribute('aria-expanded', 'false');
+    active = null;
+    pinned = false;
+    if (restoreFocus) button.focus();
+  };
+  const openPopup = (button, pin = false) => {
+    clearTimeout(timer);
+    const popup = document.getElementById(button.getAttribute('aria-controls'));
+    if (active !== popup) {
+      closePopup();
+      active = popup;
+      active.showPopover();
+      button.setAttribute('aria-expanded', 'true');
+    }
+    pinned = pinned || pin;
+    position();
+  };
+  document.addEventListener('click', event => {
+    const button = event.target.closest('.nasa-chip');
+    if (button) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (active === button.nextElementSibling && pinned) closePopup();
+      else openPopup(button, true);
+    } else if (active && !active.contains(event.target)) closePopup();
+  }, true);
+  document.addEventListener('pointerover', event => {
+    if (event.pointerType !== 'mouse') return;
+    const badge = event.target.closest('.nasa-badge');
+    if (badge && (!pinned || badge.contains(active))) {
+      openPopup(badge.querySelector('.nasa-chip'));
+    }
+  });
+  document.addEventListener('pointerout', event => {
+    const badge = event.target.closest('.nasa-badge');
+    if (badge && !badge.contains(event.relatedTarget) && !pinned) {
+      timer = setTimeout(() => closePopup(), 300);
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && active) {
+      event.preventDefault();
+      event.stopPropagation();
+      closePopup(true);
+    }
+  }, true);
+  document.addEventListener('focusout', event => {
+    if (active && event.target.closest('.nasa-badge') &&
+        !event.target.closest('.nasa-badge').contains(event.relatedTarget)) closePopup();
+  });
+  window.addEventListener('resize', position);
+  window.addEventListener('scroll', position, true);
+  window.addEventListener('hashchange', () => closePopup());
+  window.addEventListener('workspace-render', () => closePopup());
+}
 function num(x, places = 0) {
   return Number.isFinite(x)
     ? new Intl.NumberFormat(state.lang === "bn" ? "bn-BD" : "en-GB", {
@@ -476,6 +611,9 @@ async function fetchJsonMaybeGzip(url) {
   }
 }
 export {
+  nasaSources,
+  nasaBadge,
+  initNasaBadges,
   fetchJsonMaybeGzip,
   recordId,
   state,

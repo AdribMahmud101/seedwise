@@ -2,7 +2,7 @@
  * LAND3D - 3D landscape of Mithapukur, Pirganj, and Gangachara.
  * Lazy-loads MapLibre GL JS v5 only when scrolled into view (IntersectionObserver).
  */
-import { t, truth, panel } from "./ui.js";
+import { nasaBadge, t, truth, panel } from "./ui.js";
 
 let maplibreLoading = null;
 let currentMap = null;
@@ -162,7 +162,7 @@ export function landscapePanel() {
     </div>
   `;
 
-  return `<div id="landscape-3d-panel">${panel(t("Your land in 3D", "আপনার এলাকা ত্রিমাত্রিকে"), body)}</div>`;
+  return `<div id="landscape-3d-panel">${panel(t("Your land in 3D", "আপনার এলাকা ত্রিমাত্রিকে"), body, nasaBadge("nasadem"))}</div>`;
 }
 
 export function initLandscapeObserver() {

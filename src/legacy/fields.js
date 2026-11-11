@@ -1,6 +1,8 @@
+/* global L */
 import { projectWgs84ToUtm45N, pointInPoly } from "./spatial.js";
 import { units } from "./boundary.js";
 import {
+  nasaBadge,
   state,
   earth,
   allFields,
@@ -369,9 +371,9 @@ function inspectPopup(f, lat, lon) {
             ${moisture ? `<small>${esc(dateLabel(moisture))}</small>` : ""}
           </dd>
         </div>
-        <div class="inspect-item inspect-ground"><dt>${t("Ground", "জমি")}</dt><dd>${esc(ground)}</dd></div>
+        <div class="inspect-item inspect-ground"><dt>${t("Ground", "জমি")} ${!f.custom && ground !== noObservation ? nasaBadge("nasadem") : ""}</dt><dd>${esc(ground)}</dd></div>
       </dl>
-      <h3 class="inspect-group">${t("Area weather", "এলাকার আবহাওয়া")} · ${monthName()} ${t("2024", "২০২৪")}</h3>
+      <h3 class="inspect-group">${t("Area weather", "এলাকার আবহাওয়া")} · ${monthName()} ${t("2024", "২০২৪")} ${nasaBadge(["power", "imerg"])}</h3>
       <dl class="inspect-grid">
         <div class="inspect-item"><dt>${t("Rain", "বৃষ্টি")}</dt><dd>${weather(m.rainGpm, 1, t(" mm", " মিমি"))}</dd><small>${t("IMERG · ~10 km", "IMERG · প্রায় ১০ কিমি")}</small></div>
         <div class="inspect-item"><dt>${t("Wetness index", "আর্দ্রতা সূচক")}</dt><dd>${weather(m.wetness, 2)}</dd><small>${t("POWER · ~50 km", "POWER · প্রায় ৫০ কিমি")}</small></div>
@@ -435,7 +437,7 @@ function spark(values, color) {
     .join(" ");
   return `<svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"><path d="M0 25h120" stroke="#dce2d6" stroke-dasharray="2 3"/><path d="${path}" stroke="${color}" stroke-width="1.8" vector-effect="non-scaling-stroke" fill="none"/></svg>`;
 }
-function stats(months = field().monthly) {
+function stats(months = field().monthly, period = "2024") {
   const f = field();
   if (f.custom && !months) {
     if (powerLoading) {
@@ -555,14 +557,14 @@ function stats(months = field().monthly) {
           )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
         } else {
           // SMAP tile with data - use 2024 monthly SFMC values for spark line
-          return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(smapData.sfmc, places)}<small>${unit}</small></div>${spark(
+          return `<article class="data-stat"><div class="stat-top">${label}${nasaBadge("smap")}${icon(symbol)}</div><div class="stat-value">${num(smapData.sfmc, places)}<small>${unit}</small></div>${spark(
             smapData.monthly2024,
             colors.smap,
           )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
         }
       } else {
         // Regular tiles
-        return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">${num(m[key], places)}<small>${unit}</small></div>${spark(
+        return `<article class="data-stat"><div class="stat-top">${label}${Number.isFinite(m[key]) ? nasaBadge({ wetness: "wetness", rainGpm: "imerg", tmean: "power", et0: "eto" }[key], f.custom ? `2024 · ${t("retrieved", "সংগৃহীত")} ${retrievedDate}` : period) : ""}${icon(symbol)}</div><div class="stat-value">${num(m[key], places)}<small>${unit}</small></div>${spark(
           months.map((v) => v[key]),
           colors[key],
         )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
@@ -738,7 +740,7 @@ function home() {
  ${showLowGround && lowGroundSite ? `<div class="map-legend-bar low-ground-legend">
    <span class="legend-swatch low-ground-swatch" aria-hidden="true"></span>
    <span class="low-ground-description">${t("Lower than land around it — water may collect after heavy rain. Approximate (30 m, includes trees)", "আশেপাশের জমির চেয়ে নিচু — ভারী বৃষ্টির পর পানি জমতে পারে। আনুমানিক (৩০ মি, গাছের উচ্চতাও অন্তর্ভুক্ত)")}</span>
-   ${truth("MODELED")}
+   ${truth("MODELED")} ${nasaBadge("nasadem")}
  </div>` : ""}
  <div class="map-actions">
    <div class="map-controls">
@@ -821,7 +823,7 @@ function seasonView() {
     year === 2024 && f.opticalHistory
       ? panel(
           t("Greenness through the season", "মৌসুমে গাছের সবুজভাব"),
-          `<p class="note">${t("Landsat samples in the fixed 900 m window. Cloud-obscured observations leave a gap.", "৯০০ মিটার জানালায় ল্যান্ডস্যাট নমুনা। মেঘে ঢাকা পর্যবেক্ষণ ফাঁকা থাকে।")}</p><div class="table-wrap"><table class="data-table"><thead><tr><th>${t("Acquired", "তারিখ")}</th><th>NDVI</th><th>${t("Clear samples", "পরিষ্কার নমুনা")}</th><th>${t("Coverage", "তথ্যের অবস্থা")}</th></tr></thead><tbody>${f.opticalHistory.map((o) => `<tr><td>${esc(o.date)}</td><td>${o.opticalQA.validFraction >= 0.25 ? num(o.opticalQA.ndvi, 3) : t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</td><td>${num(o.opticalQA.validPixels)} / ${num(o.opticalQA.pixels)}</td><td>${o.opticalQA.validFraction >= 0.25 ? t("Usable", "ব্যবহারযোগ্য") + truth("REMOTE_OBSERVED", { source: "Landsat 8/9", date: o.date, cell: "30m" }) : t("Too little clear cover", "পরিষ্কার অংশ কম") + truth("UNKNOWN", { source: "Landsat 8/9", date: o.date, cell: "30m" })}</td></tr>`).join("")}</tbody></table></div>`,
+          `<p class="note">${t("Landsat samples in the fixed 900 m window. Cloud-obscured observations leave a gap.", "৯০০ মিটার জানালায় ল্যান্ডস্যাট নমুনা। মেঘে ঢাকা পর্যবেক্ষণ ফাঁকা থাকে।")}</p><div class="table-wrap"><table class="data-table"><thead><tr><th>${t("Acquired", "তারিখ")}</th><th>NDVI</th><th>${t("Clear samples", "পরিষ্কার নমুনা")}</th><th>${t("Coverage", "তথ্যের অবস্থা")}</th></tr></thead><tbody>${f.opticalHistory.map((o) => `<tr><td>${esc(o.date)}</td><td>${o.opticalQA.validFraction >= 0.25 ? num(o.opticalQA.ndvi, 3) : t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</td><td>${num(o.opticalQA.validPixels)} / ${num(o.opticalQA.pixels)}</td><td>${o.opticalQA.validFraction >= 0.25 ? t("Usable", "ব্যবহারযোগ্য") + truth("REMOTE_OBSERVED", { source: "Landsat 8/9", date: o.date, cell: "30m" }) : t("Too little clear cover", "পরিষ্কার অংশ কম") + truth("UNKNOWN", { source: "Landsat 8/9", date: o.date, cell: "30m" })}</td></tr>`).join("")}</tbody></table></div>`, nasaBadge("landsat"),
         )
       : "";
   const history = state.records.filter(
@@ -856,8 +858,8 @@ function seasonView() {
       ) + monthControl(year),
       tag("2021–2025", "blue"),
     ) +
-    stats(months) +
-    `<div class="notice section-space">${monthName()} ${year} · ${t("Rainfall", "বৃষ্টি")} <b>${num(m.rainGpm, 1)} mm</b> ${truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" })}. ${t("Same-month average in the other four archive years", "আর্কাইভের বাকি চার বছরে একই মাসের গড়")} <b>${num(comparisonMean, 1)} mm</b>. ${t("This is a short historical comparison.", "এটি স্বল্পমেয়াদি ঐতিহাসিক তুলনা।")}</div>` +
+    stats(months, String(year)) +
+    `<div class="notice section-space">${monthName()} ${year} · ${t("Rainfall", "বৃষ্টি")} <b>${num(m.rainGpm, 1)} mm</b> ${truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" })}. ${t("Same-month average in the other four archive years", "আর্কাইভের বাকি চার বছরে একই মাসের গড়")} <b>${num(comparisonMean, 1)} mm</b> ${nasaBadge("imerg", "2021–2025")}. ${t("This is a short historical comparison.", "এটি স্বল্পমেয়াদি ঐতিহাসিক তুলনা।")}</div>` +
     `<div class="grid-equal section-space">${panel(
       t("Where the rain went", "কোন মাসে কত বৃষ্টি"),
       chart(
@@ -879,7 +881,7 @@ function seasonView() {
           description: "Monthly rainfall estimated by two products",
         },
       ) +
-        `<p class="note">${t("The wettest IMERG month was", "IMERG অনুযায়ী সবচেয়ে বেশি বৃষ্টি")} ${monthName(months.indexOf(wet))} (${num(wet.rainGpm, 1)} mm). ${t("The driest was", "সবচেয়ে কম")} ${monthName(months.indexOf(dry))} (${num(dry.rainGpm, 1)} mm).</p>` + truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" }) + " " + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }),
+        `<p class="note">${t("The wettest IMERG month was", "IMERG অনুযায়ী সবচেয়ে বেশি বৃষ্টি")} ${monthName(months.indexOf(wet))} (${num(wet.rainGpm, 1)} mm). ${t("The driest was", "সবচেয়ে কম")} ${monthName(months.indexOf(dry))} (${num(dry.rainGpm, 1)} mm).</p>` + truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" }) + " " + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }), nasaBadge(["imerg", "power"], String(year)),
     )}
  ${panel(
    t("How wet the soil was", "মাটি কতটা ভেজা ছিল"),
@@ -903,9 +905,9 @@ function seasonView() {
        description: "POWER surface and root-zone wetness",
      },
    ) +
-     `<p class="note">${t("These regional model indices describe relative wetness. A soil probe can supply a local reading.", "এলাকার মডেল থেকে আপেক্ষিক আর্দ্রতা পাওয়া যায়। জমির নিজস্ব মাপের জন্য মাটির সেন্সর ব্যবহার করুন।")}</p>` + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }),
+     `<p class="note">${t("These regional model indices describe relative wetness. A soil probe can supply a local reading.", "এলাকার মডেল থেকে আপেক্ষিক আর্দ্রতা পাওয়া যায়। জমির নিজস্ব মাপের জন্য মাটির সেন্সর ব্যবহার করুন।")}</p>` + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }), nasaBadge("wetness", String(year)),
  )}</div>
- <div class="grid-equal section-space">${panel(t("Dated optical observation", "স্যাটেলাইট পর্যবেক্ষণ"), year === 2024 && img ? `<div class="observation-thumb"><img src="${esc(img.url)}" alt="${t("Dated satellite image near the field", "জমির কাছের ল্যান্ডস্যাট ছবি")}"><div><b>${esc(img.date)}</b><p class="note">${img.sourceLabel ? "Sentinel-2 · 10 m" : "Landsat 8 · 30 m"}</p><p class="note">${esc(img.sceneId)}</p>${Number.isFinite(img.ndvi) ? `<p>NDVI ${num(img.ndvi, 2)}</p>` : ""}<a class="source-link" href="${esc(img.itemUrl)}" target="_blank" rel="noopener">${t("View scene record ↗", "ছবির উৎস ↗")}</a></div></div><p class="note">${t("This scene keeps its acquisition date as you move between months.", "মাস বদলালেও ছবিটি তার আসল তারিখেই দেখানো হয়।")}</p>` : `<p class="note">${t("No optical scene prepared for the selected year.", "এই বছরের স্যাটেলাইট ছবি প্রস্তুত নেই।")}</p>`)}
+ <div class="grid-equal section-space">${panel(t("Dated optical observation", "স্যাটেলাইট পর্যবেক্ষণ"), year === 2024 && img ? `<div class="observation-thumb"><img src="${esc(img.url)}" alt="${t("Dated satellite image near the field", "জমির কাছের ল্যান্ডস্যাট ছবি")}"><div><b>${esc(img.date)}</b><p class="note">${img.sourceLabel ? "Sentinel-2 · 10 m" : "Landsat 8 · 30 m"}</p><p class="note">${esc(img.sceneId)}</p>${Number.isFinite(img.ndvi) ? `<p>NDVI ${num(img.ndvi, 2)}</p>` : ""}<a class="source-link" href="${esc(img.itemUrl)}" target="_blank" rel="noopener">${t("View scene record ↗", "ছবির উৎস ↗")}</a></div></div><p class="note">${t("This scene keeps its acquisition date as you move between months.", "মাস বদলালেও ছবিটি তার আসল তারিখেই দেখানো হয়।")}</p>` : `<p class="note">${t("No optical scene prepared for the selected year.", "এই বছরের স্যাটেলাইট ছবি প্রস্তুত নেই।")}</p>`, year === 2024 && img && !img.sourceLabel ? nasaBadge("landsat", img.date) : "")}
  ${panel(t("What grew here?", "এখানে কী ফসল হয়েছিল?"), `<p class="note">${history.length ? t("Harvests recorded in this year", "এই বছরে লেখা ফসল") : t("No verified harvests are recorded for this field in the selected year. Add a harvest to connect an actual variety and yield to this weather record.", "এই জমির নির্বাচিত বছরের যাচাই করা ফলনের তথ্য নেই। আবহাওয়ার সাথে তুলনা করতে একটি ফলনের রেকর্ড যোগ করুন।")}</p>${history.map((r) => `<p>${esc(r.date)} · ${esc(r.variety || cropName(r.crop))} · ${num(r.yieldKg, 1)} kg</p>`).join("")}<div class="spacer"></div>${button(t("Log a harvest", "ফলন লিখুন"), "new-harvest", "", "add")}`)}</div><div class="section-space">${opticalTable}</div>`
   );
 }
