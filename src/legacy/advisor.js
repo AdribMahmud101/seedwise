@@ -181,6 +181,7 @@ const CUSTOM_KEY = 'ropon_custom_plan_v1';
 export function getCustomPlan() {
   try {
     const p = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null');
+    if (p && Array.isArray(p.planting) && p.planting.length > 1) { const cs = distinctHexes(p.planting.map((c) => c.color)); p.planting.forEach((c, i) => { c.color = cs[i]; }); } // also fixes plans saved earlier
     return p && Array.isArray(p.planting) && p.planting.length && p.fieldId === state.fieldId ? p : null;
   } catch { return null; }
 }
@@ -215,7 +216,7 @@ function useInPlanner() {
   if (!r?.planting?.length || r.verdict === 'not_suitable') return;
   // Mode follows the auto-detected category (two crops together = mixed land split; one crop = whole field).
   const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: advisorRequest({}).mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
-  if (plan.mode !== 'rotation') { const cs = distinctHexes(plan.planting.map((c) => c.color)); plan.planting = plan.planting.map((c, i) => ({ ...c, color: cs[i] })); }
+  { const cs = distinctHexes(plan.planting.map((c) => c.color)); plan.planting = plan.planting.map((c, i) => ({ ...c, color: cs[i] })); } // every mode: chips/dots easy to scan
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
   location.hash = '#planner';
 }
