@@ -186,6 +186,12 @@ export function getCustomPlan() {
   } catch { return null; }
 }
 let customSeasonIdx = 0;
+export function customSeasonToggle() {
+  const p = getCustomPlan();
+  if (!p || p.mode !== 'rotation' || p.planting.length < 2) return '';
+  const idx = Math.min(customSeasonIdx, p.planting.length - 1);
+  return `<div class="cs-season-toggle" role="group" aria-label="${t('Season shown in 3D', '৩ডি-তে কোন মৌসুম')}"><span>${t('Season', 'মৌসুম')}:</span>${p.planting.map((c, i) => `<button type="button" data-action="custom-season" data-value="${i}" aria-pressed="${i === idx}" class="${i === idx ? 'on' : ''}"><i style="background:${esc(c.color)}"></i>${esc(c.crop)}</button>`).join('')}</div>`;
+}
 export function setCustomSeason(i) { customSeasonIdx = Math.max(0, Number(i) || 0); }
 // What the planner 3D draws: a rotation shows one season's crop on the whole field; mixed/hybrid/orchard split the land.
 export function customPlanFor3d() {
@@ -197,7 +203,7 @@ export function customPlanFor3d() {
 }
 export function clearCustomPlan() { try { localStorage.removeItem(CUSTOM_KEY); } catch { /* ignore */ } }
 // Same rule as the planner 3D (distinctColors): crops whose hues are within 40° get the farthest palette colour.
-const CONTRAST = ['#2f8f46', '#d29a1e', '#b5523b', '#2f6f9f', '#7a4fa0'];
+const CONTRAST = ['#2f8f46', '#b8c93a', '#c98a2a', '#4fa39b', '#7d9b3c'];
 function hueOf(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;

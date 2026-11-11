@@ -1,4 +1,4 @@
-import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput } from './advisor.js';
+import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput, customSeasonToggle } from './advisor.js';
 import {
   state,
   agronomy,
@@ -232,7 +232,7 @@ function planner() {
     customPlanBanner() +
     `<div id="journey-finish-slot">${journeyFinishCTA()}</div><section id="plan-seasons">${seasonTabs(plan)}</section>
     <div id="plan-season-panel" ${season ? `role="tabpanel" aria-labelledby="plan-season-tab-${plan.rotation.seasons.indexOf(season)}"` : ''} class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
- <div class="planner3d-stage-wrap">
+ <div class="planner3d-stage-wrap">${customSeasonToggle()}
  <div class="planner3d-toolbar"><div class="planner3d-view-toggle" role="group" aria-label="${t('Field view', 'জমির দৃশ্য')}">
  <button type="button" class="planner3d-view-btn ${p.view !== 'top' ? 'active' : ''}" data-action="plan-view" data-value="3d" aria-pressed="${p.view !== 'top'}">${t('3D', '৩ডি')}</button>
  <button type="button" class="planner3d-view-btn ${p.view === 'top' ? 'active' : ''}" data-action="plan-view" data-value="top" aria-pressed="${p.view === 'top'}">${t('Top', 'উপর থেকে')}</button></div>

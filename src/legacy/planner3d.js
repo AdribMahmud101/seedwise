@@ -2523,7 +2523,7 @@ export function insideOutline(x, y, outline) {
   return inside;
 }
 
-const CUSTOM_CONTRAST = ['#2f8f46', '#d29a1e', '#b5523b', '#2f6f9f', '#7a4fa0'];
+const CUSTOM_CONTRAST = ['#2f8f46', '#b8c93a', '#c98a2a', '#4fa39b', '#7d9b3c'];
 // Pure: keep crops visually distinct — if a colour is too close to an earlier one, use a contrasting palette colour.
 export function distinctColors(colors) {
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
