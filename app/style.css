@@ -3942,3 +3942,41 @@ label.plan-import { cursor: pointer; }
 .exit-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .exit-actions .button { width: 100%; justify-content: center; min-height: 44px; }
 .journey-exit-btn { margin-left: auto; color: var(--muted); }
+
+/* Your plan hero: roomy card, big title, demo ribbon in the corner, rotation as a connected season ribbon. */
+.panel.plan-hero {
+  position: relative;
+  padding: clamp(18px, 3vw, 28px);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f6f8ef 0%, #eef4e6 100%);
+  border: 1px solid #d6e2c8;
+}
+.plan-hero .plan-hero-top { gap: 16px; align-items: center; padding-right: 150px; }
+.plan-hero .plan-planty .planty-mascot { width: 72px; height: 72px; }
+.plan-hero .eyebrow { color: #3f6b4a; letter-spacing: .12em; }
+.plan-hero h2 { font-size: clamp(26px, 3.2vw, 34px); margin: 4px 0 6px; line-height: 1.1; }
+.plan-hero .plan-hero-top p { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.plan-hero .plan-demo-ribbon { position: absolute; top: 16px; right: 18px; margin: 0; }
+.plan-hero .plan-ribbon { gap: 0; padding: 18px 0 4px; align-items: stretch; }
+.plan-hero .plan-ribbon .plan-chip {
+  flex: 1 0 auto; min-width: 128px; gap: 10px; padding: 10px 14px; border-radius: 12px;
+  background: #fffef9; border: 1px solid #d9dfcf; border-left: 4px solid var(--crop, #6c8f5a);
+}
+.plan-hero .plan-ribbon .plan-chip + .plan-chip { margin-left: 22px; position: relative; }
+.plan-hero .plan-ribbon .plan-chip + .plan-chip::before {
+  content: "→"; position: absolute; left: -18px; top: 50%; transform: translateY(-50%); color: #7d9a76; font-size: 14px;
+}
+.plan-hero .plan-chip b { font-size: 14px; }
+.plan-hero .plan-crop-aman, .plan-hero .plan-crop-boro, .plan-hero .plan-crop-rice { --crop: #3f8f4a; }
+.plan-hero .plan-crop-potato { --crop: #9a6b3a; }
+.plan-hero .plan-crop-mustard { --crop: #d4a62a; }
+.plan-hero .plan-crop-mungbean { --crop: #7fb04f; }
+.plan-hero .plan-crop-wheat { --crop: #c9a24d; }
+.plan-hero .plan-crop-fallow { --crop: #b9b3a3; background: repeating-linear-gradient(135deg, #fffef9 0 6px, #f3f0e7 6px 12px); }
+@media (max-width: 700px) {
+  .plan-hero .plan-hero-top { padding-right: 0; align-items: flex-start; }
+  .plan-hero .plan-planty .planty-mascot { width: 56px; height: 56px; }
+  .plan-hero .plan-demo-ribbon { position: static; margin: 10px 0 0; }
+  .plan-hero .plan-ribbon { overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
+  .plan-hero .plan-ribbon .plan-chip { min-width: 118px; scroll-snap-align: start; }
+}
