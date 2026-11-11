@@ -29,6 +29,7 @@
 | S23 | ESA Sentinel-2 overview | https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-2 |
 | S24 | NASA POWER parameter dictionary | https://power.larc.nasa.gov/parameters/ |
 | S25 | NASA Earthdata | https://www.earthdata.nasa.gov/ |
+| S26 | NASA JPL GRACE / GRACE-FO mascons RL06.3Mv04; total water storage anomalies, 2004–2009 baseline, ~300 km effective resolution | https://grace.jpl.nasa.gov/data/get-data/jpl_global_mascons/ |
 
 ## B. Evidence shipped in the core app [CORE `public/data/*.json`]
 

@@ -1,0 +1,369 @@
+{
+  "schemaVersion": 1,
+  "source": "NASA JPL GRACE / GRACE-FO mascons RL06.3Mv04 CRI",
+  "url": "https://grace.jpl.nasa.gov/data/get-data/jpl_global_mascons/",
+  "retrievedAt": "2026-11-11T06:53:20.857237+00:00",
+  "collectionId": "TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4",
+  "granuleId": "G4407658620-POCLOUD",
+  "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+  "fileUrl": "https://archive.podaac.earthdata.nasa.gov/podaac-ops-cumulus-protected/TELLUS_GRAC-GRFO_MASCON_CRI_GRID_RL06.3_V4/GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+  "variable": "lwe_thickness",
+  "units": "cm",
+  "resolution": {
+    "effective": "~300 km (3-degree mascons)",
+    "sampling": "0.5 degrees"
+  },
+  "baseline": {
+    "start": "2004-01-01",
+    "end": "2009-12-31",
+    "note": "Anomalies relative to the January 2004–December 2009 time mean; normal is this fixed baseline, not the selected month's climatology."
+  },
+  "method": "Nearest 0.5-degree grid centre to each soil-nutrients.json site; original monthly lwe_thickness in cm, no gain factors, interpolation or synthetic gap filling. Calendar month assigned by the native time coordinate.",
+  "note": "Total terrestrial water storage includes groundwater, soil moisture, surface water, snow and ice. This is not a groundwater-only estimate or a local well depth. Nearby sites may share one mascon.",
+  "period": {
+    "start": "2024-01",
+    "end": "2024-12"
+  },
+  "sites": {
+    "mithapukur": {
+      "lat": 25.54,
+      "lon": 89.27,
+      "gridCentre": {
+        "lat": 25.75,
+        "lon": 89.25
+      },
+      "gridIndex": {
+        "lat": 231,
+        "lon": 178
+      },
+      "masconId": 1214,
+      "monthly": [
+        {
+          "month": "2024-01",
+          "twsAnomalyCm": -69.484955,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 228,
+          "nativeTime": "2024-01-16T12:00:00"
+        },
+        {
+          "month": "2024-02",
+          "twsAnomalyCm": -63.162373,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 229,
+          "nativeTime": "2024-02-15T12:00:00"
+        },
+        {
+          "month": "2024-03",
+          "twsAnomalyCm": -67.08432,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 230,
+          "nativeTime": "2024-03-16T12:00:00"
+        },
+        {
+          "month": "2024-04",
+          "twsAnomalyCm": -70.842414,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 231,
+          "nativeTime": "2024-04-16T00:00:00"
+        },
+        {
+          "month": "2024-05",
+          "twsAnomalyCm": -64.983302,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 232,
+          "nativeTime": "2024-05-16T12:00:00"
+        },
+        {
+          "month": "2024-06",
+          "twsAnomalyCm": -39.476829,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 233,
+          "nativeTime": "2024-06-16T00:00:00"
+        },
+        {
+          "month": "2024-07",
+          "twsAnomalyCm": -14.630767,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 234,
+          "nativeTime": "2024-07-16T12:00:00"
+        },
+        {
+          "month": "2024-08",
+          "twsAnomalyCm": -17.369183,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 235,
+          "nativeTime": "2024-08-16T12:00:00"
+        },
+        {
+          "month": "2024-09",
+          "twsAnomalyCm": -32.513158,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 236,
+          "nativeTime": "2024-09-16T00:00:00"
+        },
+        {
+          "month": "2024-10",
+          "twsAnomalyCm": -33.344872,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 237,
+          "nativeTime": "2024-10-16T12:00:00"
+        },
+        {
+          "month": "2024-11",
+          "twsAnomalyCm": -49.034442,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 238,
+          "nativeTime": "2024-11-16T00:00:00"
+        },
+        {
+          "month": "2024-12",
+          "twsAnomalyCm": -64.841936,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 239,
+          "nativeTime": "2024-12-16T12:00:00"
+        }
+      ]
+    },
+    "pirganj": {
+      "lat": 25.5,
+      "lon": 89.22,
+      "gridCentre": {
+        "lat": 25.25,
+        "lon": 89.25
+      },
+      "gridIndex": {
+        "lat": 230,
+        "lon": 178
+      },
+      "masconId": 1321,
+      "monthly": [
+        {
+          "month": "2024-01",
+          "twsAnomalyCm": -10.511372,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 228,
+          "nativeTime": "2024-01-16T12:00:00"
+        },
+        {
+          "month": "2024-02",
+          "twsAnomalyCm": -5.922605,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 229,
+          "nativeTime": "2024-02-15T12:00:00"
+        },
+        {
+          "month": "2024-03",
+          "twsAnomalyCm": -17.077826,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 230,
+          "nativeTime": "2024-03-16T12:00:00"
+        },
+        {
+          "month": "2024-04",
+          "twsAnomalyCm": -25.82728,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 231,
+          "nativeTime": "2024-04-16T00:00:00"
+        },
+        {
+          "month": "2024-05",
+          "twsAnomalyCm": -14.667842,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 232,
+          "nativeTime": "2024-05-16T12:00:00"
+        },
+        {
+          "month": "2024-06",
+          "twsAnomalyCm": 14.138204,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 233,
+          "nativeTime": "2024-06-16T00:00:00"
+        },
+        {
+          "month": "2024-07",
+          "twsAnomalyCm": 33.44326,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 234,
+          "nativeTime": "2024-07-16T12:00:00"
+        },
+        {
+          "month": "2024-08",
+          "twsAnomalyCm": 34.07196,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 235,
+          "nativeTime": "2024-08-16T12:00:00"
+        },
+        {
+          "month": "2024-09",
+          "twsAnomalyCm": 32.492473,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 236,
+          "nativeTime": "2024-09-16T00:00:00"
+        },
+        {
+          "month": "2024-10",
+          "twsAnomalyCm": 32.639574,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 237,
+          "nativeTime": "2024-10-16T12:00:00"
+        },
+        {
+          "month": "2024-11",
+          "twsAnomalyCm": 16.108899,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 238,
+          "nativeTime": "2024-11-16T00:00:00"
+        },
+        {
+          "month": "2024-12",
+          "twsAnomalyCm": 1.724418,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 239,
+          "nativeTime": "2024-12-16T12:00:00"
+        }
+      ]
+    },
+    "gangachara": {
+      "lat": 25.85,
+      "lon": 89.2,
+      "gridCentre": {
+        "lat": 25.75,
+        "lon": 89.25
+      },
+      "gridIndex": {
+        "lat": 231,
+        "lon": 178
+      },
+      "masconId": 1214,
+      "monthly": [
+        {
+          "month": "2024-01",
+          "twsAnomalyCm": -69.484955,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 228,
+          "nativeTime": "2024-01-16T12:00:00"
+        },
+        {
+          "month": "2024-02",
+          "twsAnomalyCm": -63.162373,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 229,
+          "nativeTime": "2024-02-15T12:00:00"
+        },
+        {
+          "month": "2024-03",
+          "twsAnomalyCm": -67.08432,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 230,
+          "nativeTime": "2024-03-16T12:00:00"
+        },
+        {
+          "month": "2024-04",
+          "twsAnomalyCm": -70.842414,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 231,
+          "nativeTime": "2024-04-16T00:00:00"
+        },
+        {
+          "month": "2024-05",
+          "twsAnomalyCm": -64.983302,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 232,
+          "nativeTime": "2024-05-16T12:00:00"
+        },
+        {
+          "month": "2024-06",
+          "twsAnomalyCm": -39.476829,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 233,
+          "nativeTime": "2024-06-16T00:00:00"
+        },
+        {
+          "month": "2024-07",
+          "twsAnomalyCm": -14.630767,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 234,
+          "nativeTime": "2024-07-16T12:00:00"
+        },
+        {
+          "month": "2024-08",
+          "twsAnomalyCm": -17.369183,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 235,
+          "nativeTime": "2024-08-16T12:00:00"
+        },
+        {
+          "month": "2024-09",
+          "twsAnomalyCm": -32.513158,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 236,
+          "nativeTime": "2024-09-16T00:00:00"
+        },
+        {
+          "month": "2024-10",
+          "twsAnomalyCm": -33.344872,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 237,
+          "nativeTime": "2024-10-16T12:00:00"
+        },
+        {
+          "month": "2024-11",
+          "twsAnomalyCm": -49.034442,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 238,
+          "nativeTime": "2024-11-16T00:00:00"
+        },
+        {
+          "month": "2024-12",
+          "twsAnomalyCm": -64.841936,
+          "fileId": "GRCTellus.JPL.200204_202609.GLO.RL06.3M.MSCNv04CRI.nc",
+          "granuleId": "G4407658620-POCLOUD",
+          "timeIndex": 239,
+          "nativeTime": "2024-12-16T12:00:00"
+        }
+      ]
+    }
+  },
+  "sha256": "3522dd579cc10326339efdecece550ba01f41b9bee599d0ed915fc35f9eafb64",
+  "nativeMetadata": {
+    "title": "JPL GRACE and GRACE-FO MASCON RL06.3Mv04 CRI",
+    "institution": "NASA/JPL",
+    "summary": "Monthly gravity solutions from GRACE and GRACE-FO as determined from the JPL RL06.3Mv04 mascon solution - with CRI filter applied",
+    "time_mean_removed": "2004.000 to 2009.999"
+  }
+}

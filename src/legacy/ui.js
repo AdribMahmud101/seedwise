@@ -134,6 +134,13 @@ const nasaSources = {
     res: ['~9 km regional grid', '~৯ কিমি আঞ্চলিক গ্রিড'],
     url: 'https://nsidc.org/data/spl4smgp/versions/8',
   },
+  grace: {
+    label: ['NASA GRACE-FO', 'নাসা GRACE-FO'],
+    name: ['NASA JPL GRACE / GRACE-FO mascons RL06.3Mv04', 'নাসা JPL GRACE / GRACE-FO mascons RL06.3Mv04'],
+    line: ["Satellites weigh the region's total water, including groundwater, against the 2004–2009 average.", 'স্যাটেলাইট এলাকার ভূগর্ভস্থ পানিসহ মোট পানির ওজন ২০০৪–২০০৯ সালের গড়ের সঙ্গে তুলনা করে।'],
+    res: ['~300 km regional estimate (0.5° sampling)', '~৩০০ কিমি আঞ্চলিক অনুমান (০.৫° গ্রিড)'],
+    url: 'https://grace.jpl.nasa.gov/data/get-data/jpl_global_mascons/',
+  },
   nasadem: {
     label: ['NASA', 'নাসা'],
     name: ['NASADEM elevation', 'NASADEM ভূমির উচ্চতা'],

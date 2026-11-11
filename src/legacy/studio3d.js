@@ -18,12 +18,42 @@ async function loadWaterTableData() {
     waterTableData = res.ok ? await res.json() : false;
     // Callouts may have rendered before this arrived: refresh them once.
     if (waterTableData && currentData && containerEl) {
-      updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData, t }));
+      updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData, smap: smapData || null, grace: graceData || null, t }));
     }
   } catch (e) {
     waterTableData = false;
   }
   return waterTableData;
+}
+
+async function loadSmapData() {
+  if (smapData !== null) return smapData;
+  try {
+    const res = await fetch("/data/smap.json");
+    smapData = res.ok ? await res.json() : false;
+    // Callouts may have rendered before this arrived: refresh them once.
+    if (smapData && currentData && containerEl) {
+      updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData || null, smap: smapData, grace: graceData || null, t }));
+    }
+  } catch (e) {
+    smapData = false;
+  }
+  return smapData;
+}
+
+async function loadGraceData() {
+  if (graceData !== null) return graceData;
+  try {
+    const res = await fetch("/data/grace-groundwater.json");
+    graceData = res.ok ? await res.json() : false;
+    // Callouts may have rendered before this arrived: refresh them once.
+    if (graceData && currentData && containerEl) {
+      updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData || null, smap: smapData || null, grace: graceData, t }));
+    }
+  } catch (e) {
+    graceData = false;
+  }
+  return graceData;
 }
 
 async function loadSoilNutrientsData() {
@@ -166,6 +196,8 @@ let ndviRelativeOverride = null; // null = auto (within-field at ≥95 % one cla
 let probeUV = { u: 0.5, v: 0.5 };
 let s1WaterData = null; // lazy loaded from /data/s1-water.json
 let waterTableData = null; // lazy loaded from /data/water-table.json
+let smapData = null; // lazy loaded from /data/smap.json
+let graceData = null; // lazy loaded from /data/grace-groundwater.json
 let soilNutrientsData = null; // lazy loaded from /data/soil-nutrients.json
 let waterMesh = null;
 let contourLinesGroup = null;
@@ -596,7 +628,8 @@ async function prepareSurface(data, mode, monthIdx) {
     loadS1WaterData(), loadSoilNutrientsData(),
     optical || mode === 'productivity' ? loadSurfacePack(mode === 'moisture' || mode === 'ndmi' ? 'moisture-grid' : 'ndvi-grid') : null,
     mode === 'fertility' ? loadSurfacePack('soil-profile') : null,
-    loadWaterTableData(), // keep last: the destructure above is positional
+    loadWaterTableData(), // keep auxiliary loaders last: the destructure above is positional
+    loadSmapData(), loadGraceData(), // append loaders: the first four results are positional
   ]);
   const year = Number(month.month?.slice(0, 4)) || 2024;
   const grid = nearestObservation(gridPack?.grids?.filter((g) => g.siteId === data.field.id), monthIdx, year)?.observation;
@@ -3699,13 +3732,14 @@ function soilDetailHtml(band, detail) {
   const title = { topsoil: t("Topsoil", "উপরের মাটি"), rootzone: t("Root zone", "শিকড় স্তর"), aquifer: t("Deep soil & water table", "গভীর মাটি ও পানির স্তর") }[band];
   const depth = String(detail.eyebrow || "").split(" · ")[0];
   // Only sources that really are NASA get the badge (root zone = NASA POWER soil moisture).
-  const nasa = band === "rootzone" ? nasaBadge("wetness") : "";
+  const nasa = band === "rootzone" ? nasaBadge("wetness") : detail.nasaKey ? nasaBadge(detail.nasaKey, detail.nasaPeriod) : "";
   return `<div class="callout-box ${band}${nasa ? " has-nasa" : ""}" title="${esc(truthLabel)}">
     <div class="callout-head"><span class="callout-title">${esc(title)}</span><span class="callout-depth">${esc(depth)}</span>${nasa}</div>
     <div class="callout-val">${detail.isButton
       ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
       : esc(detail.value)}</div>
     ${detail.isButton ? "" : `<small>${esc(truthLabel)}</small>`}
+    ${detail.nasaValue ? `<div class="callout-val">${esc(detail.nasaValue)}</div><small>${esc(detail.nasaNote)}</small>` : ""}
     ${detail.askReading ? `<button type="button" class="callout-btn" data-soil-test>${esc(t("Add your well reading", "আপনার কূপের মাপ দিন"))}</button>` : ""}
     ${detail.cropValue ? `<div class="callout-val callout-crop">${esc(detail.cropValue)}</div><small>${esc(detail.cropTruthLabel)}</small>` : ""}
   </div>`;
@@ -4139,6 +4173,8 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
     monthIdx: currentMonthIdx,
     soilOverrides,
     waterTable: waterTableData || null,
+    smap: smapData || null,
+    grace: graceData || null,
     t,
   });
 
@@ -4625,6 +4661,8 @@ export async function setStudioMonth(monthIdx) {
     monthIdx: currentMonthIdx,
     soilOverrides,
     waterTable: waterTableData || null,
+    smap: smapData || null,
+    grace: graceData || null,
     t,
   });
   if (calloutData && containerEl) updateSoilDetails(calloutData);
@@ -5076,7 +5114,7 @@ export function setSoilOverrides(overrides) {
   soilOverrides = overrides ? { ...overrides } : null;
   sideTextureCache.clear();
   if (containerEl && currentData) {
-    updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData || null, t }));
+    updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData || null, smap: smapData || null, grace: graceData || null, t }));
     buildFieldBlock(currentData, currentCutaway).then(() => {
       updateProbeCard();
       requestRender();

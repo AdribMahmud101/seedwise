@@ -1357,10 +1357,19 @@ export function computeAutoExaggeration(reliefM, blockWidthM, minExag = 1.0, max
  * Band 2: 15–60 cm · ROOT ZONE
  * Band 3: >120 cm · SUBSOIL & WATER TABLE
  */
-export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, waterTable = null, t = (en) => en }) {
+export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, waterTable = null, smap = null, grace = null, t = (en) => en }) {
   if (!data) return null;
   const month = data.months?.[monthIdx] || data.months?.[0] || {};
   const layers = data.soil?.layers || [];
+  const calendarMonth = month.month;
+  const calMonth = Number(String(calendarMonth || "").slice(5, 7)) - 1;
+  const period = calMonth >= 0 && calMonth < 12
+    ? `${t(MONTHS_EN[calMonth], MONTHS_BN[calMonth])} ${calendarMonth.slice(0, 4)}` : null;
+  const surfaceDays = (smap?.sites?.[data.field?.id]?.daily || []).filter(day =>
+    period && day.date?.slice(0, 7) === calendarMonth && Number.isFinite(day.SFMC) && day.SFMC >= 0 && day.SFMC <= 1);
+  const sfmc = surfaceDays.length ? surfaceDays.reduce((sum, day) => sum + day.SFMC, 0) / surfaceDays.length : null;
+  const graceMonth = grace?.sites?.[data.field?.id]?.monthly?.find(row => row.month === calendarMonth);
+  const twsCm = Number.isFinite(graceMonth?.twsAnomalyCm) ? graceMonth.twsAnomalyCm : null;
 
   // Band 1: 0-15 cm Topsoil
   const topLayer = layers[0] || {};
@@ -1446,7 +1455,6 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, wat
   const hasLocalGw = soilOverrides?.gwDepthM != null && Number(soilOverrides.gwDepthM) > 0;
   // Fan et al. 2017 ~1 km water-table model (public/data/water-table.json); a farmer's well reading overrides it.
   const wtSite = waterTable?.sites?.[data.field?.id];
-  const calMonth = Number(String(month.month || "").slice(5, 7)) - 1;
   const modelGwM = !hasLocalGw ? wtSite?.monthlyDepthM?.[calMonth >= 0 && calMonth < 12 ? calMonth : monthIdx % 12] : null;
   const hasModelGw = Number.isFinite(modelGwM);
   const aquiferVal = hasLocalGw
@@ -1470,6 +1478,12 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, wat
       texture,
       ph,
       omPct,
+      sfmc,
+      nasaKey: sfmc !== null ? "smap" : null,
+      nasaPeriod: calendarMonth?.slice(0, 4),
+      nasaValue: sfmc !== null
+        ? t(`Surface moisture ${sfmc.toFixed(2)} m³/m³ (top 5 cm) · ${period} average`, `পৃষ্ঠের আর্দ্রতা ${sfmc.toFixed(2)} মি³/মি³ (উপরের ৫ সেমি) · ${period} গড়`) : null,
+      nasaNote: sfmc !== null ? t("NASA SMAP L4 · 9 km regional estimate", "NASA SMAP L4 · ৯ কিমি আঞ্চলিক অনুমান") : null,
     },
     rootzone: {
       eyebrow: rootzoneEyebrow,
@@ -1492,6 +1506,13 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, wat
       askReading: hasModelGw,
       gwDepthM: hasLocalGw ? soilOverrides.gwDepthM : null,
       modelGwM: hasModelGw ? modelGwM : null,
+      twsAnomalyCm: twsCm,
+      nasaKey: twsCm !== null ? "grace" : null,
+      nasaPeriod: calendarMonth?.slice(0, 4),
+      nasaValue: twsCm !== null
+        ? t(`Regional water storage: ${twsCm < 0 ? "−" : "+"}${Math.abs(twsCm).toFixed(1)} cm vs normal (${period}) · NASA GRACE-FO ~300 km`, `আঞ্চলিক পানি সঞ্চয়: ${twsCm < 0 ? "−" : "+"}${Math.abs(twsCm).toFixed(1)} সেমি স্বাভাবিকের তুলনায় (${period}) · NASA GRACE-FO ~৩০০ কিমি`) : null,
+      nasaNote: twsCm !== null
+        ? t("Total water, including groundwater · 2004–2009 baseline; not well depth", "ভূগর্ভস্থ পানিসহ মোট পানি · ২০০৪–২০০৯ গড়ের তুলনায়; কূপের গভীরতা নয়") : null,
     },
   };
 }
