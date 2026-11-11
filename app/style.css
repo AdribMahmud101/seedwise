@@ -851,6 +851,62 @@ small {
   color: var(--muted);
   margin-bottom: 16px;
 }
+.field-recommend .next-step-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.field-recommend .button.primary {
+  position: relative;
+}
+.field-recommend .button.primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(49, 92, 61, 0.55);
+  animation: field-recommend-ripple 2.4s ease-out infinite;
+}
+.field-recommend .button.primary svg {
+  animation: field-recommend-arrow 2.4s ease-in-out infinite;
+}
+.field-recommend .button.primary:hover::after,
+.field-recommend .button.primary:focus::after {
+  animation: none;
+  box-shadow: 0 0 0 0 var(--green);
+}
+.field-recommend .button.primary:hover svg,
+.field-recommend .button.primary:focus svg {
+  animation: none;
+  transform: translateX(0);
+}
+@keyframes field-recommend-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(49, 92, 61, 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+@keyframes field-recommend-arrow {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-recommend .button.primary {
+    box-shadow: 0 0 0 3px var(--green);
+  }
+  .field-recommend .button.primary:focus-visible {
+    outline-offset: 6px;
+  }
+}
 .field-bottom {
   padding: 12px 22px;
   border-top: 1px solid var(--line);
