@@ -156,10 +156,156 @@ async function readBody(request) {
   }
 }
 
+
+// ---- /api/rotation-advisor: AI decision helper for custom crops (grounded in public/data/agronomy.json) ----
+const ADVISOR_MODES = new Set(['rotation', 'single', 'mixed', 'orchard']);
+const ADVISOR_VERDICTS = new Set(['recommended', 'possible_with_conditions', 'not_suitable']);
+const ADVISOR_STAGES = new Set(['sow', 'grow', 'harvest', 'fallow', 'orchard']);
+const ADVISOR_CONTEXT_KEYS = ['fieldId', 'fieldName', 'areaHa', 'irrigation', 'budget', 'soil', 'outlook', 'flood', 'waterTable'];
+let agronomyCache = null;
+
+async function loadAgronomy(env, origin) {
+  if (agronomyCache) return agronomyCache;
+  try {
+    const res = await env.ASSETS.fetch(new Request(`${origin}/data/agronomy.json`));
+    if (!res.ok) return null;
+    const a = await res.json();
+    agronomyCache = {
+      scope: a.scope,
+      aez: a.aez && { label: a.aez.label, id: a.aez.id, notes: a.aez.notes || a.aez.summary },
+      crops: (a.crops || []).map(c => ({ id: c.id, label: c.label, durationDays: c.durationDays, sowing: c.sowingWindow || c.sowing, notes: c.notes })),
+      rotations: (a.rotations || []).map(r => ({ id: r.id, label: r.label, evidence: r.evidence || r.summary, source: r.source || r.sourceId })),
+      water: a.water && { method: a.water.method, etcFormula: a.water.etcFormula },
+      modellingRules: a.modellingRules,
+      sources: (a.sources || []).map(s => ({ id: s.id, title: s.title, url: s.url })),
+    };
+    return agronomyCache;
+  } catch {
+    return null;
+  }
+}
+
+function cleanList(value, maxItems = 6, maxLen = 220) {
+  return Array.isArray(value)
+    ? value.filter(v => typeof v === 'string' && v.trim()).slice(0, maxItems).map(v => v.trim().slice(0, maxLen))
+    : [];
+}
+
+function parseModelJson(text) {
+  const raw = String(text).trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try { return JSON.parse(raw.slice(start, end + 1)); } catch { return null; }
+}
+
+// Pure: validate/normalise the model's JSON; evidence may only cite known source ids.
+export function normaliseAdvice(parsed, sources) {
+  if (!parsed || !ADVISOR_VERDICTS.has(parsed.verdict)) return null;
+  const byId = new Map((sources || []).map(s => [s.id, s]));
+  const months = new Map();
+  for (const m of Array.isArray(parsed.calendar) ? parsed.calendar : []) {
+    const month = Number(m?.month);
+    if (!Number.isInteger(month) || month < 1 || month > 12 || months.has(month)) continue;
+    const stage = ADVISOR_STAGES.has(m?.stage) ? m.stage : (m?.crop ? 'grow' : 'fallow');
+    months.set(month, { month, crop: typeof m?.crop === 'string' && m.crop.trim() ? m.crop.trim().slice(0, 40) : null, stage });
+  }
+  const calendar = Array.from({ length: 12 }, (_, i) => months.get(i + 1) || { month: i + 1, crop: null, stage: 'fallow' });
+  const evidence = cleanList(parsed.evidence, 6, 80).filter(id => byId.has(id)).map(id => ({ id, title: byId.get(id).title, url: byId.get(id).url }));
+  return {
+    verdict: parsed.verdict,
+    title: typeof parsed.title === 'string' ? parsed.title.trim().slice(0, 140) : '',
+    summary: typeof parsed.summary === 'string' ? parsed.summary.trim().slice(0, 700) : '',
+    calendar,
+    reasons: cleanList(parsed.reasons),
+    risks: cleanList(parsed.risks),
+    requirements: cleanList(parsed.requirements),
+    alternatives: cleanList(parsed.alternatives, 4, 140),
+    confidence: ['low', 'medium', 'high'].includes(parsed.confidence) ? parsed.confidence : 'low',
+    evidence,
+  };
+}
+
+export function sanitizeAdvisorRequest(body) {
+  if (!body || typeof body !== 'object' || !['en', 'bn'].includes(body.lang) || !ADVISOR_MODES.has(body.mode)) return null;
+  const crops = Array.isArray(body.crops)
+    ? [...new Set(body.crops.filter(c => typeof c === 'string').map(c => c.trim().slice(0, 40)).filter(Boolean))].slice(0, 5)
+    : [];
+  if (!crops.length) return null;
+  const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
+  const context = {};
+  const ctx = body.context && typeof body.context === 'object' && !Array.isArray(body.context) ? body.context : {};
+  for (const key of ADVISOR_CONTEXT_KEYS) {
+    const v = ctx[key];
+    if (typeof v === 'string' && v.trim()) context[key] = v.trim().slice(0, 240);
+    else if (typeof v === 'number' && Number.isFinite(v) && v >= 0) context[key] = v;
+  }
+  return { lang: body.lang, mode: body.mode, crops, notes, context };
+}
+
+async function rotationAdvisor(request, env, url) {
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
+  const origin = request.headers.get('Origin');
+  if ((origin && origin !== url.origin) || ['cross-site', 'same-site'].includes(request.headers.get('Sec-Fetch-Site'))) return json({ error: 'forbidden' }, 403);
+  if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) return json({ error: 'payload_too_large' }, 413);
+  if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') return json({ error: 'bad_request' }, 400);
+  let req;
+  try {
+    const text = await readBody(request);
+    if (text === null) return json({ error: 'payload_too_large' }, 413);
+    req = sanitizeAdvisorRequest(JSON.parse(text));
+  } catch { req = null; }
+  if (!req) return json({ error: 'bad_request' }, 400);
+
+  const now = Date.now();
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const entry = requestsByIp.get(ip) || { count: 0, expires: now + RATE_WINDOW_MS };
+  if (entry.expires <= now) { entry.count = 0; entry.expires = now + RATE_WINDOW_MS; }
+  if (entry.count >= 20) return json({ error: 'rate_limited' }, 429);
+  entry.count++; requestsByIp.set(ip, entry);
+  if (!env.MUSE_API_KEY) return json({ error: 'not_configured' }, 503);
+
+  const research = await loadAgronomy(env, url.origin);
+  const system = `You are Planty's crop decision helper for smallholder farmers in Rangpur, Bangladesh (Tista Meander Floodplain, humid subtropical monsoon: hot wet Jun–Oct, cool dry Nov–Feb, hot pre-monsoon Mar–May; low-lying fields can flood or waterlog in monsoon).
+The farmer proposes crops (mode: rotation = seasons in one year on the same field; single = one crop only; mixed = intercrop/hybrid on the same field; orchard = perennial fruit trees).
+Your job: judge suitability for THIS field honestly and build the best 12-month plan if it is reasonable.
+BE BRUTALLY HONEST: if the proposal is unsuitable (climate, waterlogging, soil, season clash, perennial vs annual conflict, no market/input reality, needs inputs the farmer lacks), set verdict "not_suitable", say clearly why in the summary, and give better alternatives. Use "possible_with_conditions" only when it can work with specific, realistic requirements. Do not flatter.
+Rules: use only the facts in the field context and research data for field-specific claims; general agronomy knowledge for Bangladesh is allowed but say it is general; never invent measurements, yields, prices or chemical doses; cite evidence ONLY by source ids from the research "sources" list (omit if none fit).
+Respond with ONE JSON object only, no prose, in ${req.lang === 'bn' ? 'Bengali' : 'English'} for all text values:
+{"verdict":"recommended|possible_with_conditions|not_suitable","title":"short plan name","summary":"2-4 plain sentences","calendar":[{"month":1,"crop":"name or null","stage":"sow|grow|harvest|fallow|orchard"}... all 12 months],"reasons":["..."],"risks":["..."],"requirements":["..."],"alternatives":["..."],"confidence":"low|medium|high","evidence":["source-id"]}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 35000);
+  try {
+    const response = await fetch('https://api.meta.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.MUSE_API_KEY}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: env.PLANTY_MODEL || 'muse-ember-1.0', max_tokens: 3000, reasoning_effort: 'low', temperature: 0.2,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: `Research data (Rangpur, reviewed): ${JSON.stringify(research || {}).slice(0, 14000)}` },
+          { role: 'user', content: `Field context: ${JSON.stringify(req.context)}` },
+          { role: 'user', content: `Proposal — mode: ${req.mode}; crops: ${req.crops.join(', ')}${req.notes ? `; farmer note: ${req.notes}` : ''}` },
+        ],
+      }),
+    });
+    if (!response.ok) return json({ error: 'unavailable' }, 503);
+    const data = await response.json();
+    const advice = normaliseAdvice(parseModelJson(data?.choices?.[0]?.message?.content || ''), research?.sources);
+    if (!advice) return json({ error: 'unavailable' }, 503);
+    return json({ ...advice, source: env.PLANTY_MODEL || 'muse-ember-1.0' });
+  } catch {
+    return json({ error: 'unavailable' }, 503);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (url.pathname === '/api/rotation-advisor') return rotationAdvisor(request, env, url);
     if (url.pathname !== '/api/planty' && url.pathname !== '/api/plan-summary') return json({ error: 'not_found' }, 404);
     const planSummary = url.pathname === '/api/plan-summary';
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
