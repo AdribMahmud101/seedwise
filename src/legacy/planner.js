@@ -559,8 +559,14 @@ function plannerAction(action, value) {
     refreshPlannerSettings();
     document.querySelector('[name="plantCrop"]:checked')?.focus({ preventScroll: true });
   }
-  if (action === 'custom-plan-clear') { clearCustomPlan(); drawPlanner(); return; }
-  if (action === 'custom-season') { setCustomSeason(value); drawPlanner(); return; }
+  if (action === 'custom-plan-clear') { clearCustomPlan(); location.hash = '#planner'; location.reload(); return; }
+  if (action === 'custom-season') {
+    setCustomSeason(value);
+    const tg = document.querySelector('.cs-season-toggle'); if (tg) tg.outerHTML = customSeasonToggle();
+    const bn = document.querySelector('.adv-plan-banner'); if (bn) bn.outerHTML = customPlanBanner();
+    schedulePlanner3d();
+    return;
+  }
   if (action === 'plan-confirm' && activeSeason()) {
     const plan = seasonPlan();
     const next = nextSeason(plan, activeSeason(plan));
