@@ -1768,3 +1768,24 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
     }
   }
 }
+
+/* Phones: candidate rows wrap — crop sequence on its own line, then score · gap · details, strip full width. */
+@media (max-width: 600px) {
+  .rotation-candidate-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+  }
+  .rotation-candidate-crops {
+    flex: 1 1 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .rotation-candidate-gap { white-space: nowrap; }
+  .rotation-mini-strip { flex: 1 1 100%; order: 5; }
+  .rotation-candidate-row > button,
+  .rotation-candidate-row .rotation-candidate-toggle { order: 4; margin-left: auto; }
+}
