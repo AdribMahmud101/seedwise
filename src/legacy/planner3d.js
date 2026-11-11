@@ -2522,6 +2522,31 @@ export function insideOutline(x, y, outline) {
   return inside;
 }
 
+const CUSTOM_CONTRAST = ['#2f8f46', '#d29a1e', '#b5523b', '#2f6f9f', '#7a4fa0'];
+// Pure: keep crops visually distinct — if a colour is too close to an earlier one, use a contrasting palette colour.
+export function distinctColors(colors) {
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const out = [];
+  colors.forEach((c, i) => {
+    const near = out.some((o) => { const a = rgb(o), b = rgb(c); return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 0.28; });
+    out.push(near ? CUSTOM_CONTRAST.find((p) => !out.includes(p)) || CUSTOM_CONTRAST[i % CUSTOM_CONTRAST.length] : c);
+  });
+  return out;
+}
+
+function customLabelSprite(text, color) {
+  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,254,249,0.94)'; ctx.strokeStyle = color; ctx.lineWidth = 8;
+  const r = 40; ctx.beginPath(); ctx.roundRect(8, 8, 496, 112, r); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(64, 64, 22, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1f3527'; ctx.font = '600 52px system-ui, sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText(text, 100, 66, 390);
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.renderOrder = 20;
+  return sprite;
+}
+
 function customTreeParts(item) {
   const h = item.heightM;
   const trunk = new THREE.CylinderGeometry(h * 0.045, h * 0.065, h * 0.45, 7);
@@ -2544,6 +2569,9 @@ function buildCustomPlants(data) {
   const alongX = bounds.width >= bounds.height;
   const [lo, hi] = alongX ? [bounds.minX, bounds.maxX] : [bounds.minY, bounds.maxY];
   const strips = customStrips(lo, hi, items.map((p) => p.sharePct));
+  const multi = items.length > 1;
+  const colors = multi ? distinctColors(items.map((p) => p.color)) : items.map((p) => p.color);
+  items.forEach((p, i) => { p.color = colors[i]; });
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
   const fieldArea = Math.max(1, bounds.width * bounds.height);
@@ -2566,6 +2594,29 @@ function buildCustomPlants(data) {
         if (!insideOutline(x + margin, y, outlineM) || !insideOutline(x - margin, y, outlineM) || !insideOutline(x, y + margin, outlineM) || !insideOutline(x, y - margin, outlineM)) continue;
         if (fieldZoneClearance(x, y, zoneGeom, outlineM) <= 0.05) continue;
         pts.push([x, y]);
+      }
+    }
+    if (multi) {
+      // Tinted ground for this crop's share + label floating above the strip centre.
+      const [c0g, c1g] = alongX ? [bounds.minY, bounds.maxY] : [bounds.minX, bounds.maxX];
+      const w = b - a, d = c1g - c0g, cu = (a + b) / 2, cv = (c0g + c1g) / 2;
+      const cx = alongX ? cu : cv, cy = alongX ? cv : cu;
+      const tint = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? w : d, alongX ? d : w),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(item.color), transparent: true, opacity: 0.16, depthWrite: false }));
+      tint.rotation.x = -Math.PI / 2; tint.position.set(cx, heightAt(cx, -cy) + 0.03, -cy); tint.renderOrder = 2;
+      group.add(tint);
+      const label = customLabelSprite(`${item.crop} · ${item.sharePct}%`, item.color);
+      const span = Math.max(bounds.width, bounds.height);
+      label.scale.set(span * 0.22, span * 0.055, 1);
+      label.position.set(cx, heightAt(cx, -cy) + Math.max(item.heightM, 1) + span * 0.06, -cy);
+      group.add(label);
+      if (idx > 0) { // dashed white divider between strips
+        const pts2 = [];
+        for (let v = c0g; v <= c1g; v += 0.6) { const x = alongX ? a : v, y = alongX ? v : a; if (insideOutline(x, y, outlineM)) pts2.push(new THREE.Vector3(x, heightAt(x, -y) + 0.06, -y)); }
+        if (pts2.length > 1) {
+          const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts2), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.8, gapSize: 0.5, linewidth: 2 }));
+          line.computeLineDistances(); line.renderOrder = 3; group.add(line);
+        }
       }
     }
     if (!pts.length) return;
