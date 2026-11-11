@@ -1,0 +1,2252 @@
+{
+ "model": {
+  "id": "ropon-flood/prithvi-eo-2.0-300m-tl-sen1floods11",
+  "version": "2026-11-11T14:59:15Z",
+  "backbone": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL (NASA/IBM)",
+  "head": "UperNet, 2 classes (land, water)",
+  "recipe": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL-Sen1Floods11 config.yaml (TerraTorch)",
+  "software": {
+   "terratorch": "1.2.14",
+   "torch": "2.8.0",
+   "lightning": "2.6.6",
+   "torchgeo": "0.10.1",
+   "albumentations": "2.0.8",
+   "timm": "1.0.31"
+  },
+  "training": {
+   "epochs_run": 50,
+   "best_val_mIoU": 0.8982075452804565,
+   "stopped_early": false,
+   "gpu": "A10G",
+   "wall_s": 505
+  }
+ },
+ "trainingDataset": "Sen1Floods11 v1.1 hand-labelled Sentinel-2 L1C chips (Bonafilia et al. 2020), official train/valid/test split",
+ "testMetrics": {
+  "split": "Sen1Floods11 v1.1 flood_handlabeled test (official)",
+  "n_chips": 90,
+  "IoU_water": 82.03,
+  "IoU_land": 97.29,
+  "mIoU": 89.66,
+  "F1_water": 90.13,
+  "F1_macro": 94.38,
+  "pixel_accuracy": 97.59,
+  "eval_wall_s": 30,
+  "published": {
+   "source": "Szwarcman et al. 2024, Prithvi-EO-2.0, arXiv:2412.02732, Table IV (Sen1Floods11 test)",
+   "model": "Prithvi-EO-2.0-300M-TL",
+   "mIoU": 90.0,
+   "mF1": 97.7,
+   "IoU_water": 82.6
+  },
+  "note": "Paper resized chips to 448 px and reports mean of several seeds; we use 512 px full chips, one seed (0)."
+ },
+ "inputs": {
+  "collections": [
+   "hls2-s30",
+   "hls2-l30"
+  ],
+  "provider": "NASA HLS v2.0 via Microsoft Planetary Computer STAC",
+  "bands": {
+   "BLUE": [
+    "B02",
+    "B02"
+   ],
+   "GREEN": [
+    "B03",
+    "B03"
+   ],
+   "RED": [
+    "B04",
+    "B04"
+   ],
+   "NIR_NARROW": [
+    "B8A",
+    "B05"
+   ],
+   "SWIR_1": [
+    "B11",
+    "B06"
+   ],
+   "SWIR_2": [
+    "B12",
+    "B07"
+   ]
+  },
+  "scale": "SR x 0.0001, Sen1Floods11 mean/std normalisation",
+  "window": "224x224 px (30 m) context centred on field; stats over clear pixels only",
+  "box": "2000 m square around centroid",
+  "buffer": "300 m radius around centroid",
+  "cloud_mask": "HLS Fmask bits 0-3 (cirrus, cloud, adjacent, shadow)",
+  "skip_if_cloud_fraction_box_gt": 0.3,
+  "period": "2024,2025 06-01..10-31"
+ },
+ "caveats": [
+  "Field centroids only, not surveyed polygons.",
+  "Fine-tuned on Sentinel-2 L1C top-of-atmosphere; applied to HLS surface reflectance (domain shift).",
+  "30 m pixels: water in small plots, channels and ponds below ~1 pixel is missed or mixed.",
+  "Optical: scenes with cloud/shadow over the box are skipped, so peak-flood days are under-sampled.",
+  "Water fraction includes permanent water (ponds, rivers) and flooded paddy; not separated from flood.",
+  "Positive control (Teesta at Kaunia 25.775N 89.435E; HLS S30 2025-10-22, L30 2024-11-19): this model and IBM's published Sen1Floods11 checkpoint give near-identical masks tracing the visible channel (S30 8.4% vs 8.1% of the 6.7 km window); HLS Fmask water flags 25% (S30) / 18% (L30) incl. sand bars and turbid shallows. No ground truth decides between them: small or turbid water may be under-detected by the model."
+ ],
+ "retrievedAt": "2026-11-11T15:10:12Z",
+ "fields": {
+  "mithapukur": {
+   "lat": 25.54,
+   "lon": 89.27,
+   "summary": {
+    "2024": {
+     "scenes_found": 32,
+     "usable": 3,
+     "water_fraction_box_mean": 0.0053,
+     "water_fraction_box_max": 0.0158,
+     "water_fraction_buffer300m_mean": 0.0,
+     "water_fraction_buffer300m_max": 0.0
+    },
+    "2025": {
+     "scenes_found": 35,
+     "usable": 3,
+     "water_fraction_box_mean": 0.0001,
+     "water_fraction_box_max": 0.0003,
+     "water_fraction_buffer300m_mean": 0.0,
+     "water_fraction_buffer300m_max": 0.0
+    }
+   },
+   "scenes": [
+    {
+     "date": "2024-08-01",
+     "stac_item": "HLS.S30.T45RYJ.2024214T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.298,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 72.0,
+     "clear_fraction_buffer300m": 0.832,
+     "water_fraction_box": 0.0158,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0161
+    },
+    {
+     "date": "2024-08-16",
+     "stac_item": "HLS.S30.T45RYJ.2024229T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.208,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 27.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0454
+    },
+    {
+     "date": "2024-09-20",
+     "stac_item": "HLS.S30.T45RYJ.2024264T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.158,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 18.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0094
+    },
+    {
+     "date": "2025-10-15",
+     "stac_item": "HLS.S30.T45RYJ.2025288T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.205,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 19.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0017
+    },
+    {
+     "date": "2025-10-20",
+     "stac_item": "HLS.S30.T45RYJ.2025293T043831.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.296,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 1.0,
+     "clear_fraction_buffer300m": 0.259,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-22",
+     "stac_item": "HLS.S30.T45RYJ.2025295T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.276,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 1.0,
+     "clear_fraction_buffer300m": 0.848,
+     "water_fraction_box": 0.0003,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0172
+    }
+   ],
+   "skipped": [
+    {
+     "date": "2024-06-02",
+     "stac_item": "HLS.S30.T45RYJ.2024154T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.986,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 54.0,
+     "reason": "cloud/shadow 99% of box > 30%"
+    },
+    {
+     "date": "2024-06-04",
+     "stac_item": "HLS.L30.T45RYJ.2024156T042917.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 95.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-07",
+     "stac_item": "HLS.S30.T45RYJ.2024159T043711.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-12",
+     "stac_item": "HLS.L30.T45RYJ.2024164T042929.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-22",
+     "stac_item": "HLS.S30.T45RYJ.2024174T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-07",
+     "stac_item": "HLS.S30.T45RYJ.2024189T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-14",
+     "stac_item": "HLS.L30.T45RYJ.2024196T042938.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 87.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-17",
+     "stac_item": "HLS.S30.T45RYJ.2024199T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 52.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-22",
+     "stac_item": "HLS.S30.T45RYJ.2024204T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.986,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 90.0,
+     "reason": "cloud/shadow 99% of box > 30%"
+    },
+    {
+     "date": "2024-07-27",
+     "stac_item": "HLS.S30.T45RYJ.2024209T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 74.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-30",
+     "stac_item": "HLS.L30.T45RYJ.2024212T042940.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 87.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-06",
+     "stac_item": "HLS.S30.T45RYJ.2024219T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.827,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 96.0,
+     "reason": "cloud/shadow 83% of box > 30%"
+    },
+    {
+     "date": "2024-08-15",
+     "stac_item": "HLS.L30.T45RYJ.2024228T042947.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 92.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-21",
+     "stac_item": "HLS.S30.T45RYJ.2024234T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 97.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-26",
+     "stac_item": "HLS.S30.T45RYJ.2024239T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-31",
+     "stac_item": "HLS.S30.T45RYJ.2024244T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-31",
+     "stac_item": "HLS.L30.T45RYJ.2024244T042958.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-09-08",
+     "stac_item": "HLS.L30.T45RYJ.2024252T043006.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-09-10",
+     "stac_item": "HLS.S30.T45RYJ.2024254T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.788,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 79% of box > 30%"
+    },
+    {
+     "date": "2024-09-24",
+     "stac_item": "HLS.L30.T45RYJ.2024268T043005.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.88,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 92.0,
+     "reason": "cloud/shadow 88% of box > 30%"
+    },
+    {
+     "date": "2024-09-30",
+     "stac_item": "HLS.S30.T45RYJ.2024274T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 73.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-02",
+     "stac_item": "HLS.L30.T45RYJ.2024276T043008.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-05",
+     "stac_item": "HLS.S30.T45RYJ.2024279T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-10",
+     "stac_item": "HLS.S30.T45RYJ.2024284T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 83.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-10",
+     "stac_item": "HLS.L30.T45RYJ.2024284T043009.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 84.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-15",
+     "stac_item": "HLS.S30.T45RYJ.2024289T043741.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 76.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-18",
+     "stac_item": "HLS.L30.T45RYJ.2024292T043017.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 85.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-20",
+     "stac_item": "HLS.S30.T45RYJ.2024294T043729.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.992,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 19.0,
+     "reason": "cloud/shadow 99% of box > 30%"
+    },
+    {
+     "date": "2024-10-30",
+     "stac_item": "HLS.S30.T45RYJ.2024304T043829.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.65,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 36.0,
+     "reason": "cloud/shadow 65% of box > 30%"
+    },
+    {
+     "date": "2025-06-04",
+     "stac_item": "HLS.S30.T45RYJ.2025155T044241.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.924,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 82.0,
+     "reason": "cloud/shadow 92% of box > 30%"
+    },
+    {
+     "date": "2025-06-07",
+     "stac_item": "HLS.S30.T45RYJ.2025158T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.975,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 48.0,
+     "reason": "cloud/shadow 98% of box > 30%"
+    },
+    {
+     "date": "2025-06-07",
+     "stac_item": "HLS.L30.T45RYJ.2025158T042942.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.925,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 93% of box > 30%"
+    },
+    {
+     "date": "2025-06-12",
+     "stac_item": "HLS.S30.T45RYJ.2025163T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 86.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-15",
+     "stac_item": "HLS.L30.T45RYJ.2025166T042946.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 91.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-17",
+     "stac_item": "HLS.S30.T45RYJ.2025168T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 93.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-22",
+     "stac_item": "HLS.S30.T45RYJ.2025173T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-27",
+     "stac_item": "HLS.S30.T45RYJ.2025178T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 59.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-01",
+     "stac_item": "HLS.L30.T45RYJ.2025182T042955.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 91.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-07",
+     "stac_item": "HLS.S30.T45RYJ.2025188T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.34,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 75.0,
+     "reason": "cloud/shadow 34% of box > 30%"
+    },
+    {
+     "date": "2025-07-12",
+     "stac_item": "HLS.S30.T45RYJ.2025193T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.801,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 54.0,
+     "reason": "cloud/shadow 80% of box > 30%"
+    },
+    {
+     "date": "2025-07-14",
+     "stac_item": "HLS.S30.T45RYJ.2025195T044241.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-17",
+     "stac_item": "HLS.S30.T45RYJ.2025198T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 95.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-25",
+     "stac_item": "HLS.L30.T45RYJ.2025206T043005.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-16",
+     "stac_item": "HLS.S30.T45RYJ.2025228T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.83,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 41.0,
+     "reason": "cloud/shadow 83% of box > 30%"
+    },
+    {
+     "date": "2025-08-18",
+     "stac_item": "HLS.L30.T45RYJ.2025230T043018.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-26",
+     "stac_item": "HLS.S30.T45RYJ.2025238T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 66.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-26",
+     "stac_item": "HLS.L30.T45RYJ.2025238T043015.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 74.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-31",
+     "stac_item": "HLS.S30.T45RYJ.2025243T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.883,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 67.0,
+     "reason": "cloud/shadow 88% of box > 30%"
+    },
+    {
+     "date": "2025-09-03",
+     "stac_item": "HLS.L30.T45RYJ.2025246T043023.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 75.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-05",
+     "stac_item": "HLS.S30.T45RYJ.2025248T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 85.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-12",
+     "stac_item": "HLS.S30.T45RYJ.2025255T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 93.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-15",
+     "stac_item": "HLS.S30.T45RYJ.2025258T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-19",
+     "stac_item": "HLS.L30.T45RYJ.2025262T043025.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-20",
+     "stac_item": "HLS.S30.T45RYJ.2025263T043711.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.87,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 60.0,
+     "reason": "cloud/shadow 87% of box > 30%"
+    },
+    {
+     "date": "2025-09-25",
+     "stac_item": "HLS.S30.T45RYJ.2025268T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.614,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 10.0,
+     "reason": "cloud/shadow 61% of box > 30%"
+    },
+    {
+     "date": "2025-09-27",
+     "stac_item": "HLS.L30.T45RYJ.2025270T043026.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 80.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-30",
+     "stac_item": "HLS.S30.T45RYJ.2025273T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.746,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 36.0,
+     "reason": "cloud/shadow 75% of box > 30%"
+    },
+    {
+     "date": "2025-10-02",
+     "stac_item": "HLS.S30.T45RYJ.2025275T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-10-10",
+     "stac_item": "HLS.S30.T45RYJ.2025283T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.414,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 55.0,
+     "reason": "cloud/shadow 41% of box > 30%"
+    },
+    {
+     "date": "2025-10-13",
+     "stac_item": "HLS.L30.T45RYJ.2025286T043028.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.76,
+     "nodata_fraction_box": 0.004,
+     "eo_cloud_cover_tile": 33.0,
+     "reason": "cloud/shadow 76% of box > 30%"
+    },
+    {
+     "date": "2025-10-29",
+     "stac_item": "HLS.L30.T45RYJ.2025302T043029.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    }
+   ]
+  },
+  "pirganj": {
+   "lat": 25.5,
+   "lon": 89.22,
+   "summary": {
+    "2024": {
+     "scenes_found": 32,
+     "usable": 2,
+     "water_fraction_box_mean": 0.0,
+     "water_fraction_box_max": 0.0,
+     "water_fraction_buffer300m_mean": 0.0,
+     "water_fraction_buffer300m_max": 0.0
+    },
+    "2025": {
+     "scenes_found": 35,
+     "usable": 3,
+     "water_fraction_box_mean": 0.0,
+     "water_fraction_box_max": 0.0,
+     "water_fraction_buffer300m_mean": 0.0,
+     "water_fraction_buffer300m_max": 0.0
+    }
+   },
+   "scenes": [
+    {
+     "date": "2024-09-20",
+     "stac_item": "HLS.S30.T45RYJ.2024264T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.133,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 18.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2024-10-15",
+     "stac_item": "HLS.S30.T45RYJ.2024289T043741.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.218,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 76.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-15",
+     "stac_item": "HLS.S30.T45RYJ.2025288T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 19.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-20",
+     "stac_item": "HLS.S30.T45RYJ.2025293T043831.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 1.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-22",
+     "stac_item": "HLS.S30.T45RYJ.2025295T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 1.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    }
+   ],
+   "skipped": [
+    {
+     "date": "2024-06-02",
+     "stac_item": "HLS.S30.T45RYJ.2024154T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.67,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 54.0,
+     "reason": "cloud/shadow 67% of box > 30%"
+    },
+    {
+     "date": "2024-06-04",
+     "stac_item": "HLS.L30.T45RYJ.2024156T042917.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 95.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-07",
+     "stac_item": "HLS.S30.T45RYJ.2024159T043711.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-12",
+     "stac_item": "HLS.L30.T45RYJ.2024164T042929.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-22",
+     "stac_item": "HLS.S30.T45RYJ.2024174T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-07",
+     "stac_item": "HLS.S30.T45RYJ.2024189T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-14",
+     "stac_item": "HLS.L30.T45RYJ.2024196T042938.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 87.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-17",
+     "stac_item": "HLS.S30.T45RYJ.2024199T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 52.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-22",
+     "stac_item": "HLS.S30.T45RYJ.2024204T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 90.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-27",
+     "stac_item": "HLS.S30.T45RYJ.2024209T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 74.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-30",
+     "stac_item": "HLS.L30.T45RYJ.2024212T042940.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 87.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-01",
+     "stac_item": "HLS.S30.T45RYJ.2024214T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 72.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-06",
+     "stac_item": "HLS.S30.T45RYJ.2024219T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.832,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 96.0,
+     "reason": "cloud/shadow 83% of box > 30%"
+    },
+    {
+     "date": "2024-08-15",
+     "stac_item": "HLS.L30.T45RYJ.2024228T042947.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 92.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-16",
+     "stac_item": "HLS.S30.T45RYJ.2024229T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.331,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 27.0,
+     "reason": "cloud/shadow 33% of box > 30%"
+    },
+    {
+     "date": "2024-08-21",
+     "stac_item": "HLS.S30.T45RYJ.2024234T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 97.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-26",
+     "stac_item": "HLS.S30.T45RYJ.2024239T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-31",
+     "stac_item": "HLS.S30.T45RYJ.2024244T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-31",
+     "stac_item": "HLS.L30.T45RYJ.2024244T042958.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-09-08",
+     "stac_item": "HLS.L30.T45RYJ.2024252T043006.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-09-10",
+     "stac_item": "HLS.S30.T45RYJ.2024254T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.674,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 67% of box > 30%"
+    },
+    {
+     "date": "2024-09-24",
+     "stac_item": "HLS.L30.T45RYJ.2024268T043005.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.342,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 92.0,
+     "reason": "cloud/shadow 34% of box > 30%"
+    },
+    {
+     "date": "2024-09-30",
+     "stac_item": "HLS.S30.T45RYJ.2024274T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 73.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-02",
+     "stac_item": "HLS.L30.T45RYJ.2024276T043008.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-05",
+     "stac_item": "HLS.S30.T45RYJ.2024279T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-10",
+     "stac_item": "HLS.S30.T45RYJ.2024284T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 83.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-10",
+     "stac_item": "HLS.L30.T45RYJ.2024284T043009.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.974,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 84.0,
+     "reason": "cloud/shadow 97% of box > 30%"
+    },
+    {
+     "date": "2024-10-18",
+     "stac_item": "HLS.L30.T45RYJ.2024292T043017.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 85.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-20",
+     "stac_item": "HLS.S30.T45RYJ.2024294T043729.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.999,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 19.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-30",
+     "stac_item": "HLS.S30.T45RYJ.2024304T043829.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.654,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 36.0,
+     "reason": "cloud/shadow 65% of box > 30%"
+    },
+    {
+     "date": "2025-06-04",
+     "stac_item": "HLS.S30.T45RYJ.2025155T044241.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.94,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 82.0,
+     "reason": "cloud/shadow 94% of box > 30%"
+    },
+    {
+     "date": "2025-06-07",
+     "stac_item": "HLS.S30.T45RYJ.2025158T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.701,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 48.0,
+     "reason": "cloud/shadow 70% of box > 30%"
+    },
+    {
+     "date": "2025-06-07",
+     "stac_item": "HLS.L30.T45RYJ.2025158T042942.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.534,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 53% of box > 30%"
+    },
+    {
+     "date": "2025-06-12",
+     "stac_item": "HLS.S30.T45RYJ.2025163T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 86.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-15",
+     "stac_item": "HLS.L30.T45RYJ.2025166T042946.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 91.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-17",
+     "stac_item": "HLS.S30.T45RYJ.2025168T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 93.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-22",
+     "stac_item": "HLS.S30.T45RYJ.2025173T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-27",
+     "stac_item": "HLS.S30.T45RYJ.2025178T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 59.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-01",
+     "stac_item": "HLS.L30.T45RYJ.2025182T042955.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 91.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-07",
+     "stac_item": "HLS.S30.T45RYJ.2025188T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.318,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 75.0,
+     "reason": "cloud/shadow 32% of box > 30%"
+    },
+    {
+     "date": "2025-07-12",
+     "stac_item": "HLS.S30.T45RYJ.2025193T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.793,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 54.0,
+     "reason": "cloud/shadow 79% of box > 30%"
+    },
+    {
+     "date": "2025-07-14",
+     "stac_item": "HLS.S30.T45RYJ.2025195T044241.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-17",
+     "stac_item": "HLS.S30.T45RYJ.2025198T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 95.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-25",
+     "stac_item": "HLS.L30.T45RYJ.2025206T043005.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-16",
+     "stac_item": "HLS.S30.T45RYJ.2025228T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.352,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 41.0,
+     "reason": "cloud/shadow 35% of box > 30%"
+    },
+    {
+     "date": "2025-08-18",
+     "stac_item": "HLS.L30.T45RYJ.2025230T043018.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-26",
+     "stac_item": "HLS.S30.T45RYJ.2025238T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 66.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-26",
+     "stac_item": "HLS.L30.T45RYJ.2025238T043015.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 74.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-31",
+     "stac_item": "HLS.S30.T45RYJ.2025243T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.945,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 67.0,
+     "reason": "cloud/shadow 94% of box > 30%"
+    },
+    {
+     "date": "2025-09-03",
+     "stac_item": "HLS.L30.T45RYJ.2025246T043023.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 75.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-05",
+     "stac_item": "HLS.S30.T45RYJ.2025248T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.941,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 85.0,
+     "reason": "cloud/shadow 94% of box > 30%"
+    },
+    {
+     "date": "2025-09-12",
+     "stac_item": "HLS.S30.T45RYJ.2025255T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 93.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-15",
+     "stac_item": "HLS.S30.T45RYJ.2025258T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-19",
+     "stac_item": "HLS.L30.T45RYJ.2025262T043025.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-20",
+     "stac_item": "HLS.S30.T45RYJ.2025263T043711.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.991,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 60.0,
+     "reason": "cloud/shadow 99% of box > 30%"
+    },
+    {
+     "date": "2025-09-25",
+     "stac_item": "HLS.S30.T45RYJ.2025268T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.456,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 10.0,
+     "reason": "cloud/shadow 46% of box > 30%"
+    },
+    {
+     "date": "2025-09-27",
+     "stac_item": "HLS.L30.T45RYJ.2025270T043026.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 80.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-30",
+     "stac_item": "HLS.S30.T45RYJ.2025273T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.337,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 36.0,
+     "reason": "cloud/shadow 34% of box > 30%"
+    },
+    {
+     "date": "2025-10-02",
+     "stac_item": "HLS.S30.T45RYJ.2025275T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-10-10",
+     "stac_item": "HLS.S30.T45RYJ.2025283T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.438,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 55.0,
+     "reason": "cloud/shadow 44% of box > 30%"
+    },
+    {
+     "date": "2025-10-13",
+     "stac_item": "HLS.L30.T45RYJ.2025286T043028.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.559,
+     "nodata_fraction_box": 0.004,
+     "eo_cloud_cover_tile": 33.0,
+     "reason": "cloud/shadow 56% of box > 30%"
+    },
+    {
+     "date": "2025-10-29",
+     "stac_item": "HLS.L30.T45RYJ.2025302T043029.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    }
+   ]
+  },
+  "gangachara": {
+   "lat": 25.85,
+   "lon": 89.2,
+   "summary": {
+    "2024": {
+     "scenes_found": 32,
+     "usable": 8,
+     "water_fraction_box_mean": 0.0009,
+     "water_fraction_box_max": 0.0074,
+     "water_fraction_buffer300m_mean": 0.0,
+     "water_fraction_buffer300m_max": 0.0
+    },
+    "2025": {
+     "scenes_found": 35,
+     "usable": 4,
+     "water_fraction_box_mean": 0.0,
+     "water_fraction_box_max": 0.0,
+     "water_fraction_buffer300m_mean": 0.0,
+     "water_fraction_buffer300m_max": 0.0
+    }
+   },
+   "scenes": [
+    {
+     "date": "2024-06-02",
+     "stac_item": "HLS.S30.T45RYJ.2024154T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.153,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 54.0,
+     "clear_fraction_buffer300m": 0.451,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2024-08-16",
+     "stac_item": "HLS.S30.T45RYJ.2024229T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.096,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 27.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0074,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0069
+    },
+    {
+     "date": "2024-09-20",
+     "stac_item": "HLS.S30.T45RYJ.2024264T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.087,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 18.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2024-09-30",
+     "stac_item": "HLS.S30.T45RYJ.2024274T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.077,
+     "nodata_fraction_box": 0.007,
+     "eo_cloud_cover_tile": 73.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2024-10-10",
+     "stac_item": "HLS.L30.T45RYJ.2024284T043009.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 84.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0021
+    },
+    {
+     "date": "2024-10-10",
+     "stac_item": "HLS.S30.T45RYJ.2024284T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.254,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 83.0,
+     "clear_fraction_buffer300m": 0.943,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2024-10-20",
+     "stac_item": "HLS.S30.T45RYJ.2024294T043729.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.216,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 19.0,
+     "clear_fraction_buffer300m": 0.559,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2024-10-30",
+     "stac_item": "HLS.S30.T45RYJ.2024304T043829.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.283,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 36.0,
+     "clear_fraction_buffer300m": 0.571,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-06-04",
+     "stac_item": "HLS.S30.T45RYJ.2025155T044241.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.26,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 82.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-15",
+     "stac_item": "HLS.S30.T45RYJ.2025288T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 19.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-20",
+     "stac_item": "HLS.S30.T45RYJ.2025293T043831.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 1.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0
+    },
+    {
+     "date": "2025-10-22",
+     "stac_item": "HLS.S30.T45RYJ.2025295T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 1.0,
+     "clear_fraction_buffer300m": 1.0,
+     "water_fraction_box": 0.0,
+     "water_fraction_buffer300m": 0.0,
+     "fmask_water_fraction_box": 0.0034
+    }
+   ],
+   "skipped": [
+    {
+     "date": "2024-06-04",
+     "stac_item": "HLS.L30.T45RYJ.2024156T042917.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.976,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 95.0,
+     "reason": "cloud/shadow 98% of box > 30%"
+    },
+    {
+     "date": "2024-06-07",
+     "stac_item": "HLS.S30.T45RYJ.2024159T043711.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.967,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 97% of box > 30%"
+    },
+    {
+     "date": "2024-06-12",
+     "stac_item": "HLS.L30.T45RYJ.2024164T042929.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-06-22",
+     "stac_item": "HLS.S30.T45RYJ.2024174T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-07",
+     "stac_item": "HLS.S30.T45RYJ.2024189T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-14",
+     "stac_item": "HLS.L30.T45RYJ.2024196T042938.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 87.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-17",
+     "stac_item": "HLS.S30.T45RYJ.2024199T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 52.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-22",
+     "stac_item": "HLS.S30.T45RYJ.2024204T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 90.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-07-27",
+     "stac_item": "HLS.S30.T45RYJ.2024209T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.413,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 74.0,
+     "reason": "cloud/shadow 41% of box > 30%"
+    },
+    {
+     "date": "2024-07-30",
+     "stac_item": "HLS.L30.T45RYJ.2024212T042940.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 0.756,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 87.0,
+     "reason": "cloud/shadow 76% of box > 30%"
+    },
+    {
+     "date": "2024-08-01",
+     "stac_item": "HLS.S30.T45RYJ.2024214T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.821,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 72.0,
+     "reason": "cloud/shadow 82% of box > 30%"
+    },
+    {
+     "date": "2024-08-06",
+     "stac_item": "HLS.S30.T45RYJ.2024219T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 96.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-15",
+     "stac_item": "HLS.L30.T45RYJ.2024228T042947.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 92.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-21",
+     "stac_item": "HLS.S30.T45RYJ.2024234T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 97.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-26",
+     "stac_item": "HLS.S30.T45RYJ.2024239T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-31",
+     "stac_item": "HLS.S30.T45RYJ.2024244T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-08-31",
+     "stac_item": "HLS.L30.T45RYJ.2024244T042958.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-09-08",
+     "stac_item": "HLS.L30.T45RYJ.2024252T043006.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-09-10",
+     "stac_item": "HLS.S30.T45RYJ.2024254T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.924,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 92% of box > 30%"
+    },
+    {
+     "date": "2024-09-24",
+     "stac_item": "HLS.L30.T45RYJ.2024268T043005.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 92.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-02",
+     "stac_item": "HLS.L30.T45RYJ.2024276T043008.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-05",
+     "stac_item": "HLS.S30.T45RYJ.2024279T043701.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2024-10-15",
+     "stac_item": "HLS.S30.T45RYJ.2024289T043741.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 0.35,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 76.0,
+     "reason": "cloud/shadow 35% of box > 30%"
+    },
+    {
+     "date": "2024-10-18",
+     "stac_item": "HLS.L30.T45RYJ.2024292T043017.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 0.746,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 85.0,
+     "reason": "cloud/shadow 75% of box > 30%"
+    },
+    {
+     "date": "2025-06-07",
+     "stac_item": "HLS.S30.T45RYJ.2025158T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.91,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 48.0,
+     "reason": "cloud/shadow 91% of box > 30%"
+    },
+    {
+     "date": "2025-06-07",
+     "stac_item": "HLS.L30.T45RYJ.2025158T042942.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.836,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 53.0,
+     "reason": "cloud/shadow 84% of box > 30%"
+    },
+    {
+     "date": "2025-06-12",
+     "stac_item": "HLS.S30.T45RYJ.2025163T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 86.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-15",
+     "stac_item": "HLS.L30.T45RYJ.2025166T042946.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 91.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-17",
+     "stac_item": "HLS.S30.T45RYJ.2025168T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 93.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-22",
+     "stac_item": "HLS.S30.T45RYJ.2025173T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-06-27",
+     "stac_item": "HLS.S30.T45RYJ.2025178T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.965,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 59.0,
+     "reason": "cloud/shadow 96% of box > 30%"
+    },
+    {
+     "date": "2025-07-01",
+     "stac_item": "HLS.L30.T45RYJ.2025182T042955.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 91.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-07",
+     "stac_item": "HLS.S30.T45RYJ.2025188T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 75.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-12",
+     "stac_item": "HLS.S30.T45RYJ.2025193T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.745,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 54.0,
+     "reason": "cloud/shadow 74% of box > 30%"
+    },
+    {
+     "date": "2025-07-14",
+     "stac_item": "HLS.S30.T45RYJ.2025195T044241.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-07-17",
+     "stac_item": "HLS.S30.T45RYJ.2025198T043709.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.925,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 95.0,
+     "reason": "cloud/shadow 93% of box > 30%"
+    },
+    {
+     "date": "2025-07-25",
+     "stac_item": "HLS.L30.T45RYJ.2025206T043005.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-16",
+     "stac_item": "HLS.S30.T45RYJ.2025228T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.86,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 41.0,
+     "reason": "cloud/shadow 86% of box > 30%"
+    },
+    {
+     "date": "2025-08-18",
+     "stac_item": "HLS.L30.T45RYJ.2025230T043018.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-08-26",
+     "stac_item": "HLS.S30.T45RYJ.2025238T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.908,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 66.0,
+     "reason": "cloud/shadow 91% of box > 30%"
+    },
+    {
+     "date": "2025-08-26",
+     "stac_item": "HLS.L30.T45RYJ.2025238T043015.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.708,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 74.0,
+     "reason": "cloud/shadow 71% of box > 30%"
+    },
+    {
+     "date": "2025-08-31",
+     "stac_item": "HLS.S30.T45RYJ.2025243T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 67.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-03",
+     "stac_item": "HLS.L30.T45RYJ.2025246T043023.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 0.723,
+     "nodata_fraction_box": 0.005,
+     "eo_cloud_cover_tile": 75.0,
+     "reason": "cloud/shadow 72% of box > 30%"
+    },
+    {
+     "date": "2025-09-05",
+     "stac_item": "HLS.S30.T45RYJ.2025248T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 85.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-12",
+     "stac_item": "HLS.S30.T45RYJ.2025255T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 93.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-15",
+     "stac_item": "HLS.S30.T45RYJ.2025258T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-19",
+     "stac_item": "HLS.L30.T45RYJ.2025262T043025.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-9",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 100.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-09-20",
+     "stac_item": "HLS.S30.T45RYJ.2025263T043711.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.871,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 60.0,
+     "reason": "cloud/shadow 87% of box > 30%"
+    },
+    {
+     "date": "2025-09-25",
+     "stac_item": "HLS.S30.T45RYJ.2025268T043659.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2b",
+     "cloud_fraction_box": 0.683,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 10.0,
+     "reason": "cloud/shadow 68% of box > 30%"
+    },
+    {
+     "date": "2025-09-27",
+     "stac_item": "HLS.L30.T45RYJ.2025270T043026.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.821,
+     "nodata_fraction_box": 0.005,
+     "eo_cloud_cover_tile": 80.0,
+     "reason": "cloud/shadow 82% of box > 30%"
+    },
+    {
+     "date": "2025-09-30",
+     "stac_item": "HLS.S30.T45RYJ.2025273T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.738,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 36.0,
+     "reason": "cloud/shadow 74% of box > 30%"
+    },
+    {
+     "date": "2025-10-02",
+     "stac_item": "HLS.S30.T45RYJ.2025275T044231.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2a",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 98.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    },
+    {
+     "date": "2025-10-10",
+     "stac_item": "HLS.S30.T45RYJ.2025283T043721.v2.0",
+     "collection": "hls2-s30",
+     "sensor": "sentinel-2c",
+     "cloud_fraction_box": 0.718,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 55.0,
+     "reason": "cloud/shadow 72% of box > 30%"
+    },
+    {
+     "date": "2025-10-13",
+     "stac_item": "HLS.L30.T45RYJ.2025286T043028.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 0.976,
+     "nodata_fraction_box": 0.014,
+     "eo_cloud_cover_tile": 33.0,
+     "reason": "cloud/shadow 98% of box > 30%"
+    },
+    {
+     "date": "2025-10-29",
+     "stac_item": "HLS.L30.T45RYJ.2025302T043029.v2.0",
+     "collection": "hls2-l30",
+     "sensor": "landsat-8",
+     "cloud_fraction_box": 1.0,
+     "nodata_fraction_box": 0.0,
+     "eo_cloud_cover_tile": 99.0,
+     "reason": "cloud/shadow 100% of box > 30%"
+    }
+   ]
+  }
+ }
+}
