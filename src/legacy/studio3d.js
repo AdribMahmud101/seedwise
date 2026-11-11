@@ -554,9 +554,10 @@ async function prepareSurface(data, mode, monthIdx) {
   const month = data.months?.[monthIdx] || {};
   const optical = ['ndvi', 'moisture', 'ndmi'].includes(mode);
   const [radarPack, nutrientPack, gridPack, soilPack] = await Promise.all([
-    loadS1WaterData(), loadSoilNutrientsData(), loadWaterTableData(),
+    loadS1WaterData(), loadSoilNutrientsData(),
     optical || mode === 'productivity' ? loadSurfacePack(mode === 'moisture' || mode === 'ndmi' ? 'moisture-grid' : 'ndvi-grid') : null,
     mode === 'fertility' ? loadSurfacePack('soil-profile') : null,
+    loadWaterTableData(), // keep last: the destructure above is positional
   ]);
   const year = Number(month.month?.slice(0, 4)) || 2024;
   const grid = nearestObservation(gridPack?.grids?.filter((g) => g.siteId === data.field.id), monthIdx, year)?.observation;
