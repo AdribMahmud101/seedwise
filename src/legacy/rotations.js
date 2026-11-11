@@ -212,19 +212,12 @@ function compactRotation(r, i, bestScore) {
  */
 // Prominent "choose" action beside the field chips: acts on the rotation currently previewed.
 function chooseTopCTA() {
-  const id = getSelectedRotationId();
-  const r = ranking().find((x) => x.id === id) || ranking()[0];
+  const r = ranking()[0];
   if (!r) return '';
   const name = esc(t(r.label, r.bn || r.label));
   const score = r.score != null ? `<span class="rot-choose-score">${r.score}/100</span>` : '';
-  const plan = getPlan();
-  if (plan) {
-    const ready = plan.steps.field === 'done';
-    return `<button type="button" class="button primary rot-choose-btn${ready ? ' rot-choose-pulse' : ''}" data-journey="rotation" data-value="${esc(r.id)}"${ready ? '' : ` disabled title="${esc(t('Use your field first', 'আগে জমি নিশ্চিত করুন'))}"`}>
-      <span class="rot-choose-main">${t('Choose this rotation →', 'এই ফসলচক্র বেছে নিন →')}</span><span class="rot-choose-sub">${name} ${score}</span></button>`;
-  }
-  return `<button type="button" class="button primary rot-choose-btn" data-action="layout-for" data-value="${esc(r.id)}">
-    <span class="rot-choose-main">${t('Plan planting with this →', 'এটি দিয়ে বপন সাজান →')}</span><span class="rot-choose-sub">${name} ${score}</span></button>`;
+  return `<button type="button" class="button primary rot-choose-btn rot-choose-pulse" data-action="scroll-rotations">
+    <span class="rot-choose-main">${t('Choose your rotation ↓', 'ফসলচক্র বেছে নিন ↓')}</span><span class="rot-choose-sub">${t('Best fit', 'সবচেয়ে উপযুক্ত')}: ${name} ${score}</span></button>`;
 }
 function refreshChooseCTA() {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return; // tests / non-DOM
@@ -827,7 +820,7 @@ function rotations() {
       panelWhereWillWaterCollect() +
       panelWhatIsUnderMyField() +
     `</div>` +
-    `<div class="priority-layout">` +
+    `<div class="priority-layout" id="rotation-compare">` +
       `<section class="panel priority-box">` +
         `<div class="panel-header">` +
           `<h2>${t('My priorities', 'আমার অগ্রাধিকার')}</h2>` +
@@ -1063,6 +1056,14 @@ function method() {
  * Handle rotation actions
  */
 function rotationAction(action, value) {
+  if (action === 'scroll-rotations') {
+    const target = document.querySelector('#rotation-compare') || document.querySelector('#rotation-list');
+    const top = target.getBoundingClientRect().top + window.scrollY - 72; // clear the sticky journey bar
+    window.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const best = document.querySelector('#rotation-list .rotation-card.best') || document.querySelector('#rotation-list .rotation-card');
+    best?.classList.remove('rot-flash'); void best?.offsetWidth; best?.classList.add('rot-flash');
+    return;
+  }
   if (String(action).startsWith('adv-')) return advisorAction(action, value);
   if (action === 'rotation-details') {
     const list = document.querySelector('#rotation-list');
