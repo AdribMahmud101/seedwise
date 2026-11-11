@@ -3778,3 +3778,15 @@ dialog .modal-body {
   [data-page="planner"] .plan-metrics { grid-column: 2; grid-row: 3; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
   [data-page="planner"] .plan-harvest { grid-column: 2; grid-row: 4; border: 1px solid var(--line); border-radius: 14px; }
 }
+
+/* Planty artwork (raster): pose = motion on the whole image. */
+[data-page="planner"] img.planty-mascot { object-fit: contain; transform-origin: 50% 90%; }
+[data-page="planner"] img.planty-idle { animation: planty-bob 3.6s ease-in-out infinite; }
+[data-page="planner"] img.planty-thinking { animation: planty-ponder 1.4s ease-in-out infinite alternate; }
+[data-page="planner"] img.planty-happy { animation: planty-hop .9s cubic-bezier(.3,1.4,.5,1) 2; }
+@keyframes planty-bob { 50% { transform: translateY(-3px) rotate(-2deg); } }
+@keyframes planty-ponder { from { transform: rotate(-6deg); } to { transform: rotate(5deg); } }
+@keyframes planty-hop { 40% { transform: translateY(-8px) scale(1.04); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-page="planner"] img.planty-mascot { animation: none !important; }
+}

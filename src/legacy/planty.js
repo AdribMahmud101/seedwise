@@ -9,7 +9,7 @@ export async function askPlanty({ question, context }) {
 }
 
 export function plantyMascot(pose = 'idle') {
-  return `<svg class="planty-mascot planty-${pose}" viewBox="0 0 64 64" fill="none" aria-hidden="true"><g class="planty-leaves"><path d="M32 32C12 33 9 20 11 10c15-1 25 6 21 22Z" fill="#88b85d"/><path d="M32 32C30 16 43 7 55 10c1 13-8 24-23 22Z" fill="#b8d879"/><path d="M32 42V29m0 2L20 20m12 9 12-10" stroke="#315c3d" stroke-width="2.5" stroke-linecap="round"/></g><path d="M15 38h34l-4 17c-6 6-20 6-26 0Z" fill="#e6b984"/><path d="M13 38h38" stroke="#315c3d" stroke-width="3" stroke-linecap="round"/><g class="planty-face" stroke="#315c3d" stroke-width="2.5" stroke-linecap="round"><path d="M25 46v1m14-1v1"/><path class="planty-smile" d="M29 50q3 3 6 0"/></g></svg>`;
+  return `<img class="planty-mascot planty-${pose}" src="/assets/planty/planty-96.webp" srcset="/assets/planty/planty-96.webp 1x, /assets/planty/planty-192.webp 2x, /assets/planty/planty-512.webp 4x" width="50" height="50" alt="" aria-hidden="true" decoding="async">`;
 }
 
 export function plantySuggestions(planner) {
