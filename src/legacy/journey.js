@@ -61,20 +61,37 @@ function validateField(field) {
 }
 
 function validateRotation(rotation) {
-  requireValid(object(rotation) && STRATEGIES.some(strategy => strategy.id === rotation.id) && text(rotation.name) && object(rotation.priorities) &&
+  const custom = rotation?.id === 'custom';
+  requireValid(object(rotation) && (custom || STRATEGIES.some(strategy => strategy.id === rotation.id)) && text(rotation.name) && object(rotation.priorities) &&
     same(Object.keys(rotation.priorities).sort(), ['cost', 'risk', 'soil', 'water']) &&
     Object.values(rotation.priorities).every(n => Number.isFinite(n) && n >= 0 && n <= 5) &&
     date(rotation.confirmedAt) && Array.isArray(rotation.seasons) && rotation.seasons.length > 0);
+  if (custom) {
+    const value = rotation.customPlan;
+    requireValid(object(value) && text(value.fieldId) && text(value.mode) &&
+      ['recommended', 'possible_with_conditions'].includes(value.verdict) &&
+      Array.isArray(value.planting) && value.planting.length > 0 &&
+      Array.isArray(value.calendar) && value.calendar.length === 12 &&
+      new Set(value.calendar.map(m => m.month)).size === 12 && value.calendar.every(m =>
+        Number.isInteger(m.month) && m.month >= 1 && m.month <= 12 && (m.crop === null || text(m.crop))));
+    requireValid(value.planting.every(item => object(item) && text(item.crop) && text(item.model) &&
+      positive(item.rowSpacingCm) && item.rowSpacingCm <= 1500 && positive(item.withinRowCm) && item.withinRowCm <= 1500 &&
+      Number.isFinite(item.sharePct) && item.sharePct >= 0 && item.sharePct <= 100));
+  }
   const keys = new Set();
   for (const season of rotation.seasons) {
     requireValid(object(season) && text(season.key) && !keys.has(season.key) &&
-      text(season.crop) && (season.crop === 'fallow' || Object.hasOwn(PLANTING, plannerCrop(season.crop))) && text(season.cropBn) &&
+      text(season.crop) && (custom || season.crop === 'fallow' || Object.hasOwn(PLANTING, plannerCrop(season.crop))) && text(season.cropBn) &&
       [season.sowMonth, season.harvestMonth].every(n => Number.isInteger(n) && n >= 1 && n <= 12));
     keys.add(season.key);
   }
 }
 
 function countsFor(field, settings) {
+  if (settings.source === 'ai') return {
+    plants: Math.floor(field.areaHa * 10000 * (settings.usableAreaPct / 100) * (settings.sharePct / 100) /
+      ((settings.rowSpacingCm / 100) * (settings.withinRowCm / 100))), seedKg: null,
+  };
   const broadcast = settings.crop === 'mustard';
   const result = capacity(field.areaHa, settings.usableAreaPct, settings.crop,
     broadcast ? 0 : settings.rowSpacingCm / 100, broadcast ? 0 : settings.withinRowCm / 100);
@@ -92,21 +109,25 @@ function validatePlan(plan) {
   if (plan.rotation !== null) {
     requireValid(plan.field !== null);
     validateRotation(plan.rotation);
+    if (plan.rotation.id === 'custom') requireValid(plan.rotation.customPlan.fieldId === plan.field.id);
   }
   const keys = plan.rotation?.seasons.filter(season => season.crop !== 'fallow').map(season => season.key) ?? [];
   requireValid(same(Object.keys(plan.planting).sort(), [...keys].sort()));
   for (const settings of Object.values(plan.planting)) {
-    requireValid(object(settings) && Object.hasOwn(PLANTING, settings.crop) &&
+    const custom = plan.rotation?.id === 'custom';
+    requireValid(object(settings) && (custom ? text(settings.crop) && settings.source === 'ai' : Object.hasOwn(PLANTING, settings.crop) && settings.source !== 'ai') &&
       positive(settings.rowSpacingCm) && positive(settings.withinRowCm) &&
       positive(settings.usableAreaPct) && settings.usableAreaPct <= 100 &&
       (settings.variety === undefined || text(settings.variety)) &&
       (settings.custom === undefined || typeof settings.custom === 'boolean') && timestamp(settings.confirmedAt) &&
       object(settings.counts));
+    if (custom) requireValid(Number.isFinite(settings.sharePct) && settings.sharePct >= 0 && settings.sharePct <= 100 &&
+      settings.rowSpacingCm <= 1500 && settings.withinRowCm <= 1500);
     requireValid(settings.usableSource === undefined || ['field', 'override'].includes(settings.usableSource));
     const expected = countsFor(plan.field, settings);
     requireValid(settings.counts.plants === expected.plants && settings.counts.seedKg === expected.seedKg);
-    requireValid(clampPlannerValue(settings.crop, 'usable', settings.usableAreaPct) === settings.usableAreaPct);
-    if (settings.crop !== 'mustard') {
+    requireValid(clampPlannerValue(custom ? 'rice' : settings.crop, 'usable', settings.usableAreaPct) === settings.usableAreaPct);
+    if (!custom && settings.crop !== 'mustard') {
       requireValid(clampPlannerValue(settings.crop, 'row', settings.rowSpacingCm) === settings.rowSpacingCm &&
         clampPlannerValue(settings.crop, 'spacing', settings.withinRowCm) === settings.withinRowCm);
     }
@@ -132,6 +153,26 @@ export function fieldSnapshot(field, outline, constraints, netInputs) {
 }
 
 export function rotationSnapshot(id, priorities, agronomy) {
+  if (object(id)) {
+    const customPlan = copy(id);
+    const seasons = customPlan.planting.map((item, index) => {
+      const words = item.crop.toLowerCase().trim().split(/\s+/);
+      const matches = [words.join(' '), words[0], words.at(-1)].map(word =>
+        Array.from({ length: 12 }, (_, i) => customPlan.calendar.some(m => m.month === i + 1 && m.crop?.toLowerCase().includes(word))))
+        .find(months => months.some(Boolean));
+      if (!matches) throw new RangeError('Missing crop calendar');
+      let start = matches.findIndex((on, i) => on && !matches[(i + 11) % 12]);
+      if (start < 0) start = 0;
+      let end = start;
+      while (matches[(end + 1) % 12] && (end + 1) % 12 !== start) end = (end + 1) % 12;
+      return { key: `custom-${index}`, crop: item.crop, cropBn: item.cropBn || item.crop,
+        sowMonth: start + 1, harvestMonth: end + 1 };
+    });
+    const snapshot = { id: 'custom', name: customPlan.title || customPlan.planting.map(item => item.crop).join(' → '),
+      priorities: copy(priorities), seasons, customPlan };
+    validateRotation({ ...snapshot, confirmedAt: new Date().toISOString() });
+    return snapshot;
+  }
   const strategy = STRATEGIES.find(item => item.id === id);
   if (!strategy) throw new RangeError('Unknown rotation');
   const start = strategy.months.indexOf('aman');
@@ -170,7 +211,15 @@ export function fieldUsableDefault(field) {
 }
 
 function plantingDefaults(plan) {
-  return Object.fromEntries(plan.rotation.seasons.filter(season => season.crop !== 'fallow').map(season => {
+  return Object.fromEntries(plan.rotation.seasons.filter(season => season.crop !== 'fallow').map((season, index) => {
+    if (plan.rotation.customPlan) {
+      const item = plan.rotation.customPlan.planting[index];
+      const settings = { ...copy(item), source: 'ai',
+        sharePct: plan.rotation.customPlan.mode === 'rotation' ? 100 : item.sharePct,
+        usableAreaPct: fieldUsableDefault(plan.field) ?? 88, usableSource: 'field', confirmedAt: null };
+      settings.counts = countsFor(plan.field, settings);
+      return [season.key, settings];
+    }
     const defaults = recommendedSettings(plannerCrop(season.crop));
     const settings = { crop: defaults.crop, rowSpacingCm: defaults.row, withinRowCm: defaults.spacing,
       usableAreaPct: fieldUsableDefault(plan.field) ?? defaults.usable, usableSource: 'field', confirmedAt: null };
@@ -239,11 +288,11 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
     requireValid(plan.rotation && Object.hasOwn(plan.planting, action.key));
     const old = plan.planting[action.key];
     const settings = { ...old };
-    for (const key of ['crop', 'rowSpacingCm', 'withinRowCm', 'usableAreaPct', 'usableSource', 'variety', 'custom']) {
+    for (const key of ['crop', 'rowSpacingCm', 'withinRowCm', 'usableAreaPct', 'usableSource', 'variety', 'custom', ...(plan.rotation.customPlan ? ['sharePct'] : [])]) {
       if (Object.hasOwn(action.value, key)) settings[key] = action.value[key];
     }
     if (Object.hasOwn(action.value, 'usableAreaPct') && !Object.hasOwn(action.value, 'usableSource')) settings.usableSource = 'override';
-    requireValid(Object.hasOwn(PLANTING, settings.crop));
+    requireValid(plan.rotation.id === 'custom' ? text(settings.crop) : Object.hasOwn(PLANTING, settings.crop));
     settings.counts = countsFor(plan.field, settings);
     if (!same(old, settings)) {
       settings.confirmedAt = null;

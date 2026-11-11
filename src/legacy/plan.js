@@ -305,7 +305,7 @@ export function fallbackSummary(plan, lang = 'en') {
 
 const EXPORT_CSS = `:root{color-scheme:light}*{box-sizing:border-box}body{font-family:system-ui,'Noto Sans Bengali',sans-serif;margin:0;background:#f2f4ec;color:#233d2b;line-height:1.5}.wrap{max-width:760px;margin:0 auto;padding:16px}header.hero{background:#233d2b;color:#f2f4ec;border-radius:14px;padding:18px;margin-bottom:14px}header.hero h1{margin:0 0 4px;font-size:22px}header.hero p{margin:2px 0;color:#cfd8c6}.card{background:#fff;border:1px solid #d9e0d2;border-radius:14px;padding:14px;margin-bottom:14px}.card h2{margin:0 0 8px;font-size:17px}.scroll{overflow-x:auto;border-radius:8px}svg text{font-family:inherit}.plan-cal-month{font-size:11px;fill:#536456}.plan-cal-crop{font-size:12px;fill:#233d2b}.plan-cal-legend{font-size:12px;fill:#536456}.plan-cal-today{fill:#cfe0ef;opacity:.8}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.tabs button{border:1px solid #9db3a4;background:#eef3e8;color:#233d2b;border-radius:999px;padding:8px 14px;font-size:14px;cursor:pointer}.tabs button[aria-selected="true"]{background:#233d2b;color:#fff}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.tile{background:#f6f8f1;border:1px solid #d9e0d2;border-radius:10px;padding:10px}.tile b{display:block;font-size:18px}.tile span{font-size:12px;color:#536456}label.rec{display:flex;justify-content:space-between;gap:8px;margin:6px 0;font-size:14px}label.rec input{width:90px;padding:6px;border:1px solid #9db3a4;border-radius:8px}ul.check{list-style:none;padding:0;margin:0}ul.check li{padding:7px 2px;border-bottom:1px solid #e3e8da;font-size:14px}ul.check li:last-child{border-bottom:0}.note{font-size:12px;color:#536456}.src{font-size:12px}footer{font-size:12px;color:#536456;margin:16px 0 40px}@media print{body{background:#fff}.card,header.hero{break-inside:avoid;box-shadow:none}header.hero{color:#000;background:#fff;border:1px solid #999}header.hero p{color:#333}.tabs,.no-print{display:none!important}.season-pane{display:block!important}}`;
 
-const EXPORT_JS = `function recalc(areaHa){var panes=document.querySelectorAll('.season-pane');panes.forEach(function(pane){var crop=pane.dataset.crop;var rowEl=pane.querySelector('[data-field="row"]');var withinEl=pane.querySelector('[data-field="within"]');var usableEl=pane.querySelector('[data-field="usable"]');var row=rowEl?parseFloat(rowEl.value):20;var within=withinEl?parseFloat(withinEl.value):20;var usable=usableEl?parseFloat(usableEl.value):88;if(!(row>0))row=20;if(!(within>0))within=20;if(!(usable>0))usable=88;if(usable>100)usable=100;var net=Math.max(0,areaHa)*Math.min(100,Math.max(0,usable))/100;var out=pane.querySelector('[data-result]');if(crop==='mustard'){out.textContent=(net*7).toFixed(1)+' kg seed · '+net.toFixed(2)+' ha usable';}else{var positions=Math.floor((net*1e4)/((row/100)*(within/100))+1e-8);out.textContent=positions.toLocaleString()+' positions · '+net.toFixed(2)+' ha usable';}});}
+const EXPORT_JS = `function recalc(areaHa){var panes=document.querySelectorAll('.season-pane');panes.forEach(function(pane){var crop=pane.dataset.crop;var rowEl=pane.querySelector('[data-field="row"]');var withinEl=pane.querySelector('[data-field="within"]');var usableEl=pane.querySelector('[data-field="usable"]');var row=rowEl?parseFloat(rowEl.value):20;var within=withinEl?parseFloat(withinEl.value):20;var usable=usableEl?parseFloat(usableEl.value):88;if(!(row>0))row=20;if(!(within>0))within=20;if(!(usable>0))usable=88;if(usable>100)usable=100;var net=Math.max(0,areaHa)*Math.min(100,Math.max(0,usable))/100;net*=pane.dataset.share===undefined?1:Number(pane.dataset.share)/100;var out=pane.querySelector('[data-result]');if(crop==='mustard'&&pane.dataset.source!=='ai'){out.textContent=(net*7).toFixed(1)+' kg seed · '+net.toFixed(2)+' ha usable';}else{var positions=Math.floor((net*1e4)/((row/100)*(within/100))+1e-8);out.textContent=positions.toLocaleString()+' positions · '+net.toFixed(2)+' ha usable';}});}
 document.querySelectorAll('.tabs button').forEach(function(btn){btn.addEventListener('click',function(){document.querySelectorAll('.tabs button').forEach(function(b){b.setAttribute('aria-selected','false');});btn.setAttribute('aria-selected','true');document.querySelectorAll('.season-pane').forEach(function(pane){pane.hidden=pane.dataset.season!==btn.dataset.season;});});});
 document.querySelectorAll('.season-pane input').forEach(function(input){input.addEventListener('input',function(){recalc(parseFloat(document.body.dataset.areaHa));});});`;
 
@@ -315,23 +315,24 @@ export function buildExportHTML(plan, { monthly = null, lang = 'en', nowMonth = 
   const planted = seasons.filter(season => season.crop !== 'fallow');
   const generated = (plan.plan?.generatedAt ?? plan.updatedAt ?? '').slice(0, 10);
   const title = bn ? 'আপনার পরিকল্পনা' : 'Your plan';
-  const waterRows = monthly ? planted.map(season => {
+  const waterRows = monthly && !plan.rotation.customPlan ? planted.map(season => {
     const { needMm, rainMm } = seasonWater(monthly, season);
     return { label: cropLabel(season.crop, lang), needMm: needMm ?? 0, rainMm: rainMm ?? 0 };
   }) : [];
-  const saving = monthly ? rotationSavingMm(monthly, plan.rotation.id) : null;
+  const saving = waterRows.length ? rotationSavingMm(monthly, plan.rotation.id) : null;
   const panes = planted.map((season, i) => {
     const settings = plan.planting[season.key];
     const names = MONTH_EN;
+    const seed = settings.source !== 'ai' && settings.crop === 'mustard';
     const span = `${names[season.sowMonth - 1]}–${names[season.harvestMonth - 1]}`;
-    const total = settings.crop === 'mustard'
+    const total = seed
       ? `${(settings.counts.seedKg ?? 0).toFixed(1)} kg seed`
       : `${(settings.counts.plants ?? 0).toLocaleString('en-GB')} ${settings.crop === 'rice' ? 'hills' : 'positions'}`;
-    return `<section class="season-pane" data-season="${esc(season.key)}" data-crop="${esc(settings.crop)}"${i > 0 ? ' hidden' : ''}>
+    return `<section class="season-pane" data-season="${esc(season.key)}" data-crop="${esc(settings.crop)}" data-source="${esc(settings.source ?? '')}" data-share="${settings.source === 'ai' ? settings.sharePct : 100}"${i > 0 ? ' hidden' : ''}>
       <h3>${esc(cropLabel(season.crop, lang))} · ${esc(span)}</h3>
       ${planTopViewSVG(plan, season.key, { lang, uid: `x${i}` })}
-      <p><b data-result>${esc(total)} · ${(plan.field.areaHa * settings.usableAreaPct / 100).toFixed(2)} ha usable</b></p>
-      ${settings.crop === 'mustard' ? '' : `<label class="rec">Row cm <input type="number" data-field="row" value="${settings.rowSpacingCm}" min="2"></label>
+      <p><b data-result>${esc(total)} · ${(plan.field.areaHa * settings.usableAreaPct / 100 * (settings.source === 'ai' ? settings.sharePct / 100 : 1)).toFixed(2)} ha usable</b></p>
+      ${seed ? '' : `<label class="rec">Row cm <input type="number" data-field="row" value="${settings.rowSpacingCm}" min="2"></label>
       <label class="rec">Within-row cm <input type="number" data-field="within" value="${settings.withinRowCm}" min="2"></label>`}
       <label class="rec">Usable % <input type="number" data-field="usable" value="${settings.usableAreaPct}" min="1" max="100"></label>
     </section>`;
@@ -415,6 +416,7 @@ function field3dCard(plan, activeKey) {
 
 export function spacingTruth(settings) {
   if (!settings) return truth('RECOMMENDED');
+  if (settings.source === 'ai') return truth('SCENARIO', { source: 'AI' });
   const defaults = recommendedSettings(settings.crop);
   const isChanged = settings.custom ||
     settings.rowSpacingCm !== defaults.row ||
@@ -426,10 +428,10 @@ function numbersCard(plan) {
   const planted = (plan.rotation?.seasons ?? []).filter(season => season.crop !== 'fallow');
   const tiles = planted.map(season => {
     const settings = plan.planting[season.key];
-    const seed = settings.crop === 'mustard';
+    const seed = settings.source !== 'ai' && settings.crop === 'mustard';
     const total = seed ? settings.counts.seedKg : settings.counts.plants;
     const unit = seed ? t('kg seed', 'কেজি বীজ') : settings.crop === 'rice' ? t('hills', 'গোছা') : t('plants', 'গাছ');
-    const usableHa = plan.field.areaHa * settings.usableAreaPct / 100;
+    const usableHa = plan.field.areaHa * settings.usableAreaPct / 100 * (settings.source === 'ai' ? settings.sharePct / 100 : 1);
     return `<div class="plan-tile"><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b>
       <strong><span data-plan-count="${total ?? 0}" data-places="${seed ? 1 : 0}">${num(total ?? 0, seed ? 1 : 0)}</span> <small>${unit}</small></strong> ${truth('SCENARIO')}
       <span>${seed ? t('Broadcast · no rows', 'ছিটিয়ে বপন · সারি নেই') : `${num(settings.rowSpacingCm)}×${num(settings.withinRowCm)} cm`} ${spacingTruth(settings)}</span>
@@ -437,7 +439,7 @@ function numbersCard(plan) {
   }).join('');
   const monthly = planMonthly(plan);
   let water = '';
-  if (monthly) {
+  if (monthly && !plan.rotation.customPlan) {
     const rows = planted.map(season => {
       const { needMm, rainMm } = seasonWater(monthly, season);
       return { label: state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang), needMm: needMm ?? 0, rainMm: rainMm ?? 0 };
@@ -606,6 +608,7 @@ function schedulePlan3d() {
       const { field: planField, polygon: outline } = planFieldInput(fresh);
       await mod.mountPlanner3d(host, {
         field: planField, polygon: outline, rotationId: fresh.rotation.id, agronomy, soilProfile,
+        ...(fresh.rotation.customPlan ? { custom: { ...fresh.rotation.customPlan, planting: [{ ...settings, sharePct: 100 }] } } : {}),
         planner: { crop: settings.crop, row: settings.rowSpacingCm, spacing: settings.withinRowCm, usable: settings.usableAreaPct },
         net: { inputs: fresh.field.netInputs ?? netInputsFor(fresh.field.id),
           edited: fresh.field.netEdited ?? isNetEdited(fresh.field.id) },

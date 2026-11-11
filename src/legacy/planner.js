@@ -1,4 +1,4 @@
-import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput, customSeasonToggle } from './advisor.js';
+import { customPlanFor3d, customCount, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput, customSeasonToggle } from './advisor.js';
 import { recommendedSetupChanges } from './recommended-setup.js';
 import {
   state,
@@ -12,6 +12,7 @@ import {
   field,
   fieldName,
   polygon,
+  profile,
   area,
   button,
   header,
@@ -31,8 +32,59 @@ import { cultivableUsablePct } from './netarea.js';
 import { netAreaFor, netInputsFor, isNetEdited } from './fields.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
-import { getPlan, getReadyPlan, setPlanting } from './journey.js';
+import { getPlan, getReadyPlan, setPlanting, startPlan, fieldSnapshot, rotationSnapshot, transitionPlan, savePlan, defaultPlanName, resetPlan } from './journey.js';
 import { journeyFinishCTA } from './journey-bar.js';
+
+function plannerSaveSource() {
+  if (!field() || field().id !== state.fieldId) return { route: 'field', message: t('Choose your field →', 'আপনার জমি বাছুন →') };
+  const custom = getCustomPlan();
+  const selected = state.planner.rotation;
+  const saved = (Array.isArray(state.plans) ? [...state.plans] : []).reverse().find(item => item?.fieldId === state.fieldId);
+  const rotationId = selected?.fieldId === state.fieldId ? selected.id : saved?.rotation;
+  if (!custom && !rotationId) return { route: 'rotations', message: t('Choose crops in Rotation studio →', 'ফসলচক্রে ফসল বাছুন →') };
+  try {
+    return { field: fieldSnapshot(field(), polygon(), profile(), state.netInputs[state.fieldId]),
+      rotation: rotationSnapshot(custom || rotationId, state.weights, agronomy) };
+  } catch {
+    return { route: 'rotations', message: t('Choose crops and a calendar in Rotation studio →', 'ফসলচক্রে ফসল ও ক্যালেন্ডার বাছুন →') };
+  }
+}
+
+function plannerSaveCTA() {
+  if (getPlan()) return '';
+  const source = plannerSaveSource();
+  return `<div class="plan-save">${button(t('Save as my plan', 'আমার পরিকল্পনা হিসেবে সংরক্ষণ'), 'plan-save', 'primary')}${source.message ? `<p class="note" role="status"><a href="#${source.route}">${source.message}</a></p>` : ''}</div>`;
+}
+
+function savePlannerPlan() {
+  if (getPlan()) return;
+  const source = plannerSaveSource();
+  if (source.message) { toast(source.message); return; }
+  try {
+    let plan = startPlan();
+    plan = transitionPlan(plan, { type: 'field', value: source.field });
+    plan = transitionPlan(plan, { type: 'rotation', value: source.rotation });
+    const custom = !!source.rotation.customPlan;
+    const currentSeason = source.rotation.seasons.find(season => seasonCrop(season) === state.planner.crop) ??
+      source.rotation.seasons.find(season => season.crop !== 'fallow');
+    for (const season of source.rotation.seasons.filter(season => season.crop !== 'fallow')) {
+      const value = { usableAreaPct: state.planner.usable, usableSource: state.planner.usableSource ?? 'field' };
+      if (!custom && season === currentSeason) Object.assign(value, {
+        crop: state.planner.crop, rowSpacingCm: state.planner.row, withinRowCm: state.planner.spacing, custom: true,
+      });
+      plan = transitionPlan(plan, { type: 'planting', key: season.key, value });
+    }
+    plan = transitionPlan(plan, { type: 'confirmPlanting' });
+    plan = transitionPlan(plan, { type: 'generated', value: {} });
+    savePlan(plan, { status: 'ready', name: defaultPlanName(plan) });
+    sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
+    location.hash = '#plans';
+  } catch (error) {
+    resetPlan();
+    console.warn('Planner plan could not be saved', error);
+    toast(t('Plan could not be saved. Please try again.', 'পরিকল্পনা সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'));
+  }
+}
 
 // One usable-area truth: the slider defaults to the field's cultivable share
 // from its bund/drain/path widths (netarea.js). Pure w.r.t. state except reads.
@@ -59,7 +111,7 @@ let plannerSeasonKey = null;
 let plannerPlanId = null;
 function seasonPlan() {
   const plan = getPlan();
-  return plan?.rotation?.confirmedAt && plan.field.id === field()?.id ? plan : null;
+  return plan?.rotation?.confirmedAt && !plan.rotation.customPlan && plan.field.id === field()?.id ? plan : null;
 }
 function activeSeason(plan = seasonPlan()) {
   if (!plan) return null;
@@ -95,6 +147,7 @@ function seasonLabel(season) {
   return esc(t(season.crop === 'fallow' ? 'Fallow' : cropName(season.crop), season.cropBn));
 }
 function seasonTabs(plan = seasonPlan()) {
+  if (getCustomPlan()) return '';
   if (!plan && getReadyPlan()) return '';
   if (!plan) return `<p class="note plan-rotation-note"><a href="#rotations">${t('Choose a rotation first to plan every season', 'প্রতি মৌসুমের পরিকল্পনা করতে আগে ফসলচক্র বাছুন')}</a></p>`;
   const selected = activeSeason(plan);
@@ -197,6 +250,18 @@ function estimate() {
   );
 }
 function plannerResult() {
+  const custom = getCustomPlan();
+  if (custom) {
+    const usableHa = area() * state.planner.usable / 100;
+    const counts = custom.planting.map(item => customCount(area(), state.planner.usable,
+      custom.mode === 'rotation' ? { ...item, sharePct: 100 } : item));
+    return `<div class="plan-result"><div class="eyebrow">${t('Plants to sow', 'কতগুলো গাছ লাগাবেন')}</div><div class="plan-result-total"><strong>${num(counts.reduce((a, b) => a + b, 0))}</strong><span>${t('plants', 'চারা')}</span></div>${truth('SCENARIO', { source: 'AI' })}</div>
+      <dl class="field-meta plan-metrics"><div><dt>${t('Usable area', 'চাষযোগ্য জমি')}</dt><dd>${num(usableHa, 2)} ha ${truth('SCENARIO')}</dd></div>${custom.planting.map((item, i) => {
+        const share = custom.mode === 'rotation' ? 1 : item.sharePct / 100;
+        const rows = Math.max(1, Math.floor(Math.sqrt(usableHa * 10000 * share) / (item.rowSpacingCm / 100)));
+        return `<div><dt>${esc(item.crop)} · ${t('Spacing', 'দূরত্ব')}</dt><dd>${num(item.rowSpacingCm)} × ${num(item.withinRowCm)} cm ${truth('SCENARIO', { source: 'AI' })} · AI</dd></div><div class="plan-rows"><dt>${t('Rows × plants per row', 'সারি × প্রতি সারিতে গাছ')}</dt><dd>${num(rows)} × ~${num(counts[i] / rows)} ${truth('SCENARIO')}</dd><small>${t('Equivalent square layout · estimated, not surveyed rows', 'সমান আয়তনের বর্গাকার জমি ধরে অনুমান · জরিপ করা সারি নয়')}</small></div>`;
+      }).join('')}</dl>`;
+  }
   const p = state.planner,
     c = PLANTING[p.crop],
     q = estimate(),
@@ -209,6 +274,14 @@ function plannerResult() {
 }
 function planner() {
   const p = state.planner;
+  const active = getPlan();
+  if (active?.rotation?.customPlan) {
+    const custom = { ...active.rotation.customPlan, planting: active.rotation.seasons.map(season => active.planting[season.key]) };
+    const settings = custom.planting[0];
+    Object.assign(p, { usable: settings.usableAreaPct, usableSource: settings.usableSource });
+    try { localStorage.setItem('ropon_custom_plan_v1', JSON.stringify(custom)); }
+    catch (error) { console.warn('Custom planner settings could not be restored', error); }
+  }
   const plan = seasonPlan();
   const season = activeSeason(plan);
   if (season) loadSeason(season, plan);
@@ -230,6 +303,7 @@ function planner() {
       button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
     ) +
     chips() +
+    plannerSaveCTA() +
     customPlanBanner() +
     `<div id="journey-finish-slot">${journeyFinishCTA()}</div><section id="plan-seasons">${seasonTabs(plan)}</section>
     <div id="plan-season-panel" ${season ? `role="tabpanel" aria-labelledby="plan-season-tab-${plan.rotation.seasons.indexOf(season)}"` : ''} class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
@@ -609,6 +683,7 @@ function plannerAction(action, value) {
     applyRecommendedSetup();
     return;
   }
+  if (action === 'plan-save') { savePlannerPlan(); return; }
   if (action === 'plan-season') {
     const plan = seasonPlan();
     activeSeason(plan);
@@ -630,6 +705,7 @@ function plannerAction(action, value) {
     setCustomSeason(value);
     const tg = document.querySelector('.cs-season-toggle'); if (tg) tg.outerHTML = customSeasonToggle();
     const bn = document.querySelector('.adv-plan-banner'); if (bn) bn.outerHTML = customPlanBanner();
+    updatePlannerResults();
     schedulePlanner3d();
     return;
   }
@@ -710,7 +786,22 @@ function updatePlannerResults() {
   schedulePlanner3d();
 }
 function plannerInput(el) {
-  if (customInput(el)) { const host = document.querySelector('.plan-settings'); if (host) host.outerHTML = plannerSettings(); const b = document.querySelector('.adv-plan-banner'); if (b) b.outerHTML = customPlanBanner(); schedulePlanner3d(); return; }
+  if (customInput(el)) {
+    const plan = getPlan();
+    if (plan?.rotation?.customPlan) {
+      try {
+        getCustomPlan().planting.forEach((item, i) => setPlanting(plan.rotation.seasons[i].key, {
+          rowSpacingCm: item.rowSpacingCm, withinRowCm: item.withinRowCm, sharePct: item.sharePct,
+        }));
+      } catch (error) {
+        console.warn('Custom season settings could not be saved', error);
+        toast(t('Season settings could not be saved. Please try again.', 'মৌসুমের মাপ সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'));
+      }
+    }
+    const host = document.querySelector('.plan-settings'); if (host) host.outerHTML = plannerSettings();
+    const b = document.querySelector('.adv-plan-banner'); if (b) b.outerHTML = customPlanBanner();
+    updatePlannerResults(); schedulePlanner3d(); return;
+  }
   if (!el.closest('#plant-controls') || el.name === 'plantCrop') return;
   const { min, max } = controlLimits(state.planner.crop, el.name);
   // Keep partial number drafts editable; commit and clamp on change.
