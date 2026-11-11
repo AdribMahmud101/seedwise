@@ -77,7 +77,7 @@ test('sanitizes context and sends the bounded Muse request with credentials from
     assert.ok(options.signal instanceof AbortSignal);
     const payload = JSON.parse(options.body);
     assert.equal(payload.model, 'muse-ember-1.0');
-    assert.equal(payload.max_tokens, 350);
+    assert.equal(payload.max_tokens, 1500);
     assert.equal(payload.temperature, 0.3);
     assert.equal(payload.messages[0].role, 'system');
     assert.match(payload.messages[0].content, /Bengali/);
