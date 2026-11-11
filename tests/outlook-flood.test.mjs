@@ -5,6 +5,8 @@ import { state, loadData, nasaBadge, nasaSources } from '../src/legacy/ui.js';
 import { STRATEGIES } from '../src/legacy/engine.js';
 import { seasonView } from '../src/legacy/fields.js';
 import { rotations } from '../src/legacy/rotations.js';
+import { setScoresRevealed } from '../src/legacy/advisor.js';
+setScoresRevealed(true); // scored list is shown after the farmer decides; these tests check the scored view
 import { recovery } from '../src/legacy/recovery.js';
 import { water } from '../src/legacy/water.js';
 import { deriveChecklist, summaryPayload } from '../src/legacy/plan.js';

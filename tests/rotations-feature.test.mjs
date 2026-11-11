@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { loadData, state } from '../src/legacy/ui.js';
 import { STRATEGIES } from '../src/legacy/engine.js';
 import { rotationAction, rotationInput, rotations } from '../src/legacy/rotations.js';
+import { setScoresRevealed } from '../src/legacy/advisor.js';
+setScoresRevealed(true); // scored list is shown after the farmer decides; these tests check the scored view
 
 test('rotation candidates collapse, expand accessibly, tie, and rerank', async () => {
   globalThis.document = { baseURI: new URL('../public/', import.meta.url).href };

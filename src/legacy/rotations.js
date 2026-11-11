@@ -34,7 +34,7 @@ import * as rotationTool from './rotation-tool.js';
 import { outlookSeasonLine } from './outlook-flood.js';
 import { confirmRotation, getPlan, rotationSnapshot, subscribe } from './journey.js';
 import { journeyRotationCTA } from './journey-bar.js';
-import { advisorCard, advisorAction } from './advisor.js';
+import { advisorCard, advisorAction, scoresRevealed } from './advisor.js';
 
 function syncSeasonRotation(id = getSelectedRotationId()) {
   if (!agronomy || !field() || !getPlan()?.field) return;
@@ -217,7 +217,13 @@ function chooseTopCTA() {
   const name = esc(t(r.label, r.bn || r.label));
   const score = r.score != null ? `<span class="rot-choose-score">${r.score}/100</span>` : '';
   return `<button type="button" class="button primary rot-choose-btn rot-choose-pulse" data-action="scroll-rotations">
-    <span class="rot-choose-main">${t('Choose your rotation ↓', 'ফসলচক্র বেছে নিন ↓')}</span><span class="rot-choose-sub">${t('Best fit', 'সবচেয়ে উপযুক্ত')}: ${name} ${score}</span></button>`;
+    <span class="rot-choose-main">${t('Choose your crops ↓', 'ফসল বেছে নিন ↓')}</span><span class="rot-choose-sub">${scoresRevealed() ? `${t('Best fit', 'সবচেয়ে উপযুক্ত')}: ${name} ${score}` : t('Planty helps you decide', 'Planty সিদ্ধান্তে সাহায্য করে')}</span></button>`;
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('ropon:rotations-reveal', () => {
+    const list = document.querySelector('#rotation-list');
+    if (list) list.innerHTML = rankedCards();
+  });
 }
 function refreshChooseCTA() {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return; // tests / non-DOM
@@ -240,14 +246,15 @@ function rankedCards() {
   const topCount = bestScore == null ? 1 : items.filter((r) => r.score === bestScore).length;
   const top = items.slice(0, topCount).map((r, i) => rotationCard(r, i, Boolean(sum && r.score != null), sum, fieldAreaHa, selectedTariff)).join('');
   const others = items.slice(topCount);
-  if (!others.length) return top + advisorCard();
+  if (!scoresRevealed()) return advisorCard();
+  if (!others.length) return advisorCard() + `<div id="rotation-scored" class="rot-reveal">${top}</div>`;
   const allExpanded = others.every((r) => expandedRotations.has(r.id));
-  return `${top}${advisorCard()}<section class="rotation-candidates" aria-label="${t('Compare other rotations', 'অন্য ফসলচক্র তুলনা করুন')}">
+  return `${advisorCard()}<div id="rotation-scored" class="rot-reveal"><h2 class="rot-scored-title">${t('Standard rotations, scored for your priorities', 'আপনার অগ্রাধিকারে সাধারণ ফসলচক্রের স্কোর')}</h2>${top}<section class="rotation-candidates" aria-label="${t('Compare other rotations', 'অন্য ফসলচক্র তুলনা করুন')}">
     <div class="rotation-candidates-heading"><h2>${t(`Compare other rotations (${others.length})`, `অন্য ফসলচক্র তুলনা করুন (${others.length})`)}</h2>
       <button type="button" class="rotation-show-all" data-action="rotation-details" data-value="all" aria-expanded="${allExpanded}">${allExpanded ? t('Hide all', 'সব বন্ধ') : t('Show all', 'সব দেখুন')}</button>
     </div>
     ${others.map((r, i) => compactRotation(r, i + topCount, bestScore)).join('')}
-  </section>`;
+  </section></div>`;
 }
 
 /**

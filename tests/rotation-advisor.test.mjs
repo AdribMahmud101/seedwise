@@ -30,3 +30,17 @@ test('custom planting spec: shares normalised, colours/models validated', async 
   assert.equal(out[1].color, '#5f9e4a');
   assert.equal(Math.round(out[0].sharePct + out[1].sharePct), 100);
 });
+
+test('decide-first: categories from up to 2 crops; scored list hidden until revealed; suggestions capped', async () => {
+  globalThis.document ??= { addEventListener() {}, dispatchEvent() {} };
+  const { cropCategory } = await import('../src/legacy/advisor.js');
+  assert.equal(cropCategory(['Potato', 'Strawberry']), 'crop_fruit');
+  assert.equal(cropCategory(['Hybrid Aman rice', 'Mustard']), 'crop_crop');
+  assert.equal(cropCategory(['Mango']), 'fruit_only');
+  assert.equal(cropCategory(['Dragon fruit', 'Banana']), 'fruit_fruit');
+  assert.equal(cropCategory(['Potato']), 'single_crop');
+  const { normaliseSuggestions } = await import('../worker/index.js');
+  const s = normaliseSuggestions([{ crops: ['Potato', 'Strawberry', 'Mango'], line: 'x' }, { crops: [] }, { crops: ['Mustard'] }, { crops: ['A'] }, { crops: ['B'] }]);
+  assert.equal(s.length, 2);
+  assert.deepEqual(s[0].crops, ['Potato', 'Strawberry']);
+});

@@ -9,6 +9,31 @@ export const ADVISOR_CROPS = [
   ['Mungbean', 'মুগ ডাল'], ['Lentil', 'মসুর'], ['Maize', 'ভুট্টা'], ['Wheat', 'গম'], ['Jute', 'পাট'],
   ['Strawberry', 'স্ট্রবেরি'], ['Mango', 'আম'], ['Banana', 'কলা'], ['Chilli', 'মরিচ'], ['Tomato', 'টমেটো'],
 ];
+const FRUITS = new Set(['strawberry', 'mango', 'banana', 'papaya', 'guava', 'jackfruit', 'lemon', 'lime', 'litchi', 'lychee', 'dragon fruit', 'watermelon', 'melon', 'pineapple', 'orange', 'malta', 'coconut', 'jujube', 'kul', 'pomegranate', 'grape', 'sapota', 'amla', 'blackberry', 'jamun']);
+export const isFruit = (name) => FRUITS.has(String(name).toLowerCase().trim()) || /fruit|berry|melon/i.test(String(name));
+// Pure: category from up to 2 chosen crops (crop + secondary fruit, crop + crop, fruit only, single crop).
+export function cropCategory(crops) {
+  const f = crops.filter(isFruit).length, c = crops.length - f;
+  if (!crops.length) return null;
+  if (crops.length === 1) return f ? 'fruit_only' : 'single_crop';
+  if (c && f) return 'crop_fruit';
+  return f ? 'fruit_fruit' : 'crop_crop';
+}
+const CATEGORY_LABEL = {
+  single_crop: ['One field crop', 'একটি মাঠ ফসল'],
+  crop_crop: ['Hybrid: crop + crop', 'মিশ্র: ফসল + ফসল'],
+  crop_fruit: ['Hybrid: crop + secondary fruit', 'মিশ্র: ফসল + সহায়ক ফল'],
+  fruit_only: ['Fruit only', 'শুধু ফল'],
+  fruit_fruit: ['Fruit only (two fruits)', 'শুধু ফল (দুটি)'],
+};
+let revealed = false;
+export const scoresRevealed = () => revealed;
+export function setScoresRevealed(v) { revealed = Boolean(v); } // tests / programmatic reveal
+function reveal() {
+  if (revealed) return;
+  revealed = true;
+  document.dispatchEvent(new CustomEvent('ropon:rotations-reveal'));
+}
 const MODES = [
   ['rotation', 'Season rotation', 'মৌসুমি চক্র'], ['single', 'Single crop', 'একটি ফসল'],
   ['mixed', 'Mixed / hybrid', 'মিশ্র / একসাথে'], ['orchard', 'Orchard / fruit trees', 'ফলের বাগান'],
@@ -22,7 +47,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const ui = { mode: 'rotation', crops: [], notes: '', status: 'idle', result: null, error: '' };
 
 export function advisorRequest(context) {
-  return { lang: state.lang === 'bn' ? 'bn' : 'en', mode: ui.mode, crops: ui.crops.slice(0, 5), notes: ui.notes.slice(0, 300), context };
+  const category = cropCategory(ui.crops);
+  const mode = category === 'single_crop' ? 'single' : category === 'fruit_only' || category === 'fruit_fruit' ? 'orchard' : 'mixed';
+  return { lang: state.lang === 'bn' ? 'bn' : 'en', mode, category, crops: ui.crops.slice(0, 2), notes: ui.notes.slice(0, 300), context };
 }
 
 function fieldContext() {
@@ -67,7 +94,11 @@ function resultHtml(r) {
     ${calendarStrip(r.calendar || [])}
     <div class="adv-grid">${list(t('Why', 'কেন'), r.reasons)}${list(t('Risks', 'ঝুঁকি'), r.risks)}${list(t("What you'd need", 'যা লাগবে'), r.requirements)}${list(t('Better options for this field', 'এই জমির জন্য ভালো বিকল্প'), r.alternatives)}</div>
     ${r.evidence?.length ? `<p class="adv-evidence">${t('Evidence', 'প্রমাণ')}: ${r.evidence.map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>`).join(' · ')}</p>` : ''}
+    ${r.verdict !== 'recommended' && (r.dropLine || r.suggestions?.length) ? `<div class="adv-drop"><p><strong>${t('Planty suggests dropping this idea.', 'Planty এই পরিকল্পনা বাদ দিতে বলছে।')}</strong> ${esc(r.dropLine || '')}</p>
+      ${r.suggestions?.length ? `<p class="adv-drop-label">${t('Crops that suit this field better — tap one to check it:', 'এই জমিতে বেশি মানানসই — যাচাই করতে একটিতে চাপুন:')}</p><div class="adv-suggest">${r.suggestions.map((g, i) => `<button type="button" class="adv-suggest-btn" data-action="adv-try" data-value="${i}"><strong>${esc(g.crops.join(' + '))}</strong><small>${esc(g.line)}</small></button>`).join('')}</div>` : ''}
+      <div class="adv-drop-actions">${r.verdict === 'possible_with_conditions' ? `<span class="note">${t('Or keep your idea with the conditions above.', 'অথবা ওপরের শর্ত মেনে নিজের পরিকল্পনা রাখুন।')}</span>` : ''}<button type="button" class="button small" data-action="adv-exit">${t('Exit', 'বন্ধ করুন')}</button></div></div>` : ''}
     ${r.verdict !== 'not_suitable' && r.planting?.length ? `<div class="adv-use"><button type="button" class="button primary" data-action="adv-use">${t('Use this plan in the planner →', 'এই পরিকল্পনা বপনে ব্যবহার করুন →')}</button><span class="note">${r.planting.map((p) => `${esc(p.crop)} ${p.sharePct}%`).join(' · ')}</span></div>` : ''}
+    <div class="adv-compare"><button type="button" class="button small" data-action="show-rotations">${t('Compare with standard rotations (scores) ↓', 'সাধারণ ফসলচক্রের সঙ্গে তুলনা (স্কোর) ↓')}</button></div>
     <p class="note adv-note">${t('AI decision helper · experimental · check with your extension officer.', 'এআই সিদ্ধান্ত সহায়ক · পরীক্ষামূলক · কৃষি কর্মকর্তার সঙ্গে মিলিয়ে নিন।')}</p>
   </div>`;
 }
@@ -77,14 +108,15 @@ export function advisorCard() {
   return `<section class="panel adv-card" id="advisor-card" aria-labelledby="adv-title">
     <div class="adv-head"><span class="adv-planty">${plantyMascot(busy ? 'thinking' : ui.result ? 'happy' : 'idle')}</span>
       <div><span class="eyebrow">${t('AI decision helper', 'এআই সিদ্ধান্ত সহায়ক')}</span><h2 id="adv-title">${t('Plan your own crops', 'নিজের ফসল বেছে পরিকল্পনা')}</h2>
-      <p class="note">${t('Want hybrid Aman + strawberry, or only mango? Planty checks it against this field and the research — and says no if it will not work.', 'হাইব্রিড আমন + স্ট্রবেরি, বা শুধু আম? Planty এই জমি ও গবেষণার সঙ্গে মিলিয়ে দেখে — না হলে সরাসরি না বলে।')}</p></div></div>
-    <div class="adv-modes" role="radiogroup" aria-label="${t('Plan type', 'পরিকল্পনার ধরন')}">${MODES.map(([id, en, bn]) => `<button type="button" role="radio" aria-checked="${ui.mode === id}" class="adv-mode${ui.mode === id ? ' on' : ''}" data-action="adv-mode" data-value="${id}">${t(en, bn)}</button>`).join('')}</div>
-    <div class="adv-chips">${ADVISOR_CROPS.map(([en, bn]) => { const on = ui.crops.includes(en); return `<button type="button" class="adv-chip${on ? ' on' : ''}" aria-pressed="${on}" data-action="adv-crop" data-value="${esc(en)}">${t(en, bn)}</button>`; }).join('')}
+      <p class="note">${t('Tell Planty what you want to grow — up to 2 crops. It checks them against this field and the research, and says no (with better options) if they will not work.', 'হাইব্রিড আমন + স্ট্রবেরি, বা শুধু আম? Planty এই জমি ও গবেষণার সঙ্গে মিলিয়ে দেখে — না হলে সরাসরি না বলে।')}</p></div></div>
+    <p class="adv-category">${ui.crops.length ? `${t('Plan type', 'ধরন')}: <strong>${t(...CATEGORY_LABEL[cropCategory(ui.crops)])}</strong>` : t('Type or tap up to 2 crops — e.g. Potato + Strawberry, Aman + Mustard, or only Mango.', 'সর্বোচ্চ ২টি ফসল লিখুন বা বাছুন — যেমন আলু + স্ট্রবেরি, আমন + সরিষা, বা শুধু আম।')}</p>
+    <div class="adv-chips">${ADVISOR_CROPS.map(([en, bn]) => { const on = ui.crops.includes(en); return `<button type="button" class="adv-chip${on ? ' on' : ''}" aria-pressed="${on}" data-action="adv-crop" data-value="${esc(en)}"${!on && ui.crops.length >= 2 ? ' disabled' : ''}>${t(en, bn)}</button>`; }).join('')}
       ${ui.crops.filter((c) => !ADVISOR_CROPS.some(([en]) => en === c)).map((c) => `<button type="button" class="adv-chip on" aria-pressed="true" data-action="adv-crop" data-value="${esc(c)}">${esc(c)} ✕</button>`).join('')}</div>
     <div class="adv-add"><input id="adv-other" type="text" maxlength="40" placeholder="${t('Add another crop (e.g. Dragon fruit)', 'অন্য ফসল যোগ করুন')}" aria-label="${t('Add another crop', 'অন্য ফসল যোগ করুন')}"><button type="button" class="button small" data-action="adv-add">${t('Add', 'যোগ')}</button></div>
     <textarea id="adv-notes" maxlength="300" rows="2" placeholder="${t('What matters to you? (optional)', 'আপনার কাছে কী জরুরি? (ঐচ্ছিক)')}">${esc(ui.notes)}</textarea>
-    <div class="adv-actions"><span class="note">${ui.crops.length}/5 ${t('crops', 'ফসল')}</span>
+    <div class="adv-actions"><span class="note">${ui.crops.length}/2 ${t('crops', 'ফসল')}</span>
       <button type="button" class="button primary" data-action="adv-check" ${!ui.crops.length || busy ? 'disabled' : ''}>${busy ? t('Planty is checking…', 'Planty দেখছে…') : t('Check with Planty', 'Planty-কে দিয়ে যাচাই')}</button></div>
+    ${!ui.result && !revealed ? `<p class="adv-skip"><button type="button" class="text-link" data-action="show-rotations">${t('Not sure? Compare the standard rotations first', 'নিশ্চিত নন? আগে সাধারণ ফসলচক্র তুলনা করুন')}</button></p>` : ''}
     ${busy ? `<div class="adv-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>` : ''}
     ${ui.error ? `<p class="adv-error" role="alert">${esc(ui.error)}</p>` : ''}
     ${ui.result ? resultHtml(ui.result) : ''}
@@ -100,15 +132,27 @@ export async function advisorAction(action, value) {
   const notes = document.querySelector('#adv-notes');
   if (notes) ui.notes = notes.value;
   if (action === 'adv-use') { useInPlanner(); return; }
+  if (action === 'adv-exit') { ui.result = null; ui.error = ''; ui.crops = []; rerender(); return; }
+  if (action === 'adv-try') {
+    const g = ui.result?.suggestions?.[Number(value)];
+    if (!g) return;
+    ui.crops = g.crops.slice(0, 2); ui.notes = '';
+    return advisorAction('adv-check');
+  }
+  if (action === 'show-rotations') {
+    reveal();
+    requestAnimationFrame(() => document.querySelector('#rotation-scored')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return;
+  }
   if (action === 'adv-mode') { ui.mode = value; rerender(); return; }
   if (action === 'adv-crop') {
-    ui.crops = ui.crops.includes(value) ? ui.crops.filter((c) => c !== value) : ui.crops.length < 5 ? [...ui.crops, value] : ui.crops;
+    ui.crops = ui.crops.includes(value) ? ui.crops.filter((c) => c !== value) : ui.crops.length < 2 ? [...ui.crops, value] : ui.crops;
     rerender(); return;
   }
   if (action === 'adv-add') {
     const input = document.querySelector('#adv-other');
     const v = (input?.value || '').trim().slice(0, 40);
-    if (v && !ui.crops.includes(v) && ui.crops.length < 5) ui.crops = [...ui.crops, v];
+    if (v && !ui.crops.includes(v) && ui.crops.length < 2) ui.crops = [...ui.crops, v];
     rerender(); return;
   }
   if (action === 'adv-check' && ui.crops.length) {
@@ -120,6 +164,7 @@ export async function advisorAction(action, value) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) throw new Error(data.error || 'unavailable');
       ui.result = data;
+      reveal();
     } catch (e) {
       ui.error = !navigator.onLine
         ? t("Planty can't reach the internet right now — the built-in rotations still work offline.", 'এখন ইন্টারনেট নেই — তৈরি ফসলচক্রগুলো অফলাইনেও কাজ করে।')
