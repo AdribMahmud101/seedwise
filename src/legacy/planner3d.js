@@ -11,15 +11,18 @@ import {
   IDLE_RESUME_DELAY_S,
   fitTopView, plannerRowLayout,
   computeFieldFraming,
+  computeFieldZones, buildZoneGeometry, pickDrainEdge, zonePopoverData,
+  drainSurfacePolygons,
+  fieldZoneClearance,
   easeOutCubic, easeInOutCubic,
 } from "./planner3d-helpers.js";
+import { t, num } from "./ui.js";
 import {
   introCameraParams,
   shouldSkipIntro,
   sampleRowCropScale,
 } from "./studio3d-helpers.js";
 import {
-  smoothOutline,
   computeMicroRelief,
   rimErosionNoise,
   generateUndersideGeometry,
@@ -51,6 +54,22 @@ let plantsGroup = null;
 let shadowPlane = null;
 let introAnim = null;
 let transitionAnim = null;
+
+// Field zones (bund / drain / path / other) drawn from the field's own widths.
+let zonesGroup = null;
+let zonePickMeshes = [];
+let zoneKindMats = new Map();
+let drainWaterMats = [];
+let currentZoneModel = null;
+let lastZoneKey = null;
+let zonesFade = null;
+let plantsPulse = null;
+let selectedZoneKind = null;
+let hoveredZoneKind = null;
+let zonePopoverEl = null;
+let zoneLegendEl = null;
+let zoneTapStart = null;
+let lastZoneHoverMs = 0;
 
 // Crop-specific botanical config for enhanced realism
 const CROP_CONFIG = Object.freeze({
@@ -395,9 +414,13 @@ function disposeGroup(group) {
   if (group.parent) group.parent.remove(group);
 }
 
-function buildSurfaceGeometry(ringM, heightAt, bounds) {
+function buildSurfaceGeometry(ringM, heightAt, bounds, drain = null) {
   const ring = ringM.map(([x, y]) => new THREE.Vector2(x, y));
-  const triangles = THREE.ShapeUtils.triangulateShape(ring, []);
+  const triangles = THREE.ShapeUtils.triangulateShape(ring, []).flatMap(ids => {
+    const parts = drainSurfacePolygons(ids.map(i => ringM[i]), drain);
+    return parts.flatMap(poly => poly.slice(1, -1).map((_, i) =>
+      [poly[0], poly[i + 1], poly[i + 2]].map(([x, y]) => new THREE.Vector2(x, y))));
+  });
   const positions = [];
   const uvs = [];
   const n = 28;
@@ -412,8 +435,7 @@ function buildSurfaceGeometry(ringM, heightAt, bounds) {
     uvs.push((x - bounds.minX) / width, (-z - bounds.minY) / depth);
   };
 
-  for (const ids of triangles) {
-    const [a, b, c] = ids.map((i) => ring[i]);
+  for (const [a, b, c] of triangles) {
     if (!a || !b || !c) continue;
     const point = (i, j) =>
       new THREE.Vector2(
@@ -566,8 +588,8 @@ function buildFieldBlock(data) {
   if (!outlineM || outlineM.length < 3) return;
   const bounds = outlineBounds(outlineM);
   const depth = blockDepthM(bounds);
-  // Organic outline smoothing pass (Chaikin / quadratic pass <= 1.5 m)
-  const ringM = smoothOutline(outlineM, 1.5);
+  // Keep entered outline corners so the ground and zone offsets share one boundary.
+  const ringM = outlineM;
   const heightAt = makeHeightAt(data);
   const topMat = new THREE.MeshStandardMaterial({
     map: buildTopTexture(data), roughness: 0.93, metalness: 0.01,
@@ -586,7 +608,7 @@ function buildFieldBlock(data) {
     side: THREE.DoubleSide,
   });
 
-  const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds);
+  const topGeom = buildSurfaceGeometry(ringM, heightAt, bounds, zoneModelFor(data).geom?.drain);
   const topMesh = new THREE.Mesh(topGeom, topMat);
   topMesh.userData.terrain = true;
   topMesh.castShadow = true;
@@ -611,6 +633,7 @@ function buildFieldBlock(data) {
   blockGroup = new THREE.Group();
   blockGroup.add(topMesh, wallMesh, boundary);
   buildCropGround(data, heightAt, bounds, ringM);
+  buildFieldZones(data, heightAt, ringM, bounds);
   if (undersideMesh) blockGroup.add(undersideMesh);
   ensureFloatGroup();
   floatGroup.add(blockGroup);
@@ -647,24 +670,16 @@ function buildWaterTexture() {
 
 function buildCropGround(data, heightAt, bounds, ringM) {
   const cropId = data.months[0]?.cropId;
-  const layout = plannerRowLayout(data.field.outlineM, data.planner.row, data.planner.spacing, data.planner.usable);
-  const scale = layout.displayScale || 1;
-  const soil = new THREE.MeshStandardMaterial({ color: 0x59402c, roughness: 0.96 });
+  const layout = plannerRowLayout(data.field.outlineM, data.planner.row, data.planner.spacing,
+    data.planner.usable, zoneModelFor(data, heightAt).geom);
   if (['aman', 'boro', 'rice'].includes(cropId)) {
-    const water = new THREE.Mesh(buildSurfaceGeometry(ringM, () => 0.035 * scale, bounds),
+    const water = new THREE.Mesh(buildSurfaceGeometry(ringM, () => 0.035, bounds, zoneModelFor(data).geom?.drain),
       new THREE.MeshStandardMaterial({ map: buildWaterTexture(), roughness: 0.16, metalness: 0.12,
         transparent: true, opacity: 0.72, side: THREE.DoubleSide }));
     water.receiveShadow = true;
     blockGroup.add(water);
-    const path = new THREE.CurvePath();
-    ringM.forEach(([x, y], i) => {
-      const [nx, ny] = ringM[(i + 1) % ringM.length];
-      path.add(new THREE.LineCurve3(new THREE.Vector3(x, 0, -y), new THREE.Vector3(nx, 0, -ny)));
-    });
-    const bund = new THREE.Mesh(new THREE.TubeGeometry(path, ringM.length * 3, scale * 0.14, 8, true), soil);
-    bund.receiveShadow = bund.castShadow = true;
-    blockGroup.add(bund);
   } else if (cropId === 'potato') {
+    const soil = new THREE.MeshStandardMaterial({ color: 0x59402c, roughness: 0.96 });
     const alongX = bounds.width >= bounds.height;
     const rowSpacing = alongX ? layout.spacingY : layout.spacingX;
     const plantSpacing = alongX ? layout.spacingX : layout.spacingY;
@@ -675,12 +690,635 @@ function buildCropGround(data, heightAt, bounds, ringM) {
     layout.positions.forEach(([x, y], i) => {
       dummy.rotation.set(alongX ? 0 : Math.PI / 2, 0, alongX ? Math.PI / 2 : 0);
       dummy.position.set(x, heightAt(x, -y) - rowSpacing * 0.07, -y);
+      dummy.scale.setScalar(Math.min(1, fieldZoneClearance(x, y, zoneModelFor(data).geom, data.field.outlineM) /
+        Math.max(0.01, Math.hypot(rowSpacing * 0.22, plantSpacing * 0.49))));
       dummy.updateMatrix();
       ridges.setMatrixAt(i, dummy.matrix);
     });
     ridges.castShadow = ridges.receiveShadow = true;
     blockGroup.add(ridges);
-  } else soil.dispose();
+  }
+}
+
+/* ------------------------------------------------------- field zones */
+
+// DEM-only vertex heights for drain placement: crop-independent (rice rendering
+// flattens the surface, but the field's low edge does not move with the crop).
+function drainHeightsDEM(data) {
+  if (!elevationSampler) return null;
+  const [lat, lon] = data?.field?.centroid || [0, 0];
+  const outlineM = data?.field?.outlineM || [];
+  if (outlineM.length < 3) return null;
+  const scaleX = 111195.08 * Math.cos((lat * Math.PI) / 180);
+  const base = elevationSampler(lon, lat);
+  if (!Number.isFinite(base)) return null;
+  const heights = outlineM.map(([x, y]) => {
+    const el = elevationSampler(lon + x / scaleX, lat + y / 111195.08);
+    return Number.isFinite(el) ? el - base : NaN;
+  });
+  if (heights.some((h) => !Number.isFinite(h))) return null;
+  return heights;
+}
+
+function zoneModelFor(data, heightAt) {
+  if (currentZoneModel && currentZoneModel.data === data) return currentZoneModel;
+  const outlineM = data?.field?.outlineM || [];
+  const inputs = data?.net?.inputs || {};
+  let drainIndex = -1;
+  if (outlineM.length >= 3) {
+    const dem = drainHeightsDEM(data);
+    const spread = dem ? Math.max(...dem) - Math.min(...dem) : 0;
+    const pick = spread > 0.01 ? pickDrainEdge(outlineM, dem) : pickDrainEdge(outlineM, null);
+    drainIndex = pick.index;
+  }
+  const grossM2 = data?.field?.areaHa > 0 ? data.field.areaHa * 10000 : undefined;
+  const zones = computeFieldZones(outlineM, inputs, { drainEdgeIndex: drainIndex, grossM2 });
+  const geom = buildZoneGeometry(outlineM, inputs, { drainEdgeIndex: drainIndex, display: true });
+  currentZoneModel = { data, zones, geom, edited: !!data?.net?.edited, drainIndex };
+  return currentZoneModel;
+}
+
+function zoneReadabilityNote() {
+  const z = currentZoneModel?.zones;
+  if (!z) return "";
+  const names = ["bund", "drain", "path"].filter((k) => z[k]?.enlarged).map((k) => z[k].name);
+  if (!names.length) return "";
+  const label = names.join(" / ");
+  return t(`${label} enlarged for readability.`, `${label} বোঝার সুবিধায় বড় করে দেখানো হয়েছে।`);
+}
+
+function zoneCanvasTexture(key, draw) {
+  if (textureCache.has(key)) return textureCache.get(key);
+  const cvs = document.createElement("canvas");
+  cvs.width = cvs.height = 256;
+  draw(cvs.getContext("2d"));
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  textureCache.set(key, tex);
+  return tex;
+}
+
+// Compacted bund soil: darker than the field top, with lengthwise striations.
+function bundTexture() {
+  return zoneCanvasTexture("zone-bund", (ctx) => {
+    ctx.fillStyle = "#3a2a1c";
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 900; i++) {
+      const x = deterministic(i, 31) * 256, y = deterministic(i, 32) * 256;
+      ctx.fillStyle = i % 3 ? "rgba(20,13,8,0.35)" : "rgba(150,116,76,0.28)";
+      ctx.fillRect(x, y, 2 + deterministic(i, 33) * 6, 1.4);
+    }
+    ctx.strokeStyle = "rgba(24,16,10,0.4)";
+    ctx.lineWidth = 1;
+    for (let y = 8; y < 256; y += 14) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + deterministic(y, 34) * 4);
+      ctx.lineTo(256, y + deterministic(y, 35) * 4);
+      ctx.stroke();
+    }
+  });
+}
+
+// Muddy drain bed with a wet sheen down the middle.
+function drainBedTexture() {
+  return zoneCanvasTexture("zone-drain-bed", (ctx) => {
+    const grad = ctx.createLinearGradient(0, 0, 256, 0);
+    grad.addColorStop(0, "#8a6f4d");
+    grad.addColorStop(0.28, "#5c4735");
+    grad.addColorStop(0.5, "#2e2115");
+    grad.addColorStop(0.72, "#5c4735");
+    grad.addColorStop(1, "#8a6f4d");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 700; i++) {
+      const x = deterministic(i, 36) * 256, y = deterministic(i, 37) * 256;
+      ctx.fillStyle = i % 2 ? "rgba(18,12,7,0.3)" : "rgba(160,130,95,0.2)";
+      ctx.fillRect(x, y, 2, 1 + deterministic(i, 38) * 3);
+    }
+  });
+}
+
+// Thin drain water: pale flow streaks over green-grey.
+function drainWaterTexture() {
+  return zoneCanvasTexture("zone-drain-water", (ctx) => {
+    ctx.fillStyle = "#5e9aa0";
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 90; i++) {
+      const x = deterministic(i, 39) * 256, y = deterministic(i, 40) * 256;
+      ctx.strokeStyle = i % 3 ? "rgba(225,244,240,0.35)" : "rgba(30,80,76,0.25)";
+      ctx.lineWidth = 0.8 + deterministic(i, 41);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + 9, y - 2, x + 16 + deterministic(i, 42) * 18, y);
+      ctx.stroke();
+    }
+  });
+}
+
+// Worn walking soil: lighter than the field, with footprint noise.
+function pathTexture() {
+  return zoneCanvasTexture("zone-path", (ctx) => {
+    ctx.fillStyle = "#a38e75";
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 500; i++) {
+      const x = deterministic(i, 43) * 256, y = deterministic(i, 44) * 256;
+      ctx.fillStyle = i % 2 ? "rgba(70,52,34,0.22)" : "rgba(230,214,184,0.25)";
+      ctx.fillRect(x, y, 1 + deterministic(i, 45) * 3, 1.5);
+    }
+    for (let i = 0; i < 26; i++) {
+      const x = 12 + deterministic(i, 46) * 232;
+      const y = 12 + deterministic(i, 47) * 232;
+      ctx.fillStyle = "rgba(74,56,36,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 4.5, 7, (deterministic(i, 48) - 0.5) * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
+// Other patch: grass with a hatched overlay so it reads as set aside.
+function otherTexture() {
+  return zoneCanvasTexture("zone-other", (ctx) => {
+    ctx.fillStyle = "#6f8f3d";
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 1200; i++) {
+      const x = deterministic(i, 49) * 256, y = deterministic(i, 50) * 256;
+      ctx.fillStyle = i % 2 ? "rgba(40,70,25,0.35)" : "rgba(190,220,130,0.3)";
+      ctx.fillRect(x, y, 1.5, 2 + deterministic(i, 51) * 3);
+    }
+    ctx.strokeStyle = "rgba(240,246,220,0.55)";
+    ctx.lineWidth = 2;
+    for (let d = -256; d < 512; d += 22) {
+      ctx.beginPath();
+      ctx.moveTo(d, 0);
+      ctx.lineTo(d + 256, 256);
+      ctx.stroke();
+    }
+  });
+}
+
+function sampleRingStations(ringM, stepM) {
+  const stations = [];
+  const area = ringSignedArea(ringM);
+  for (let i = 0; i < ringM.length; i++) {
+    const a = ringM[i], b = ringM[(i + 1) % ringM.length];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!(len > 1e-6)) continue;
+    const steps = Math.max(1, Math.min(80, Math.ceil(len / stepM)));
+    const dx = (b[0] - a[0]) / len, dy = (b[1] - a[1]) / len;
+    for (let s = 0; s < steps; s++) {
+      const tt = s / steps;
+      stations.push({ x: a[0] + (b[0] - a[0]) * tt, y: a[1] + (b[1] - a[1]) * tt,
+        nx: area >= 0 ? -dy : dy, ny: area >= 0 ? dx : -dx });
+    }
+  }
+  return stations;
+}
+
+function sampleLineStations(ax, ay, bx, by, stepM) {
+  const len = Math.hypot(bx - ax, by - ay);
+  if (!(len > 1e-6)) return [];
+  const steps = Math.max(1, Math.min(120, Math.ceil(len / stepM)));
+  const dx = (bx - ax) / len, dy = (by - ay) / len;
+  const stations = [];
+  for (let s = 0; s <= steps; s++) {
+    const tt = s / steps;
+    stations.push({ x: ax + (bx - ax) * tt, y: ay + (by - ay) * tt, nx: -dy, ny: dx });
+  }
+  return stations;
+}
+
+// Ribbon of `across` columns over spine stations; liftFn(t01, x, y, ground, i)
+// returns the absolute surface height. Closed wraps the last quad to the first.
+function buildRibbonGeometry(stations, { width, across = 5, closed = false, heightAt, liftFn, uRepeat = 0.25 }) {
+  const n = stations.length;
+  const cols = Math.max(2, across);
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  let travelled = 0;
+  for (let i = 0; i < n; i++) {
+    const st = stations[i];
+    if (i > 0) {
+      travelled += Math.hypot(st.x - stations[i - 1].x, st.y - stations[i - 1].y);
+    }
+    for (let c = 0; c < cols; c++) {
+      const t01 = c / (cols - 1);
+      const off = (t01 - 0.5) * width;
+      const x = st.x + st.nx * off;
+      const y = st.y + st.ny * off;
+      const ground = heightAt(x, -y);
+      positions.push(x, liftFn(t01, x, y, ground, i), -y);
+      uvs.push(travelled * uRepeat, t01);
+    }
+  }
+  const rows = closed ? n : n - 1;
+  for (let i = 0; i < rows; i++) {
+    const r0 = i * cols, r1 = ((i + 1) % n) * cols;
+    for (let c = 0; c < cols - 1; c++) {
+      indices.push(r0 + c, r1 + c, r0 + c + 1, r0 + c + 1, r1 + c, r1 + c + 1);
+    }
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function zoneMaterial(kind, params) {
+  const mat = new THREE.MeshStandardMaterial(params);
+  mat.userData.finalOpacity = params.opacity ?? 1;
+  if (!zoneKindMats.has(kind)) zoneKindMats.set(kind, []);
+  zoneKindMats.get(kind).push(mat);
+  return mat;
+}
+
+function addZoneMesh(kind, mesh, { pick = true, shadow = false } = {}) {
+  mesh.userData.zoneKind = kind;
+  mesh.castShadow = shadow;
+  mesh.receiveShadow = true;
+  zonesGroup.add(mesh);
+  if (pick) zonePickMeshes.push(mesh);
+  return mesh;
+}
+
+function buildBundMesh(zones, heightAt, ringM) {
+  const zone = zones.bund;
+  if (!zone) return;
+  const width = zone.displayWidthM;
+  const ring = ringSignedArea(ringM) < 0 ? [...ringM].reverse() : ringM;
+  const stations = sampleRingStations(ring, isPhone() ? 2.2 : 1.5)
+    .map((st) => ({ ...st, x: st.x + st.nx * width * 0.5, y: st.y + st.ny * width * 0.5 }));
+  if (stations.length < 3) return;
+  const geom = buildRibbonGeometry(stations, { width, across: 5, closed: true, heightAt,
+    liftFn: (t01, x, y, ground, i) =>
+      ground + 0.015 + 0.28 * Math.pow(Math.max(0, Math.sin(Math.PI * t01)), 0.75) +
+      (deterministic(i, 52) - 0.5) * 0.02 });
+  const mat = zoneMaterial("bund", { map: bundTexture(), roughness: 1, metalness: 0 });
+  addZoneMesh("bund", new THREE.Mesh(geom, mat), { shadow: !isPhone() });
+  // Sparse grass tufts along the ridge crown.
+  const tuftCount = Math.min(isPhone() ? 80 : 160, Math.max(8, Math.floor(zone.lengthM / 2)));
+  const tuftGeom = new THREE.ConeGeometry(0.07, 0.22, 4);
+  const tuftMat = zoneMaterial("bund", { color: 0x5c7a3a, roughness: 0.95 });
+  const tufts = new THREE.InstancedMesh(tuftGeom, tuftMat, tuftCount);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < tuftCount; i++) {
+    const st = stations[Math.floor((i / tuftCount) * stations.length)];
+    const jx = (deterministic(i, 53) - 0.5) * width * 0.5;
+    const x = st.x + st.nx * jx;
+    const y = st.y + st.ny * jx;
+    dummy.position.set(x, heightAt(x, -y) + 0.28, -y);
+    dummy.rotation.set(0, deterministic(i, 54) * Math.PI, 0);
+    dummy.scale.setScalar(0.7 + deterministic(i, 55) * 0.7);
+    dummy.updateMatrix();
+    tufts.setMatrixAt(i, dummy.matrix);
+  }
+  tufts.instanceMatrix.needsUpdate = true;
+  tufts.userData.zoneKind = "bund";
+  zonesGroup.add(tufts);
+}
+
+function buildDrainMesh(zones, geom, heightAt, paddyY = 0) {
+  const zone = zones.drain;
+  const line = geom?.drain;
+  if (!zone || !line) return;
+  const width = zone.displayWidthM;
+  const stations = sampleLineStations(line.ax, line.ay, line.bx, line.by, isPhone() ? 2 : 1.2);
+  if (stations.length < 2) return;
+  // The ground and paddy surface omit this channel; muddy banks surround a bed 0.3 m deep.
+  // Banks stay visible above flooded paddy water; the bed keeps its true depth.
+  const edgeLift = paddyY > 0 ? paddyY + 0.06 : 0.06;
+  const bedLift = -0.3;
+  const bedGeom = buildRibbonGeometry(stations, { width, across: 7, heightAt,
+    liftFn: (t01, x, y, ground) =>
+      ground + edgeLift - (edgeLift - bedLift) * Math.pow(Math.max(0, Math.sin(Math.PI * t01)), 1.1) });
+  const bedMat = zoneMaterial("drain", { map: drainBedTexture(), roughness: 0.65, metalness: 0.05 });
+  addZoneMesh("drain", new THREE.Mesh(bedGeom, bedMat));
+  const waterGeom = buildRibbonGeometry(stations, { width: width * 0.72, across: 2, heightAt,
+    liftFn: (t01, x, y, ground) => ground - 0.12, uRepeat: 0.1 });
+  const waterTex = drainWaterTexture();
+  const waterMat = zoneMaterial("drain", { map: waterTex, roughness: 0.15, metalness: 0.1,
+    transparent: true, opacity: 0.72, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -1 });
+  waterMat.userData.water = true;
+  addZoneMesh("drain", new THREE.Mesh(waterGeom, waterMat));
+  drainWaterMats.push({ mat: waterMat, tex: waterTex });
+}
+
+function buildPathMesh(zones, geom, heightAt, paddyY = 0) {
+  const zone = zones.path;
+  const line = geom?.path;
+  if (!zone || !line) return;
+  const stations = sampleLineStations(line.ax, line.ay, line.bx, line.by, isPhone() ? 2 : 1.5);
+  if (stations.length < 2) return;
+  const geomPath = buildRibbonGeometry(stations, { width: zone.displayWidthM, across: 3, heightAt,
+    liftFn: (t01, x, y, ground) => ground + (paddyY > 0 ? paddyY + 0.02 : 0.02), uRepeat: 0.12 });
+  const mat = zoneMaterial("path", { map: pathTexture(), roughness: 0.95, metalness: 0,
+    polygonOffset: true, polygonOffsetFactor: -1 });
+  addZoneMesh("path", new THREE.Mesh(geomPath, mat));
+}
+
+function buildOtherMesh(zones, geom, heightAt, paddyY = 0) {
+  const zone = zones.other;
+  const rect = geom?.other;
+  if (!zone || !rect) return;
+  const plane = buildSurfaceGeometry(rect.polygon,
+    (x, z) => heightAt(x, z) + (paddyY > 0 ? paddyY + 0.03 : 0.03), rect);
+  const mat = zoneMaterial("other", { map: otherTexture(), roughness: 0.9, metalness: 0,
+    polygonOffset: true, polygonOffsetFactor: -1 });
+  const mesh = new THREE.Mesh(plane, mat);
+  addZoneMesh("other", mesh);
+}
+
+function disposeZones() {
+  cancelAnimationFrame(zonesFade?.frameId);
+  zonesFade = null;
+  drainWaterMats = [];
+  zonePickMeshes = [];
+  zoneKindMats = new Map();
+  selectedZoneKind = null;
+  hoveredZoneKind = null;
+  closeZonePopover();
+  disposeGroup(zonesGroup);
+  zonesGroup = null;
+}
+
+function buildFieldZones(data, heightAt, ringM, bounds = null) {
+  const model = zoneModelFor(data, heightAt);
+  const key = JSON.stringify([data.net, model.drainIndex, data.field.centroid, data.field.outlineM, data.months[0]?.cropId]);
+  if (lastZoneKey === key && zonesGroup) {
+    // Widths unchanged (usable/crop move only): keep meshes and popover steady.
+    const wrap = canvasHostEl?.closest(".planner3d-stage-wrap");
+    if (zonePopoverEl && zonePopoverEl.parentElement !== wrap) closeZonePopover();
+    if (!zoneLegendEl?.isConnected ||
+        zoneLegendEl.parentElement?.closest?.(".planner3d-stage-wrap") !== wrap) renderZoneLegend();
+    return;
+  }
+  const first = lastZoneKey === null;
+  disposeZones();
+  ensureFloatGroup();
+  zonesGroup = new THREE.Group();
+  floatGroup.add(zonesGroup);
+  // Flooded paddy waterline (mirrors buildCropGround): zones must clear it.
+  const paddyY = ["aman", "boro", "rice"].includes(data.months[0]?.cropId)
+    ? 0.035 : 0;
+  buildBundMesh(model.zones, heightAt, ringM);
+  buildDrainMesh(model.zones, model.geom, heightAt, paddyY);
+  buildPathMesh(model.zones, model.geom, heightAt, paddyY);
+  buildOtherMesh(model.zones, model.geom, heightAt, paddyY);
+  renderZoneLegend();
+  if (!first && !prefersReducedMotion) startZonesFade();
+  lastZoneKey = key;
+}
+
+function startZonesFade() {
+  const mats = [...zoneKindMats.values()].flat().filter((m) => m && !m.userData.windShader);
+  if (!mats.length) return;
+  for (const m of mats) {
+    m.transparent = true;
+    m.opacity = 0;
+  }
+  const start = performance.now();
+  const duration = 450;
+  const tick = () => {
+    if (!zonesFade) return;
+    const progress = Math.min(1, (performance.now() - start) / duration);
+    const eased = easeOutCubic(progress);
+    for (const m of mats) m.opacity = (m.userData.finalOpacity ?? 1) * eased;
+    requestRender();
+    if (progress < 1) zonesFade.frameId = requestAnimationFrame(tick);
+    else {
+      for (const m of mats) {
+        m.opacity = m.userData.finalOpacity ?? 1;
+        if (m.opacity >= 1) m.transparent = false;
+      }
+      zonesFade = null;
+      requestRender();
+    }
+  };
+  zonesFade = { frameId: requestAnimationFrame(tick) };
+}
+
+// Brief crossfade when the usable share moves rows without changing the crop.
+function pulsePlantsMaterial(mesh) {
+  if (!mesh?.material || prefersReducedMotion) return;
+  cancelAnimationFrame(plantsPulse?.frameId);
+  const mat = mesh.material;
+  mat.transparent = true;
+  const start = performance.now();
+  const duration = 280;
+  const tick = () => {
+    if (!plantsPulse) return;
+    const progress = Math.min(1, (performance.now() - start) / duration);
+    mat.opacity = 1 - Math.sin(progress * Math.PI) * 0.55;
+    requestRender();
+    if (progress < 1) plantsPulse.frameId = requestAnimationFrame(tick);
+    else {
+      mat.opacity = 1;
+      mat.transparent = false;
+      plantsPulse = null;
+      requestRender();
+    }
+  };
+  plantsPulse = { frameId: requestAnimationFrame(tick) };
+}
+
+function updateZoneWater(timeMs) {
+  if (!drainWaterMats.length) return;
+  const tm = timeMs / 1000;
+  for (const { mat, tex } of drainWaterMats) {
+    if (!prefersReducedMotion) tex.offset.x = (tm * 0.04) % 1;
+    if (!zonesFade) mat.opacity = prefersReducedMotion ? 0.72 : 0.7 + 0.07 * Math.sin(tm * 1.3);
+  }
+}
+
+/* ------------------------------------------------- zone picking + popover */
+
+function applyZoneHighlight() {
+  for (const [kind, mats] of zoneKindMats) {
+    const selected = kind === selectedZoneKind;
+    const on = selected || kind === hoveredZoneKind;
+    for (const m of mats) {
+      if (!m.emissive) continue;
+      m.emissive.set(!on ? 0x000000 : m.userData.water ? 0x3f9b9a : selected ? 0x8a7a2a : 0x3a3a20);
+      m.emissiveIntensity = !on ? 0 : m.userData.water ? 0.35 : selected ? 1 : 0.55;
+    }
+  }
+  zoneLegendEl?.querySelectorAll("[data-zone-kind]").forEach((chip) => {
+    const on = chip.dataset.zoneKind === (selectedZoneKind || hoveredZoneKind);
+    chip.classList.toggle("active", on);
+    chip.setAttribute("aria-pressed", String(chip.dataset.zoneKind === selectedZoneKind));
+  });
+  requestRender();
+}
+
+function pickZoneAt(clientX, clientY) {
+  if (!zonePickMeshes.length || !canvas || !activeCamera) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+  const pointer = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1);
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(pointer, activeCamera);
+  const hits = raycaster.intersectObjects(zonePickMeshes, false);
+  return hits.length ? hits[0].object.userData.zoneKind : null;
+}
+
+function escHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+function openZonePopover(kind, anchor) {
+  const model = currentZoneModel;
+  const data = model && zonePopoverData(kind, model.zones, model.edited);
+  if (!data || !canvasHostEl) return;
+  closeZonePopover();
+  selectedZoneKind = kind;
+  const wrap = canvasHostEl.closest(".planner3d-stage-wrap") || canvasHostEl;
+  const el = document.createElement("div");
+  el.className = "zone-popover";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-label", `${data.name} parameters`);
+  el.innerHTML =
+    `<div class="zone-popover-head"><strong>${escHtml(t(data.name, data.name))}</strong>` +
+    `<button type="button" class="zone-popover-close" aria-label="${escHtml(t("Close", "বন্ধ করুন"))}">×</button></div>` +
+    `<dl class="zone-popover-grid">` +
+    `<div><dt>${escHtml(t("Width", "প্রস্থ"))}</dt><dd>${escHtml(num(data.widthM, 2))} m</dd></div>` +
+    `<div><dt>${escHtml(t("Length", "দৈর্ঘ্য"))}</dt><dd>${escHtml(num(data.lengthM, 1))} m</dd></div>` +
+    `<div><dt>${escHtml(t("Area", "আয়তন"))}</dt><dd>${escHtml(num(data.areaM2, 1))} m² · ${escHtml(num(data.decimals, 2))} ${escHtml(t("decimals", "শতক"))}</dd></div>` +
+    `<div><dt>${escHtml(t("Share of field", "জমির অংশ"))}</dt><dd>${escHtml(num(data.sharePct, 1))} %</dd></div>` +
+    `<div><dt>${escHtml(t("Source", "উৎস"))}</dt><dd>${escHtml(data.source)}</dd></div></dl>` +
+    `<a class="zone-popover-edit" href="${escHtml(data.editHref)}">${escHtml(t("Edit on My field", "আমার জমিতে বদলান"))}</a>`;
+  el.querySelector(".zone-popover-close").addEventListener("click", (event) => {
+    event.stopPropagation();
+    selectZone(null);
+  });
+  wrap.appendChild(el);
+  zonePopoverEl = el;
+  const wrapRect = wrap.getBoundingClientRect();
+  const hostRect = canvasHostEl.getBoundingClientRect();
+  let left = (anchor?.clientX ?? hostRect.left + hostRect.width / 2) - wrapRect.left + 12;
+  let top = (anchor?.clientY ?? hostRect.top + hostRect.height * 0.3) - wrapRect.top - 10;
+  left = Math.max(8, Math.min(left, wrapRect.width - el.offsetWidth - 8));
+  top = Math.max(8, Math.min(top, wrapRect.height - el.offsetHeight - 8));
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+  applyZoneHighlight();
+}
+
+function closeZonePopover() {
+  zonePopoverEl?.remove();
+  zonePopoverEl = null;
+  document.removeEventListener("keydown", onZoneKeyDown, true);
+  document.removeEventListener("pointerdown", onZoneOutsideDown, true);
+}
+
+function selectZone(kind, anchor = null) {
+  selectedZoneKind = kind;
+  if (!kind) {
+    closeZonePopover();
+    applyZoneHighlight();
+    return;
+  }
+  openZonePopover(kind, anchor);
+  document.addEventListener("keydown", onZoneKeyDown, true);
+  document.addEventListener("pointerdown", onZoneOutsideDown, true);
+}
+
+function onZoneKeyDown(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    selectZone(null);
+    canvasHostEl?.focus({ preventScroll: true });
+  }
+}
+
+function onZoneOutsideDown(event) {
+  if (zonePopoverEl && !zonePopoverEl.contains(event.target) &&
+      !event.target.closest?.("[data-zone-kind]")) {
+    selectZone(null);
+  }
+}
+
+function renderZoneLegend() {
+  zoneLegendEl?.remove();
+  zoneLegendEl = null;
+  const model = currentZoneModel;
+  const wrap = canvasHostEl?.closest(".planner3d-stage-wrap");
+  if (!model || !wrap) return;
+  const entries = ["bund", "drain", "path", "other"]
+    .map((kind) => [kind, model.zones[kind]])
+    .filter(([, zone]) => zone);
+  if (!entries.length) return;
+  const el = document.createElement("div");
+  el.className = "zone-legend";
+  el.setAttribute("role", "group");
+  el.setAttribute("aria-label", t("Field zones", "জমির অংশ"));
+  for (const [kind, zone] of entries) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.dataset.zoneKind = kind;
+    chip.setAttribute("aria-pressed", "false");
+    chip.textContent = kind === "other"
+      ? `${zone.name} ${num(zone.decimals, 1)} ${t("dec", "শতক")}`
+      : `${zone.name} ${num(zone.widthM, 1)} m`;
+    chip.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectZone(selectedZoneKind === kind ? null : kind);
+    });
+    el.appendChild(chip);
+  }
+  const footer = wrap.querySelector(".planner3d-footer");
+  if (footer) footer.prepend(el);
+  else {
+    el.classList.add("zone-legend-overlay");
+    wrap.appendChild(el);
+  }
+  zoneLegendEl = el;
+}
+
+function bindZonePicking() {
+  if (!canvas || canvas.userData?.zonePickingBound) return;
+  canvas.userData = canvas.userData || {};
+  canvas.userData.zonePickingBound = true;
+  canvas.addEventListener("pointerdown", (event) => {
+    zoneTapStart = { x: event.clientX, y: event.clientY, at: performance.now() };
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    const start = zoneTapStart;
+    zoneTapStart = null;
+    if (!start) return;
+    const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    if (moved > 10 || performance.now() - start.at > 700) return;
+    const kind = pickZoneAt(event.clientX, event.clientY);
+    if (kind) selectZone(kind, { clientX: event.clientX, clientY: event.clientY });
+    else if (selectedZoneKind) selectZone(null);
+  });
+  canvas.addEventListener("pointercancel", () => { zoneTapStart = null; });
+  canvas.addEventListener("pointermove", (event) => {
+    if (event.pointerType !== "mouse" || event.buttons || isDragging) return;
+    const now = performance.now();
+    if (now - lastZoneHoverMs < 70) return;
+    lastZoneHoverMs = now;
+    const kind = pickZoneAt(event.clientX, event.clientY);
+    if (kind !== hoveredZoneKind) {
+      hoveredZoneKind = kind;
+      if (canvasHostEl) canvasHostEl.style.cursor = kind ? "pointer" : "";
+      applyZoneHighlight();
+    }
+  });
+  canvas.addEventListener("pointerleave", () => {
+    hoveredZoneKind = null;
+    if (canvasHostEl) canvasHostEl.style.cursor = "";
+    applyZoneHighlight();
+  });
 }
 
 function mergeClumpParts(parts) {
@@ -839,6 +1477,8 @@ function deterministic(i, seed) {
 }
 
 function buildPlants(data) {
+  const prevSig = plantsGroup?.userData?.plantSig || null;
+  const prevCrop = plantsGroup?.userData?.plants?.cropId || null;
   disposeGroup(plantsGroup);
   plantsGroup = null;
 
@@ -848,7 +1488,8 @@ function buildPlants(data) {
   const outlineM = data.field.outlineM;
   const bounds = currentBlock.bounds || outlineBounds(outlineM);
   const heightAt = makeHeightAt(data);
-  const layout = plannerRowLayout(outlineM, data.planner.row, data.planner.spacing, data.planner.usable);
+  const layout = plannerRowLayout(outlineM, data.planner.row, data.planner.spacing,
+    data.planner.usable, zoneModelFor(data, heightAt).geom);
   const { positions, spacingX, spacingY } = layout;
   canvasHostEl.dataset.rowCount = layout.rowCount;
   
@@ -856,14 +1497,16 @@ function buildPlants(data) {
   const cappedPositions = positions;
   const totalCount = positions.length;
   canvasHostEl.dataset.plantCount = positions.length;
+  canvasHostEl.dataset.totalPositions = layout.totalPositions;
   const { displayScale, rowStep, plantStep } = layout;
   const broadcast = month.cropId === 'mustard';
   const note = document.documentElement.lang === 'bn'
     ? `বোঝার সুবিধায় গাছ ×${displayScale} বড়; প্রতি ${rowStep} সারি ও ${plantStep} গাছ পরপর দেখানো। ${broadcast ? 'বীজের হিসাব ছিটিয়ে বপনের হার অনুযায়ী।' : 'গাছের হিসাব প্রকৃত দূরত্ব অনুযায়ী।'}`
     : `Plants enlarged ×${displayScale}; every ${rowStep}th row and ${plantStep}th plant drawn for readability; ${broadcast ? 'seed uses the broadcast rate' : 'counts use true spacing'}.`;
   canvasHostEl.dataset.plantSampleNote = note;
+  const zoneNote = zoneReadabilityNote();
   const chip = canvasHostEl.closest('.planner3d-stage-wrap')?.querySelector('.planner3d-crop-chip');
-  if (chip) chip.textContent = note;
+  if (chip) chip.textContent = zoneNote ? `${note} ${zoneNote}` : note;
   if (cappedPositions.length === 0) return;
 
   const h = month.canopyHeightM * month.stageFraction * displayScale;
@@ -877,6 +1520,15 @@ function buildPlants(data) {
   const ridgeHeight = (alongX ? spacingY : spacingX) * 0.15;
   const spread = (month.cropId === 'potato' ? 0.8 : month.cropId === 'mungbean' ? 0.65 : 0.55) * displayScale;
   const geom = buildClumpGeometry(month.cropId, h, spread, month.stage, lod);
+  const zoneGeom = zoneModelFor(data).geom;
+  const vertices = geom.getAttribute('position');
+  let footprintRadius = 0;
+  let windMargin = 0.01;
+  for (let i = 0; i < vertices.count; i++) {
+    footprintRadius = Math.max(footprintRadius, Math.hypot(vertices.getX(i), vertices.getZ(i)));
+    if (!prefersReducedMotion) windMargin = Math.max(windMargin,
+      0.04 * (0.5 + 0.5 * vertices.getY(i)) * Math.SQRT2 + 0.01);
+  }
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 0.9,
@@ -924,13 +1576,16 @@ function buildPlants(data) {
     const jitter = 0.82 + deterministic(i, 1) * 0.38;
     const yaw = deterministic(i, 2) * Math.PI * 2;
     dummy.position.set(
-      x + (deterministic(i, 3) - 0.5) * trueSpacingX * 0.18,
+      x + (zoneGeom ? 0 : (deterministic(i, 3) - 0.5) * trueSpacingX * 0.18),
       heightAt(x, z) + (month.cropId === "potato" ? ridgeHeight : 0.015),
-      z + (deterministic(i, 4) - 0.5) * trueSpacingY * 0.18,
+      z + (zoneGeom ? 0 : (deterministic(i, 4) - 0.5) * trueSpacingY * 0.18),
     );
     dummy.rotation.set(0, yaw, 0);
-    const sx = jitter * cropScale * stageScale;
-    const sz = jitter * cropScale * stageScale;
+    const clearance = fieldZoneClearance(x, y, zoneGeom, outlineM);
+    const horizontalScale = Math.min(jitter * cropScale * stageScale,
+      Math.max(0, clearance - windMargin) / Math.max(footprintRadius, 0.01));
+    const sx = horizontalScale;
+    const sz = horizontalScale;
     const sy = (0.9 + deterministic(i, 5) * 0.24) * cropScale * stageScale;
     dummy.scale.set(sx, sy, sz);
     dummy.updateMatrix();
@@ -949,6 +1604,13 @@ function buildPlants(data) {
   plantsGroup = new THREE.Group();
   ensureFloatGroup();
   plantsGroup.add(mesh);
+  plantsGroup.userData.plantSig =
+    `${cappedPositions.length}:${cappedPositions[0]?.join(",")}:${cappedPositions.at(-1)?.join(",")}`;
+  const sameCrop = prevCrop === month.cropId;
+  if (prevSig && prevSig !== plantsGroup.userData.plantSig && sameCrop &&
+      !transitionAnim && !introAnim) {
+    pulsePlantsMaterial(mesh);
+  }
   plantsGroup.userData.plants = {
     positions: cappedPositions.map(([x, y]) => [x, heightAt(x, -y) + 0.02, -y]),
     height: h,
@@ -1389,6 +2051,7 @@ function initThree(host) {
   }
   host.appendChild(canvas);
   canvasHostEl = host;
+  bindZonePicking();
   resizeObserver?.disconnect();
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(onResize);
@@ -1575,6 +2238,7 @@ function startAnimation() {
     controls.update();
     // Update wind shaders for subtle plant motion
     updateWindShaders(time);
+    updateZoneWater(time);
     // Idle sway is a transient offset on top of the user's camera: applied
     // after controls.update() and restored right after the frame renders.
     if (!introAnim) applyIdleFloat(time / 1000);
@@ -1643,6 +2307,7 @@ export async function mountPlanner3d(host, input) {
   data.months = [{ cropId, stage: "grow",
     stageFraction: 0.75, canopyHeightM: FAO56_CROP_LIMITS[cropId].heightM }];
   data.planner = { ...input.planner };
+  data.net = input.net || null;
   const key = JSON.stringify([data.field.centroid, data.field.bboxLatLon, data.field.outlineM]);
   const refit = key !== elevationKey || host !== canvasHostEl;
   if (!motionQuery) {
@@ -1689,6 +2354,13 @@ export function disposePlanner3d() {
   finishCropTransition();
   stopIntroAnimation(true);
   stopAnimation();
+  cancelAnimationFrame(plantsPulse?.frameId);
+  plantsPulse = null;
+  disposeZones();
+  zoneLegendEl?.remove();
+  zoneLegendEl = null;
+  currentZoneModel = null;
+  lastZoneKey = null;
   if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
   renderFrameId = null;
   intersectionObserver?.disconnect();

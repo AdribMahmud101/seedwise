@@ -8,6 +8,9 @@ export const DEFAULT_NET_INPUTS = {
   otherDecimals: 0,
 };
 
+// 1 decimal = 1/247.105381 ha (same factor netArea uses for otherDecimals).
+export const M2_PER_DECIMAL = 10000 / 247.105381;
+
 export function polygonPerimeterM(points) {
   if (!points || points.length < 2) return 0;
   const latitude = (mean(points.map((p) => p[0])) * Math.PI) / 180;
@@ -72,4 +75,13 @@ export function netArea(grossHa, perimeterM, inputs = {}) {
       otherDecimals,
     },
   };
+}
+
+// Planner "Usable area %" default: the field's cultivable share, clamped to the
+// slider range and rounded to one decimal (e.g. 88.7). Pure — the caller decides
+// farmer-saved vs scenario-default inputs.
+export function cultivableUsablePct(grossHa, perimeterM, inputs = {}) {
+  const net = netArea(grossHa, perimeterM, inputs);
+  if (!(net.netPct > 0)) return 1;
+  return Math.min(100, Math.max(1, Math.round(net.netPct * 10) / 10));
 }

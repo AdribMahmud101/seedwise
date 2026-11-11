@@ -222,7 +222,7 @@ export async function journeyAction(action, value) {
         jump(steps.find(item => item[0] === step)[1]);
       }
     } else if (action === 'field') {
-      confirmField(fieldSnapshot(field(), polygon(), profile()));
+      confirmField(fieldSnapshot(field(), polygon(), profile(), state.netInputs[state.fieldId]));
       handoff('rotations', t('Field confirmed!', 'জমি নিশ্চিত হয়েছে!'), '#rotation-list',
         t('Pick the rotation that fits you', 'আপনার উপযোগী ফসলচক্র বেছে নিন'));
     } else if (action === 'rotation') {

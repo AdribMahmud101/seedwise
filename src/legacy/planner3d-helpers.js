@@ -1,4 +1,6 @@
 // Pure helpers for the Planner 3D (forked from planner-3d-base). No three.js, no DOM — safe to unit test.
+import { capacity } from './engine.js';
+import { M2_PER_DECIMAL } from './netarea.js';
 
 export function outlineBounds(outlineM) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -41,6 +43,334 @@ export function distToPolygonEdge(x, y, poly) {
   return min;
 }
 
+// Edge lengths in metres for a local-metre outline ring.
+export function edgeLengths(outlineM) {
+  if (!Array.isArray(outlineM) || outlineM.length < 2) return [];
+  return outlineM.map((a, i) => {
+    const b = outlineM[(i + 1) % outlineM.length];
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  });
+}
+
+export function outlinePerimeterM(outlineM) {
+  return edgeLengths(outlineM).reduce((sum, len) => sum + len, 0);
+}
+
+export function longestEdgeIndex(outlineM) {
+  const lengths = edgeLengths(outlineM);
+  if (!lengths.length) return -1;
+  let best = 0;
+  for (let i = 1; i < lengths.length; i++) {
+    if (lengths[i] > lengths[best]) best = i;
+  }
+  return best;
+}
+
+// Drain edge: the lowest edge by elevation, falling back to the longest edge.
+// elevationAt is per-vertex readings, a function (x, y) -> metres, or null.
+export function pickDrainEdge(outlineM, elevationAt = null) {
+  const fallback = longestEdgeIndex(outlineM);
+  const lengths = edgeLengths(outlineM);
+  if (!outlineM || outlineM.length < 3 || fallback < 0) return { index: -1, lengthM: 0, fallback: true };
+  let heights = null;
+  try {
+    if (typeof elevationAt === 'function') {
+      heights = outlineM.map(([x, y]) => elevationAt(x, y));
+    } else if (Array.isArray(elevationAt)) {
+      heights = outlineM.map((_, i) => elevationAt[i]);
+    }
+  } catch {
+    heights = null;
+  }
+  if (!heights || heights.some((h) => !Number.isFinite(h))) {
+    return { index: fallback, lengthM: lengths[fallback], fallback: true };
+  }
+  let best = 0;
+  let bestAvg = Infinity;
+  for (let i = 0; i < outlineM.length; i++) {
+    const avg = (heights[i] + heights[(i + 1) % outlineM.length]) / 2;
+    if (avg < bestAvg - 1e-9) {
+      bestAvg = avg;
+      best = i;
+    }
+  }
+  return { index: best, lengthM: lengths[best], fallback: false };
+}
+
+// Path centre-line: through the centroid along the long axis, clipped to the polygon.
+export function pathAxisThroughCentroid(outlineM) {
+  const empty = { ax: 0, ay: 0, bx: 0, by: 0, lengthM: 0, alongX: true };
+  if (!Array.isArray(outlineM) || outlineM.length < 3) return empty;
+  let dx = 1, dy = 0, bestArea = Infinity;
+  for (let i = 0; i < outlineM.length; i++) {
+    const a = outlineM[i], b = outlineM[(i + 1) % outlineM.length];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!len) continue;
+    const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+    const u = outlineM.map(([x, y]) => x * ux + y * uy);
+    const v = outlineM.map(([x, y]) => -x * uy + y * ux);
+    const width = Math.max(...u) - Math.min(...u), height = Math.max(...v) - Math.min(...v);
+    if (width * height < bestArea - 1e-8) {
+      bestArea = width * height;
+      [dx, dy] = width >= height ? [ux, uy] : [-uy, ux];
+    }
+  }
+  // Area centroid stays independent of vertex density around the boundary.
+  let cx = 0, cy = 0;
+  const area = ringSignedArea(outlineM);
+  if (Math.abs(area) < 1e-9) return empty;
+  outlineM.forEach((a, i) => {
+    const b = outlineM[(i + 1) % outlineM.length];
+    const cross = a[0] * b[1] - b[0] * a[1];
+    cx += (a[0] + b[0]) * cross / (6 * area);
+    cy += (a[1] + b[1]) * cross / (6 * area);
+  });
+  const alongX = Math.abs(dx) >= Math.abs(dy);
+  // Intersect the axis ray with every edge; keep the extreme inside parameters.
+  const projections = outlineM.map(([x, y]) => (x - cx) * dx + (y - cy) * dy);
+  const tMin = Math.min(...projections), tMax = Math.max(...projections);
+  const hits = [];
+  for (let i = 0; i < outlineM.length; i++) {
+    const [ax, ay] = outlineM[i];
+    const [bx, by] = outlineM[(i + 1) % outlineM.length];
+    const ex = bx - ax, ey = by - ay;
+    const denom = dx * ey - dy * ex;
+    if (Math.abs(denom) < 1e-12) continue;
+    const t = ((ax - cx) * ey - (ay - cy) * ex) / denom;
+    const u = ((ax - cx) * dy - (ay - cy) * dx) / denom;
+    if (u >= -1e-9 && u <= 1 + 1e-9) hits.push(t);
+  }
+  hits.sort((p, q) => p - q);
+  // Walk the sorted crossings: inside spans sit between pairs starting inside.
+  const inside = (t) => pointInPolygon(cx + dx * t, cy + dy * t, outlineM);
+  let best0 = 0, best1 = 0;
+  let centered = false;
+  const consider = (s0, s1) => {
+    const containsCenter = s0 <= 0 && s1 >= 0;
+    if ((containsCenter && !centered) || (containsCenter === centered && s1 - s0 > best1 - best0)) {
+      best0 = s0; best1 = s1; centered = containsCenter;
+    }
+  };
+  let spanStart = null;
+  const bounds = [tMin - 1, ...hits, tMax + 1];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const mid = (bounds[i] + bounds[i + 1]) / 2;
+    if (inside(mid)) {
+      if (spanStart === null) spanStart = bounds[i];
+    } else if (spanStart !== null) {
+      const s0 = Math.max(spanStart, tMin), s1 = Math.min(bounds[i], tMax);
+      consider(s0, s1);
+      spanStart = null;
+    }
+  }
+  if (spanStart !== null) {
+    const s0 = Math.max(spanStart, tMin), s1 = tMax;
+    consider(s0, s1);
+  }
+  if (!(best1 > best0)) return empty;
+  return { ax: cx + dx * best0, ay: cy + dy * best0, bx: cx + dx * best1, by: cy + dy * best1,
+    lengthM: best1 - best0, alongX };
+}
+
+// Clip a corner patch to the entered area, including on rotated and concave fields.
+export function otherPatchRect(outlineM, sideM) {
+  if (!Array.isArray(outlineM) || outlineM.length < 3 || !(sideM > 0)) return null;
+  const b = outlineBounds(outlineM);
+  const targetArea = Math.min(sideM ** 2, Math.abs(ringSignedArea(outlineM)));
+  const [cornerX, cornerY] = outlineM.reduce((corner, p) =>
+    Math.hypot(p[0] - b.cx, p[1] - b.cy) > Math.hypot(corner[0] - b.cx, corner[1] - b.cy) ? p : corner);
+  const dx = cornerX - b.cx, dy = cornerY - b.cy;
+  const projection = ([x, y]) => x * dx + y * dy;
+  const dots = outlineM.map(projection);
+  let low = Math.min(...dots), high = Math.max(...dots);
+  let polygon = outlineM;
+  for (let i = 0; i < 48; i++) {
+    const cut = (low + high) / 2;
+    polygon = clipHalfPlane(outlineM, p => projection(p) - cut);
+    if (Math.abs(ringSignedArea(polygon)) > targetArea) low = cut;
+    else high = cut;
+  }
+  return { ...outlineBounds(polygon), polygon, clamped: targetArea < sideM ** 2 };
+}
+
+// Display enlargement: a 0.4 m feature is sub-pixel on a wide field, so widen
+// the drawn ribbon while keeping the true width for maths and labels.
+export function zoneDisplayWidth(widthM, fieldSpanM) {
+  const span = Number.isFinite(fieldSpanM) && fieldSpanM > 0 ? fieldSpanM : 30;
+  const minReadable = span * 0.01;
+  if (!(widthM > 0)) return { displayWidthM: 0, enlarged: false };
+  if (widthM >= minReadable) return { displayWidthM: widthM, enlarged: false };
+  return { displayWidthM: minReadable, enlarged: true };
+}
+
+// Pure zone descriptors for the planner 3D: lengths, areas and shares from the
+// field's entered widths. opts: { drainEdgeIndex, elevationAt, grossM2 }.
+export function computeFieldZones(outlineM, inputs = {}, opts = {}) {
+  const none = { grossM2: 0, perimeterM: 0, bund: null, drain: null, path: null, other: null, enlarged: false };
+  if (!Array.isArray(outlineM) || outlineM.length < 3) return none;
+  const bundWidthM = Math.max(0, Number(inputs.bundWidthM) || 0);
+  const drainWidthM = Math.max(0, Number(inputs.drainWidthM) || 0);
+  const pathWidthM = Math.max(0, Number(inputs.pathWidthM) || 0);
+  const otherDecimals = Math.max(0, Number(inputs.otherDecimals) || 0);
+  const b = outlineBounds(outlineM);
+  const span = Math.max(b.width, b.height, 1);
+  const perimeterM = outlinePerimeterM(outlineM);
+  const grossM2 = Number.isFinite(opts.grossM2) && opts.grossM2 > 0
+    ? opts.grossM2 : Math.abs(ringSignedArea(outlineM));
+  const share = (areaM2) => (grossM2 > 0 ? (areaM2 / grossM2) * 100 : 0);
+  const describe = (kind, name, widthM, lengthM, areaM2, extra = {}) => {
+    if (!(widthM > 0) && kind !== 'other') return null;
+    if (kind === 'other' && !(areaM2 > 0)) return null;
+    const { displayWidthM, enlarged } = kind === 'other'
+      ? { displayWidthM: widthM, enlarged: false } : zoneDisplayWidth(widthM, span);
+    return { kind, name, widthM, lengthM, areaM2, decimals: areaM2 / M2_PER_DECIMAL,
+      sharePct: share(areaM2), displayWidthM, enlarged, ...extra };
+  };
+  let enlarged = false;
+  const bund = describe('bund', 'Bund', bundWidthM, perimeterM,
+    Math.max(0, bundWidthM * perimeterM - 4 * bundWidthM * bundWidthM));
+  if (bund?.enlarged) enlarged = true;
+  let drain = null;
+  if (drainWidthM > 0) {
+    const pick = Number.isInteger(opts.drainEdgeIndex) && opts.drainEdgeIndex >= 0
+      ? { index: opts.drainEdgeIndex, lengthM: edgeLengths(outlineM)[opts.drainEdgeIndex] ?? 0, fallback: false }
+      : pickDrainEdge(outlineM, opts.elevationAt ?? null);
+    drain = describe('drain', 'Drain', drainWidthM, pick.lengthM, drainWidthM * pick.lengthM,
+      { edgeIndex: pick.index, edgeFallback: pick.fallback });
+    if (drain?.enlarged) enlarged = true;
+  }
+  let path = null;
+  if (pathWidthM > 0) {
+    const axis = pathAxisThroughCentroid(outlineM);
+    path = describe('path', 'Path', pathWidthM, axis.lengthM, pathWidthM * axis.lengthM, { axis });
+    if (path?.enlarged) enlarged = true;
+  }
+  const other = otherDecimals > 0
+    ? describe('other', 'Other', Math.sqrt(otherDecimals * M2_PER_DECIMAL),
+        Math.sqrt(otherDecimals * M2_PER_DECIMAL), otherDecimals * M2_PER_DECIMAL)
+    : null;
+  return { grossM2, perimeterM, bund, drain, path, other, enlarged };
+}
+
+// Geometry used both to draw the zones and to keep plants out of them.
+export function buildZoneGeometry(outlineM, inputs = {}, opts = {}) {
+  if (!Array.isArray(outlineM) || outlineM.length < 3) return null;
+  const b = outlineBounds(outlineM);
+  const width = value => opts.display ? zoneDisplayWidth(value, Math.max(b.width, b.height)).displayWidthM : value;
+  const bundWidthM = width(Math.max(0, Number(inputs.bundWidthM) || 0));
+  const drainWidthM = width(Math.max(0, Number(inputs.drainWidthM) || 0));
+  const pathWidthM = width(Math.max(0, Number(inputs.pathWidthM) || 0));
+  const otherDecimals = Math.max(0, Number(inputs.otherDecimals) || 0);
+  if (!(bundWidthM > 0 || drainWidthM > 0 || pathWidthM > 0 || otherDecimals > 0)) return null;
+  const geom = { bundWidthM, drain: null, path: null, other: null };
+  if (drainWidthM > 0) {
+    const pick = Number.isInteger(opts.drainEdgeIndex) && opts.drainEdgeIndex >= 0
+      ? { index: opts.drainEdgeIndex } : pickDrainEdge(outlineM, opts.elevationAt ?? null);
+    const a = outlineM[pick.index];
+    const c = outlineM[(pick.index + 1) % outlineM.length];
+    if (a && c) {
+      // Drain centre-line inset just inside the bund.
+      const dx = c[0] - a[0], dy = c[1] - a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const area = ringSignedArea(outlineM);
+      const nx = (area >= 0 ? -dy : dy) / len;
+      const ny = (area >= 0 ? dx : -dx) / len;
+      const off = bundWidthM + drainWidthM / 2;
+      geom.drain = { ax: a[0] + nx * off, ay: a[1] + ny * off,
+        bx: c[0] + nx * off, by: c[1] + ny * off, widthM: drainWidthM, edgeIndex: pick.index };
+    }
+  }
+  if (pathWidthM > 0) {
+    const axis = pathAxisThroughCentroid(outlineM);
+    if (axis.lengthM > 0) geom.path = { ...axis, widthM: pathWidthM };
+  }
+  if (otherDecimals > 0) {
+    const rect = otherPatchRect(outlineM, Math.sqrt(otherDecimals * M2_PER_DECIMAL), bundWidthM);
+    if (rect) geom.other = { ...rect, decimals: otherDecimals };
+  }
+  return geom;
+}
+
+// Subtract a finite drain ribbon from each terrain triangle before tessellation.
+export function drainSurfacePolygons(triangle, drain) {
+  if (!drain) return [triangle];
+  const dx = drain.bx - drain.ax, dy = drain.by - drain.ay;
+  const length = Math.hypot(dx, dy);
+  if (!length) return [triangle];
+  const ux = dx / length, uy = dy / length;
+  const along = ([x, y]) => (x - drain.ax) * ux + (y - drain.ay) * uy;
+  const across = ([x, y]) => -(x - drain.ax) * uy + (y - drain.ay) * ux;
+  const planes = [p => along(p), p => length - along(p),
+    p => drain.widthM / 2 - across(p), p => drain.widthM / 2 + across(p)];
+  const pieces = [];
+  let remaining = triangle;
+  for (const plane of planes) {
+    const outside = clipHalfPlane(remaining, p => -plane(p));
+    if (outside.length >= 3) pieces.push(outside);
+    remaining = clipHalfPlane(remaining, plane);
+    if (remaining.length < 3) break;
+  }
+  return pieces;
+}
+
+function clipHalfPlane(poly, distance) {
+  const result = [];
+  poly.forEach((a, i) => {
+    const b = poly[(i + 1) % poly.length];
+    const da = distance(a), db = distance(b);
+    if (da >= 0) result.push(a);
+    if ((da >= 0) !== (db >= 0)) {
+      const t = da / (da - db);
+      result.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  });
+  return result;
+}
+
+// Bound an enlarged clump's footprint by its nearest non-cultivable zone.
+export function fieldZoneClearance(x, y, geom, outlineM) {
+  let clearance = distToPolygonEdge(x, y, outlineM) - (geom?.bundWidthM || 0);
+  if (pointInFieldZones(x, y, geom, outlineM)) return 0;
+  for (const line of [geom?.path, geom?.drain]) {
+    if (line) clearance = Math.min(clearance,
+      distToSegment(x, y, line.ax, line.ay, line.bx, line.by) - line.widthM / 2);
+  }
+  if (geom?.other?.polygon) clearance = Math.min(clearance, distToPolygonEdge(x, y, geom.other.polygon));
+  return Math.max(0, clearance);
+}
+
+// Which zone (if any) contains the point. Returns 'bund' | 'drain' | 'path' | 'other' | null.
+export function pointInFieldZones(x, y, zoneGeom, outlineM = null) {
+  if (!zoneGeom) return null;
+  if (zoneGeom.other && (zoneGeom.other.polygon
+    ? pointInPolygon(x, y, zoneGeom.other.polygon)
+    : x >= zoneGeom.other.minX && x <= zoneGeom.other.maxX &&
+      y >= zoneGeom.other.minY && y <= zoneGeom.other.maxY)) return 'other';
+  if (zoneGeom.path) {
+    const p = zoneGeom.path;
+    if (distToSegment(x, y, p.ax, p.ay, p.bx, p.by) < p.widthM / 2) return 'path';
+  }
+  if (zoneGeom.drain) {
+    const d = zoneGeom.drain;
+    if (distToSegment(x, y, d.ax, d.ay, d.bx, d.by) < d.widthM / 2) return 'drain';
+  }
+  if (zoneGeom.bundWidthM > 0 && outlineM &&
+      distToPolygonEdge(x, y, outlineM) < zoneGeom.bundWidthM) return 'bund';
+  return null;
+}
+
+// Popover rows for a tapped zone: parameters plus the truth label.
+export function zonePopoverData(kind, zones, edited) {
+  const zone = zones?.[kind];
+  if (!zone) return null;
+  return {
+    kind, name: zone.name, widthM: zone.widthM, lengthM: zone.lengthM,
+    areaM2: zone.areaM2, decimals: zone.decimals, sharePct: zone.sharePct,
+    source: edited ? 'Entered by farmer' : 'Scenario default',
+    editHref: '#field',
+  };
+}
+
 // Generate plant positions on a grid inside outlineM, inset by half the widest spacing
 // so instances never sit outside the field. spacingYM lets callers model crop rows.
 export function plantPositionsInPolygon(outlineM, spacingM, spacingYM = spacingM) {
@@ -60,7 +390,9 @@ export function plantPositionsInPolygon(outlineM, spacingM, spacingYM = spacingM
 
 // Expand each spacing independently for a readable, bounded illustration.
 // A fixed field-relative gap keeps the 2 cm minimum below 70 × 70 clumps.
-export function plannerRowLayout(outlineM, rowCm, plantCm, usable = 100) {
+// zoneGeom (from buildZoneGeometry) keeps drawn rows out of bunds, drains,
+// paths and other patches so the illustration matches the reduced count.
+export function plannerRowLayout(outlineM, rowCm, plantCm, usable = 100, zoneGeom = null) {
   const empty = { positions: [], rowCount: 0, spacingX: 0, spacingY: 0 };
   if (!Array.isArray(outlineM) || outlineM.length < 3 ||
       outlineM.some((p) => !Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) ||
@@ -76,20 +408,32 @@ export function plannerRowLayout(outlineM, rowCm, plantCm, usable = 100) {
   const rowsAlongX = b.width >= b.height;
   const spacingX = rowsAlongX ? plant : row;
   const spacingY = rowsAlongX ? row : plant;
-  const reserve = (1 - Math.sqrt(usable / 100)) * Math.min(b.width, b.height) / 2;
+  const reserve = zoneGeom ? 0 : (1 - Math.sqrt(usable / 100)) * Math.min(b.width, b.height) / 2;
   const trueX = (rowsAlongX ? plantCm : rowCm) / 100;
   const trueY = (rowsAlongX ? rowCm : plantCm) / 100;
-  const inset = Math.max(reserve, Math.min(spacingX, spacingY, b.width, b.height) * 0.3);
+  const inset = Math.max(reserve, Math.min(spacingX, spacingY, b.width, b.height) * 0.3,
+    zoneGeom?.bundWidthM || 0);
   const positions = [];
+  let availableSamples = 0;
   const startX = trueX / 2 + Math.max(0, Math.floor((Math.min(spacingX, b.width) - trueX) / (2 * trueX))) * trueX;
   const startY = trueY / 2 + Math.max(0, Math.floor((Math.min(spacingY, b.height) - trueY) / (2 * trueY))) * trueY;
   for (let x = b.minX + startX; x < b.maxX; x += spacingX) {
     for (let y = b.minY + startY; y < b.maxY; y += spacingY) {
-      if (pointInPolygon(x, y, outlineM) && distToPolygonEdge(x, y, outlineM) >= inset) positions.push([x, y]);
+      if (!pointInPolygon(x, y, outlineM) || distToPolygonEdge(x, y, outlineM) < inset) continue;
+      availableSamples++;
+      if (zoneGeom && pointInFieldZones(x, y, zoneGeom, outlineM) !== null) continue;
+      positions.push([x, y]);
     }
   }
+  if (zoneGeom && usable < 100) {
+    const count = Math.min(positions.length, Math.max(1, Math.round(availableSamples * usable / 100)));
+    const sampled = Array.from({ length: count }, (_, i) => positions[Math.floor(i * positions.length / count)]);
+    positions.splice(0, positions.length, ...sampled);
+  }
   const rowCount = new Set(positions.map((p) => p[rowsAlongX ? 1 : 0])).size;
-  return { positions, rowCount, spacingX, spacingY, displayScale, rowStep, plantStep };
+  const totalPositions = capacity(Math.abs(ringSignedArea(outlineM)) / 10000, usable, 'rice', rowCm / 100, plantCm / 100).positions;
+  const sampleWeights = positions.map((_, i) => Math.floor(totalPositions / positions.length) + (i < totalPositions % positions.length ? 1 : 0));
+  return { positions, rowCount, spacingX, spacingY, displayScale, rowStep, plantStep, totalPositions, sampleWeights };
 }
 
 export function ringSignedArea(ring) {

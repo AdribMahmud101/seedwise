@@ -19,6 +19,7 @@ import {
   fieldName,
   polygon,
   area,
+  basePolygon,
   profile,
   setProfile,
   cropName,
@@ -53,18 +54,22 @@ import { getSmapSurfaceForMonth } from "./water.js";
 import { netArea, polygonPerimeterM, DEFAULT_NET_INPUTS } from "./netarea.js";
 import { outlookCard } from "./outlook-flood.js";
 
-function netInputsFor(fieldId = state.fieldId) {
+export function netInputsFor(fieldId = state.fieldId) {
   const saved = state.netInputs?.[fieldId];
   return saved ? { ...DEFAULT_NET_INPUTS, ...saved } : { ...DEFAULT_NET_INPUTS };
 }
-function netAreaFor(f = field()) {
-  const pts = state.boundaries[f.id] || polygon();
+export function netAreaFor(f = field()) {
+  const pts = state.boundaries[f.id] || basePolygon(f);
   const grossHa = areaHa(pts);
   const perimM = polygonPerimeterM(pts);
   return netArea(grossHa, perimM, netInputsFor(f.id));
 }
-function isNetEdited(fieldId = state.fieldId) {
+export function isNetEdited(fieldId = state.fieldId) {
   return !!state.netInputs?.[fieldId];
+}
+// Truth label for the field's bund/drain/path widths.
+export function netSourceLabel(fieldId = state.fieldId) {
+  return isNetEdited(fieldId) ? 'Entered by farmer' : 'Scenario default';
 }
 
 function isOnline() {

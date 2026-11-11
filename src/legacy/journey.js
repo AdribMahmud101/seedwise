@@ -1,5 +1,6 @@
 import { areaHa, capacity, PLANTING, polygonValid, rotationEvidence, STRATEGIES } from './engine.js';
 import { clampPlannerValue, recommendedSettings } from './planner-controls.js';
+import { cultivableUsablePct, DEFAULT_NET_INPUTS, polygonPerimeterM } from './netarea.js';
 
 const STORAGE_KEY = 'ropon_season_plan_v1';
 const SAVED_PLANS_KEY = 'ropon_saved_plans_v1';
@@ -41,6 +42,9 @@ function validateField(field) {
   requireValid(object(field) && text(field.id) && text(field.name) && positive(field.areaHa) &&
     text(field.outlineHash) && object(field.constraints) && date(field.confirmedAt));
   requireValid(!Object.hasOwn(Object.prototype, field.id) && field.id !== 'prototype');
+  if (field.netInputs !== undefined) requireValid(object(field.netInputs) &&
+    Object.keys(DEFAULT_NET_INPUTS).every(key => Number.isFinite(field.netInputs[key]) && field.netInputs[key] >= 0) &&
+    typeof field.netEdited === 'boolean');
   if (field.outline !== undefined) {
     requireValid(Array.isArray(field.outline) && field.outline.every(point => Array.isArray(point) &&
       Math.abs(point[0]) < 90 && Math.abs(point[1]) <= 180) && polygonValid(field.outline));
@@ -98,6 +102,7 @@ function validatePlan(plan) {
       (settings.variety === undefined || text(settings.variety)) &&
       (settings.custom === undefined || typeof settings.custom === 'boolean') && timestamp(settings.confirmedAt) &&
       object(settings.counts));
+    requireValid(settings.usableSource === undefined || ['field', 'override'].includes(settings.usableSource));
     const expected = countsFor(plan.field, settings);
     requireValid(settings.counts.plants === expected.plants && settings.counts.seedKg === expected.seedKg);
     requireValid(clampPlannerValue(settings.crop, 'usable', settings.usableAreaPct) === settings.usableAreaPct);
@@ -120,9 +125,10 @@ function validatePlan(plan) {
 
 const plannerCrop = crop => ['aman', 'boro'].includes(crop) ? 'rice' : crop;
 
-export function fieldSnapshot(field, outline, constraints) {
+export function fieldSnapshot(field, outline, constraints, netInputs) {
   return { id: field.id, name: field.name, areaHa: areaHa(outline),
-    outlineHash: JSON.stringify(outline), outline: copy(outline), constraints: copy(constraints) };
+    outlineHash: JSON.stringify(outline), outline: copy(outline), constraints: copy(constraints),
+    netInputs: { ...DEFAULT_NET_INPUTS, ...netInputs }, netEdited: !!netInputs };
 }
 
 export function rotationSnapshot(id, priorities, agronomy) {
@@ -146,11 +152,28 @@ export function rotationSnapshot(id, priorities, agronomy) {
     priorities: copy(priorities), seasons };
 }
 
+// Season usable default: the field's cultivable share from its bund/drain/path
+// widths (farmer-saved when present, scenario defaults otherwise). Falls back
+// to the generic recommendation when the field cannot provide one.
+export function fieldUsableDefault(field) {
+  try {
+    if (!field || !(field.areaHa > 0)) return null;
+    const inputs = field.netInputs ?? DEFAULT_NET_INPUTS;
+    const perimM = Array.isArray(field.outline) && field.outline.length >= 2
+      ? polygonPerimeterM(field.outline)
+      : 4 * Math.sqrt(field.areaHa * 10000);
+    if (!(perimM > 0)) return null;
+    return cultivableUsablePct(field.areaHa, perimM, inputs);
+  } catch {
+    return null;
+  }
+}
+
 function plantingDefaults(plan) {
   return Object.fromEntries(plan.rotation.seasons.filter(season => season.crop !== 'fallow').map(season => {
     const defaults = recommendedSettings(plannerCrop(season.crop));
     const settings = { crop: defaults.crop, rowSpacingCm: defaults.row, withinRowCm: defaults.spacing,
-      usableAreaPct: defaults.usable, confirmedAt: null };
+      usableAreaPct: fieldUsableDefault(plan.field) ?? defaults.usable, usableSource: 'field', confirmedAt: null };
     settings.counts = countsFor(plan.field, settings);
     return [season.key, settings];
   }));
@@ -171,10 +194,14 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
     validateField(value);
     if (!same(old, value)) {
       const changed = old && (old.id !== value.id || old.outlineHash !== value.outlineHash ||
-        Math.abs(old.areaHa - value.areaHa) / old.areaHa > 0.01 + Number.EPSILON || !same(old.constraints, value.constraints));
+        Math.abs(old.areaHa - value.areaHa) / old.areaHa > 0.01 + Number.EPSILON || !same(old.constraints, value.constraints) ||
+        !same(old.netInputs, value.netInputs));
       plan.field = { ...value, confirmedAt: now };
       plan.steps.field = 'done';
-      for (const settings of Object.values(plan.planting)) settings.counts = countsFor(plan.field, settings);
+      for (const settings of Object.values(plan.planting)) {
+        if (settings.usableSource === 'field') settings.usableAreaPct = fieldUsableDefault(plan.field) ?? settings.usableAreaPct;
+        settings.counts = countsFor(plan.field, settings);
+      }
       if (changed) {
         for (const settings of Object.values(plan.planting)) settings.confirmedAt = null;
         const reason = { en: 'field changed', bn: 'জমি পরিবর্তিত হয়েছে' };
@@ -212,9 +239,10 @@ export function transitionPlan(previous, action, now = new Date().toISOString())
     requireValid(plan.rotation && Object.hasOwn(plan.planting, action.key));
     const old = plan.planting[action.key];
     const settings = { ...old };
-    for (const key of ['crop', 'rowSpacingCm', 'withinRowCm', 'usableAreaPct', 'variety', 'custom']) {
+    for (const key of ['crop', 'rowSpacingCm', 'withinRowCm', 'usableAreaPct', 'usableSource', 'variety', 'custom']) {
       if (Object.hasOwn(action.value, key)) settings[key] = action.value[key];
     }
+    if (Object.hasOwn(action.value, 'usableAreaPct') && !Object.hasOwn(action.value, 'usableSource')) settings.usableSource = 'override';
     requireValid(Object.hasOwn(PLANTING, settings.crop));
     settings.counts = countsFor(plan.field, settings);
     if (!same(old, settings)) {
@@ -550,7 +578,7 @@ export async function demoPlan() {
   const constraints = ui.defaultProfile();
   const priorities = ui.defaultPriorities();
   const best = rotationEvidence(field.monthly, priorities, constraints)[0];
-  const snapshot = fieldSnapshot(field, ui.basePolygon(field), constraints);
+  const snapshot = fieldSnapshot(field, ui.basePolygon(field), constraints, ui.state.netInputs[field.id]);
   startPlan({ mode: 'demo' });
   confirmField({ ...snapshot, name: "Rahim's field" });
   confirmRotation(rotationSnapshot(best.id, priorities, agronomy));

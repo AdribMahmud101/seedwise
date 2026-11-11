@@ -9,6 +9,7 @@ import { getPlan, getReadyPlan, editReadyPlan, importPlanJSON, markPlanGenerated
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setPlannerSeason } from './planner.js';
+import { netInputsFor, isNetEdited } from './fields.js';
 import { recommendedSettings } from './planner-controls.js';
 
 const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -606,6 +607,8 @@ function schedulePlan3d() {
       await mod.mountPlanner3d(host, {
         field: planField, polygon: outline, rotationId: fresh.rotation.id, agronomy, soilProfile,
         planner: { crop: settings.crop, row: settings.rowSpacingCm, spacing: settings.withinRowCm, usable: settings.usableAreaPct },
+        net: { inputs: fresh.field.netInputs ?? netInputsFor(fresh.field.id),
+          edited: fresh.field.netEdited ?? isNetEdited(fresh.field.id) },
       });
     } catch (error) {
       if (version !== planVersion) return;
