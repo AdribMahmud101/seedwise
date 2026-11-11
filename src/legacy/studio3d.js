@@ -51,7 +51,7 @@ async function loadSoilNutrientsData() {
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { nasaBadge, state, t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
+import { nasaBadge, hlsField, state, t, truth, esc, num, fetchJsonMaybeGzip } from "./ui.js";
 import {
   outlineBounds,
   plantPositionsInPolygon,
@@ -536,6 +536,45 @@ function nearestForMonth(list, monthIdx) {
   return nearestObservation(list || [], monthIdx, year);
 }
 
+const photoSources = new Map();
+
+function surfaceSourceHtml(mode, data = currentData) {
+  if (['elevation', 'hypso', 'water', 'ponding'].includes(mode)) return nasaBadge('nasadem');
+  if (['ndvi', 'moisture', 'ndmi', 'productivity'].includes(mode) ||
+      (mode === 'photo' && photoSources.get(data?.field.id) === 'sentinel2')) return nasaBadge('sentinel2');
+  return '';
+}
+
+function hlsCheckHtml(mode, data = currentData) {
+  if (!['ndvi', 'moisture', 'ndmi', 'productivity'].includes(mode)) return '';
+  const site = hlsField?.sites?.[data?.field.id];
+  if (!site) return '';
+  if (data.field.boundary !== 'traced') return `<span class="hls-field-check">${t('HLS average unavailable for edited boundary', 'পরিবর্তিত সীমানার জন্য HLS গড় নেই')}</span>`;
+  const observations = site.observations.map(o => ({ date: o.targetDate, receipt: o }));
+  const observation = nearestForMonth(observations, currentMonthIdx)?.observation.receipt;
+  if (!observation) return '';
+  const index = mode === 'moisture' || mode === 'ndmi' ? 'NDMI' : 'NDVI';
+  const value = observation[index.toLowerCase()];
+  if (!Number.isFinite(value)) return `<span class="hls-field-check">${esc(t('NASA HLS unavailable', 'নাসা HLS নেই'))} · ${esc(observation.targetDate)} · ${esc(observation.reason)}</span>`;
+  return `<span class="hls-field-check">${t('Field average', 'মাঠের গড়')} ${index} ${num(value, 2)} · ${t('NASA HLS 30 m', 'নাসা HLS ৩০ মি')} · ${esc(observation.date)} · ${num(observation.cellCount)} ${t('clear cell(s)', 'মেঘমুক্ত সেল')} ${nasaBadge('hls', observation.date)}</span>`;
+}
+
+function updateLayerSources() {
+  if (!containerEl || !currentData) return;
+  const source = containerEl.querySelector('[data-surface-nasa]');
+  if (source) source.innerHTML = surfaceSourceHtml(currentSurfaceMode);
+  const photo = containerEl.querySelector('[data-photo-source]');
+  if (photo) photo.innerHTML = surfaceSourceHtml('photo');
+  containerEl.querySelectorAll('[data-hls-mode]').forEach(note => {
+    note.innerHTML = hlsCheckHtml(note.dataset.hlsMode);
+  });
+}
+
+function recordPhotoSource(data, name) {
+  photoSources.set(data.field.id, name.startsWith('/assets/sentinel-') ? 'sentinel2' : 'landsat');
+  updateLayerSources();
+}
+
 function loadSurfacePack(name) {
   if (!surfacePacks.has(name)) surfacePacks.set(name, fetchJsonMaybeGzip(`/data/${name}.json`));
   return surfacePacks.get(name);
@@ -638,7 +677,11 @@ async function buildTopTexture(data, layer, monthIdx, model = null) {
   // The photo layer keeps its actual image; categorical surfaces keep exact class colours.
   if (mode === 'photo') {
     for (const name of [`/assets/sentinel-${data.field.id}.jpg`, `/assets/satellite-${data.field.id}.jpg`]) {
-      try { drawImageCover(ctx, await loadImageElement(name), cvs.width, cvs.height); break; } catch { /* Keep the unclassified base if offline. */ }
+      try {
+        drawImageCover(ctx, await loadImageElement(name), cvs.width, cvs.height);
+        recordPhotoSource(data, name);
+        break;
+      } catch { /* Keep the unclassified base if offline. */ }
     }
   }
   const tex = new THREE.CanvasTexture(cvs);
@@ -1909,6 +1952,7 @@ async function buildGroundTexture(data) {
   for (const name of [`/assets/sentinel-${data.field.id}.jpg`, `/assets/satellite-${data.field.id}.jpg`]) {
     try {
       img = await loadImageElement(name);
+      recordPhotoSource(data, name);
       break;
     } catch (err) {
       /* next local image */
@@ -3474,6 +3518,7 @@ export function surfaceLegendHtml(legend) {
       ${legend.flowRows ? `<ul class="studio-flow-key">${legend.flowRows.map((row) => `<li><i style="background:${row.color}" aria-hidden="true"></i>${esc(row.label)}</li>`).join('')}</ul>` : ''}
       ${legend.remote ? `<p class="studio-surface-observed">${truth('REMOTE_OBSERVED')} ${esc(t('Remote observed (S1)', 'দূরবর্তী পর্যবেক্ষণ (S1)'))} · ${esc(legend.remote)}</p>` : ''}
       <p class="studio-surface-note">${esc(legend.note)}</p>
+      <div class="studio-surface-provenance">${hlsCheckHtml(legend.mode)}${surfaceSourceHtml(legend.mode)}</div>
       <p class="studio-surface-source">${esc(legend.source)} · ${esc(legend.date)}</p>
     </div>`;
 }
@@ -4116,12 +4161,12 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
         <h3>${t("3D Surface Layers", "সারফেস লেয়ার")}</h3>
         <div class="studio-layers-radio">
           <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="crops" ${currentSurfaceMode === "crops" ? "checked" : ""}><span>${t("Crop season (3D Plants)", "মৌসুমি ফসল (৩ডি উদ্ভিদ)")}</span></label>${nasaBadge(["power", "imerg"])}</div>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentSurfaceMode === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI)", "আর্দ্রতা (NDMI)")}</span></label>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label><span data-photo-source>${surfaceSourceHtml('photo', data)}</span></div>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>${nasaBadge('sentinel2')}<div data-hls-mode="ndvi">${hlsCheckHtml('ndvi', data)}</div></div>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentSurfaceMode === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI)", "আর্দ্রতা (NDMI)")}</span></label>${nasaBadge('sentinel2')}<div data-hls-mode="moisture">${hlsCheckHtml('moisture', data)}</div></div>
           <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="water" ${currentSurfaceMode === "water" || currentSurfaceMode === "ponding" ? "checked" : ""}><span>${t("Water flow & ponding", "পানির প্রবাহ ও জমা পানি")}</span></label>${nasaBadge("nasadem")}</div>
           <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="elevation" ${currentSurfaceMode === "elevation" || currentSurfaceMode === "hypso" ? "checked" : ""}><span>${t("Elevation & contours", "উচ্চতা ও কনট্যুর")}</span></label>${nasaBadge("nasadem")}</div>
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="productivity" ${currentSurfaceMode === "productivity" ? "checked" : ""}><span>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</span></label>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="productivity" ${currentSurfaceMode === "productivity" ? "checked" : ""}><span>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</span></label>${nasaBadge('sentinel2')}<div data-hls-mode="productivity">${hlsCheckHtml('productivity', data)}</div></div>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="fertility" ${currentSurfaceMode === "fertility" ? "checked" : ""}><span>${t("Soil fertility (SoilGrids)", "মাটির উর্বরতা (SoilGrids)")}</span></label>
         </div>
         <div class="studio-terrain-tools">
@@ -4214,7 +4259,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
               <option value="productivity" ${currentSurfaceMode === "productivity" ? "selected" : ""}>${t("Productivity zones", "উৎপাদনশীলতার অঞ্চল")}</option>
               <option value="fertility" ${currentSurfaceMode === "fertility" ? "selected" : ""}>${t("Soil fertility (SoilGrids)", "মাটির উর্বরতা (SoilGrids)")}</option>
             </select>
-            <span data-surface-nasa>${['elevation', 'hypso', 'water', 'ponding'].includes(currentSurfaceMode) ? nasaBadge('nasadem') : ''}</span>
+            <span data-surface-nasa>${surfaceSourceHtml(currentSurfaceMode, data)}</span>
           </div>
 
           <div class="studio-slice-card">
@@ -4503,6 +4548,7 @@ export async function mountStudio3d(container, data, opts = {}) {
 
 export async function setStudioMonth(monthIdx) {
   currentMonthIdx = monthIdx;
+  updateLayerSources();
   state.month = monthIdx;
   if (!currentData) return;
 
@@ -5057,8 +5103,7 @@ export function setSurfaceMode(mode) {
   if (containerEl) {
     const select = containerEl.querySelector("#select-surface-mode");
     if (select && select.value !== currentSurfaceMode) select.value = currentSurfaceMode;
-    const source = containerEl.querySelector('[data-surface-nasa]');
-    if (source) source.innerHTML = ['elevation', 'hypso', 'water', 'ponding'].includes(currentSurfaceMode) ? nasaBadge('nasadem') : '';
+    updateLayerSources();
     containerEl.querySelectorAll('input[name="studio-layer"]').forEach((r) => {
       r.checked = r.value === currentSurfaceMode;
     });

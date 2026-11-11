@@ -1,0 +1,587 @@
+{
+  "schemaVersion": 1,
+  "source": "NASA HLS v2.0 (HLSL30 / HLSS30), Microsoft Planetary Computer",
+  "url": "https://www.earthdata.nasa.gov/data/projects/hls",
+  "resolutionMetres": 30,
+  "method": "Nearest acquisition day within \u00b110 days; ties use tile cloud cover then item ID. Native 30 m cell centres inside ui.js basePolygon traced field outlines, no buffer. Fmask bits 1\u20134 and high aerosol (bits 6\u20137=3) excluded; fill, reflectance outside 0\u20131 and nonpositive denominators excluded. Arithmetic mean of per-cell NDVI=(NIR-red)/(NIR+red), NDMI=(NIR-SWIR1)/(NIR+SWIR1), same valid cells. S30 uses B04/B8A/B11; L30 uses B04/B05/B06. Scale 0.0001, offset 0. First scene with at least one jointly valid field cell is selected; partial clear coverage is reported by cellCount/eligibleCellCount.",
+  "qaReference": "https://lpdaac.usgs.gov/documents/1698/HLS_User_Guide_V2.pdf",
+  "itemIds": [
+    "HLS.S30.T45RYJ.2024069T043701.v2.0",
+    "HLS.S30.T45RYJ.2024314T043919.v2.0"
+  ],
+  "sites": {
+    "mithapukur": {
+      "polygon": [
+        [
+          25.541043,
+          89.271147
+        ],
+        [
+          25.540992,
+          89.27142099999999
+        ],
+        [
+          25.540692,
+          89.271343
+        ],
+        [
+          25.540727999999998,
+          89.271091
+        ]
+      ],
+      "coordinateOrder": "latitude,longitude",
+      "observations": [
+        {
+          "targetDate": "2024-03-09",
+          "date": "2024-03-09",
+          "ndvi": 0.717412,
+          "ndmi": 0.363293,
+          "cellCount": 1,
+          "itemId": "HLS.S30.T45RYJ.2024069T043701.v2.0",
+          "sensor": "sentinel-2a",
+          "reason": null,
+          "searchUrl": "https://planetarycomputer.microsoft.com/api/stac/v1/search?collections=hls2-l30%2Chls2-s30&bbox=89.271091%2C25.540692%2C89.27142099999999%2C25.541043&datetime=2024-02-28T00%3A00%3A00Z%2F2024-03-19T23%3A59%3A59Z&limit=100",
+          "candidateItemIds": [
+            "HLS.S30.T45RYJ.2024069T043701.v2.0",
+            "HLS.L30.T45RYJ.2024068T043023.v2.0",
+            "HLS.S30.T45RYJ.2024074T043659.v2.0",
+            "HLS.S30.T45RYJ.2024064T043659.v2.0",
+            "HLS.L30.T45RYJ.2024076T043001.v2.0",
+            "HLS.L30.T45RYJ.2024060T043011.v2.0",
+            "HLS.S30.T45RYJ.2024059T043731.v2.0",
+            "HLS.S30.T45RYJ.2024079T043701.v2.0"
+          ],
+          "attemptedItemIds": [
+            "HLS.S30.T45RYJ.2024069T043701.v2.0"
+          ],
+          "attempts": [
+            {
+              "itemId": "HLS.S30.T45RYJ.2024069T043701.v2.0",
+              "date": "2024-03-09",
+              "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024069T043701.v2.0",
+              "ndvi": 0.717412,
+              "ndmi": 0.363293,
+              "cellCount": 1,
+              "eligibleCellCount": 1,
+              "assets": [
+                {
+                  "band": "B04",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B04.tif",
+                  "windowSha256": "4febfc0de86c3002e7d1c7052d8b16e47751503f21c9d51dd93f2ccaa85ffd40"
+                },
+                {
+                  "band": "B8A",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B8A.tif",
+                  "windowSha256": "eba2946fd90498584ffbe1049dfb1aefe7587ae288153a3c0c22fe6766889c56"
+                },
+                {
+                  "band": "B11",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B11.tif",
+                  "windowSha256": "1b78a7ad34e7f53a3ff4f279ce0315fbc2a1aeb477a95ec69947ffa1322fa8ed"
+                },
+                {
+                  "band": "Fmask",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.Fmask.tif",
+                  "windowSha256": "ce718fc71b27c9421f534711a0e0927ce8bbbcdc2c350c8776603feced984959"
+                }
+              ],
+              "reason": null
+            }
+          ],
+          "eligibleCellCount": 1,
+          "assets": [
+            {
+              "band": "B04",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B04.tif",
+              "windowSha256": "4febfc0de86c3002e7d1c7052d8b16e47751503f21c9d51dd93f2ccaa85ffd40"
+            },
+            {
+              "band": "B8A",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B8A.tif",
+              "windowSha256": "eba2946fd90498584ffbe1049dfb1aefe7587ae288153a3c0c22fe6766889c56"
+            },
+            {
+              "band": "B11",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B11.tif",
+              "windowSha256": "1b78a7ad34e7f53a3ff4f279ce0315fbc2a1aeb477a95ec69947ffa1322fa8ed"
+            },
+            {
+              "band": "Fmask",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.Fmask.tif",
+              "windowSha256": "ce718fc71b27c9421f534711a0e0927ce8bbbcdc2c350c8776603feced984959"
+            }
+          ],
+          "collection": "hls2-s30",
+          "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024069T043701.v2.0"
+        },
+        {
+          "targetDate": "2024-11-09",
+          "date": "2024-11-09",
+          "ndvi": 0.785739,
+          "ndmi": 0.362418,
+          "cellCount": 1,
+          "itemId": "HLS.S30.T45RYJ.2024314T043919.v2.0",
+          "sensor": "sentinel-2b",
+          "reason": null,
+          "searchUrl": "https://planetarycomputer.microsoft.com/api/stac/v1/search?collections=hls2-l30%2Chls2-s30&bbox=89.271091%2C25.540692%2C89.27142099999999%2C25.541043&datetime=2024-10-30T00%3A00%3A00Z%2F2024-11-19T23%3A59%3A59Z&limit=100",
+          "candidateItemIds": [
+            "HLS.S30.T45RYJ.2024314T043919.v2.0",
+            "HLS.L30.T45RYJ.2024316T043012.v2.0",
+            "HLS.S30.T45RYJ.2024319T044041.v2.0",
+            "HLS.L30.T45RYJ.2024308T043017.v2.0",
+            "HLS.S30.T45RYJ.2024324T044009.v2.0",
+            "HLS.L30.T45RYJ.2024324T043022.v2.0",
+            "HLS.S30.T45RYJ.2024304T043829.v2.0"
+          ],
+          "attemptedItemIds": [
+            "HLS.S30.T45RYJ.2024314T043919.v2.0"
+          ],
+          "attempts": [
+            {
+              "itemId": "HLS.S30.T45RYJ.2024314T043919.v2.0",
+              "date": "2024-11-09",
+              "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024314T043919.v2.0",
+              "ndvi": 0.785739,
+              "ndmi": 0.362418,
+              "cellCount": 1,
+              "eligibleCellCount": 1,
+              "assets": [
+                {
+                  "band": "B04",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B04.tif",
+                  "windowSha256": "1ab0a6f049a0e24f2216ed722a0060b7ebe996dbb31dd3b99480c7ceca3defc9"
+                },
+                {
+                  "band": "B8A",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B8A.tif",
+                  "windowSha256": "59bbc849ef7ee824a4af275e6ba4d3c76c7c7c993a789c83e268875a06706763"
+                },
+                {
+                  "band": "B11",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B11.tif",
+                  "windowSha256": "80751cf0314e65291afbe75692b9e53c870bc6d66475c3e8468f158444c32623"
+                },
+                {
+                  "band": "Fmask",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.Fmask.tif",
+                  "windowSha256": "b9b1d7af0a82314b24dd88b9f257985d5b975166e9e6d074d21c6278dadf2ec6"
+                }
+              ],
+              "reason": null
+            }
+          ],
+          "eligibleCellCount": 1,
+          "assets": [
+            {
+              "band": "B04",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B04.tif",
+              "windowSha256": "1ab0a6f049a0e24f2216ed722a0060b7ebe996dbb31dd3b99480c7ceca3defc9"
+            },
+            {
+              "band": "B8A",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B8A.tif",
+              "windowSha256": "59bbc849ef7ee824a4af275e6ba4d3c76c7c7c993a789c83e268875a06706763"
+            },
+            {
+              "band": "B11",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B11.tif",
+              "windowSha256": "80751cf0314e65291afbe75692b9e53c870bc6d66475c3e8468f158444c32623"
+            },
+            {
+              "band": "Fmask",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.Fmask.tif",
+              "windowSha256": "b9b1d7af0a82314b24dd88b9f257985d5b975166e9e6d074d21c6278dadf2ec6"
+            }
+          ],
+          "collection": "hls2-s30",
+          "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024314T043919.v2.0"
+        }
+      ]
+    },
+    "pirganj": {
+      "polygon": [
+        [
+          25.500745,
+          89.220838
+        ],
+        [
+          25.500736,
+          89.221298
+        ],
+        [
+          25.500487,
+          89.22129
+        ],
+        [
+          25.500479,
+          89.220832
+        ]
+      ],
+      "coordinateOrder": "latitude,longitude",
+      "observations": [
+        {
+          "targetDate": "2024-03-09",
+          "date": "2024-03-09",
+          "ndvi": 0.67106,
+          "ndmi": 0.500237,
+          "cellCount": 1,
+          "itemId": "HLS.S30.T45RYJ.2024069T043701.v2.0",
+          "sensor": "sentinel-2a",
+          "reason": null,
+          "searchUrl": "https://planetarycomputer.microsoft.com/api/stac/v1/search?collections=hls2-l30%2Chls2-s30&bbox=89.220832%2C25.500479%2C89.221298%2C25.500745&datetime=2024-02-28T00%3A00%3A00Z%2F2024-03-19T23%3A59%3A59Z&limit=100",
+          "candidateItemIds": [
+            "HLS.S30.T45RYJ.2024069T043701.v2.0",
+            "HLS.L30.T45RYJ.2024068T043023.v2.0",
+            "HLS.S30.T45RYJ.2024074T043659.v2.0",
+            "HLS.S30.T45RYJ.2024064T043659.v2.0",
+            "HLS.L30.T45RYJ.2024076T043001.v2.0",
+            "HLS.L30.T45RYJ.2024060T043011.v2.0",
+            "HLS.S30.T45RYJ.2024059T043731.v2.0",
+            "HLS.S30.T45RYJ.2024079T043701.v2.0"
+          ],
+          "attemptedItemIds": [
+            "HLS.S30.T45RYJ.2024069T043701.v2.0"
+          ],
+          "attempts": [
+            {
+              "itemId": "HLS.S30.T45RYJ.2024069T043701.v2.0",
+              "date": "2024-03-09",
+              "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024069T043701.v2.0",
+              "ndvi": 0.67106,
+              "ndmi": 0.500237,
+              "cellCount": 1,
+              "eligibleCellCount": 2,
+              "assets": [
+                {
+                  "band": "B04",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B04.tif",
+                  "windowSha256": "d730cc8e0023f1c2a6550691dd39fb3b3298c1ac1888704e95e1f560c2019d5b"
+                },
+                {
+                  "band": "B8A",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B8A.tif",
+                  "windowSha256": "3429926c4f0f6571dd27436b7bc31c46726ccab13b35d581adf7d81894d6b70f"
+                },
+                {
+                  "band": "B11",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B11.tif",
+                  "windowSha256": "90f2ed9bc993e7920bf51fee073ea3f079700a0a83b4ce3d1a84f6762d7a9a9e"
+                },
+                {
+                  "band": "Fmask",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.Fmask.tif",
+                  "windowSha256": "0b93c01f4ac97f1246ca23f5a8e445efe9c45a32eaa305018aef3726ca3acfb8"
+                }
+              ],
+              "reason": null
+            }
+          ],
+          "eligibleCellCount": 2,
+          "assets": [
+            {
+              "band": "B04",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B04.tif",
+              "windowSha256": "d730cc8e0023f1c2a6550691dd39fb3b3298c1ac1888704e95e1f560c2019d5b"
+            },
+            {
+              "band": "B8A",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B8A.tif",
+              "windowSha256": "3429926c4f0f6571dd27436b7bc31c46726ccab13b35d581adf7d81894d6b70f"
+            },
+            {
+              "band": "B11",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B11.tif",
+              "windowSha256": "90f2ed9bc993e7920bf51fee073ea3f079700a0a83b4ce3d1a84f6762d7a9a9e"
+            },
+            {
+              "band": "Fmask",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.Fmask.tif",
+              "windowSha256": "0b93c01f4ac97f1246ca23f5a8e445efe9c45a32eaa305018aef3726ca3acfb8"
+            }
+          ],
+          "collection": "hls2-s30",
+          "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024069T043701.v2.0"
+        },
+        {
+          "targetDate": "2024-11-09",
+          "date": "2024-11-09",
+          "ndvi": 0.788272,
+          "ndmi": 0.377062,
+          "cellCount": 2,
+          "itemId": "HLS.S30.T45RYJ.2024314T043919.v2.0",
+          "sensor": "sentinel-2b",
+          "reason": null,
+          "searchUrl": "https://planetarycomputer.microsoft.com/api/stac/v1/search?collections=hls2-l30%2Chls2-s30&bbox=89.220832%2C25.500479%2C89.221298%2C25.500745&datetime=2024-10-30T00%3A00%3A00Z%2F2024-11-19T23%3A59%3A59Z&limit=100",
+          "candidateItemIds": [
+            "HLS.S30.T45RYJ.2024314T043919.v2.0",
+            "HLS.L30.T45RYJ.2024316T043012.v2.0",
+            "HLS.S30.T45RYJ.2024319T044041.v2.0",
+            "HLS.L30.T45RYJ.2024308T043017.v2.0",
+            "HLS.S30.T45RYJ.2024324T044009.v2.0",
+            "HLS.L30.T45RYJ.2024324T043022.v2.0",
+            "HLS.S30.T45RYJ.2024304T043829.v2.0"
+          ],
+          "attemptedItemIds": [
+            "HLS.S30.T45RYJ.2024314T043919.v2.0"
+          ],
+          "attempts": [
+            {
+              "itemId": "HLS.S30.T45RYJ.2024314T043919.v2.0",
+              "date": "2024-11-09",
+              "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024314T043919.v2.0",
+              "ndvi": 0.788272,
+              "ndmi": 0.377062,
+              "cellCount": 2,
+              "eligibleCellCount": 2,
+              "assets": [
+                {
+                  "band": "B04",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B04.tif",
+                  "windowSha256": "c02286a49293f85ac924da3bc16f89f51d93f024b23951e2083f845110c8e201"
+                },
+                {
+                  "band": "B8A",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B8A.tif",
+                  "windowSha256": "ec6a47b63bc0783ceea79f5e2175f41803e4ad572ce5fb788648badd8291fdd4"
+                },
+                {
+                  "band": "B11",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B11.tif",
+                  "windowSha256": "f0e5226f3a372150efd3fe13d6d740745fcb6eb808bdae1081f971eb43cc2cc9"
+                },
+                {
+                  "band": "Fmask",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.Fmask.tif",
+                  "windowSha256": "809a84227cf4d6fde8c9424bd2ef91e700f189e3098033a25a66ab0d8773ffdb"
+                }
+              ],
+              "reason": null
+            }
+          ],
+          "eligibleCellCount": 2,
+          "assets": [
+            {
+              "band": "B04",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B04.tif",
+              "windowSha256": "c02286a49293f85ac924da3bc16f89f51d93f024b23951e2083f845110c8e201"
+            },
+            {
+              "band": "B8A",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B8A.tif",
+              "windowSha256": "ec6a47b63bc0783ceea79f5e2175f41803e4ad572ce5fb788648badd8291fdd4"
+            },
+            {
+              "band": "B11",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B11.tif",
+              "windowSha256": "f0e5226f3a372150efd3fe13d6d740745fcb6eb808bdae1081f971eb43cc2cc9"
+            },
+            {
+              "band": "Fmask",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.Fmask.tif",
+              "windowSha256": "809a84227cf4d6fde8c9424bd2ef91e700f189e3098033a25a66ab0d8773ffdb"
+            }
+          ],
+          "collection": "hls2-s30",
+          "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024314T043919.v2.0"
+        }
+      ]
+    },
+    "gangachara": {
+      "polygon": [
+        [
+          25.851101,
+          89.19940100000001
+        ],
+        [
+          25.851071,
+          89.19979000000001
+        ],
+        [
+          25.85086,
+          89.199783
+        ],
+        [
+          25.850691,
+          89.199736
+        ],
+        [
+          25.850721,
+          89.19933400000001
+        ],
+        [
+          25.850854,
+          89.199347
+        ]
+      ],
+      "coordinateOrder": "latitude,longitude",
+      "observations": [
+        {
+          "targetDate": "2024-03-09",
+          "date": "2024-03-09",
+          "ndvi": 0.565441,
+          "ndmi": 0.163629,
+          "cellCount": 1,
+          "itemId": "HLS.S30.T45RYJ.2024069T043701.v2.0",
+          "sensor": "sentinel-2a",
+          "reason": null,
+          "searchUrl": "https://planetarycomputer.microsoft.com/api/stac/v1/search?collections=hls2-l30%2Chls2-s30&bbox=89.19933400000001%2C25.850691%2C89.19979000000001%2C25.851101&datetime=2024-02-28T00%3A00%3A00Z%2F2024-03-19T23%3A59%3A59Z&limit=100",
+          "candidateItemIds": [
+            "HLS.S30.T45RYJ.2024069T043701.v2.0",
+            "HLS.L30.T45RYJ.2024068T043023.v2.0",
+            "HLS.S30.T45RYJ.2024074T043659.v2.0",
+            "HLS.S30.T45RYJ.2024064T043659.v2.0",
+            "HLS.L30.T45RYJ.2024076T043001.v2.0",
+            "HLS.L30.T45RYJ.2024060T043011.v2.0",
+            "HLS.S30.T45RYJ.2024059T043731.v2.0",
+            "HLS.S30.T45RYJ.2024079T043701.v2.0"
+          ],
+          "attemptedItemIds": [
+            "HLS.S30.T45RYJ.2024069T043701.v2.0"
+          ],
+          "attempts": [
+            {
+              "itemId": "HLS.S30.T45RYJ.2024069T043701.v2.0",
+              "date": "2024-03-09",
+              "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024069T043701.v2.0",
+              "ndvi": 0.565441,
+              "ndmi": 0.163629,
+              "cellCount": 1,
+              "eligibleCellCount": 1,
+              "assets": [
+                {
+                  "band": "B04",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B04.tif",
+                  "windowSha256": "cec2d9b0a07723305b8f051e2d277438c732986dee442c04485f821ef363d1a4"
+                },
+                {
+                  "band": "B8A",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B8A.tif",
+                  "windowSha256": "33426effe60f9871752b0628a09e63a0530eb12e5b0496d3ec926140eb026120"
+                },
+                {
+                  "band": "B11",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B11.tif",
+                  "windowSha256": "308fd78da20bfd03efa715084d346aa762265083d025aeab011bf1e4d6e0f776"
+                },
+                {
+                  "band": "Fmask",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.Fmask.tif",
+                  "windowSha256": "48c43ca34cb88e39f1d36a4339505bff6dda9d977d421e08aa050610ce4c7d05"
+                }
+              ],
+              "reason": null
+            }
+          ],
+          "eligibleCellCount": 1,
+          "assets": [
+            {
+              "band": "B04",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B04.tif",
+              "windowSha256": "cec2d9b0a07723305b8f051e2d277438c732986dee442c04485f821ef363d1a4"
+            },
+            {
+              "band": "B8A",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B8A.tif",
+              "windowSha256": "33426effe60f9871752b0628a09e63a0530eb12e5b0496d3ec926140eb026120"
+            },
+            {
+              "band": "B11",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.B11.tif",
+              "windowSha256": "308fd78da20bfd03efa715084d346aa762265083d025aeab011bf1e4d6e0f776"
+            },
+            {
+              "band": "Fmask",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/03/09/HLS.S30.T45RYJ.2024069T043701.v2.0/HLS.S30.T45RYJ.2024069T043701.v2.0.Fmask.tif",
+              "windowSha256": "48c43ca34cb88e39f1d36a4339505bff6dda9d977d421e08aa050610ce4c7d05"
+            }
+          ],
+          "collection": "hls2-s30",
+          "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024069T043701.v2.0"
+        },
+        {
+          "targetDate": "2024-11-09",
+          "date": "2024-11-09",
+          "ndvi": 0.708733,
+          "ndmi": 0.296566,
+          "cellCount": 1,
+          "itemId": "HLS.S30.T45RYJ.2024314T043919.v2.0",
+          "sensor": "sentinel-2b",
+          "reason": null,
+          "searchUrl": "https://planetarycomputer.microsoft.com/api/stac/v1/search?collections=hls2-l30%2Chls2-s30&bbox=89.19933400000001%2C25.850691%2C89.19979000000001%2C25.851101&datetime=2024-10-30T00%3A00%3A00Z%2F2024-11-19T23%3A59%3A59Z&limit=100",
+          "candidateItemIds": [
+            "HLS.S30.T45RYJ.2024314T043919.v2.0",
+            "HLS.L30.T45RYJ.2024316T043012.v2.0",
+            "HLS.S30.T45RYJ.2024319T044041.v2.0",
+            "HLS.L30.T45RYJ.2024308T043017.v2.0",
+            "HLS.S30.T45RYJ.2024324T044009.v2.0",
+            "HLS.L30.T45RYJ.2024324T043022.v2.0",
+            "HLS.S30.T45RYJ.2024304T043829.v2.0"
+          ],
+          "attemptedItemIds": [
+            "HLS.S30.T45RYJ.2024314T043919.v2.0"
+          ],
+          "attempts": [
+            {
+              "itemId": "HLS.S30.T45RYJ.2024314T043919.v2.0",
+              "date": "2024-11-09",
+              "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024314T043919.v2.0",
+              "ndvi": 0.708733,
+              "ndmi": 0.296566,
+              "cellCount": 1,
+              "eligibleCellCount": 1,
+              "assets": [
+                {
+                  "band": "B04",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B04.tif",
+                  "windowSha256": "96d063ec1f99d66cac1a7fbca26d4c45b3f616e5b0e7e506366c4fbeafa23215"
+                },
+                {
+                  "band": "B8A",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B8A.tif",
+                  "windowSha256": "61650e1b19df14b671f90a351d99fb2ad9235aacdebf44241ada4eaf13083c9b"
+                },
+                {
+                  "band": "B11",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B11.tif",
+                  "windowSha256": "03230078c94f71fdc2a7dec31b1b4c29a3ad4945829668da525a0aaa1bb9a1b1"
+                },
+                {
+                  "band": "Fmask",
+                  "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.Fmask.tif",
+                  "windowSha256": "403ce1f996a16b3980bfe450ee3d707226c9050fc22c22e965f7c634786ed902"
+                }
+              ],
+              "reason": null
+            }
+          ],
+          "eligibleCellCount": 1,
+          "assets": [
+            {
+              "band": "B04",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B04.tif",
+              "windowSha256": "96d063ec1f99d66cac1a7fbca26d4c45b3f616e5b0e7e506366c4fbeafa23215"
+            },
+            {
+              "band": "B8A",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B8A.tif",
+              "windowSha256": "61650e1b19df14b671f90a351d99fb2ad9235aacdebf44241ada4eaf13083c9b"
+            },
+            {
+              "band": "B11",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.B11.tif",
+              "windowSha256": "03230078c94f71fdc2a7dec31b1b4c29a3ad4945829668da525a0aaa1bb9a1b1"
+            },
+            {
+              "band": "Fmask",
+              "url": "https://hls2euwest.blob.core.windows.net/hls2/S30/45/R/YJ/2024/11/09/HLS.S30.T45RYJ.2024314T043919.v2.0/HLS.S30.T45RYJ.2024314T043919.v2.0.Fmask.tif",
+              "windowSha256": "403ce1f996a16b3980bfe450ee3d707226c9050fc22c22e965f7c634786ed902"
+            }
+          ],
+          "collection": "hls2-s30",
+          "url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/hls2-s30/items/HLS.S30.T45RYJ.2024314T043919.v2.0"
+        }
+      ]
+    }
+  },
+  "retrievedAt": "2026-11-11T06:23:01.641970+00:00"
+}
