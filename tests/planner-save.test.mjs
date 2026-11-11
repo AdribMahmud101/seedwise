@@ -178,7 +178,9 @@ test('storage failure leaves saved inputs available for another attempt', t => {
   assert.equal(location.hash, '#planner');
   assert.equal(journey.getPlan(), null);
   assert.deepEqual(journey.listPlans(), []);
-  assert.deepEqual(JSON.parse(localStorage.getItem('ropon_custom_plan_v1')), source);
+  // Recommended-setup migration adds original* fields; the user's saved inputs must otherwise be untouched.
+  const kept = JSON.parse(localStorage.getItem('ropon_custom_plan_v1'), (k, v) => (k.startsWith('original') ? undefined : v));
+  assert.deepEqual(kept, source);
   assert.match(planner(), /data-action="plan-save"/);
 });
 
