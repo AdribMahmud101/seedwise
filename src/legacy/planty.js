@@ -1,11 +1,34 @@
 import { t, esc, num } from './ui.js';
 
+let configured = false;
+
+function offlineAnswer(lang) {
+  return lang === 'bn'
+    ? 'Planty এখন ইন্টারনেটে সংযোগ করতে পারছে না — আপনার পরিকল্পনার হিসাব অফলাইনেও কাজ করে।'
+    : "Planty can't reach the internet right now — your planner numbers still work offline.";
+}
+
 export async function askPlanty({ question, context }) {
-  // This is the single backend boundary; no request leaves the browser yet.
-  void question;
-  return context.lang === 'bn'
-    ? 'Planty-এর এআই সংযোগ এখনো চালু হয়নি। আপাতত পরিকল্পনার হিসাব দেখতে সেটিংস ব্যবহার করুন।'
-    : "Planty's AI connection is not set up yet. Use the planner settings to explore the estimates for now.";
+  // This is the single backend boundary; only the Worker contacts the model.
+  const { lang, ...fieldContext } = context;
+  if (globalThis.navigator?.onLine === false) return offlineAnswer(lang);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const response = await fetch('/api/planty', {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, lang, context: fieldContext }), signal: controller.signal,
+    });
+    const data = await response.json();
+    if (response.status === 503 && data?.error === 'not_configured') configured = false;
+    if (!response.ok || typeof data?.answer !== 'string' || !data.answer.trim()) return offlineAnswer(lang);
+    configured = true;
+    return data.answer;
+  } catch {
+    return offlineAnswer(lang);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function plantyMascot(pose = 'idle') {
@@ -40,11 +63,11 @@ let activeRequest = 0;
 export function plantyPanel(planner) {
   return `<div class="planty-shade" hidden></div><aside id="planty-panel" class="planty-panel" aria-labelledby="planty-title" ${open ? '' : 'hidden'}>
     <header class="planty-header">${plantyMascot()}<div><h2 id="planty-title">Planty</h2><span>${t('Your planting companion', 'আপনার বপনের সঙ্গী')}</span></div><button type="button" class="planty-close" aria-label="${t('Close Planty', 'Planty বন্ধ করুন')}">×</button></header>
-    <div class="planty-body"><div class="planty-greeting"><strong>${t('A little help to get growing.', 'চাষের শুরুতে একটু সহায়তা।')}</strong><p>${t('Hi, I’m Planty. Your current crop and settings travel with each question.', 'আমি Planty। প্রতিটি প্রশ্নের সঙ্গে আপনার ফসল ও বর্তমান সেটিংস যুক্ত থাকবে।')}</p><span class="planty-status">${t('AI connection not set up', 'এআই সংযোগ চালু হয়নি')}</span></div>
+    <div class="planty-body"><div class="planty-greeting"><strong>${t('A little help to get growing.', 'চাষের শুরুতে একটু সহায়তা।')}</strong><p>${t('Hi, I’m Planty. Your current crop and settings travel with each question.', 'আমি Planty। প্রতিটি প্রশ্নের সঙ্গে আপনার ফসল ও বর্তমান সেটিংস যুক্ত থাকবে।')}</p><span class="planty-status" ${configured ? 'hidden' : ''}>${t('AI connection not set up', 'এআই সংযোগ চালু হয়নি')}</span></div>
     <div class="planty-suggestions" aria-label="${t('Suggested questions', 'প্রস্তাবিত প্রশ্ন')}">${suggestions(planner)}</div>
     <div class="planty-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="${t('Conversation', 'কথোপকথন')}">${messages.map(message => messageMarkup(message)).join('')}</div></div>
-    <form id="planty-form"><label class="sr-only" for="planty-question">${t('Ask Planty', 'Planty-কে প্রশ্ন করুন')}</label><input id="planty-question" placeholder="${t('Ask about this plan…', 'এই পরিকল্পনা নিয়ে প্রশ্ন…')}" autocomplete="off" maxlength="1000" value="${esc(draft)}" required><button type="submit" aria-label="${t('Send question', 'প্রশ্ন পাঠান')}">${t('Send', 'পাঠান')} <span aria-hidden="true">↗</span></button></form>
-    <p class="planty-footnote">${t('UI preview · No AI advice yet', 'ইউআই নমুনা · এআই পরামর্শ এখনো নেই')}</p></aside>
+    <form id="planty-form"><label class="sr-only" for="planty-question">${t('Ask Planty', 'Planty-কে প্রশ্ন করুন')}</label><input id="planty-question" placeholder="${t('Ask about this plan…', 'এই পরিকল্পনা নিয়ে প্রশ্ন…')}" autocomplete="off" maxlength="600" value="${esc(draft)}" required><button type="submit" aria-label="${t('Send question', 'প্রশ্ন পাঠান')}">${t('Send', 'পাঠান')} <span aria-hidden="true">↗</span></button></form>
+    <p class="planty-footnote">${t('AI answers can be wrong — check with your local extension officer.', 'এআইয়ের উত্তর ভুল হতে পারে — স্থানীয় কৃষি কর্মকর্তার পরামর্শ নিন।')}</p></aside>
     <button type="button" class="planty-launch" aria-controls="planty-panel" aria-expanded="${open}">${plantyMascot('happy')}<span>${t('Ask Planty', 'Planty-কে বলুন')}</span><span class="planty-launch-dot" aria-hidden="true"></span></button>`;
 }
 
@@ -106,21 +129,26 @@ export function mountPlanty(getContext) {
   form.onsubmit = async event => {
     event.preventDefault();
     const question = input.value.trim();
-    if (!question || form.querySelector('button').disabled) return;
+    if (!question || question.length > 600 || form.querySelector('button').disabled) return;
     const request = ++activeRequest;
     const context = getContext();
     append({ role: 'user', text: question });
     draft = input.value = '';
     form.querySelector('button').disabled = true;
-    panel.querySelector('.planty-mascot').classList.replace('planty-idle', 'planty-thinking');
+    panel.querySelector('.planty-header .planty-mascot').outerHTML = plantyMascot('thinking');
+    panel.querySelector('.planty-messages').setAttribute('aria-busy', 'true');
     try {
       const text = await askPlanty({ question, context });
-      if (request === activeRequest) append({ role: 'assistant', text });
+      if (request === activeRequest) {
+        append({ role: 'assistant', text });
+        panel.querySelector('.planty-status').hidden = configured;
+      }
     } catch {
-      if (request === activeRequest) append({ role: 'assistant', text: context.lang === 'bn' ? 'Planty-এর সঙ্গে সংযোগ হয়নি। আবার চেষ্টা করুন।' : 'Could not connect to Planty. Please try again.' });
+      if (request === activeRequest) append({ role: 'assistant', text: offlineAnswer(context.lang) });
     } finally {
       form.querySelector('button').disabled = false;
-      panel.querySelector('.planty-mascot').classList.replace('planty-thinking', 'planty-idle');
+      panel.querySelector('.planty-header .planty-mascot').outerHTML = plantyMascot('happy');
+      panel.querySelector('.planty-messages').setAttribute('aria-busy', 'false');
     }
   };
   const resize = () => setOpen(open, false);

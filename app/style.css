@@ -3703,7 +3703,7 @@ dialog .modal-body {
 [data-page="planner"] .plan-harvest .note { font-size: 11px; margin: 5px 0; }
 [data-page="planner"] .plan-harvest .source-links { font-size: 11px; }
 [data-page="planner"] .planty-panel { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); min-width: 0; overflow: hidden; position: sticky; top: 18px; display: flex; flex-direction: column; max-height: calc(100dvh - 36px); }
-[data-page="planner"] .planty-panel[hidden], [data-page="planner"] .planty-shade[hidden] { display: none; }
+[data-page="planner"] .planty-panel[hidden], [data-page="planner"] .planty-shade[hidden], [data-page="planner"] .planty-status[hidden] { display: none; }
 [data-page="planner"] .planty-header { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); background: #f0f4e5; }
 [data-page="planner"] .planty-header h2 { font: 25px/1.1 Fraunces, serif; margin: 0 0 3px; }
 [data-page="planner"] .planty-header span { font-size: 10px; color: var(--muted); }
@@ -3719,7 +3719,7 @@ dialog .modal-body {
 [data-page="planner"] .planty-message { padding: 11px 13px; margin: 12px 0; border-radius: 12px; background: #f0f2e8; overflow-wrap: anywhere; }
 [data-page="planner"] .planty-message.user { margin-left: 20px; background: #e5edda; }
 [data-page="planner"] .planty-message small { font-size: 10px; color: var(--muted); }
-[data-page="planner"] .planty-message p { margin: 4px 0 0; font-size: 12px; }
+[data-page="planner"] .planty-message p { margin: 4px 0 0; font-size: 12px; white-space: pre-wrap; }
 [data-page="planner"] #planty-form { display: flex; gap: 6px; padding: 12px; border-top: 1px solid var(--line); }
 [data-page="planner"] #planty-form input { width: 0; min-width: 0; flex: 1; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 12px; }
 [data-page="planner"] #planty-form button { min-width: 58px; min-height: 44px; border: 0; border-radius: 8px; background: var(--green); color: white; padding: 8px; font-size: 12px; }

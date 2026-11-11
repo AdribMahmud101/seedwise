@@ -35,10 +35,16 @@ export function syncPlannerControl(input, planner) {
   return value;
 }
 
-export function plantyContext(fieldId, planner, counts, lang) {
+export function plantyContext(fieldId, planner, counts, lang, details = {}) {
   return {
-    fieldId, crop: planner.crop,
-    spacing: planner.crop === 'mustard' ? null : { rowCm: planner.row, withinRowCm: planner.spacing },
-    usablePercent: planner.usable, counts: { ...counts }, lang,
+    fieldId, fieldName: details.fieldName, crop: planner.crop,
+    rowSpacingCm: planner.crop === 'mustard' ? null : planner.row,
+    withinRowCm: planner.crop === 'mustard' ? null : planner.spacing,
+    usableAreaPct: planner.usable, areaHa: counts.net, plantCount: counts.positions, seedKg: counts.seedKg,
+    month: details.month, lang,
+    truthLabels: {
+      rowSpacingCm: 'FARMER_REPORTED', withinRowCm: 'FARMER_REPORTED', usableAreaPct: 'SCENARIO',
+      areaHa: 'SCENARIO', plantCount: 'SCENARIO', seedKg: 'SCENARIO',
+    },
   };
 }

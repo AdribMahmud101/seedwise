@@ -5,6 +5,7 @@ import {
   t,
   num,
   field,
+  fieldName,
   polygon,
   area,
   button,
@@ -336,7 +337,7 @@ function disposePlanner() {
 
 function mountPlanner() {
   disposePlanty?.();
-  disposePlanty = mountPlanty(() => plantyContext(field().id, state.planner, estimate(), state.lang));
+  disposePlanty = mountPlanty(() => plantyContext(field().id, state.planner, estimate(), state.lang, { fieldName: fieldName(), month: state.month + 1 }));
   document.querySelector('#plant-controls').onsubmit = event => event.preventDefault();
   const cv = document.querySelector('#plant-model');
   if (!cv) return;
