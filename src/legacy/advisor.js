@@ -198,7 +198,8 @@ export function clearCustomPlan() { try { localStorage.removeItem(CUSTOM_KEY); }
 function useInPlanner() {
   const r = ui.result;
   if (!r?.planting?.length || r.verdict === 'not_suitable') return;
-  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: ui.mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
+  // Mode follows the auto-detected category (two crops together = mixed land split; one crop = whole field).
+  const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: advisorRequest({}).mode, planting: r.planting, calendar: r.calendar, savedAt: new Date().toISOString() };
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
   location.hash = '#planner';
 }
