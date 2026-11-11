@@ -83,6 +83,25 @@ export const FIELD_HOWTO_STEPS = [
 
 export const ROTATION_HOWTO_STEPS = [
   {
+    id: 'rotation-intro',
+    title: { en: 'Meet your field in 3D', bn: '৩ডি-তে আপনার জমি দেখুন' },
+    why: { en: 'See your field, soil and seasons before choosing', bn: 'আপনার জমি, মাটি ও মৌসুম নির্বাচনের আগে দেখুন' },
+    how: { en: 'Look, then tap Next', bn: 'দেখুন, তারপর Next চাপুন' },
+    target: '#studio-3d-root, #studio-3d-host',
+    doneEvent: 'intro-viewed',
+    clip: `${HOWTO_ASSET_DIR}/rotation-intro.webp`,
+    poster: `${HOWTO_ASSET_DIR}/rotation-intro.jpg`,
+    seconds: 8,
+    micro: [
+      { target: '.studio-stage-canvas-host', action: 'none', text: { en: 'Your field, built from NASA elevation data', bn: 'আপনার জমি, NASA উচ্চতার তথ্যে তৈরি' } },
+      { target: '.studio-calendar-bar', action: 'none', text: { en: 'Play the year — crops grow month by month', bn: 'বছরটি চালান — প্রতি মাসে ফসল বাড়ে' } },
+      { target: '.studio-view-toggle', action: 'none', text: { en: 'Switch between 3D view, soil slice, and top view', bn: '৩ডি দৃশ্য, মাটির স্তর ও উপরের দৃশ্যে বদলান' } },
+      { target: '.studio-soil-pin', targetAll: true, action: 'none', text: { en: 'Tap a layer to see soil and NASA moisture', bn: 'মাটির বিবরণ ও NASA আর্দ্রতা দেখতে চাপুন' } },
+      { target: '.studio-feature-chips', action: 'none', text: { en: 'Your bunds, drains and paths with real sizes', bn: 'আসল মাপে আপনার আল, নালা ও রাস্তা' } },
+      { target: '[data-studio-layers]', action: 'none', text: { en: 'Switch to NASA water, greenness, elevation', bn: 'NASA পানি, সবুজভাব ও উচ্চতায় পরিবর্তন করুন' } },
+    ],
+  },
+  {
     id: 'rotation-priorities',
     title: { en: 'Set what matters', bn: 'যা গুরুত্বপূর্ণ তা ঠিক করুন' },
     why: { en: 'Your priorities change rotation scores', bn: 'আপনার অগ্রাধিকার ফসলচক্রের স্কোর বদলায়' },

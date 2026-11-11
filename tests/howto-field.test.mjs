@@ -54,11 +54,11 @@ test('sub-step model shape: bilingual, word limits, micro-sequence per control',
   assert.equal(byId['field-use'].micro.length, 1);
 });
 
-test('rotation sub-steps cover priorities, top two, selection, and optional constraints', () => {
+test('rotation sub-steps start with the 3D intro, then priorities, top two, selection, and optional constraints', () => {
   assert.deepEqual(HOWTO_STEPS.field, FIELD_HOWTO_STEPS);
   assert.deepEqual(HOWTO_STEPS.rotations, ROTATION_HOWTO_STEPS);
   assert.deepEqual(ROTATION_HOWTO_STEPS.map(step => step.id), [
-    'rotation-priorities', 'rotation-compare', 'rotation-choose', 'rotation-constraints',
+    'rotation-intro', 'rotation-priorities', 'rotation-compare', 'rotation-choose', 'rotation-constraints',
   ]);
   for (const step of ROTATION_HOWTO_STEPS) {
     for (const lang of ['en', 'bn']) {
@@ -76,16 +76,35 @@ test('rotation sub-steps cover priorities, top two, selection, and optional cons
       assert.ok(['click', 'change', 'none'].includes(micro.action));
     }
   }
-  assert.deepEqual(ROTATION_HOWTO_STEPS[0].micro.map(step => step.target), [
+  assert.equal(REGISTRY_STEPS.rotations, ROTATION_HOWTO_STEPS);
+  const intro = ROTATION_HOWTO_STEPS[0];
+  assert.equal(intro.title.en, 'Meet your field in 3D');
+  assert.equal(intro.why.en, 'See your field, soil and seasons before choosing');
+  assert.equal(intro.how.en, 'Look, then tap Next');
+  assert.deepEqual(intro.micro.map(step => step.target), [
+    '.studio-stage-canvas-host', '.studio-calendar-bar', '.studio-view-toggle',
+    '.studio-soil-pin', '.studio-feature-chips', '[data-studio-layers]',
+  ]);
+  assert.equal(intro.micro[3].targetAll, true, 'spotlight includes all three soil labels');
+  assert.deepEqual(intro.micro.map(step => step.text.en), [
+    'Your field, built from NASA elevation data',
+    'Play the year — crops grow month by month',
+    'Switch between 3D view, soil slice, and top view',
+    'Tap a layer to see soil and NASA moisture',
+    'Your bunds, drains and paths with real sizes',
+    'Switch to NASA water, greenness, elevation',
+  ]);
+  assert.ok(intro.micro.every(step => step.action === 'none'));
+  assert.deepEqual(ROTATION_HOWTO_STEPS[1].micro.map(step => step.target), [
     '#weight-water', '#weight-soil', '#weight-income', '#weight-stability',
   ]);
-  assert.ok(ROTATION_HOWTO_STEPS[0].micro.every(step => step.action === 'none'));
-  assert.equal(ROTATION_HOWTO_STEPS[1].micro.length, 10);
-  assert.equal(ROTATION_HOWTO_STEPS[2].micro[0].action, 'click');
-  assert.equal(ROTATION_HOWTO_STEPS[3].optional, true);
-  assert.ok(ROTATION_HOWTO_STEPS[3].micro.slice(1).every(step => step.inDialog));
-  assert.ok(ROTATION_HOWTO_STEPS[3].micro.some(step => step.target === '#in-irrigation' && step.action === 'change'));
-  assert.ok(ROTATION_HOWTO_STEPS[3].micro.some(step => step.target === '#in-budget' && step.action === 'change'));
+  assert.ok(ROTATION_HOWTO_STEPS[1].micro.every(step => step.action === 'none'));
+  assert.equal(ROTATION_HOWTO_STEPS[2].micro.length, 10);
+  assert.equal(ROTATION_HOWTO_STEPS[3].micro[0].action, 'click');
+  assert.equal(ROTATION_HOWTO_STEPS[4].optional, true);
+  assert.ok(ROTATION_HOWTO_STEPS[4].micro.slice(1).every(step => step.inDialog));
+  assert.ok(ROTATION_HOWTO_STEPS[4].micro.some(step => step.target === '#in-irrigation' && step.action === 'change'));
+  assert.ok(ROTATION_HOWTO_STEPS[4].micro.some(step => step.target === '#in-budget' && step.action === 'change'));
 });
 
 test('planting and My plans guidance uses bilingual, bounded copy and real selectors', () => {

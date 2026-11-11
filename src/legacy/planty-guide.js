@@ -68,6 +68,7 @@ function move(session, event) {
   else void showStep(session);
   // Action handlers and application renders finish before callbacks start another guide.
   if (event === 'next' || event === 'action') session.steps[previous.index].onDone?.();
+  else if (event === 'skip') session.steps[previous.index].onSkip?.();
 }
 
 function viewport() {
@@ -77,7 +78,16 @@ function viewport() {
 }
 
 function position(session, target) {
-  const box = target?.getBoundingClientRect();
+  let box = target?.getBoundingClientRect();
+  if (target && session.steps[session.state.index].targetAll) {
+    const boxes = [...document.querySelectorAll(session.steps[session.state.index].target)]
+      .filter(visible).map(element => element.getBoundingClientRect());
+    if (boxes.length) {
+      const left = Math.min(...boxes.map(rect => rect.left)), right = Math.max(...boxes.map(rect => rect.right));
+      const top = Math.min(...boxes.map(rect => rect.top)), bottom = Math.max(...boxes.map(rect => rect.bottom));
+      box = { left, right, top, bottom, width: right - left, height: bottom - top };
+    }
+  }
   const view = viewport();
   const bubble = session.root.querySelector('.planty-guide__bubble');
   const rect = box ?? { left: view.width / 2, right: view.width / 2, top: view.height / 2,
@@ -104,7 +114,7 @@ async function showStep(session) {
   const target = await waitForTarget(step.target, signal, step.timeout);
   if (signal.aborted || session !== active) return;
   if (!target) { move(session, 'missing'); return; }
-  if (session.kind === 'tour') target.scrollIntoView({ behavior: motion().behavior, block: 'center', inline: 'nearest' });
+  if (session.kind === 'tour') target.scrollIntoView({ behavior: step.scrollBehavior ?? motion().behavior, block: 'center', inline: 'nearest' });
   const bubble = session.root.querySelector('.planty-guide__bubble');
   bubble.querySelector('.planty-guide__mascot').innerHTML = plantyMascot(step.pose ?? 'pointing');
   bubble.querySelector('[data-guide="back"]').disabled = session.state.index === 0;
@@ -200,6 +210,7 @@ function celebrate(text) {
 
 /** Data-agnostic singleton. Missing targets skip after 4s; a step may set timeout in milliseconds.
  * onDone runs once per successful visit (Next or the requested real action), never for missing targets or Skip.
+ * onSkip runs only when the user selects Skip guide.
  * Back revisits a step and requires its action again. stop() cancels observers, waits and effects.
  */
 export const guide = { show: step => sequence([step]), sequence, celebrate, hint, stop };
