@@ -89,6 +89,7 @@ export const BD_BBOX = {
 let placesData = null;
 let powerLoading = false;
 let powerError = null;
+let fieldCtaObserver = null;
 
 async function loadCustomPower(f = field(), fetchFn = fetch) {
   if (!f || !f.custom) return;
@@ -409,6 +410,8 @@ function setField(id) {
   }, 0);
 }
 function disposeMap() {
+  fieldCtaObserver?.disconnect();
+  fieldCtaObserver = null;
   if (tapMarker) {
     tapMarker.remove();
     tapMarker = null;
@@ -696,7 +699,7 @@ function home() {
   const showTimeline = layerMode !== "high-detail";
 
   return (
-    header(
+    `<div class="field-compact-head">${header(
       t("Field atlas  /  01", "জমির মানচিত্র  /  ০১"),
       t("My field notebook", "আমার জমির খাতা"),
       t(
@@ -710,9 +713,8 @@ function home() {
         "recovery",
       ) +
         button(t("Find a field", "জমি খুঁজুন"), "search", "primary", "search"),
-    ) +
-    chips() +
-    `<div class="grid-two"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
+    )}${chips()}</div>` +
+    `<div class="grid-two field-overview"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
  <div class="map-switcher">
    <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
      <button type="button" class="button ${layerMode === "high-detail" ? "active" : ""}" data-action="set-layer-mode" data-value="high-detail" role="tab" aria-selected="${layerMode === "high-detail"}" ${!online ? "disabled" : ""} title="${!online ? t("Needs internet", "ইন্টারনেট প্রয়োজন") : ""}" aria-label="${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}">${icon("camera", 14)} <span class="label-full">${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}</span><span class="label-short">${t("Photo", "ছবি")}</span>${!online ? ` <small class="layer-offline-note">(${t("needs internet", "ইন্টারনেট প্রয়োজন")})</small>` : ""}</button>
@@ -763,6 +765,7 @@ function home() {
  <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${boundaryTruth}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(net.netHa)}">${num(net.netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${num(net.netHa * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p><div class="next-step-hint">${t("Next step 2 of 4 · Rotation studio — pick crops for this field", "পরের ধাপ ২/৪ · ফসলচক্র স্টুডিও — এই জমির জন্য ফসল বাছুন")}</div>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
+ <aside class="field-mobile-cta" hidden>${goButton(t("Next: Rotation studio → Explore rotations", "পরের ধাপ: ফসলচক্র স্টুডিও → ফসলচক্র দেখুন"), "rotations", "primary")}</aside>
  <div class="section-label"><div><div class="eyebrow">${t("Historical observations", "পুরনো পর্যবেক্ষণ")}</div><h2>${monthName()} 2024</h2></div>${goButton(t("See past seasons", "পুরনো মৌসুম"), "seasons", "small")}</div>${stats()}
  <div class="section-label"><h2>${t("Work on this field", "এই জমিতে আরও কাজ")}</h2></div><div class="work-actions">${[
    [
@@ -1044,6 +1047,18 @@ function seasonView() {
   );
 }
 async function mountMap() {
+  const mobileCta = document.querySelector(".field-mobile-cta");
+  const mapTarget = document.querySelector("#field-map");
+  const recommendTarget = document.querySelector(".field-recommend");
+  if (mobileCta && mapTarget && recommendTarget && "IntersectionObserver" in window) {
+    const visibility = new Map();
+    fieldCtaObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) visibility.set(entry.target, entry.isIntersecting);
+      mobileCta.hidden = !visibility.get(mapTarget) || !!visibility.get(recommendTarget);
+    });
+    fieldCtaObserver.observe(mapTarget);
+    fieldCtaObserver.observe(recommendTarget);
+  }
   const selectedChip = document.querySelector(".field-selector .field-chip.selected");
   if (selectedChip && typeof selectedChip.scrollIntoView === "function") {
     selectedChip.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });

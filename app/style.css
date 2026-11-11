@@ -4217,3 +4217,92 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
   .data-row.season-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .season-hero h2 { font-size: 18px; }
 }
+@media (min-width: 1024px) {
+  .main[data-page="field"] { padding-top: 14px; padding-bottom: 20px; }
+  .main[data-page="field"] .field-compact-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin-bottom: 8px; }
+  .main[data-page="field"] .page-head { display: contents; }
+  .main[data-page="field"] .page-head > div:first-child { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .main[data-page="field"] .page-head .eyebrow { margin: 0; font-size: 10px; white-space: nowrap; }
+  .main[data-page="field"] .page-head p { margin: 0; max-width: 300px; font-size: 11px; white-space: nowrap; }
+  .main[data-page="field"] .page-head h1 { margin: 0; font-size: 25px; white-space: nowrap; }
+  .main[data-page="field"] .page-head-actions { grid-column: 2; grid-row: 2; gap: 6px; }
+  .main[data-page="field"] .page-head-actions .button { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+  .main[data-page="field"] .field-selector { grid-column: 1; grid-row: 2; flex: none; gap: 5px; margin: 0; }
+  .main[data-page="field"] .field-chip { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+  .main[data-page="field"] .field-overview { height: clamp(440px, calc(100dvh - 300px), 700px); min-height: 0; grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); gap: 12px; }
+  .main[data-page="field"] .field-overview > .panel { min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
+  .main[data-page="field"] .field-overview > .panel:first-child { display: flex; flex-direction: column; }
+  .main[data-page="field"] .field-overview .panel-header { min-height: 42px; padding: 8px 12px; }
+  .main[data-page="field"] .field-overview .panel-header h2 { font-size: 16px; }
+  .main[data-page="field"] .map-switcher { flex: none; gap: 4px; padding: 5px 8px; }
+  .main[data-page="field"] .map-segmented .button { min-height: 34px; padding: 5px 8px; font-size: 11px; }
+  .main[data-page="field"] .map-subcontrols { gap: 5px; }
+  .main[data-page="field"] .map-subcontrols .button { min-height: 32px; padding: 4px 7px; font-size: 11px; }
+  .main[data-page="field"] .map-timeline { flex: none; padding: 4px 8px; }
+  .main[data-page="field"] .map-timeline-dates { gap: 3px; }
+  .main[data-page="field"] .map-timeline-dates .button { min-height: 28px; padding: 3px 6px; font-size: 10px; }
+  .main[data-page="field"] .map-shell { flex: 1; min-height: 0; }
+  .main[data-page="field"] .map-shell .field-map { height: 100%; min-height: 0; }
+  .main[data-page="field"] .map-legend-bar { flex: none; padding: 4px 8px; font-size: 10px; }
+  .main[data-page="field"] .map-actions { flex: none; margin: 0; padding: 4px 8px; }
+  .main[data-page="field"] .map-controls { gap: 4px; }
+  .main[data-page="field"] .map-controls .button { min-height: 32px; padding: 4px 7px; font-size: 11px; }
+  .main[data-page="field"] .field-overview > .panel:last-child { display: flex; flex-direction: column; }
+  .main[data-page="field"] .field-card { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px 0; }
+  .main[data-page="field"] .field-card h2 { margin: 4px 0; font-size: 24px; }
+  .main[data-page="field"] .field-meta { gap: 8px 12px; padding: 10px 0; }
+  .main[data-page="field"] .field-meta dd.large { font-size: 20px; }
+  .main[data-page="field"] .field-recommend { position: sticky; bottom: 0; padding: 8px 0 10px; background: var(--surface); }
+  .main[data-page="field"] .field-recommend h3 { margin: 3px 0; font-size: 17px; }
+  .main[data-page="field"] .field-recommend p { margin: 0 0 6px; }
+  .main[data-page="field"] .field-recommend .button.primary { min-height: 44px; padding: 9px 18px; font-size: 15px; }
+  .main[data-page="field"] .field-bottom { flex: none; padding: 6px 16px; }
+}
+
+@media (min-width: 1024px) {
+  .main[data-page="field"] .journey-start { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; }
+  .main[data-page="field"] .journey-start > div:first-child { min-width: 0; gap: 9px; }
+  .main[data-page="field"] .journey-start .planty-mascot { width: 34px; height: 38px; }
+  .main[data-page="field"] .journey-start h2 { margin: 0; font-size: 15px; white-space: nowrap; }
+  .main[data-page="field"] .journey-start p { display: block; font-size: 10px; white-space: nowrap; }
+  .main[data-page="field"] .journey-start-actions { flex: none; gap: 6px; margin: 0; flex-wrap: nowrap; }
+  .main[data-page="field"] .journey-start-actions .button { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+}
+
+.field-recommend .button.primary { isolation: isolate; color: #fffef2; background: #284f38; border-color: #284f38; box-shadow: 0 0 18px #72a84155; }
+.field-recommend .button.primary::before { content: ""; position: absolute; inset: -3px; z-index: -1; border-radius: inherit; background: conic-gradient(from var(--field-cta-angle, 0deg), #315c3d, #b7d84b, #315c3d); animation: field-cta-border 3s linear infinite; }
+.field-recommend .button.primary::after { inset: 0; border-radius: inherit; background: linear-gradient(105deg, transparent 30%, #ffffff70 48%, transparent 66%); transform: translateX(-130%); animation: field-cta-shimmer 4s ease-in-out infinite; }
+.field-recommend .button.primary svg { animation: field-recommend-arrow 2.4s ease-in-out infinite; }
+.field-recommend .button.primary:hover,
+.field-recommend .button.primary:focus-visible { animation-play-state: paused; }
+.field-recommend .button.primary:hover::before,
+.field-recommend .button.primary:focus-visible::before,
+.field-recommend .button.primary:hover::after,
+.field-recommend .button.primary:focus-visible::after,
+.field-recommend .button.primary:hover svg,
+.field-recommend .button.primary:focus-visible svg { animation-play-state: paused; }
+@keyframes field-cta-border { to { --field-cta-angle: 360deg; } }
+@keyframes field-cta-shimmer { 0%, 65%, 100% { transform: translateX(-130%); } 82% { transform: translateX(130%); } }
+@property --field-cta-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@media (prefers-reduced-motion: reduce) {
+  .field-recommend .button.primary,
+  .field-recommend .button.primary::before,
+  .field-recommend .button.primary::after,
+  .field-recommend .button.primary svg { animation: none; }
+  .field-recommend .button.primary::before { background: conic-gradient(#315c3d, #b7d84b, #315c3d); }
+}
+@media (max-width: 1023px) {
+  .field-mobile-cta:not([hidden]) { position: fixed; z-index: 50; inset: auto 0 0; padding: 10px 16px max(10px, env(safe-area-inset-bottom)); background: #fffef9f2; border-top: 1px solid var(--line); box-shadow: 0 -5px 20px #24392c20; }
+  .field-mobile-cta .button { width: 100%; min-height: 48px; }
+  body:has(.field-mobile-cta:not([hidden])) .coach-host { bottom: 76px; }
+  body:has(.field-mobile-cta:not([hidden])) [data-page="field"] .planty-launch { bottom: 76px; }
+}
+@media (max-width: 700px) {
+  .journey-start { display: block; }
+  .journey-start > div:first-child { align-items: center; }
+  .journey-start .planty-mascot { width: 48px; height: 56px; }
+  .journey-start h2 { white-space: normal; font-size: 20px; }
+  .journey-start p { display: block; }
+  .journey-start-actions { flex-direction: column; margin-top: 12px; }
+  .main[data-page="field"] .page-head { display: block; }
+}
