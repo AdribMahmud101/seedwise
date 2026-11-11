@@ -1,6 +1,7 @@
 import { t, esc } from './ui.js';
 import { getPlan, nextStep, stepStatus, allSeasonsReviewed, subscribe, startPlan, confirmField, fieldSnapshot, confirmRotation, rotationSnapshot, confirmPlanting, markPlanGenerated, importPlanJSON, resetPlan } from './journey.js';
 import { guide } from './planty-guide.js';
+import { FIELD_HOWTO_STEPS, clipMarkup, resolveOpenId } from './howto-field.js';
 import { plantyMascot } from './planty.js';
 import { canFinishPlanting, finishNote, showExitPrompt } from './journey-bar.js';
 
@@ -18,8 +19,9 @@ let demoController = null;
 let navigationCallback = null;
 
 // Track manual checks / user interactions within session
+// (field-constraints ticks only when the assumptions dialog is SAVED, never on open)
 const pageActivity = {
-  field: { mapChecked: false, areaChecked: false, constraintsOpened: false },
+  field: { mapChecked: false, areaChecked: false, constraintsSaved: false },
   rotation: { prioritiesChanged: false, compared: new Set() },
   plan: { calendarViewed: false, taskChecked: false, downloaded: false },
 };
@@ -34,7 +36,16 @@ export function getStoryState() {
   };
 }
 
+// HOWTO pilot state: one expanded sub-step at a time (null = auto = first not
+// done), at most one clip playing. Reset when the page actually changes.
+let openHowtoId = null;
+let playingHowtoId = null;
+
 export function setStoryPage(page, navigate) {
+  if (page !== activePage) {
+    openHowtoId = null;
+    playingHowtoId = null;
+  }
   activePage = page;
   navigationCallback = navigate;
   // If user navigated, show coach again unless stopped
@@ -66,16 +77,13 @@ export function initStoryListeners() {
       pageActivity.field.mapChecked = true;
       renderCoach();
     }
-    // Check area click or net-area edit
-    if (target.closest('.net-area-edit, .field-meta dt, [data-action="edit-net-area"]')) {
+    // Area edit opened (saving it also ticks via the submit listener below)
+    if (target.closest('.net-area-edit, [data-action="edit-net-area"]')) {
       pageActivity.field.areaChecked = true;
       renderCoach();
     }
-    // Check profile modal opened
-    if (target.closest('[data-action="profile"], .field-bottom button')) {
-      pageActivity.field.constraintsOpened = true;
-      renderCoach();
-    }
+    // NOTE: opening the assumptions dialog ticks nothing; field-constraints
+    // completes ONLY when #profile-form is saved (submit listener below).
     // Check rotation card compare or preview
     const rotCard = target.closest('.rotation-card, [data-action="preview-3d"], .disclosure summary');
     if (rotCard) {
@@ -113,6 +121,41 @@ export function initStoryListeners() {
       }
     }
   }, { capture: true, passive: true });
+
+  // Map pan/zoom without a tap: wheel zoom or a real drag inside the map.
+  window.addEventListener('wheel', (event) => {
+    if (event.target?.closest?.('#field-map, .leaflet-container') && !pageActivity.field.mapChecked) {
+      pageActivity.field.mapChecked = true;
+      renderCoach();
+    }
+  }, { capture: true, passive: true });
+  let mapPointer = null;
+  window.addEventListener('pointerdown', (event) => {
+    mapPointer = event.target?.closest?.('#field-map, .leaflet-container')
+      ? { x: event.clientX, y: event.clientY } : null;
+  }, { capture: true, passive: true });
+  window.addEventListener('pointerup', (event) => {
+    if (mapPointer && event.target?.closest?.('#field-map, .leaflet-container')) {
+      const moved = Math.hypot(event.clientX - mapPointer.x, event.clientY - mapPointer.y);
+      if (moved > 12 && !pageActivity.field.mapChecked) {
+        pageActivity.field.mapChecked = true;
+        renderCoach();
+      }
+    }
+    mapPointer = null;
+  }, { capture: true, passive: true });
+
+  // Dialog saves: assumptions saved ticks constraints; area saved ticks area.
+  window.addEventListener('submit', (event) => {
+    const id = event.target?.id;
+    if (id === 'profile-form' && !pageActivity.field.constraintsSaved) {
+      pageActivity.field.constraintsSaved = true;
+      renderCoach();
+    } else if (id === 'net-area-form' && !pageActivity.field.areaChecked) {
+      pageActivity.field.areaChecked = true;
+      renderCoach();
+    }
+  }, { capture: true, passive: true });
 }
 
 // --- Checklist item definitions & computation ---
@@ -124,7 +167,7 @@ export function getPageChecklist(page = activePage) {
     // Field: ○ Check your plot on the map · ○ Check the area (0.09 ha) · ○ Set irrigation & budget (Edit field assumptions) · ○ Use this field
     const mapChecked = pageActivity.field.mapChecked || !!(plan?.field);
     const areaChecked = pageActivity.field.areaChecked || !!(plan?.field?.areaHa);
-    const constraintsSet = pageActivity.field.constraintsOpened || !!(plan?.field?.constraints && plan.field.constraints.budget && plan.field.constraints.irrigation);
+    const constraintsSet = pageActivity.field.constraintsSaved || !!(plan?.field?.constraints && plan.field.constraints.budget && plan.field.constraints.irrigation);
     const fieldUsed = plan?.steps.field === 'done';
 
     items.push({
@@ -287,6 +330,7 @@ export function renderCoach(container) {
   }
 
   host.className = 'coach-host coach-host--docked';
+  const isHowtoPage = activePage === 'field';
   host.innerHTML = `
     <aside class="coach-card" role="region" aria-label="${t('Planty Coach', 'Planty নির্দেশিকা')}" aria-live="polite">
       <div class="coach-header">
@@ -300,8 +344,8 @@ export function renderCoach(container) {
         <button type="button" class="coach-hide-btn" data-coach="hide" title="${t('Hide coach', 'লুকান')}" aria-label="${t('Hide coach', 'লুকান')}">✕</button>
       </div>
 
-      <ul class="coach-checklist">
-        ${checklist.map(item => `
+      <ul class="coach-checklist${isHowtoPage ? ' coach-checklist--howto' : ''}">
+        ${isHowtoPage ? fieldHowtoItems(checklist, plan) : checklist.map(item => `
           <li class="coach-check-item ${item.done ? 'is-done' : ''}" data-item-id="${item.id}">
             <span class="coach-bullet" aria-hidden="true">${item.done ? '✓' : '○'}</span>
             <span class="coach-item-text">${esc(item.text)}</span>
@@ -321,12 +365,49 @@ export function renderCoach(container) {
   attachCoachEvents(host);
 }
 
+// HOWTO pilot rows: one expandable sub-step at a time (current = first not
+// done). Open row shows why + how, Show me, Watch how clip, and for the area
+// step an explicit "Area is right ✓" confirm.
+function fieldHowtoItems(checklist, plan) {
+  const done = Object.fromEntries(checklist.map(item => [item.id, !!item.done]));
+  const openId = resolveOpenId(checklist.map(item => item.id), done, openHowtoId);
+  const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const areaText = plan?.field?.areaHa ? `${numLocal(plan.field.areaHa, 2)} ha` : '0.09 ha';
+  return FIELD_HOWTO_STEPS.map(step => {
+    const isDone = !!done[step.id];
+    const isOpen = openId === step.id;
+    const title = step.id === 'field-area'
+      ? `${t(step.title.en, step.title.bn)} (${areaText})`
+      : t(step.title.en, step.title.bn);
+    return `
+      <li class="coach-check-item ${isDone ? 'is-done' : ''} ${isOpen ? 'is-open' : ''}" data-item-id="${step.id}">
+        <button type="button" class="coach-item-head" data-coach="toggle" data-id="${step.id}" aria-expanded="${isOpen}">
+          <span class="coach-bullet" aria-hidden="true">${isDone ? '✓' : '○'}</span>
+          <span class="coach-item-text">${esc(title)}</span>
+          <span class="coach-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="coach-item-body"${isOpen ? '' : ' hidden'}>
+          <p class="coach-why">${esc(t(step.why.en, step.why.bn))}</p>
+          <p class="coach-how">${esc(t(step.how.en, step.how.bn))}</p>
+          <div class="coach-item-btns">
+            <button type="button" class="button coach-show-me" data-coach="show-me" data-id="${step.id}">${t('Show me', 'আমাকে দেখান')}</button>
+            <button type="button" class="button ghost" data-coach="watch" data-id="${step.id}">${playingHowtoId === step.id ? t('■ Stop', '■ থামান') : t(`▶ Watch how · ${step.seconds} s`, `▶ দেখুন · ${step.seconds} সে`)}</button>
+            ${step.id === 'field-area' && !isDone ? `<button type="button" class="button ghost" data-coach="area-ok">${t('Area is right ✓', 'আয়তন ঠিক আছে ✓')}</button>` : ''}
+          </div>
+          ${clipMarkup(step, { playing: playingHowtoId === step.id, reducedMotion: reduced })}
+        </div>
+      </li>`;
+  }).join('');
+}
+
 function attachCoachEvents(host) {
   host.onclick = (e) => {
     const btn = e.target.closest('[data-coach]');
     if (!btn) return;
     e.stopPropagation();
     const action = btn.dataset.coach;
+    const id = btn.dataset.id;
     if (action === 'expand') {
       coachCollapsed = false;
       renderCoach();
@@ -339,13 +420,29 @@ function attachCoachEvents(host) {
       renderCoach();
     } else if (action === 'exit') {
       showExitPrompt();
+    } else if (action === 'toggle' && id) {
+      const checklist = getPageChecklist(activePage);
+      const done = Object.fromEntries(checklist.map(item => [item.id, !!item.done]));
+      const openId = resolveOpenId(checklist.map(item => item.id), done, openHowtoId);
+      openHowtoId = openId === id ? '__closed' : id;
+      renderCoach();
     } else if (action === 'show-me') {
-      runShowMe();
+      if (id) runHowtoShowMe(id);
+      else runShowMe();
+    } else if (action === 'watch' && id) {
+      playingHowtoId = playingHowtoId === id ? null : id;
+      renderCoach();
+    } else if (action === 'area-ok') {
+      pageActivity.field.areaChecked = true;
+      openHowtoId = null;
+      renderCoach();
     }
   };
 }
 
-// "Show me" action: spotlight + ripple on the first unchecked item via guide.show
+// "Show me" action: on the field page each sub-step runs its micro-sequence
+// (spotlight + ripple on every control, waiting for the real action); other
+// pages keep the single spotlight on the first unchecked item.
 export function runShowMe(customReason = null) {
   const checklist = getPageChecklist(activePage);
   const firstMissing = checklist.find(item => !item.done);
@@ -353,6 +450,14 @@ export function runShowMe(customReason = null) {
     if (typeof document !== 'undefined') {
       guide.hint(checklist[checklist.length - 1].target, t('Step is complete! Use Continue →', 'ধাপ সম্পন্ন! এগিয়ে যান → চাপুন'));
     }
+    return;
+  }
+
+  if (activePage === 'field') {
+    // The micro-sequence guides the missing action itself, so a Continue
+    // reason needs no separate bubble.
+    const done = Object.fromEntries(checklist.map(item => [item.id, !!item.done]));
+    runHowtoShowMe(resolveOpenId(checklist.map(item => item.id), done, openHowtoId) ?? firstMissing.id);
     return;
   }
 
@@ -368,6 +473,71 @@ export function runShowMe(customReason = null) {
       timeout: 8000,
     });
   }
+}
+
+// HOWTO Show me: run one sub-step's micro-actions in order with guide.sequence.
+export function runHowtoShowMe(id) {
+  const step = FIELD_HOWTO_STEPS.find(item => item.id === id) ?? FIELD_HOWTO_STEPS[0];
+  coachCollapsed = false;
+  renderCoach();
+  if (typeof document === 'undefined') return;
+  const steps = step.micro.map(micro => ({
+    target: micro.target,
+    text: { en: micro.text.en, bn: micro.text.bn },
+    action: micro.action,
+    pose: 'pointing',
+    timeout: 8000,
+    inDialog: !!micro.inDialog,
+  }));
+  guide.sequence(steps);
+  watchGuideDialog(steps);
+}
+
+// The #modal <dialog> renders in the top layer, above the guide root in
+// <body>. While a micro-step targets a control inside the dialog, reparent the
+// guide root into the dialog so scrim/ripple/bubble stay visible; move it back
+// when the step or dialog closes. Focus never leaves the dialog, so its trap
+// stays sane.
+let guideDialogCleanup = null;
+function stopGuideDialogWatch() {
+  if (guideDialogCleanup) {
+    guideDialogCleanup();
+    guideDialogCleanup = null;
+  }
+}
+function watchGuideDialog(steps) {
+  stopGuideDialogWatch();
+  if (typeof document === 'undefined') return;
+  const dialog = document.querySelector('#modal');
+  const place = () => {
+    const root = document.querySelector('.planty-guide');
+    if (!root) return;
+    const bubbleText = root.querySelector('[aria-live]')?.textContent ?? '';
+    const current = steps.find(item => bubbleText === item.text.en || bubbleText === item.text.bn);
+    if (current?.inDialog && dialog?.open) {
+      if (root.parentElement !== dialog) dialog.appendChild(root);
+    } else if (dialog && root.parentElement === dialog) {
+      document.body.appendChild(root);
+    }
+  };
+  const onClose = () => {
+    const root = document.querySelector('.planty-guide');
+    if (root && dialog && root.parentElement === dialog) document.body.appendChild(root);
+  };
+  dialog?.addEventListener('close', onClose);
+  const observer = new MutationObserver(() => {
+    if (!document.querySelector('.planty-guide')) {
+      stopGuideDialogWatch();
+      return;
+    }
+    place();
+  });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  guideDialogCleanup = () => {
+    observer.disconnect();
+    dialog?.removeEventListener('close', onClose);
+  };
+  place();
 }
 
 // --- Hand-offs in Context & Pulse ---

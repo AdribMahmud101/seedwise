@@ -72,6 +72,8 @@
   left: 280px; /* leaves room beside sidebar */
   width: 320px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 
 .coach-card {
@@ -297,7 +299,7 @@
     right: 12px;
     bottom: 56px; /* above journey bar */
     width: auto;
-    max-height: 30vh;
+    max-height: 40vh;
     overflow-y: auto;
   }
 
@@ -345,6 +347,121 @@
 }
 .demo-controls-bar .button:not(.primary):hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* --- HOWTO pilot: expandable sub-steps with "Watch how" clips (field page) --- */
+.coach-checklist--howto {
+  gap: 2px;
+}
+.coach-checklist--howto .coach-check-item {
+  display: block;
+  border-radius: 10px;
+}
+.coach-checklist--howto .coach-check-item.is-open {
+  background: #f2f6e7;
+}
+.coach-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.coach-item-head .coach-item-text {
+  flex: 1;
+  min-width: 0;
+}
+.coach-item-head:focus-visible {
+  outline: 3px solid #58823e;
+  outline-offset: -1px;
+}
+.coach-chevron {
+  flex: none;
+  font-size: 11px;
+  color: #557741;
+  transform: rotate(-90deg);
+  transition: transform .2s ease;
+}
+.coach-check-item.is-open .coach-chevron {
+  transform: rotate(0);
+}
+.coach-item-body {
+  padding: 2px 8px 10px 32px;
+}
+.coach-why {
+  margin: 0 0 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #233d2b;
+}
+.coach-how {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #43543b;
+}
+.coach-item-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.coach-item-btns .button {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.coach-clip {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid #c8d7b5;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #edf2e2;
+  cursor: pointer;
+}
+.coach-clip img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.coach-clip-arrow,
+.coach-clip-stop {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #284f38ee;
+  color: #fffef4;
+  font-size: 14px;
+}
+@media (max-width: 700px) {
+  .coach-clip {
+    max-width: 280px;
+  }
+  .coach-item-btns .button {
+    min-height: 32px;
+    font-size: 11.5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach-chevron {
+    transition: none;
+  }
 }
 
 /* During Rahim's demo the narration bubble guides; hide the coach panel so only one Planty is on screen. */

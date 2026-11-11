@@ -12,9 +12,10 @@ root = Path(__file__).resolve().parents[1] / 'out'
 if not root.exists():
     raise SystemExit('out/ not found. Run `next build` first.')
 skip = {'sw.js', '404.html', 'version.json'}  # version.json must always come from the network
-# Precache shell assets and data json, excluding tiles directory
+# Precache shell assets and data json, excluding tiles directory and the lazy
+# HOWTO clips (public/assets/howto loads on tap only, never precached).
 files = sorted(p for p in root.rglob('*')
-               if p.is_file() and p.name not in skip and '_next' not in p.parts and 'tiles' not in p.parts and p.suffix != '.txt')
+               if p.is_file() and p.name not in skip and '_next' not in p.parts and 'tiles' not in p.parts and 'howto' not in p.parts and p.suffix != '.txt')
 digest = hashlib.sha256()
 for p in files:
     digest.update(p.relative_to(root).as_posix().encode())

@@ -8,6 +8,7 @@
     "build": "next build && python scripts/prepare-offline.py",
     "start": "python serve.py",
     "test": "node --test tests/*.test.mjs",
+    "capture:howto": "node scripts/capture-howto.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
