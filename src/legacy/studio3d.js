@@ -4115,7 +4115,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
       <section class="studio-rail-section">
         <h3>${t("3D Surface Layers", "সারফেস লেয়ার")}</h3>
         <div class="studio-layers-radio">
-          <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="crops" ${currentSurfaceMode === "crops" ? "checked" : ""}><span>${t("Crop season (3D Plants)", "মৌসুমি ফসল (৩ডি উদ্ভিদ)")}</span></label>
+          <div class="nasa-layer-row"><label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="crops" ${currentSurfaceMode === "crops" ? "checked" : ""}><span>${t("Crop season (3D Plants)", "মৌসুমি ফসল (৩ডি উদ্ভিদ)")}</span></label>${nasaBadge(["power", "imerg"])}</div>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="photo" ${currentSurfaceMode === "photo" ? "checked" : ""}><span>${t("High-res photo (Esri / Sentinel)", "স্যাটেলাইট ছবি")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="ndvi" ${currentSurfaceMode === "ndvi" ? "checked" : ""}><span>${t("Greenness (NDVI grid)", "সবুজভাব (NDVI)")}</span></label>
           <label class="studio-layer-radio-item"><input type="radio" name="studio-layer" value="moisture" ${currentSurfaceMode === "moisture" ? "checked" : ""}><span>${t("Moisture (NDMI)", "আর্দ্রতা (NDMI)")}</span></label>
