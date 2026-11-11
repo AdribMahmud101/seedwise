@@ -213,7 +213,7 @@ test('season water and rotation saving come from the prepared monthly record', (
   assert.ok(Number.isFinite(legumeSaving) && legumeSaving > 0);
   const chart = planPage.waterChartSVG([{ label: 'Potato', needMm, rainMm }], { lang: 'en' });
   assert.match(chart, /<svg width="\d+" height="\d+"/);
-  assert.match(chart, new RegExp(`${needMm.toFixed(0)}/${rainMm.toFixed(0)}`));
+  assert.match(chart, new RegExp(`Need ${needMm.toFixed(0)} mm · Rain ${rainMm.toFixed(0)} mm`));
 });
 
 test('export is self-contained: plan JSON, recalc code, charts, no external URLs', () => {

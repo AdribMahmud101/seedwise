@@ -111,9 +111,9 @@ function t(english, bangla) {
   return state.lang === "bn" && bangla ? bangla : english;
 }
 const bnDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
-// Page numbers follow the nav: once a season plan exists, #plan takes 04 and later pages shift by one.
+// Page numbers follow the nav: My field 01, Rotation studio 02, Planting planner 03, My plans 04, Past seasons 05, …
 function deskNo(base) {
-  const n = base + (getPlan() ? 1 : 0);
+  const n = base + 1;
   return [`0${n}`, `০${bnDigits[n]}`];
 }
 function esc(value) {
@@ -406,6 +406,7 @@ function cropName(id) {
   return c ? t(c.label, c.bn) : id;
 }
 const paths = {
+  plans: "M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z M9 7h6 M9 11h6 M9 15h4",
   recovery: "M12 2 3 6v6c0 5 5 8 9 10 4-2 9-5 9-10V6Z M7 12l3 3 7-7",
   field: "M3 16 7 6l7-3 7 5-3 11-10 2Z M7 6l6 5 8-3 M13 11l-3 9",
   seasons: "M3 4v16h18 M6 15l4-5 4 3 6-9",
@@ -465,6 +466,7 @@ function truth(tag, opts = {}) {
   const labels = {
     MEASURED: ["Measured", "জমি থেকে মাপা"],
     FARMER_REPORTED: ["Measured", "জমি থেকে মাপা"],
+    RECOMMENDED: ["Recommended", "প্রস্তাবিত"],
     REMOTE_OBSERVED: ["Estimated", "স্যাটেলাইট অনুমান"],
     MODELED: ["Estimated", "স্যাটেলাইট অনুমান"],
     SCENARIO: ["Scenario", "কাল্পনিক পরিকল্পনা"],
@@ -473,6 +475,7 @@ function truth(tag, opts = {}) {
   const icons = {
     MEASURED: "✓",
     FARMER_REPORTED: "✓",
+    RECOMMENDED: "◈",
     REMOTE_OBSERVED: "◈",
     MODELED: "◈",
     SCENARIO: "⬡",
@@ -481,6 +484,7 @@ function truth(tag, opts = {}) {
   const classes = {
     MEASURED: "measured",
     FARMER_REPORTED: "measured",
+    RECOMMENDED: "estimated",
     REMOTE_OBSERVED: "estimated",
     MODELED: "estimated",
     SCENARIO: "scenario",
@@ -558,6 +562,45 @@ function repaint() {
     window.dispatchEvent(new Event("workspace-render"));
   }
 }
+function promptModal(title, message, defaultValue, onConfirm) {
+  const d = document.querySelector("#modal");
+  if (!d) {
+    const res = typeof window !== 'undefined' ? window.prompt(message, defaultValue) : defaultValue;
+    if (res !== null) onConfirm(res);
+    return;
+  }
+  const inputId = `prompt-input-${Date.now()}`;
+  d.innerHTML = `
+    <div class="modal-head"><h2>${esc(title)}</h2><button class="icon-button" data-action="close" aria-label="${t("Close", "বন্ধ করুন")}">${icon("close")}</button></div>
+    <div class="modal-body">
+      <p class="note">${esc(message)}</p>
+      <div style="margin:12px 0;">
+        <input type="text" id="${inputId}" value="${esc(defaultValue)}" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:6px;font:inherit;">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="button ghost" data-action="close">${t("Cancel", "বাতিল")}</button>
+        <button type="button" class="button primary" id="prompt-ok-btn">${t("Save", "সংরক্ষণ")}</button>
+      </div>
+    </div>
+  `;
+  const okBtn = d.querySelector('#prompt-ok-btn');
+  const inputEl = d.querySelector(`#${inputId}`);
+  const submit = () => {
+    const val = inputEl?.value;
+    close();
+    onConfirm(val);
+  };
+  okBtn?.addEventListener('click', submit);
+  inputEl?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+  if (!d.open && typeof d.showModal === 'function') d.showModal();
+  inputEl?.focus();
+}
+
 function modal(title, body) {
   const d = document.querySelector("#modal");
   d.innerHTML = `<div class="modal-head"><h2>${esc(title)}</h2><button class="icon-button" data-action="close" aria-label="${t("Close", "বন্ধ করুন")}">${icon("close")}</button></div><div class="modal-body">${body}</div>`;
@@ -708,6 +751,7 @@ export {
   persist,
   t,
   deskNo,
+  promptModal,
   esc,
   num,
   monthName,

@@ -1,6 +1,7 @@
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
 import { getPlan } from './journey.js';
 import { plan, mountPlan, disposePlan, planAction, planChange } from './plan.js';
+import { plans, mountPlans, disposePlans, plansAction } from './plans.js';
 import { boundaryAction, boundarySubmit } from "./boundary.js";
 import { fieldReport, printReport } from "./report.js";
 import {
@@ -67,11 +68,12 @@ const pages = [
   ["field", "My field", "আমার জমি", home],
   ["rotations", "Rotation studio", "ফসলচক্র বাছাই", rotations],
   ["planner", "Planting planner", "বপনের পরিকল্পনা", planner],
-  ["plan", "Your plan", "আপনার পরিকল্পনা", plan],
+  ["plans", "My plans", "আমার পরিকল্পনা", plans],
   ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
   ["clinic", "Crop clinic", "ফসলের চিকিৎসাঘর", clinic],
   ["water", "Water & resilience", "পানি ও সহনশীলতা", water],
   ["recovery", "Disaster recovery", "দুর্যোগের পর করণীয়", recovery],
+  ["plan", "Your plan", "আপনার পরিকল্পনা", plan],
   ["research", "Research lab", "গবেষণাগার", research],
 ];
 function page() {
@@ -90,10 +92,9 @@ function render() {
   document.documentElement.lang = state.lang;
   document.body.classList.toggle("lang-bn", state.lang === "bn");
   document.title = `${title} · Ropon Radar`;
-  // Research desk (Research lab, Evidence register) hidden from the menu to keep the app minimal (owner, 11 Nov); routes still work by URL.
-  // Your plan appears as 04 only once a season plan exists; later numbers shift consistently.
+  // Research desk and single Your plan hidden from the nav menu; My plans is always nav 04.
   const nav = pages
-    .filter(([id]) => id !== "research" && (id !== "plan" || getPlan()))
+    .filter(([id]) => id !== "research" && id !== "plan")
     .map(
       ([id, en, bn], i) =>
         `<button data-go="${id}" class="nav-item ${id === current[0] ? "active" : ""}" ${id === current[0] ? 'aria-current="page"' : ""} title="${esc(t(en, bn))}">${icon(id)}<span>${t(en, bn)}</span><span class="number">0${i + 1}</span></button>`,
@@ -109,6 +110,8 @@ function render() {
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();
   else disposePlanner();
+  if (current[0] === "plans") mountPlans();
+  else disposePlans();
   if (current[0] === "plan") mountPlan();
   else disposePlan();
   if (current[0] === "rotations") {
@@ -162,6 +165,10 @@ document.addEventListener("click", (event) => {
     state.tabs[el.dataset.tab] = el.dataset.value;
     persist();
     render();
+    return;
+  }
+  if (el.dataset.plansAction) {
+    plansAction(el.dataset.plansAction, el.dataset.planId);
     return;
   }
   const action = el.dataset.action,

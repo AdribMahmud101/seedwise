@@ -1,6 +1,7 @@
-import { t, esc, state, field, polygon, profile, agronomy, toast, repaint } from './ui.js';
+import { t, esc, state, field, polygon, profile, agronomy, toast, repaint, modal, close } from './ui.js';
 import { getPlan, startPlan, demoPlan, confirmField, fieldSnapshot, confirmRotation,
-  rotationSnapshot, confirmPlanting, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe } from './journey.js';
+  rotationSnapshot, confirmPlanting, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe,
+  savePlan, resetPlan } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setStoryPage, handleContinue, startRahimDemo, updateHandOffs, renderCoach } from './journey-story.js';
@@ -9,7 +10,7 @@ const steps = [
   ['field', 'field', 'Field', 'জমি'],
   ['rotation', 'rotations', 'Rotation', 'ফসলচক্র'],
   ['planting', 'planner', 'Planting', 'বপন'],
-  ['plan', 'plan', 'Your plan', 'আপনার পরিকল্পনা'],
+  ['plan', 'plans', 'My plans', 'আমার পরিকল্পনা'],
 ];
 const stepFor = route => steps.find(step => step[1] === route)?.[0];
 let route, navigate, hasPlanPage, handoffTimer, animationTimer, pendingHint, topbarObserver;
@@ -32,12 +33,47 @@ export function journeyBar(page) {
       const current = target === page;
       const status = statuses[key] === 'todo' && current ? 'current' : statuses[key];
       return `<li><a class="journey-step ${current ? 'is-current' : ''} ${status === 'done' && completed.has(key) ? 'just-completed' : ''}" href="#${target}" data-journey="jump" data-value="${target}" data-status="${status}"${current ? ' aria-current="step"' : ''} aria-label="${index + 1}. ${esc(t(en, bn))}: ${labels[status]}"><span class="journey-number" aria-hidden="true">${status === 'done' ? '✓' : status === 'review' ? '⚠' : t(String(index + 1), ['১', '২', '৩', '৪'][index])}</span><span class="journey-step-label">${t(en, bn)}</span></a></li>`;
-    }).join('')}</ol><button type="button" class="button primary journey-continue" data-journey="continue">${t('Continue →', 'এগিয়ে যান →')}</button></nav></div>`;
+    }).join('')}</ol><button type="button" class="button primary journey-continue" data-journey="continue">${t('Continue →', 'এগিয়ে যান →')}</button><button type="button" class="button ghost journey-exit-btn" data-journey="exit-prompt" title="${t('Exit plan', 'পরিকল্পনা থেকে বের হন')}">${t('Exit plan', 'বের হন')}</button></nav></div>`;
 }
 
 export function journeyStart() {
   if (getPlan()) return '';
   return `<section class="journey-start"><div>${plantyMascot('happy')}<div><h2>${t('Your field. Your next season.', 'আপনার জমি। আপনার পরের মৌসুম।')}</h2><p>${t('Choose your field, compare rotations, and make a planting plan.', 'জমি বেছে নিন, ফসলচক্র তুলনা করুন, বপনের পরিকল্পনা করুন।')}</p></div></div><div class="journey-start-actions"><button type="button" class="button primary" data-journey="own">${t('Plan my season', 'আমার মৌসুমের পরিকল্পনা')}</button><button type="button" class="button" data-journey="demo">${t("Watch Rahim's journey", 'রহিমের পরিকল্পনা দেখুন')}</button><label class="button plan-import">${t('Continue later', 'পরে চালিয়ে যান')}<input type="file" data-plan-import accept=".html,.json,application/json,text/html" hidden></label></div></section>`;
+}
+
+export function showExitPrompt() {
+  const plan = getPlan();
+  if (!plan) return;
+  if (plan.mode === 'demo') {
+    resetPlan();
+    if (typeof location !== 'undefined') location.hash = 'plans';
+    return;
+  }
+  const body = `
+    <div class="exit-sheet" role="region" aria-label="${t('Exit plan options', 'পরিকল্পনা প্রস্থানের উপায়')}">
+      <p class="note">${t('You can save your progress and resume anytime from My plans, or discard this plan.', 'আপনি যেকোনো সময় কাজের অগ্রগতি সংরক্ষণ করে পরে আমার পরিকল্পনা থেকে পুনরায় শুরু করতে পারেন, বা এই পরিকল্পনা মুছে ফেলতে পারেন।')}</p>
+      <div class="exit-actions">
+        <button type="button" class="button primary exit-btn-draft" data-journey="exit-draft">${t('Save as draft and exit', 'খসড়া হিসেবে সংরক্ষণ করে বের হন')}</button>
+        <button type="button" class="button exit-btn-discard" data-journey="exit-discard-prompt" style="color:#b0452b;border-color:#b0452b;">${t('Discard this plan', 'পরিকল্পনাটি বাতিল করুন')}</button>
+        <button type="button" class="button ghost" data-action="close">${t('Keep planning', 'পরিকল্পনা চালিয়ে যান')}</button>
+      </div>
+    </div>
+  `;
+  modal(t('Exit running plan', 'চলমান পরিকল্পনা থেকে বের হন'), body);
+}
+
+export function showDiscardConfirm() {
+  const body = `
+    <div class="exit-sheet exit-sheet--discard">
+      <p class="note" style="color:#b0452b;"><strong>${t('Are you sure you want to discard this plan?', 'আপনি কি নিশ্চিত যে এই পরিকল্পনা মুছে ফেলতে চান?')}</strong></p>
+      <p class="note">${t('All changes in this session will be permanently deleted.', 'এই পর্বের সমস্ত পরিবর্তন স্থায়ীভাবে মুছে ফেলা হবে।')}</p>
+      <div class="exit-actions">
+        <button type="button" class="button primary exit-btn-confirm-discard" data-journey="exit-discard-confirm" style="background:#b0452b;border-color:#b0452b;">${t('Yes, discard plan', 'হ্যাঁ, পরিকল্পনা বাতিল করুন')}</button>
+        <button type="button" class="button ghost" data-journey="exit-prompt">${t('Back', 'ফিরে যান')}</button>
+      </div>
+    </div>
+  `;
+  modal(t('Confirm discard', 'বাতিল নিশ্চিত করুন'), body);
 }
 
 export function journeyFieldCTA() {
@@ -194,9 +230,27 @@ export async function journeyAction(action, value) {
     } else if (action === 'finish') {
       if (!canFinishPlanting(getPlan())) return;
       confirmPlanting();
+      const plan = getPlan();
+      savePlan(plan, { status: 'ready' });
       celebrate('planting', t('Planting confirmed!', 'বপনের মাপ নিশ্চিত হয়েছে!'));
-      if (hasPlanPage()) navigate('plan');
-      else toast(t('Your plan page is coming next', 'আপনার পরিকল্পনার পাতা শীঘ্রই আসছে'));
+      sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
+      navigate('plans');
+    } else if (action === 'exit-prompt') {
+      showExitPrompt();
+    } else if (action === 'exit-draft') {
+      close();
+      const plan = getPlan();
+      if (plan && plan.mode !== 'demo') {
+        savePlan(plan, { status: 'draft' });
+      }
+      resetPlan();
+      navigate('plans');
+    } else if (action === 'exit-discard-prompt') {
+      showDiscardConfirm();
+    } else if (action === 'exit-discard-confirm') {
+      close();
+      resetPlan();
+      navigate('plans');
     } else if (action === 'dismiss') {
       dismissed.set(stepFor(route), reviewKey(getPlan()));
       refreshJourney();
