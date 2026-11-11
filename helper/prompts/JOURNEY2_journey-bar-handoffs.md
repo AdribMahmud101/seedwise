@@ -1,0 +1,15 @@
+# JOURNEY2 · Journey bar + hand-offs across My field → Rotation studio → Planting planner → Your plan
+
+Data layer is merged: `src/legacy/journey.js` (getPlan, startPlan, confirmField/fieldSnapshot, confirmRotation/rotationSnapshot, setPlanting, confirmPlanting, stepStatus, nextStep, reviewReasons(t), subscribe, demoPlan(), export/import). Guide engine merged: `src/legacy/planty-guide.js` (`guide.show/sequence/hint/celebrate/stop`, focus ripple + spotlight + Planty bubble). Read both first. ANOTHER CARD (PLANSEASON) is adding per-season tabs INSIDE planner.js — do not restructure planner internals; only mount the bar and the finish CTA there.
+
+1. **Journey bar** (shared component, `src/legacy/journey-bar.js` + CSS): slim, sticky-under-topbar stepper on #field, #rotations, #planner (and the future #plan route): ① Field · ② Rotation · ③ Planting · ④ Your plan. Each step: done ✓ / current / todo / ⚠ needs review (from stepStatus); tap to jump. Right side: one primary **Continue →** button = nextStep(). Phone: compact (numbers + current label, horizontal, ≥44 px targets, no overflow at 360–412 px). Bengali + English. Animate step completion (fill + check pop). Hidden until a plan exists.
+2. **Start**: first visit (no plan) on #field shows a friendly start card: "Plan my season" (startPlan({mode:'own'})) and secondary "Watch Rahim's journey" (loads demoPlan() in mode 'demo' with a clear "Demo — Rahim's field" ribbon + "Start my own" exit). Visitors always start their own journey by default.
+3. **Hand-off CTAs** (big, obvious, primary): 
+   - #field: "Use this field →" → confirmField(fieldSnapshot(...)) → navigate #rotations, Planty `guide.hint` on the rotation list ("Pick the rotation that fits you").
+   - #rotations: on the previewed/selected rotation card "Choose this rotation →" → confirmRotation(...) → navigate #planner, guide.hint on the season tabs/crop area ("Set planting for each season").
+   - #planner: "Finish my plan →" enabled when every season has planting set → confirmPlanting() → navigate #plan (route may not exist yet: if missing, show a toast "Your plan page is coming next" — PLANPAGE card adds it).
+   - After each confirm: `guide.celebrate()` short burst + bar step animates to ✓.
+4. **Needs review**: when a step becomes 'review', show a dismissible Planty banner on that page with the bilingual reason from reviewReasons(t) and a "Review" button (ripple on the changed control).
+5. Keep existing page features intact; no layout shift for users without a plan except the start card.
+Tests: bar state rendering from plan states (todo/current/done/review), CTA enablement rules, demo ribbon, phone compact markup. Verify screenshots at 1366×768 and 412×915@2.625 for each page with a plan in progress. Commit as soon as it works.
+Acceptance: eslint no-undef clean on changed src (`npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --parser-options=ecmaVersion:latest --rule 'no-undef:error' <files>`); `npm test`; `npm run build`. Never touch package-lock.json/node_modules. Commit.
