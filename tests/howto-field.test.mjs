@@ -42,7 +42,8 @@ test('sub-step model shape: bilingual, word limits, micro-sequence per control',
   // Amendment E: every button/action has its own micro-step.
   const byId = Object.fromEntries(FIELD_HOWTO_STEPS.map(s => [s.id, s]));
   assert.equal(byId['field-map'].micro.length, 3);
-  assert.equal(byId['field-area'].micro.length, 4);
+  assert.equal(byId['field-area'].micro.length, 7); // value, Edit, bund, drain, path, other, Save
+  assert.ok(byId['field-area'].micro.filter(m => m.target.startsWith('#in-')).every(m => m.action === 'none'), 'area inputs wait for Next, not the first keystroke');
   assert.equal(byId['field-constraints'].micro.length, 5);
   assert.ok(byId['field-constraints'].micro.some(m => m.target.includes('in-irrigation')));
   assert.ok(byId['field-constraints'].micro.some(m => m.target.includes('in-budget')));

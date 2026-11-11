@@ -40,7 +40,10 @@ export const FIELD_HOWTO_STEPS = [
     micro: [
       { target: '.field-meta > div:nth-child(2) dd', action: 'none', text: { en: 'Your usable area', bn: 'আপনার চাষযোগ্য আয়তন' } },
       { target: '[data-action="edit-net-area"]', action: 'click', text: { en: 'Tap Edit', bn: 'Edit চাপুন' } },
-      { target: '#in-bundWidthM', action: 'input', inDialog: true, text: { en: 'Type the widths or decimals', bn: 'প্রস্থ বা শতক লিখুন' } },
+      { target: '#in-bundWidthM', action: 'none', inDialog: true, text: { en: 'Bund width: the earth ridge around your plot. Change it if needed, then tap Next', bn: 'আলের প্রস্থ: জমির চারপাশের মাটির আল। দরকার হলে বদলান, তারপর Next চাপুন' } },
+      { target: '#in-drainWidthM', action: 'none', inDialog: true, text: { en: 'Drain width: leave 0 if there is no drain, then tap Next', bn: 'নালার প্রস্থ: নালা না থাকলে 0 রাখুন, তারপর Next চাপুন' } },
+      { target: '#in-pathWidthM', action: 'none', inDialog: true, text: { en: 'Path width: any walkway inside the plot, then tap Next', bn: 'পথের প্রস্থ: জমির ভেতরের হাঁটার পথ, তারপর Next চাপুন' } },
+      { target: '#in-otherDecimals', action: 'none', inDialog: true, text: { en: 'Other land you cannot farm (decimals), then tap Next', bn: 'চাষ করা যায় না এমন অন্য জমি (শতক), তারপর Next চাপুন' } },
       { target: '#net-area-form button[type="submit"]', action: 'click', inDialog: true, text: { en: 'Save', bn: 'সংরক্ষণ করুন' } },
     ],
   },
