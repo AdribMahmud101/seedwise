@@ -200,6 +200,13 @@
   color: #f6f9ed;
 }
 
+/* Honesty note under the chips when bund/drain draw wider than real. */
+.zone-legend-note {
+  width: 100%;
+  font-size: 12px;
+  color: #5c6b54;
+}
+
 .zone-legend-overlay {
   position: absolute;
   left: 8px;
@@ -221,6 +228,8 @@
   padding: 10px 12px 12px;
   font-size: 13px;
   color: var(--text);
+  /* max-height is set inline to the visible stage; cramped stages scroll inside. */
+  overflow-y: auto;
 }
 
 .zone-popover-head {

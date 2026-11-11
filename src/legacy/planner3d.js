@@ -16,6 +16,7 @@ import {
   fieldZoneClearance,
   plannerMeasurementAnchors, plannerSpacingAnchors,
   easeOutCubic, easeInOutCubic,
+  zonePixelsPerMetre, clampZonePopover,
 } from "./planner3d-helpers.js";
 import { t, num } from "./ui.js";
 import {
@@ -68,6 +69,7 @@ let plantsPulse = null;
 let selectedZoneKind = null;
 let hoveredZoneKind = null;
 let zonePopoverEl = null;
+let zonePopoverAnchor = null;
 let zoneLegendEl = null;
 let zoneTapStart = null;
 let lastZoneHoverMs = 0;
@@ -739,8 +741,14 @@ function zoneModelFor(data, heightAt) {
     drainIndex = pick.index;
   }
   const grossM2 = data?.field?.areaHa > 0 ? data.field.areaHa * 10000 : undefined;
-  const zones = computeFieldZones(outlineM, inputs, { drainEdgeIndex: drainIndex, grossM2 });
-  const geom = buildZoneGeometry(outlineM, inputs, { drainEdgeIndex: drainIndex, display: true });
+  // NETAREA1C: bund/drain draw at >= ~6 px at the default zoom (capped at x6),
+  // like the studio; markers still label the real widths.
+  const spanM = outlineM.length >= 3
+    ? Math.max(outlineBounds(outlineM).width, outlineBounds(outlineM).height) : 0;
+  const stageMinPx = Math.min(canvasHostEl?.clientWidth || 0, canvasHostEl?.clientHeight || 0);
+  const pixelsPerMetre = zonePixelsPerMetre(stageMinPx, spanM);
+  const zones = computeFieldZones(outlineM, inputs, { drainEdgeIndex: drainIndex, grossM2, pixelsPerMetre });
+  const geom = buildZoneGeometry(outlineM, inputs, { drainEdgeIndex: drainIndex, display: true, pixelsPerMetre });
   currentZoneModel = { data, zones, geom, edited: !!data?.net?.edited, drainIndex };
   return currentZoneModel;
 }
@@ -748,10 +756,9 @@ function zoneModelFor(data, heightAt) {
 function zoneReadabilityNote() {
   const z = currentZoneModel?.zones;
   if (!z) return "";
-  const names = ["bund", "drain", "path"].filter((k) => z[k]?.enlarged).map((k) => z[k].name);
-  if (!names.length) return "";
-  const label = names.join(" / ");
-  return t(`${label} enlarged for readability.`, `${label} বোঝার সুবিধায় বড় করে দেখানো হয়েছে।`);
+  if (!((z.bund && z.bund.enlarged) || (z.drain && z.drain.enlarged))) return "";
+  return t("Bund and drain drawn wider for readability; numbers use your real widths.",
+    "দেখার সুবিধায় আল ও নালা চওড়া দেখানো হয়েছে; সংখ্যায় আপনার প্রকৃত প্রস্থ।");
 }
 
 function zoneCanvasTexture(key, draw) {
@@ -767,17 +774,17 @@ function zoneCanvasTexture(key, draw) {
   return tex;
 }
 
-// Compacted bund soil: darker than the field top, with lengthwise striations.
+// Compacted bund soil: earthen ridge tone (studio NETAREA2B), with lengthwise striations.
 function bundTexture() {
   return zoneCanvasTexture("zone-bund", (ctx) => {
-    ctx.fillStyle = "#3a2a1c";
+    ctx.fillStyle = "#65503b";
     ctx.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 900; i++) {
       const x = deterministic(i, 31) * 256, y = deterministic(i, 32) * 256;
-      ctx.fillStyle = i % 3 ? "rgba(20,13,8,0.35)" : "rgba(150,116,76,0.28)";
+      ctx.fillStyle = i % 3 ? "rgba(38,28,18,0.35)" : "rgba(178,144,100,0.3)";
       ctx.fillRect(x, y, 2 + deterministic(i, 33) * 6, 1.4);
     }
-    ctx.strokeStyle = "rgba(24,16,10,0.4)";
+    ctx.strokeStyle = "rgba(48,36,24,0.4)";
     ctx.lineWidth = 1;
     for (let y = 8; y < 256; y += 14) {
       ctx.beginPath();
@@ -807,14 +814,15 @@ function drainBedTexture() {
   });
 }
 
-// Thin drain water: pale flow streaks over green-grey.
+// Drain water: deep teal that stays distinct from the pale flooded paddy,
+// with paler flow streaks so the channel reads as water, not shadow.
 function drainWaterTexture() {
   return zoneCanvasTexture("zone-drain-water", (ctx) => {
-    ctx.fillStyle = "#5e9aa0";
+    ctx.fillStyle = "#2f5d66";
     ctx.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 90; i++) {
       const x = deterministic(i, 39) * 256, y = deterministic(i, 40) * 256;
-      ctx.strokeStyle = i % 3 ? "rgba(225,244,240,0.35)" : "rgba(30,80,76,0.25)";
+      ctx.strokeStyle = i % 3 ? "rgba(205,232,228,0.4)" : "rgba(16,48,52,0.3)";
       ctx.lineWidth = 0.8 + deterministic(i, 41);
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -1005,11 +1013,12 @@ function buildDrainMesh(zones, geom, heightAt, paddyY = 0) {
       ground + edgeLift - (edgeLift - bedLift) * Math.pow(Math.max(0, Math.sin(Math.PI * t01)), 1.1) });
   const bedMat = zoneMaterial("drain", { map: drainBedTexture(), roughness: 0.65, metalness: 0.05 });
   addZoneMesh("drain", new THREE.Mesh(bedGeom, bedMat));
-  const waterGeom = buildRibbonGeometry(stations, { width: width * 0.72, across: 2, heightAt,
+  // The water covers the middle three-fifths so muddy banks flank the channel.
+  const waterGeom = buildRibbonGeometry(stations, { width: width * 0.6, across: 2, heightAt,
     liftFn: (t01, x, y, ground) => ground - 0.12, uRepeat: 0.1 });
   const waterTex = drainWaterTexture();
-  const waterMat = zoneMaterial("drain", { map: waterTex, roughness: 0.15, metalness: 0.1,
-    transparent: true, opacity: 0.72, side: THREE.DoubleSide,
+  const waterMat = zoneMaterial("drain", { map: waterTex, roughness: 0.25, metalness: 0.05,
+    transparent: true, opacity: 0.78, side: THREE.DoubleSide,
     polygonOffset: true, polygonOffsetFactor: -1 });
   waterMat.userData.water = true;
   addZoneMesh("drain", new THREE.Mesh(waterGeom, waterMat));
@@ -1135,11 +1144,19 @@ function pulsePlantsMaterial(mesh) {
 }
 
 function updateZoneWater(timeMs) {
-  if (!drainWaterMats.length) return;
   const tm = timeMs / 1000;
   for (const { mat, tex } of drainWaterMats) {
     if (!prefersReducedMotion) tex.offset.x = (tm * 0.04) % 1;
     if (!zonesFade) mat.opacity = prefersReducedMotion ? 0.72 : 0.7 + 0.07 * Math.sin(tm * 1.3);
+  }
+  // NETAREA1C: the selected zone pulses gently (studio NETAREA2B); the loop
+  // never runs under prefers-reduced-motion, so this stays a static glow there.
+  if (selectedZoneKind && !prefersReducedMotion) {
+    const pulse = 0.85 + 0.35 * Math.sin(tm * 4);
+    for (const mat of zoneKindMats.get(selectedZoneKind) || []) {
+      if (!mat.emissive || mat.userData.water) continue;
+      mat.emissiveIntensity = pulse;
+    }
   }
 }
 
@@ -1149,7 +1166,14 @@ function applyZoneHighlight() {
   for (const [kind, mats] of zoneKindMats) {
     const selected = kind === selectedZoneKind;
     const on = selected || kind === hoveredZoneKind;
+    // NETAREA1C: a selection dims the other zones (studio NETAREA2B); hover only glows.
+    const dimmed = !!selectedZoneKind && !selected;
     for (const m of mats) {
+      if (m.color) {
+        if (!m.userData.baseColor) m.userData.baseColor = m.color.clone();
+        if (dimmed) m.color.copy(m.userData.baseColor).multiplyScalar(0.72);
+        else m.color.copy(m.userData.baseColor);
+      }
       if (!m.emissive) continue;
       m.emissive.set(!on ? 0x000000 : m.userData.water ? 0x3f9b9a : selected ? 0x8a7a2a : 0x3a3a20);
       m.emissiveIntensity = !on ? 0 : m.userData.water ? 0.35 : selected ? 1 : 0.55;
@@ -1210,20 +1234,38 @@ function openZonePopover(kind, anchor) {
   zonePopoverEl = el;
   const wrapRect = wrap.getBoundingClientRect();
   const hostRect = canvasHostEl.getBoundingClientRect();
-  let left = (anchor?.clientX ?? hostRect.left + hostRect.width / 2) - wrapRect.left + 12;
-  let top = (anchor?.clientY ?? hostRect.top + hostRect.height * 0.3) - wrapRect.top - 10;
-  left = Math.max(8, Math.min(left, wrapRect.width - el.offsetWidth - 8));
-  top = Math.max(8, Math.min(top, wrapRect.height - el.offsetHeight - 8));
-  el.style.left = `${left}px`;
-  el.style.top = `${top}px`;
+  // Wrap-relative anchor; phones render the popover in-flow (see CSS) and ignore it.
+  zonePopoverAnchor = {
+    x: (anchor?.clientX ?? hostRect.left + hostRect.width / 2) - wrapRect.left,
+    y: (anchor?.clientY ?? hostRect.top + hostRect.height * 0.3) - wrapRect.top,
+  };
+  positionZonePopover();
   applyZoneHighlight();
+}
+
+// NETAREA1C: keep the open popover fully inside the visible stage (studio
+// NETAREA2B clamp); re-run on resize since the wrap size can change.
+function positionZonePopover() {
+  const el = zonePopoverEl;
+  if (!el || !canvasHostEl) return;
+  const wrap = canvasHostEl.closest(".planner3d-stage-wrap") || canvasHostEl;
+  const wrapRect = wrap.getBoundingClientRect();
+  const bounds = { left: 8, top: 8, right: wrapRect.width - 8, bottom: wrapRect.height - 8 };
+  const placed = clampZonePopover({ anchorX: zonePopoverAnchor?.x ?? bounds.left,
+    anchorY: zonePopoverAnchor?.y ?? bounds.top,
+    width: el.offsetWidth, height: el.offsetHeight, bounds });
+  el.style.maxHeight = `${Math.max(0, bounds.bottom - bounds.top)}px`;
+  el.style.left = `${placed.left}px`;
+  el.style.top = `${placed.top}px`;
 }
 
 function closeZonePopover() {
   zonePopoverEl?.remove();
   zonePopoverEl = null;
+  zonePopoverAnchor = null;
   document.removeEventListener("keydown", onZoneKeyDown, true);
   document.removeEventListener("pointerdown", onZoneOutsideDown, true);
+  window.removeEventListener("resize", positionZonePopover);
 }
 
 function selectZone(kind, anchor = null) {
@@ -1236,6 +1278,7 @@ function selectZone(kind, anchor = null) {
   openZonePopover(kind, anchor);
   document.addEventListener("keydown", onZoneKeyDown, true);
   document.addEventListener("pointerdown", onZoneOutsideDown, true);
+  window.addEventListener("resize", positionZonePopover);
 }
 
 function onZoneKeyDown(event) {
@@ -1277,7 +1320,12 @@ function renderZoneLegend() {
       : `${zone.name} ${num(zone.widthM, 1)} m`;
     chip.addEventListener("click", (event) => {
       event.stopPropagation();
-      selectZone(selectedZoneKind === kind ? null : kind);
+      if (selectedZoneKind === kind) {
+        selectZone(null);
+        return;
+      }
+      const rect = chip.getBoundingClientRect();
+      selectZone(kind, { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 });
     });
     el.appendChild(chip);
   }
@@ -1295,6 +1343,14 @@ function renderZoneLegend() {
     requestRender();
   });
   el.appendChild(measureChip);
+  // NETAREA1C: honesty note under the chips, matching the studio wording.
+  const readability = zoneReadabilityNote();
+  if (readability) {
+    const note = document.createElement("small");
+    note.className = "zone-legend-note";
+    note.textContent = readability;
+    el.appendChild(note);
+  }
   const footer = wrap.querySelector(".planner3d-footer");
   if (footer) footer.prepend(el);
   else {

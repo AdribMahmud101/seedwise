@@ -1,6 +1,7 @@
 // Pure helpers for the Planner 3D (forked from planner-3d-base). No three.js, no DOM — safe to unit test.
 import { capacity } from './engine.js';
 import { M2_PER_DECIMAL } from './netarea.js';
+import { infrastructureDisplayWidth } from './studio3d-helpers.js';
 
 export function outlineBounds(outlineM) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -203,8 +204,43 @@ export function zoneDisplayWidth(widthM, fieldSpanM) {
   return { displayWidthM: minReadable, enlarged: true };
 }
 
+// NETAREA1C: on-screen pixels per metre at the default zoom, ported from the
+// studio estimator (the fitted field covers ~55% of the constraining stage
+// dimension in a 3/4 perspective view). Hidden stages and degenerate outlines
+// fall back to the studio defaults instead of NaN.
+export function zonePixelsPerMetre(stageMinPx, fieldSpanM) {
+  const stage = Number.isFinite(stageMinPx) && stageMinPx > 0 ? stageMinPx : 600;
+  const span = Number.isFinite(fieldSpanM) && fieldSpanM > 0 ? fieldSpanM : 30;
+  return Math.max(1, stage * 0.55) / span;
+}
+
+// NETAREA1C: bund/drain display width from on-screen pixels — at least ~6 px
+// at the default zoom, capped at six times the real width (studio NETAREA2B
+// maths, reused so both views enlarge identically).
+export function zoneDisplayWidthPx(widthM, pixelsPerMetre) {
+  const displayWidthM = infrastructureDisplayWidth(widthM, pixelsPerMetre);
+  return { displayWidthM, enlarged: displayWidthM > widthM };
+}
+
+// NETAREA1C: popover placement, ported from the studio clamp — opens beside
+// the anchor, flips to the other side near the stage edge, and clamps fully
+// inside the visible bounds (shrinking to fit a cramped stage).
+export function clampZonePopover({ anchorX, anchorY, width, height, bounds }) {
+  const w = Math.min(width, Math.max(0, bounds.right - bounds.left));
+  const h = Math.min(height, Math.max(0, bounds.bottom - bounds.top));
+  const x = anchorX + 30 + w <= bounds.right ? anchorX + 30 : anchorX - w - 30;
+  return {
+    left: Math.max(bounds.left, Math.min(bounds.right - w, x)),
+    top: Math.max(bounds.top, Math.min(bounds.bottom - h, anchorY - h / 2)),
+    width: w, height: h,
+  };
+}
+
 // Pure zone descriptors for the planner 3D: lengths, areas and shares from the
-// field's entered widths. opts: { drainEdgeIndex, elevationAt, grossM2 }.
+// field's entered widths. opts: { drainEdgeIndex, elevationAt, grossM2, pixelsPerMetre }.
+// pixelsPerMetre (NETAREA1C) switches bund/drain to on-screen enlargement —
+// >= ~6 px at the default zoom, capped at x6 — like the studio; the path
+// keeps the span rule and all maths/labels keep the real widths.
 export function computeFieldZones(outlineM, inputs = {}, opts = {}) {
   const none = { grossM2: 0, perimeterM: 0, bund: null, drain: null, path: null, other: null, enlarged: false };
   if (!Array.isArray(outlineM) || outlineM.length < 3) return none;
@@ -217,12 +253,15 @@ export function computeFieldZones(outlineM, inputs = {}, opts = {}) {
   const perimeterM = outlinePerimeterM(outlineM);
   const grossM2 = Number.isFinite(opts.grossM2) && opts.grossM2 > 0
     ? opts.grossM2 : Math.abs(ringSignedArea(outlineM));
+  const ppm = Number.isFinite(opts.pixelsPerMetre) && opts.pixelsPerMetre > 0 ? opts.pixelsPerMetre : 0;
   const share = (areaM2) => (grossM2 > 0 ? (areaM2 / grossM2) * 100 : 0);
   const describe = (kind, name, widthM, lengthM, areaM2, extra = {}) => {
     if (!(widthM > 0) && kind !== 'other') return null;
     if (kind === 'other' && !(areaM2 > 0)) return null;
     const { displayWidthM, enlarged } = kind === 'other'
-      ? { displayWidthM: widthM, enlarged: false } : zoneDisplayWidth(widthM, span);
+      ? { displayWidthM: widthM, enlarged: false }
+      : ppm > 0 && (kind === 'bund' || kind === 'drain')
+        ? zoneDisplayWidthPx(widthM, ppm) : zoneDisplayWidth(widthM, span);
     return { kind, name, widthM, lengthM, areaM2, decimals: areaM2 / M2_PER_DECIMAL,
       sharePct: share(areaM2), displayWidthM, enlarged, ...extra };
   };
@@ -253,12 +292,19 @@ export function computeFieldZones(outlineM, inputs = {}, opts = {}) {
 }
 
 // Geometry used both to draw the zones and to keep plants out of them.
+// opts.display widens the drawn ribbons; opts.pixelsPerMetre (NETAREA1C)
+// uses the on-screen bund/drain rule so geometry matches the descriptors.
 export function buildZoneGeometry(outlineM, inputs = {}, opts = {}) {
   if (!Array.isArray(outlineM) || outlineM.length < 3) return null;
   const b = outlineBounds(outlineM);
-  const width = value => opts.display ? zoneDisplayWidth(value, Math.max(b.width, b.height)).displayWidthM : value;
-  const bundWidthM = width(Math.max(0, Number(inputs.bundWidthM) || 0));
-  const drainWidthM = width(Math.max(0, Number(inputs.drainWidthM) || 0));
+  const ppm = Number.isFinite(opts.pixelsPerMetre) && opts.pixelsPerMetre > 0 ? opts.pixelsPerMetre : 0;
+  const width = (value, px = false) => {
+    if (!opts.display) return value;
+    if (px && ppm > 0) return zoneDisplayWidthPx(value, ppm).displayWidthM;
+    return zoneDisplayWidth(value, Math.max(b.width, b.height)).displayWidthM;
+  };
+  const bundWidthM = width(Math.max(0, Number(inputs.bundWidthM) || 0), true);
+  const drainWidthM = width(Math.max(0, Number(inputs.drainWidthM) || 0), true);
   const pathWidthM = width(Math.max(0, Number(inputs.pathWidthM) || 0));
   const otherDecimals = Math.max(0, Number(inputs.otherDecimals) || 0);
   if (!(bundWidthM > 0 || drainWidthM > 0 || pathWidthM > 0 || otherDecimals > 0)) return null;
