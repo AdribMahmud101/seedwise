@@ -3312,6 +3312,11 @@ dialog .modal-body {
     max-width: 1240px;
     padding: clamp(20px, 2.4vw, 32px) clamp(16px, 2vw, 28px);
   }
+  /* 3D pages use the wide screen; text pages keep a readable width. */
+  .main[data-page="rotations"],
+  .main[data-page="planner"] {
+    max-width: 1720px;
+  }
   .sidebar {
     overflow-y: auto;
   }
