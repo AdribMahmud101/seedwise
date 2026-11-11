@@ -42,7 +42,7 @@ const state = { ...structuredClone(defaults), ...saved };
 for (const key of ["weights", "planner", "clinic", "tabs", "water"])
   state[key] = { ...defaults[key], ...saved[key] };
 let earth, agronomy, archive, smap, hlsField;
-let outlook = null, floodFields = null, graceGroundwater = null;
+let outlook = null, floodFields = null, graceGroundwater = null, s1Water = null;
 let lastSeasonField = null;
 async function loadPack(path) {
   try {
@@ -65,10 +65,11 @@ async function loadData() {
     responses.map((r) => r.json()),
   );
   // Optional ML packs: outlook + flood cards hide when these are missing or offline.
-  [outlook, floodFields, graceGroundwater] = await Promise.all([
+  [outlook, floodFields, graceGroundwater, s1Water] = await Promise.all([
     loadPack("data/outlook.json"),
     loadPack("data/flood-fields.json"),
     loadPack("data/grace-groundwater.json"),
+    loadPack("data/s1-water.json"),
   ]);
   if (!allFields().some((f) => f.id === state.fieldId))
     state.fieldId = "mithapukur";
@@ -777,6 +778,7 @@ export {
   outlook,
   floodFields,
   graceGroundwater,
+  s1Water,
   loadData,
   persist,
   t,

@@ -4,6 +4,7 @@ import {
   agronomy,
   archive,
   floodFields,
+  s1Water,
   persist,
   t,
   deskNo,
@@ -44,6 +45,7 @@ import {
   reasons,
   statuses,
   examples,
+  contacts,
 } from "./recovery-data.js";
 
 const word = (pair) => t(...pair);
@@ -89,6 +91,62 @@ function hazardCards() {
         `<button type="button" data-action="rr-hazard" data-value="${id}" class="rr-hazard ${id} ${hazard() === id ? "selected" : ""}" aria-pressed="${hazard() === id}">${sketch(id)}<span><strong>${word(g.name)}</strong><small>${word(g.caption)}</small></span><span class="rr-radio">${hazard() === id ? icon("check", 14) : ""}</span></button>`,
     )
     .join("")}</div>`;
+}
+function relevantContact() {
+  return (
+    contacts.find((c) => c.hazards.includes(hazard())) || contacts[0]
+  );
+}
+function emergency() {
+  const rel = relevantContact();
+  return `<section class="rr-emergency" aria-label="${esc(t("Emergency contacts", "জরুরি নম্বর"))}"><div class="rr-emergency-head"><h2>${t("If anyone is in danger, call first", "কেউ বিপদে থাকলে আগে কল করুন")}</h2><p>${t("Tap a number to call. Planning can wait.", "কল করতে নম্বরে ট্যাপ করুন। পরিকল্পনা পরে হবে।")}</p></div><div class="rr-emergency-nums">${contacts
+    .map(
+      (c) =>
+        `<a href="tel:${c.num}" class="${c.num === rel.num ? "relevant" : ""}"><span class="rr-emergency-num mono">${num(c.num).replace(/[,٬]/g, "")}</span><span>${word(c.name)}</span>${c.num === rel.num ? `<small>${t("Most useful now", "এখন সবচেয়ে কাজের")}</small>` : ""}</a>`,
+    )
+    .join("")}</div><p class="rr-emergency-src">${sources(contacts.map((c) => c.source))}</p></section>`;
+}
+function pathSteps(a) {
+  const index = Math.max(
+    0,
+    phases.findIndex((p) => p[0] === a.phase),
+  );
+  return `<section class="rr-path" aria-label="${esc(t("Recovery path", "পুনরুদ্ধারের পথ"))}"><div class="rr-path-head"><h2>${t("Recovery path", "পুনরুদ্ধারের পথ")}</h2><span class="note">${t("Assessed", "মূল্যায়ন")} ${date(a.date)}</span></div><ol>${phases
+    .map(([id, en, bn], i) => {
+      const cls = i < index ? "done" : i === index ? "current" : "";
+      return `<li class="${cls}"><button type="button" data-action="rr-phase" data-value="${id}" ${i === index ? 'aria-current="step"' : ""} aria-label="${esc(t(en, bn))}"><span class="rr-step-dot">${i < index ? icon("check", 14) : num(i + 1)}</span><span class="rr-step-text"><b>${esc(t(en, bn))}</b></span></button></li>`;
+    })
+    .join("")}</ol><p class="note">${t("Follow the action card. When access is confirmed safe, choose the last stage to check readiness and planting dates.", "নির্দেশনা কার্ড অনুসরণ করুন। প্রবেশ নিরাপদ নিশ্চিত হলে প্রস্তুতি ও রোপণের তারিখ দেখতে শেষ ধাপ বেছে নিন।")}</p></section>`;
+}
+function readinessChecks(a) {
+  const list = [
+    [a.ground === "workable", ["Ground stable and moist", "জমি স্থির ও আর্দ্র"]],
+    [a.standing === "free", ["Plot free for a new crop", "নতুন ফসলের জন্য জমি খালি"]],
+    [
+      ["limited", "dependable"].includes(a.water),
+      ["Water covers critical stages", "জরুরি সময়ে পানির ব্যবস্থা"],
+    ],
+  ];
+  if (hazard() !== "drought")
+    list.push([
+      ["clear", "reviewed"].includes(a.exposure),
+      ["Contamination reviewed", "দূষণ যাচাই হয়েছে"],
+    ]);
+  return list;
+}
+function readiness(a) {
+  const list = readinessChecks(a),
+    done = list.filter(([ok]) => ok).length,
+    total = list.length,
+    pct = Math.round((done / total) * 100),
+    C = 213.63,
+    off = (C * (1 - done / total)).toFixed(2);
+  return `<section class="rr-ready" aria-label="${esc(t("Field readiness", "জমির প্রস্তুতি"))}"><div class="rr-ready-ring"><svg viewBox="0 0 80 80" role="img" aria-label="${num(pct)}%"><circle cx="40" cy="40" r="34" class="rr-ring-bg"/><circle cx="40" cy="40" r="34" class="rr-ring-fg" stroke-dasharray="${C}" stroke-dashoffset="${off}"/></svg><div><b class="mono">${num(pct)}%</b><span>${t("Field readiness", "জমির প্রস্তুতি")}</span></div></div><div class="rr-ready-body"><p class="note">${t(`${done} of ${total} checks done`, `${num(total)}টির মধ্যে ${num(done)}টি সম্পন্ন`)} · ${t("Tick each check once it is done. Do this after the hazard has passed.", "প্রতিটি পরীক্ষা শেষ হলে টিক দিন। বিপদ কেটে যাওয়ার পর এটি করুন।")}</p><ul>${list
+    .map(
+      ([ok, label]) =>
+        `<li class="${ok ? "done" : ""}"><span class="rr-check-dot">${ok ? icon("check", 13) : ""}</span>${esc(word(label))}</li>`,
+    )
+    .join("")}</ul>${button(t("Continue to replanting", "রোপণ পরিকল্পনায় যান"), "rr-calendar", done === total ? "primary" : "")}</div></section>`;
 }
 function assessment(a) {
   return `<section class="panel"><div class="panel-header"><h2>${t("1. What is happening?", "১. এখন কী অবস্থা?")}</h2>${tag(a.example ? t("Worked example", "নমুনা পরিস্থিতি") : t("Your observations", "আপনার পর্যবেক্ষণ"), a.example ? "amber" : "")}</div><div class="panel-body">
@@ -203,14 +261,29 @@ function assessment(a) {
   <div class="rr-form-footer">${button(t("Try a worked example", "নমুনা দেখুন"), "rr-example", "small", "note")}${button(t("Start my assessment", "নিজের জমি যাচাই"), "rr-reset", "ghost small")}</div>
   </div></section>`;
 }
+function nextCta(a) {
+  if (a.phase === "ready")
+    return button(
+      t("See the planting window", "রোপণের সময় দেখুন"),
+      "rr-calendar",
+      "primary",
+    );
+  if (a.phase === "inspect")
+    return goButton(
+      t("Log a field observation", "মাঠের তথ্য লিখুন"),
+      "research",
+      "primary",
+    );
+  const rel = relevantContact();
+  return `<a class="button primary rr-call" href="tel:${rel.num}">${t("Call ", "কল করুন ") + num(rel.num).replace(/[,٬]/g, "")} · ${word(rel.name)}</a>`;
+}
 function actions(a) {
   const g = guides[hazard()],
     index = Math.max(
       0,
       phases.findIndex((p) => p[0] === a.phase),
     );
-  return `<aside class="rr-now ${hazard()}"><div class="eyebrow">${t("YOUR NEXT STEP", "এখন করণীয়")}</div><h2>${word(phases[index].slice(1))}</h2><p class="rr-action-text">${word(g.actions[index])}</p>
-  ${hazard() === "fire" && a.phase === "active" ? `<a class="button rr-emergency" href="tel:102">${icon("flame")}${t("Fire Service · 102", "ফায়ার সার্ভিস · ১০২")}</a>` : ""}
+  return `<aside class="rr-now ${hazard()} ${a.phase === "ready" ? "calm" : "alert"}"><div class="eyebrow">${t("YOUR NEXT STEP", "এখন করণীয়")}</div><h2>${word(phases[index].slice(1))}</h2><p class="rr-action-text">${word(g.actions[index])}</p><div class="rr-cta">${nextCta(a)}</div>
   <div class="rr-next-season"><span>${icon("rotations", 17)}</span><div><b>${t("Make the next season stronger", "পরের মৌসুমের প্রস্তুতি")}</b><p>${word(g.improve)}</p></div></div>
   <div class="rr-official"><a href="https://www.bamis.gov.bd/en/bulletin/district/" target="_blank" rel="noopener">${t("Check current BAMIS advice", "বর্তমান বামিস নির্দেশনা")} ↗</a>${hazard() === "flood" ? '<a href="https://ffwc.gov.bd/" target="_blank" rel="noopener">FFWC · ' + t("flood information", "বন্যার তথ্য") + " ↗</a>" : ""}</div><details class="rr-details"><summary>${t("Guidance sources", "নির্দেশনার সূত্র")}</summary><p>${sources(g.sources)}</p></details></aside>`;
 }
@@ -332,6 +405,30 @@ function evidence(a) {
     wet = rows.map((x) => x.rootWetness).filter(Number.isFinite);
   return `<details class="rr-details rr-evidence"><summary>${t("What can the NASA record tell us here?", "নাসার তথ্য এখানে কী বলতে পারে?")} ${nasaBadge(["imerg", "wetness"], "2021–2025")}</summary><div class="rr-evidence-grid"><div><span class="eyebrow">2021–2025 · ${monthName(+m - 1)}</span><h3>${num(Math.min(...rain), 1)}–${num(Math.max(...rain), 1)} mm</h3><p class="note">${t("Monthly IMERG rain range across five years", "পাঁচ বছরের মাসিক IMERG বৃষ্টির সীমা")}</p></div><div><span class="eyebrow">NASA POWER · GWETROOT</span><h3>${num(mean(wet), 2)}</h3><p class="note">${t("Mean regional root-zone wetness index · 0–1", "আঞ্চলিক শিকড়ের আর্দ্রতা সূচকের গড় · ০–১")}</p></div></div><p class="note">${t("Historical regional context. These data cannot establish today’s field moisture, safe access, contamination or a replanting date. Add a local observation and check the latest advisory.", "এগুলো এলাকার পুরনো তথ্য। আজকের আর্দ্রতা, নিরাপদ প্রবেশ, দূষণ বা পুনরায় বপনের দিন এগুলো দিয়ে নিশ্চিত হয় না। স্থানীয় পর্যবেক্ষণ যোগ করুন ও বর্তমান নির্দেশনা দেখুন।")}</p>${sources(["gpm", "power"])} ${goButton(t("Log a field observation", "মাঠের তথ্য লিখুন"), "research", "small")}</details>`;
 }
+function radar() {
+  const site = s1Water?.[state.fieldId],
+    dates = site?.dates?.filter((d) => Number.isFinite(d.flooded_pct));
+  if (!site || !dates?.length) return "";
+  const years = [...new Set(dates.map((d) => d.date.slice(0, 4)))].sort(),
+    period = years[0] === years.at(-1) ? years[0] : `${years[0]}–${years.at(-1)}`;
+  let peak = dates[0];
+  for (const d of dates) if (d.flooded_pct > peak.flooded_pct) peak = d;
+  const line =
+    peak.flooded_pct > 0
+      ? t(
+          `Most open water on field pixels: ${num(peak.flooded_pct, 1)}% (${peak.date})`,
+          `জমির পিক্সেলে সবচেয়ে বেশি খোলা পানি: ${num(peak.flooded_pct, 1)}% (${peak.date})`,
+        )
+      : t(
+          `No open water on field pixels across ${num(dates.length)} radar scenes (${period})`,
+          `(${period}) ${num(dates.length)}টি রাডার দৃশ্যে জমির পিক্সেলে খোলা পানি নেই`,
+        );
+  return panel(
+    t("Radar water check (Sentinel-1, ESA)", "রাডারে পানির যাচাই (Sentinel-1, ESA)"),
+    `<p class="flood-headline">${esc(line)}</p><p>${truth("REMOTE_OBSERVED", { source: "Sentinel-1 RTC", date: period, cell: "10 m" })}</p><p class="note">${esc(t(site.source, site.source))}</p><details class="rr-details"><summary>${t("How sure is this?", "কতটা নিশ্চিত?")}</summary><p class="note">${esc(site.caveat)}</p><p><a class="source-link" href="${esc(site.stac_url)}" target="_blank" rel="noopener">${t("Source scenes ↗", "মূল দৃশ্য ↗")}</a></p></details>`,
+    tag(t("Experimental", "পরীক্ষামূলক"), "amber"),
+  );
+}
 function snapshot() {
   const a = draft(),
     r = result();
@@ -388,10 +485,11 @@ function recovery() {
       ),
     ) +
     chips() +
-    `<div class="rr-intro"><span>${icon("recovery", 23)}</span><p>${t("Choose the situation you want to plan for. Conditions below come from you. This page does not monitor active emergencies.", "কোন পরিস্থিতির পরিকল্পনা চান বাছুন। নিচের পরিস্থিতি আপনার দেওয়া তথ্য। এখানে চলমান দুর্যোগ পর্যবেক্ষণ করা হয় না।")}</p></div>${hazardCards()}
+    `<div class="rr-intro"><span>${icon("recovery", 23)}</span><p>${t("Choose the situation you want to plan for. Conditions below come from you. This page does not monitor active emergencies.", "কোন পরিস্থিতির পরিকল্পনা চান বাছুন। নিচের পরিস্থিতি আপনার দেওয়া তথ্য। এখানে চলমান দুর্যোগ পর্যবেক্ষণ করা হয় না।")}</p></div>${emergency()}${hazardCards()}
  ${a.example ? exampleBanner() : ""}
- <div class="rr-assessment">${assessment(a)}${actions(a)}</div>${planting(a, r)}
- <div class="rr-bottom">${trees(a, r)}${panel(t("4. Keep a recovery plan", "৪. পরিকল্পনা রাখুন"), `<p class="note">${t("Save this assessment on this device, or take a printed plan to your extension officer. Revisit it when conditions change.", "এই ডিভাইসে যাচাই সংরক্ষণ করুন বা ছাপিয়ে কৃষি কর্মকর্তার কাছে নিন। অবস্থা বদলালে আবার দেখুন।")}</p><div class="rr-save-actions">${button(t("Save assessment", "যাচাই সংরক্ষণ"), "rr-save", "primary", "save")}${button(t("Preview / print", "দেখুন / ছাপুন"), "rr-print", "", "print")}${button(t("Export JSON", "JSON নিন"), "rr-export", "ghost small", "download")}</div>${saved ? `<p class="note rr-saved">${t("Last saved", "শেষ সংরক্ষণ")} ${date(saved.assessment.date)} · ${saved.assessment.example ? t("Example", "নমুনা") : t("Your assessment", "আপনার যাচাই")} ${button(t("View saved copy", "সংরক্ষিত কপি"), "rr-saved", "ghost small")}</p>` : ""}<div class="rr-linked">${goButton(t("Check water demand", "পানির চাহিদা দেখুন"), "water", "small")}${goButton(t("Log crop or soil evidence", "ফসল বা মাটির তথ্য লিখুন"), "research", "small")}${hazard() === "flood" && !r.reasons.length ? button(t("Use delay in rotation comparison", "ফসলচক্রে দেরি প্রয়োগ"), "rr-rotation", "small") : ""}</div>`)}</div>${evidence(a)}<div class="section-space">${floodCard(state.fieldId, floodFields)}</div>`
+ ${pathSteps(a)}
+ <div class="rr-assessment">${assessment(a)}${actions(a)}</div>${readiness(a)}${planting(a, r)}
+ <div class="rr-bottom">${trees(a, r)}${panel(t("4. Keep a recovery plan", "৪. পরিকল্পনা রাখুন"), `<p class="note">${t("Save this assessment on this device, or take a printed plan to your extension officer. Revisit it when conditions change.", "এই ডিভাইসে যাচাই সংরক্ষণ করুন বা ছাপিয়ে কৃষি কর্মকর্তার কাছে নিন। অবস্থা বদলালে আবার দেখুন।")}</p><div class="rr-save-actions">${button(t("Save assessment", "যাচাই সংরক্ষণ"), "rr-save", "primary", "save")}${button(t("Preview / print", "দেখুন / ছাপুন"), "rr-print", "", "print")}${button(t("Export JSON", "JSON নিন"), "rr-export", "ghost small", "download")}</div><p class="note rr-offline">${t("Saved on this device. Works without internet.", "এই ডিভাইসে সংরক্ষিত। ইন্টারনেট ছাড়াই চলে।")}</p>${saved ? `<p class="note rr-saved">${t("Last saved", "শেষ সংরক্ষণ")} ${date(saved.assessment.date)} · ${saved.assessment.example ? t("Example", "নমুনা") : t("Your assessment", "আপনার যাচাই")} ${button(t("View saved copy", "সংরক্ষিত কপি"), "rr-saved", "ghost small")}</p>` : ""}<div class="rr-linked">${goButton(t("Check water demand", "পানির চাহিদা দেখুন"), "water", "small")}${goButton(t("Log crop or soil evidence", "ফসল বা মাটির তথ্য লিখুন"), "research", "small")}${hazard() === "flood" && !r.reasons.length ? button(t("Use delay in rotation comparison", "ফসলচক্রে দেরি প্রয়োগ"), "rr-rotation", "small") : ""}</div>`)}</div>${evidence(a)}<div class="rr-sat">${radar()}${floodCard(state.fieldId, floodFields)}</div>`
   );
 }
 function recoveryChange(el) {
@@ -418,6 +516,20 @@ function recoveryAction(action, value) {
     state.hazard = value;
     persist();
     repaint();
+    return;
+  }
+  if (action === "rr-phase") {
+    const a = draft();
+    if (phases.some((p) => p[0] === value)) a.phase = value;
+    state.recoveryDrafts = { ...state.recoveryDrafts, [key()]: a };
+    persist();
+    repaint();
+    return;
+  }
+  if (action === "rr-calendar") {
+    document
+      .getElementById("recovery-calendar")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
   if (action === "rr-example" || action === "rr-reset") {
