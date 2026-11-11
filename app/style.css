@@ -3794,3 +3794,51 @@ dialog .modal-body {
 @media (prefers-reduced-motion: reduce) {
   [data-page="planner"] img.planty-mascot { animation: none !important; }
 }
+
+/* Planty guide: overlays never intercept the field's real controls or scrolling. */
+.planty-guide { position: fixed; inset: 0; z-index: 2100; pointer-events: none; color: #233d2b; }
+.planty-guide[hidden] { display: none; }
+.planty-guide .planty-guide__spotlight, .planty-guide .planty-guide__ripple {
+  position: fixed; border-radius: 18px; pointer-events: none;
+  transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease;
+}
+.planty-guide .planty-guide__spotlight { box-shadow: 0 0 0 200vmax #172f263b; border: 1px solid #a8c886; }
+.planty-guide .planty-guide__ripple i {
+  position: absolute; inset: 0; border: 2px solid #78a653; border-radius: inherit;
+  box-shadow: 0 0 14px #78a65345; animation: planty-guide-ripple 1.6s ease-out infinite;
+}
+.planty-guide .planty-guide__ripple i:nth-child(2) { animation-delay: -.53s; }
+.planty-guide .planty-guide__ripple i:nth-child(3) { animation-delay: -1.06s; }
+.planty-guide .planty-guide__bubble {
+  position: fixed; width: 336px; box-sizing: border-box; border: 1px solid #c8d7b5;
+  border-radius: 22px; padding: 18px; background: #fffef4; box-shadow: 0 12px 42px #172f2630;
+  pointer-events: auto; overflow: auto; overscroll-behavior: contain; overflow-wrap: anywhere;
+}
+.planty-guide .planty-guide__message { display: flex; align-items: center; gap: 14px; }
+.planty-guide .planty-guide__message p { margin: 0; font-size: 15px; line-height: 1.5; }
+.planty-guide .planty-mascot { display: block; flex: none; width: 64px; height: 64px; object-fit: contain; transform-origin: 50% 90%; }
+.planty-guide .planty-idle { animation: planty-bob 3.6s ease-in-out infinite; }
+.planty-guide .planty-thinking { animation: planty-ponder 1.4s ease-in-out infinite alternate; }
+.planty-guide .planty-happy { animation: planty-hop .8s ease-out; }
+.planty-guide .planty-pointing { transform: rotate(-9deg); }
+.planty-guide .planty-guide__instruction { font-size: 12px; line-height: 1.5; margin: 12px 0 0; color: #57694a; }
+.planty-guide .planty-guide__instruction:empty { display: none; }
+.planty-guide nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.planty-guide button { min-height: 44px; padding: 8px 12px; border: 1px solid #c8d7b5; border-radius: 12px; background: #f3f6e8; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.planty-guide button[data-guide="next"] { background: #284f38; color: #fffef4; border-color: #284f38; }
+.planty-guide button[data-guide="skip"] { margin-left: auto; background: transparent; }
+.planty-guide button:disabled { opacity: .45; cursor: default; }
+.planty-guide button:focus-visible, .planty-guide .planty-guide__bubble:focus-visible { outline: 3px solid #78a653; outline-offset: 3px; }
+.planty-guide--hint .planty-guide__spotlight, .planty-guide--celebrate .planty-guide__spotlight,
+.planty-guide--celebrate .planty-guide__ripple, .planty-guide--hint [data-guide="back"], .planty-guide--hint [data-guide="next"] { display: none; }
+.planty-guide--hint .planty-guide__bubble { width: 286px; padding: 12px; }
+.planty-guide--hint .planty-mascot { width: 40px; height: 40px; }
+.planty-guide .planty-guide__burst { position: absolute; top: 50%; left: 50%; pointer-events: none; }
+.planty-guide .planty-guide__burst i { position: absolute; width: 7px; height: 11px; border-radius: 2px; background: var(--color); opacity: 0; animation: planty-guide-burst .85s ease-out forwards; }
+@keyframes planty-guide-ripple { from { opacity: .55; transform: scale(1); } to { opacity: 0; transform: scale(1.12, 1.35); } }
+@keyframes planty-guide-burst { 0% { opacity: 1; transform: rotate(var(--angle)) translateY(0); } 75% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--angle)) translateY(calc(-1 * var(--travel))) rotate(100deg); } }
+@media (max-width: 700px) { .planty-guide .planty-guide__bubble { width: calc(100% - 24px); } }
+@media (prefers-reduced-motion: reduce) {
+  .planty-guide *, .planty-guide *::before, .planty-guide *::after { animation: none !important; transition: none !important; }
+  .planty-guide .planty-guide__ripple i:not(:first-child), .planty-guide .planty-guide__burst { display: none; }
+}

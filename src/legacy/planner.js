@@ -20,6 +20,7 @@ import {
 import { PLANTING, capacity } from './engine.js';
 import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext } from './planner-controls.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
+import { guide } from './planty-guide.js';
 
 const cropIds = {
   rice: 'aman',
@@ -97,6 +98,7 @@ function planner() {
         'Turn the field boundary into a row layout and an approximate planting count.',
         'জমির সীমানা থেকে সারি ও আনুমানিক গাছের সংখ্যা দেখুন।'
       ),
+      button(t('Guide me', 'আমাকে দেখান'), 'plan-guide') +
       button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
     ) +
     chips() +
@@ -368,6 +370,12 @@ function mountPlanner() {
   };
 }
 function plannerAction(action, value) {
+  if (action === 'plan-guide') guide.sequence([
+    { target: '.plan-crop-grid', text: { en: 'Choose a crop. Planty will walk through your planting settings.', bn: 'একটি ফসল বাছুন। Planty আপনার বপনের মাপ দেখাবে।' }, pose: 'pointing', action: 'click' },
+    { target: '#plan-row-range', text: { en: 'Try changing the distance between rows.', bn: 'সারির দূরত্ব বদলে দেখুন।' }, pose: 'thinking', action: 'input', timeout: 1200 },
+    { target: '.planty-launch', text: { en: 'Ask Planty about your current crop and settings.', bn: 'আপনার ফসল ও মাপ নিয়ে Planty-কে প্রশ্ন করুন।' }, pose: 'happy', action: 'click',
+      onDone: () => guide.celebrate({ en: 'You’re ready to plan your planting!', bn: 'আপনি বপনের পরিকল্পনা করতে প্রস্তুত!' }) },
+  ]);
   if (action === 'plan-reset') {
     Object.assign(state.planner, recommendedSettings(state.planner.crop));
     persist();
