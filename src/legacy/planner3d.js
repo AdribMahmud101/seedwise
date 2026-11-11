@@ -1290,8 +1290,12 @@ function fitPerspective(data) {
     topM: currentBlock.topMax + Math.max(b.width, b.height) * 0.12,
     targetWidthRatio: 0.88, elevationDeg, yawDeg,
   });
-  const { distance, target } = framing;
-  cameraPersp.position.set(...framing.position);
+  // Closer default on bigger previews (owner: field looked small); phones keep more margin.
+  const hostW = renderer?.domElement?.clientWidth || 0;
+  const zoom = hostW >= 820 ? 0.7 : hostW >= 560 ? 0.8 : 0.9;
+  const target = framing.target;
+  const distance = framing.distance * zoom;
+  cameraPersp.position.set(...framing.position.map((v, i) => target[i] + (v - target[i]) * zoom));
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
   cameraPersp.updateProjectionMatrix();

@@ -3741,7 +3741,11 @@ dialog .modal-body {
 }
 @media (min-width: 701px) and (max-width: 1099px) {
   [data-page="planner"] .planty-panel { position: fixed; top: 78px; right: 20px; width: 320px; z-index: 35; max-height: calc(100dvh - 98px); box-shadow: 0 12px 60px #24392c33; }
-  [data-page="planner"] .planner3d-layout { grid-template-columns: minmax(0, 1fr) minmax(270px, 1fr); }
+  /* Tablets: stack the preview full-width above the settings (side-by-side left a 346 px sliver). */
+  [data-page="planner"] .planner3d-layout { grid-template-columns: minmax(0, 1fr); }
+  [data-page="planner"] .planner3d-panel { position: static; grid-column: 1; grid-row: 1; }
+  [data-page="planner"] .planner3d-stage-canvas-host { height: clamp(380px, 52vw, 520px); }
+  [data-page="planner"] .plan-settings, [data-page="planner"] .plan-live { grid-column: 1; grid-row: auto; }
 }
 @media (max-width: 700px) {
   [data-page="planner"] .planner3d-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
@@ -3769,8 +3773,8 @@ dialog .modal-body {
   [data-page="planner"] .planty-mascot * { animation: none !important; transition: none !important; }
 }
 
-/* Keep the live count in view before the settings on wide screens. */
-@media (min-width: 701px) {
+/* Keep the live count in view before the settings on wide screens (tablets stack instead). */
+@media (min-width: 1100px) {
   [data-page="planner"] .planner3d-panel { grid-row: 1 / span 4; }
   [data-page="planner"] .plan-live, [data-page="planner"] #plan-estimate { display: contents; }
   [data-page="planner"] .plan-result { grid-column: 2; grid-row: 1; border: 1px solid #cedaba; border-radius: 14px; }
