@@ -693,6 +693,136 @@ export function idleResumeGain(timeSinceInputS, {
   return 0.5 - 0.5 * Math.cos(Math.PI * x);
 }
 
+// Dimension label for a drawn zone. The marker line spans the drawn (possibly
+// enlarged) width so it matches the visible ribbon, but the label always
+// states the real entered width — never rounded, never zero.
+export function measurementWidthLabel(widthM) {
+  return `${widthM} m`;
+}
+
+// Overall field-edge marker: one decimal, trailing zeros trimmed.
+export function measurementEdgeLabel(lengthM) {
+  return `${Number((Number.isFinite(lengthM) ? lengthM : 0).toFixed(1))} m`;
+}
+
+// Spacing markers on a planted patch: row spacing vs within-row spacing.
+export function spacingMeasurementLabel(kind, cm) {
+  return `${kind === 'row' ? '↔' : '↕'} ${cm} cm`;
+}
+
+// Dimension anchors across each drawn zone (bund / drain / path) plus one
+// overall marker along the longest field edge. Each marker spans the DISPLAY
+// width (zoneGeom must be the display geometry) while its label states the
+// REAL width. A marker is omitted when no complete cross-section fits inside
+// its zone (tight concave corners); the edge marker is always present.
+export function plannerMeasurementAnchors(outlineM, zones, zoneGeom) {
+  if (!Array.isArray(outlineM) || outlineM.length < 3) return [];
+  const winding = Math.sign(ringSignedArea(outlineM)) || 1;
+  const edges = outlineM.map((a, i) => {
+    const b = outlineM[(i + 1) % outlineM.length];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!(length > 1e-6)) return null;
+    return { a, b, i, length,
+      normal: [-(b[1] - a[1]) / length * winding, (b[0] - a[0]) / length * winding] };
+  }).filter(Boolean).sort((p, q) => q.length - p.length);
+  const markers = [];
+  const inside = (id, x, y) => pointInFieldZones(x, y, zoneGeom, outlineM) === id;
+  const fits = (id, center, normal, width) =>
+    [-0.49, -0.25, 0, 0.25, 0.49].every((tt) =>
+      inside(id, center[0] + normal[0] * width * tt, center[1] + normal[1] * width * tt));
+  const spanAcross = (center, normal, width) => [
+    center.map((v, i) => v - normal[i] * width / 2),
+    center.map((v, i) => v + normal[i] * width / 2)];
+  const bund = zones?.bund;
+  if (bund && bund.displayWidthM > 0) {
+    const width = bund.displayWidthM;
+    const candidates = [];
+    for (const edge of edges) {
+      for (const fraction of [0.3, 0.7, 0.5]) {
+        candidates.push({
+          center: edge.a.map((v, i) => v + (edge.b[i] - v) * fraction + edge.normal[i] * width / 2),
+          normal: edge.normal,
+        });
+      }
+    }
+    const hit = candidates.find((c) => fits('bund', c.center, c.normal, width));
+    if (hit) {
+      const [a, b] = spanAcross(hit.center, hit.normal, width);
+      markers.push({ id: 'bund', label: measurementWidthLabel(bund.widthM), a, b });
+    }
+  }
+  const drain = zones?.drain;
+  const dline = zoneGeom?.drain;
+  if (drain && dline && drain.displayWidthM > 0) {
+    const width = drain.displayWidthM;
+    const len = Math.hypot(dline.bx - dline.ax, dline.by - dline.ay);
+    if (len > 1e-6) {
+      const normal = [-(dline.by - dline.ay) / len, (dline.bx - dline.ax) / len];
+      const hit = [0.7, 0.3, 0.5]
+        .map((f) => ({ center: [dline.ax + (dline.bx - dline.ax) * f, dline.ay + (dline.by - dline.ay) * f], normal }))
+        .find((c) => fits('drain', c.center, c.normal, width));
+      if (hit) {
+        const [a, b] = spanAcross(hit.center, hit.normal, width);
+        markers.push({ id: 'drain', label: measurementWidthLabel(drain.widthM), a, b });
+      }
+    }
+  }
+  const path = zones?.path;
+  const pline = zoneGeom?.path;
+  if (path && pline && path.displayWidthM > 0) {
+    const width = path.displayWidthM;
+    const len = Math.hypot(pline.bx - pline.ax, pline.by - pline.ay);
+    if (len > 1e-6) {
+      const ux = (pline.bx - pline.ax) / len, uy = (pline.by - pline.ay) / len;
+      const normal = [-uy, ux];
+      const center = [(pline.ax + pline.bx) / 2, (pline.ay + pline.by) / 2];
+      const hit = [0, 0.2, -0.2, 0.35, -0.35]
+        .map((off) => ({ center: [center[0] + ux * len * off, center[1] + uy * len * off], normal }))
+        .find((c) => fits('path', c.center, c.normal, width));
+      if (hit) {
+        const [a, b] = spanAcross(hit.center, hit.normal, width);
+        markers.push({ id: 'path', label: measurementWidthLabel(path.widthM), a, b });
+      }
+    }
+  }
+  if (edges[0]) markers.push({ id: 'edge', label: measurementEdgeLabel(edges[0].length), a: edges[0].a, b: edges[0].b });
+  return markers;
+}
+
+// Row-spacing and within-row spacing markers on a small patch of the planted
+// area, starting at the drawn plant nearest the centroid. Anchors span the
+// drawn (display) spacing so they connect visible plants; labels state the
+// real slider values. Recompute on every slider move.
+export function plannerSpacingAnchors(outlineM, rowCm, plantCm, zoneGeom = null, usable = 100) {
+  if (!Array.isArray(outlineM) || outlineM.length < 3) return [];
+  if (![rowCm, plantCm].every(Number.isFinite) || rowCm < 2 || plantCm < 2) return [];
+  const layout = plannerRowLayout(outlineM, rowCm, plantCm, usable, zoneGeom);
+  if (!layout.positions.length || !(layout.spacingX > 0) || !(layout.spacingY > 0)) return [];
+  const b = outlineBounds(outlineM);
+  const rowsAlongX = b.width >= b.height;
+  const rowStep = rowsAlongX ? [0, layout.spacingY] : [layout.spacingX, 0];
+  const plantStep = rowsAlongX ? [layout.spacingX, 0] : [0, layout.spacingY];
+  const clear = ([x, y]) => pointInPolygon(x, y, outlineM) &&
+    pointInFieldZones(x, y, zoneGeom, outlineM) === null;
+  const clearSpan = (a, b) => clear(a) && clear(b) &&
+    clear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+  const ordered = [...layout.positions].sort((p, q) =>
+    Math.hypot(p[0] - b.cx, p[1] - b.cy) - Math.hypot(q[0] - b.cx, q[1] - b.cy));
+  for (const base of ordered.slice(0, 24)) {
+    for (const sign of [1, -1]) {
+      const rowEnd = [base[0] + rowStep[0] * sign, base[1] + rowStep[1] * sign];
+      const plantEnd = [base[0] + plantStep[0] * sign, base[1] + plantStep[1] * sign];
+      if (clearSpan(base, rowEnd) && clearSpan(base, plantEnd)) {
+        return [
+          { id: 'row-spacing', label: spacingMeasurementLabel('row', rowCm), a: base, b: rowEnd },
+          { id: 'plant-spacing', label: spacingMeasurementLabel('plant', plantCm), a: base, b: plantEnd },
+        ];
+      }
+    }
+  }
+  return [];
+}
+
 // Combined idle state: gated sinusoid plus the envelope gain. Dragging,
 // reduced motion, or a hidden tab parks everything at zero.
 export function idleCameraSway(timeS, timeSinceInputS, opts = {}) {

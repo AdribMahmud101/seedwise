@@ -283,3 +283,51 @@
     width: calc(100% - 16px);
   }
 }
+
+/* Scale (dimension) annotations: crisp screen-space SVG over the canvas. */
+.planner3d-measurements {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+  overflow: hidden;
+  color: #173e30;
+}
+
+.planner3d-measurements text {
+  font: 700 12px system-ui, sans-serif;
+  text-anchor: middle;
+  fill: #173e30;
+  stroke: #fffdf5;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+.planner3d-dimension-halo {
+  stroke: #fffdf5;
+  stroke-width: 4px;
+}
+
+.planner3d-dimension-line {
+  stroke: #173e30;
+  stroke-width: 1px;
+}
+
+.planner3d-dimension-leader {
+  fill: none;
+  stroke: #fffdf5;
+  stroke-width: 1px;
+}
+
+/* Measurements toggle chip next to the zone chips. */
+.zone-legend button[data-measurements][aria-pressed="true"] {
+  background: #e5ede0;
+  border-color: #65805b;
+}
+
+.zone-legend button[data-measurements][aria-pressed="false"] {
+  opacity: 0.55;
+}
