@@ -11,6 +11,21 @@ async function loadS1WaterData() {
   return s1WaterData;
 }
 
+async function loadWaterTableData() {
+  if (waterTableData !== null) return waterTableData;
+  try {
+    const res = await fetch("/data/water-table.json");
+    waterTableData = res.ok ? await res.json() : false;
+    // Callouts may have rendered before this arrived: refresh them once.
+    if (waterTableData && currentData && containerEl) {
+      updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData, t }));
+    }
+  } catch (e) {
+    waterTableData = false;
+  }
+  return waterTableData;
+}
+
 async function loadSoilNutrientsData() {
   if (soilNutrientsData !== null) return soilNutrientsData;
   try {
@@ -150,6 +165,7 @@ let soilOverrides = null; // { ph, om, p, gwDepthM }
 let ndviRelativeOverride = null; // null = auto (within-field at ≥95 % one class), true/false = legend toggle
 let probeUV = { u: 0.5, v: 0.5 };
 let s1WaterData = null; // lazy loaded from /data/s1-water.json
+let waterTableData = null; // lazy loaded from /data/water-table.json
 let soilNutrientsData = null; // lazy loaded from /data/soil-nutrients.json
 let waterMesh = null;
 let contourLinesGroup = null;
@@ -538,7 +554,7 @@ async function prepareSurface(data, mode, monthIdx) {
   const month = data.months?.[monthIdx] || {};
   const optical = ['ndvi', 'moisture', 'ndmi'].includes(mode);
   const [radarPack, nutrientPack, gridPack, soilPack] = await Promise.all([
-    loadS1WaterData(), loadSoilNutrientsData(),
+    loadS1WaterData(), loadSoilNutrientsData(), loadWaterTableData(),
     optical || mode === 'productivity' ? loadSurfacePack(mode === 'moisture' || mode === 'ndmi' ? 'moisture-grid' : 'ndvi-grid') : null,
     mode === 'fertility' ? loadSurfacePack('soil-profile') : null,
   ]);
@@ -3632,15 +3648,15 @@ function soilPinLabel(band, detail) {
 }
 
 function soilDetailHtml(band, detail) {
-  const truthLabel = band === "aquifer" ? (detail.isButton
-    ? t("Unknown — add local reading", "অজানা — স্থানীয় তথ্য দিন")
-    : t("Tubewell depth, Measured", "নলকূপের গভীরতা, মাপা")) : detail.truthLabel;
+  const truthLabel = band === "aquifer" && detail.isButton
+    ? t("Unknown — add local reading", "অজানা — স্থানীয় তথ্য দিন") : detail.truthLabel;
   return `<div class="callout-box ${band}" title="${esc(truthLabel)}">
     <div class="callout-eyebrow">${esc(detail.eyebrow)}</div>
     <div class="callout-val">${detail.isButton
       ? `<button type="button" class="callout-btn" data-soil-test>${esc(detail.value)}</button>`
       : esc(detail.value)}</div>
     ${detail.isButton ? "" : `<small>${esc(truthLabel)}</small>`}
+    ${detail.askReading ? `<button type="button" class="callout-btn" data-soil-test>${esc(t("Add your well reading", "আপনার কূপের মাপ দিন"))}</button>` : ""}
     ${detail.cropValue ? `<div class="callout-val callout-crop">${esc(detail.cropValue)}</div><small>${esc(detail.cropTruthLabel)}</small>` : ""}
   </div>`;
 }
@@ -4072,6 +4088,7 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
     data,
     monthIdx: currentMonthIdx,
     soilOverrides,
+    waterTable: waterTableData || null,
     t,
   });
 
@@ -4555,6 +4572,7 @@ export async function setStudioMonth(monthIdx) {
     data: currentData,
     monthIdx: currentMonthIdx,
     soilOverrides,
+    waterTable: waterTableData || null,
     t,
   });
   if (calloutData && containerEl) updateSoilDetails(calloutData);
@@ -5006,7 +5024,7 @@ export function setSoilOverrides(overrides) {
   soilOverrides = overrides ? { ...overrides } : null;
   sideTextureCache.clear();
   if (containerEl && currentData) {
-    updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, t }));
+    updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData || null, t }));
     buildFieldBlock(currentData, currentCutaway).then(() => {
       updateProbeCard();
       requestRender();

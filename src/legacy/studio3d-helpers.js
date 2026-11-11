@@ -1357,7 +1357,7 @@ export function computeAutoExaggeration(reliefM, blockWidthM, minExag = 1.0, max
  * Band 2: 15–60 cm · ROOT ZONE
  * Band 3: >120 cm · SUBSOIL & WATER TABLE
  */
-export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t = (en) => en }) {
+export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, waterTable = null, t = (en) => en }) {
   if (!data) return null;
   const month = data.months?.[monthIdx] || data.months?.[0] || {};
   const layers = data.soil?.layers || [];
@@ -1444,11 +1444,22 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
   // Band 3: >120 cm Subsoil & Water Table
   const aquiferEyebrow = `>120 cm · ${t("SUBSOIL & WATER TABLE", "গভীর স্তর ও পানির স্তর")}`;
   const hasLocalGw = soilOverrides?.gwDepthM != null && Number(soilOverrides.gwDepthM) > 0;
+  // Fan et al. 2017 ~1 km water-table model (public/data/water-table.json); a farmer's well reading overrides it.
+  const wtSite = waterTable?.sites?.[data.field?.id];
+  const calMonth = Number(String(month.month || "").slice(5, 7)) - 1;
+  const modelGwM = !hasLocalGw ? wtSite?.monthlyDepthM?.[calMonth >= 0 && calMonth < 12 ? calMonth : monthIdx % 12] : null;
+  const hasModelGw = Number.isFinite(modelGwM);
   const aquiferVal = hasLocalGw
     ? `${Number(soilOverrides.gwDepthM).toFixed(1)} m (${t("Measured", "মাপা")})`
-    : t("Well depth unknown (add local reading)", "কূপের গভীরতা অজানা (স্থানীয় তথ্য দিন)");
-  const aquiferTruth = hasLocalGw ? "FARMER_REPORTED" : "UNKNOWN";
-  const aquiferTruthLabel = hasLocalGw ? "Tubewell depth, Measured" : "Unknown — add local reading";
+    : hasModelGw
+      ? `${t("Water table", "পানির স্তর")} ~${modelGwM.toFixed(1)} m ${t("below ground", "মাটির নিচে")} (${t("model", "মডেল")})`
+      : t("Well depth unknown (add local reading)", "কূপের গভীরতা অজানা (স্থানীয় তথ্য দিন)");
+  const aquiferTruth = hasLocalGw ? "FARMER_REPORTED" : hasModelGw ? "MODELED" : "UNKNOWN";
+  const aquiferTruthLabel = hasLocalGw
+    ? t("Well water level, Measured", "কূপের পানির স্তর, মাপা")
+    : hasModelGw
+      ? t("Estimated · Fan et al. 2017 model, ~1 km, monthly average", "আনুমানিক · Fan et al. 2017 মডেল, ~১ কিমি, মাসিক গড়")
+      : t("Unknown — add local reading", "অজানা — স্থানীয় তথ্য দিন");
 
   return {
     topsoil: {
@@ -1477,8 +1488,10 @@ export function buildCalloutData({ data, monthIdx = 0, soilOverrides = null, t =
       value: aquiferVal,
       truth: aquiferTruth,
       truthLabel: aquiferTruthLabel,
-      isButton: !hasLocalGw,
+      isButton: !hasLocalGw && !hasModelGw,
+      askReading: hasModelGw,
       gwDepthM: hasLocalGw ? soilOverrides.gwDepthM : null,
+      modelGwM: hasModelGw ? modelGwM : null,
     },
   };
 }

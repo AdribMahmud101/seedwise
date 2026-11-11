@@ -608,3 +608,18 @@ test("buildCalloutData includes fallow residue description for fallow months", (
 });
 
 
+
+test('deep soil uses the Fan 2017 water-table model for the calendar month; a well reading overrides it', () => {
+  const waterTable = { sites: { mithapukur: { monthlyDepthM: [1.9, 2.2, 2.6, 3.2, 3.5, 2.7, 0.6, 0.3, 0.2, 0.3, 1.0, 1.7] } } };
+  const data = { field: { id: 'mithapukur' }, months: [{ month: '2024-04' }] };
+  const { aquifer } = buildCalloutData({ data, waterTable });
+  assert.equal(aquifer.truth, 'MODELED');
+  assert.equal(aquifer.modelGwM, 3.2);
+  assert.match(aquifer.value, /~3\.2 m below ground \(model\)/);
+  assert.equal(aquifer.isButton, false);
+  assert.equal(aquifer.askReading, true);
+  const measured = buildCalloutData({ data, waterTable, soilOverrides: { gwDepthM: 4.5 } }).aquifer;
+  assert.equal(measured.truth, 'FARMER_REPORTED');
+  assert.equal(measured.modelGwM, null);
+  assert.equal(buildCalloutData({ data: { ...data, field: { id: 'elsewhere' } }, waterTable }).aquifer.truth, 'UNKNOWN');
+});
