@@ -140,36 +140,25 @@ const riskBn = {
   legume: 'আলুর খরচ বেশি। মুগের জন্য উপযুক্ত সময় ও পানি নিষ্কাশন দরকার।',
 };
 
-/**
- * Generate ranked rotation cards
- */
-function rankedCards() {
-  const f = field();
-  if (!f?.monthly || !f.monthly.length) {
-    return stateEmpty(t('Weather data not loaded for this field', 'এই জমির আবহাওয়ার তথ্য লোড করা নেই'));
-  }
-  const items = ranking();
-  const sum = Object.values(state.weights).reduce((a, b) => a + b, 0);
-  const selectedTariff = state.pumpTariff || 'diesel';
-  const fieldAreaHa = area();
+const expandedRotations = new Set();
 
-  return items
-    .map((r, i) => {
-      const study = agronomy.rotations[studyIndex[r.id]];
-      const saved = state.plans.some(
-        (p) => p.fieldId === state.fieldId && p.rotation === r.id
-      );
+function rotationCard(r, i, best, sum, fieldAreaHa, selectedTariff) {
+  const study = agronomy.rotations[studyIndex[r.id]];
+  const saved = state.plans.some(
+    (p) => p.fieldId === state.fieldId && p.rotation === r.id
+  );
 
-      // Shortfall litres = shortfallMm * areaHa * 10,000 (from studiodata.js logic)
-      const shortfallLitres = (r.deficit || 0) * fieldAreaHa * 10000;
-      const { pumpHours, costTk } = calcIrrigationCost(shortfallLitres, selectedTariff);
+  // Shortfall litres = shortfallMm * areaHa * 10,000 (from studiodata.js logic)
+  const shortfallLitres = (r.deficit || 0) * fieldAreaHa * 10000;
+  const { pumpHours, costTk } = calcIrrigationCost(shortfallLitres, selectedTariff);
 
-      return `<article class="panel rotation-card ${i === 0 && r.feasible && sum ? 'best' : ''} ${r.feasible ? '' : 'conditional'}">
+  return `<article class="panel rotation-card ${best ? 'best' : ''} ${r.feasible ? '' : 'conditional'}" data-rotation-id="${r.id}">
         <div class="rotation-top">
           <div class="rank-num">${String(i + 1).padStart(2, '0')}</div>
           <div>
             <div class="eyebrow">${r.id === 'baseline' ? t('Existing rotation', 'বর্তমান ফসলচক্র') : t(r.intent, r.bn)}</div>
             <h2>${esc(t(r.crops.join(' → '), r.bnCrops?.join(' → ') || ''))}</h2>
+            ${best ? `<span class="rotation-best-badge">${t(`Best fit for your priorities · ${num(r.score)}/100`, `আপনার অগ্রাধিকারে সেরা · ${num(r.score)}/১০০`)}</span>` : ''}
           </div>
           <div class="score">${r.score == null ? '—' : num(r.score)}<small>/100</small> ${r.score != null ? truth('SCENARIO') : ''}</div>
         </div>
@@ -196,10 +185,52 @@ function rankedCards() {
             ${button(t('Plan planting', 'বপন সাজান'), 'layout-for', 'small', 'right', r.id)}
           </div>
         </div>
-        ${r.id === getSelectedRotationId() ? journeyRotationCTA(r.id) : ''}
+        ${best || r.id === getSelectedRotationId() ? journeyRotationCTA(r.id) : ''}
       </article>`;
-    })
-    .join('');
+}
+
+function compactRotation(r, i, bestScore) {
+  const expanded = expandedRotations.has(r.id);
+  const difference = bestScore == null || r.score == null ? null : bestScore - r.score;
+  const gap = difference == null ? '—' : `${difference > 0 ? '−' : difference < 0 ? '+' : ''}${Math.abs(difference)} ${t('points', 'পয়েন্ট')}`;
+  return `<div class="rotation-candidate ${expanded ? 'expanded' : ''}">
+    <div class="rotation-candidate-row">
+      <span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
+      <span class="rotation-candidate-crops">${esc(t(r.crops.join(' → '), r.bnCrops?.join(' → ') || ''))}</span>
+      <span class="rotation-candidate-score">${r.score == null ? '—' : num(r.score)}<small>/100</small></span>
+      <span class="rotation-candidate-gap">${gap}</span>
+      <span class="rotation-mini-strip" aria-label="${t('12-month crop calendar', '১২ মাসের ফসল ক্যালেন্ডার')}">${r.months.map((month) => `<i class="${month}"></i>`).join('')}</span>
+      <button type="button" class="rotation-candidate-toggle" data-action="rotation-details" data-value="${r.id}" aria-expanded="${expanded}">${expanded ? t('Hide details', 'বিস্তারিত বন্ধ') : t('Show details', 'বিস্তারিত দেখুন')}</button>
+    </div>
+    ${expanded ? rotationCard(r, i, false, Object.values(state.weights).reduce((a, b) => a + b, 0), area(), state.pumpTariff || 'diesel') : ''}
+  </div>`;
+}
+
+/**
+ * Generate ranked rotation cards
+ */
+function rankedCards() {
+  const f = field();
+  if (!f?.monthly || !f.monthly.length) {
+    return stateEmpty(t('Weather data not loaded for this field', 'এই জমির আবহাওয়ার তথ্য লোড করা নেই'));
+  }
+  const items = ranking();
+  const sum = Object.values(state.weights).reduce((a, b) => a + b, 0);
+  const selectedTariff = state.pumpTariff || 'diesel';
+  const fieldAreaHa = area();
+
+  const bestScore = items[0]?.score;
+  const topCount = bestScore == null ? 1 : items.filter((r) => r.score === bestScore).length;
+  const top = items.slice(0, topCount).map((r, i) => rotationCard(r, i, Boolean(sum && r.score != null), sum, fieldAreaHa, selectedTariff)).join('');
+  const others = items.slice(topCount);
+  if (!others.length) return top;
+  const allExpanded = others.every((r) => expandedRotations.has(r.id));
+  return `${top}<section class="rotation-candidates" aria-label="${t('Compare other rotations', 'অন্য ফসলচক্র তুলনা করুন')}">
+    <div class="rotation-candidates-heading"><h2>${t(`Compare other rotations (${others.length})`, `অন্য ফসলচক্র তুলনা করুন (${others.length})`)}</h2>
+      <button type="button" class="rotation-show-all" data-action="rotation-details" data-value="all" aria-expanded="${allExpanded}">${allExpanded ? t('Hide all', 'সব বন্ধ') : t('Show all', 'সব দেখুন')}</button>
+    </div>
+    ${others.map((r, i) => compactRotation(r, i + topCount, bestScore)).join('')}
+  </section>`;
 }
 
 /**
@@ -295,6 +326,19 @@ function rotationOptionsFor(activeId) {
     ? items.map((r) => ({ id: r.id, label: r.label, bn: r.bn, score: r.score, feasible: r.feasible }))
     : fallback;
   return source.map((r) => ({ ...r, active: r.id === activeId }));
+}
+
+function syncRotationPickerOrder() {
+  const picker = document.querySelector('.studio-rotations-picker');
+  if (!picker) return;
+  const options = new Map([...picker.querySelectorAll('[data-studio-rot-id]')].map((item) => [item.dataset.studioRotId, item]));
+  ranking().forEach((rotation, index) => {
+    const option = options.get(rotation.id);
+    if (!option) return;
+    option.querySelector('.studio-rot-rank').textContent = String(index + 1).padStart(2, '0');
+    option.querySelector('.studio-rot-score').textContent = `${rotation.score == null ? '—' : num(rotation.score)}/100`;
+    picker.appendChild(option);
+  });
 }
 
 /**
@@ -995,6 +1039,22 @@ function method() {
  * Handle rotation actions
  */
 function rotationAction(action, value) {
+  if (action === 'rotation-details') {
+    const list = document.querySelector('#rotation-list');
+    if (!list) return;
+    const toggle = list.querySelector(`[data-action="rotation-details"][data-value="${value}"]`);
+    if (value === 'all') {
+      const items = ranking();
+      const topCount = items[0]?.score == null ? 1 : items.filter((r) => r.score === items[0].score).length;
+      const others = items.slice(topCount);
+      if (toggle?.getAttribute('aria-expanded') === 'true') others.forEach((r) => expandedRotations.delete(r.id));
+      else others.forEach((r) => expandedRotations.add(r.id));
+    } else if (expandedRotations.has(value)) expandedRotations.delete(value);
+    else expandedRotations.add(value);
+    list.innerHTML = rankedCards();
+    list.querySelector(`[data-action="rotation-details"][data-value="${value}"]`)?.focus();
+    return;
+  }
   if (action === 'preview-3d') {
     activeRotationId = value;
     document.querySelector('#rotation-list').innerHTML = rankedCards();
@@ -1084,6 +1144,7 @@ function rotationInput(el) {
     if (getPlan()?.steps.rotation === 'done') syncSeasonRotation();
     document.querySelector(`#value-${el.dataset.weight}`).textContent = num(+el.value);
     document.querySelector('#rotation-list').innerHTML = rankedCards();
+    syncRotationPickerOrder();
   }
 }
 
