@@ -2331,3 +2331,17 @@
 .studio-rail {
   overflow-x: hidden;
 }
+
+/* Desktop: the rail follows the page instead of leaving a blank column under a fixed 700 px box.
+   overflow: clip (not hidden) keeps the container from becoming a scroll container, so sticky works. */
+@media (min-width: 1101px) {
+  .studio-container {
+    overflow: clip;
+  }
+  .studio-rail {
+    position: sticky;
+    top: 12px;
+    align-self: flex-start;
+    max-height: calc(100svh - 24px);
+  }
+}
