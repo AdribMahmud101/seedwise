@@ -59,6 +59,18 @@ export const references = [
     "https://www.cdph.ca.gov/Programs/EPO/Pages/Wildfire%20Pages/ash-homegardens.aspx",
     "Mixed fire ash may contain contaminants. Do not use as garden fertilizer.",
   ],
+  [
+    "bd-999",
+    "National Emergency Service 999",
+    "https://www.police.gov.bd/",
+    "Unified police, fire and ambulance helpline run by Bangladesh Police.",
+  ],
+  [
+    "bd-krishi",
+    "Krishi Call Center 16123",
+    "https://sharifpurup.noakhali.gov.bd/en/site/page/b1uV-%E0%A6%95%E0%A7%83%E0%A6%B7%E0%A6%BF-%E0%A6%95%E0%A6%B2-%E0%A6%B8%E0%A7%87%E0%A6%A8%E0%A7%8D%E0%A6%9F%E0%A6%BE%E0%A6%B0",
+    "Agriculture Information Service helpline for crop, fisheries and livestock advice.",
+  ],
 ].map(([id, name, url, method]) => ({
   id,
   name,
@@ -127,6 +139,26 @@ export const reasons = {
     "বীজ গজানো ও গুরুত্বপূর্ণ বৃদ্ধির সময়ে পানির ব্যবস্থা নিশ্চিত করুন। খরা সহনশীল ফসলেও পানি লাগে।",
   ],
 };
+export const contacts = [
+  {
+    num: "999",
+    name: ["National emergency", "জাতীয় জরুরি সেবা"],
+    source: "bd-999",
+    hazards: ["flood"],
+  },
+  {
+    num: "102",
+    name: ["Fire Service", "ফায়ার সার্ভিস"],
+    source: "rr-fire",
+    hazards: ["fire"],
+  },
+  {
+    num: "16123",
+    name: ["Krishi Call Center", "কৃষি কল সেন্টার"],
+    source: "bd-krishi",
+    hazards: ["drought"],
+  },
+];
 export const statuses = {
   open: ["Window open", "বপনের সময় চলছে"],
   upcoming: ["Next window", "পরের সুযোগ"],
