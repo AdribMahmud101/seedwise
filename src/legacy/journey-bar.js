@@ -52,10 +52,20 @@ export function canFinishPlanting(plan) {
   return !!(plan?.steps.rotation === 'done' && allSeasonsReviewed(plan));
 }
 
+// Name the seasons still waiting for "Looks good ✓" so a disabled Finish is never a mystery.
+function finishNote(plan) {
+  const names = { aman: 'Aman rice', boro: 'Boro rice' };
+  const left = (plan.rotation?.seasons || []).filter(s => s.crop !== 'fallow' && !plan.planting?.[s.key]?.confirmedAt);
+  if (plan.steps?.rotation !== 'done' || !left.length) return t('Choose a rotation and review every season to finish.', 'শেষ করতে ফসলচক্র বেছে প্রতিটি মৌসুম যাচাই করুন।');
+  const en = left.map(s => names[s.crop] || s.crop[0].toUpperCase() + s.crop.slice(1)).join(', ');
+  const bn = left.map(s => s.cropBn || s.crop).join(', ');
+  return t(`Still to review: ${en}. Open each tab and tap “Looks good ✓”.`, `এখনও যাচাই বাকি: ${bn}। প্রতিটি ট্যাব খুলে “ঠিক আছে ✓” চাপুন।`);
+}
+
 export function journeyFinishCTA() {
   const plan = getPlan();
   if (!plan) return '';
-  return `<div class="journey-handoff"><button type="button" class="button primary" data-journey="finish"${canFinishPlanting(plan) ? '' : ' disabled'}>${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}</button>${canFinishPlanting(plan) ? '' : `<p class="note">${t('Mark each season Looks good ✓ to finish', 'প্রতি মৌসুমকে ঠিক আছে ✓ চিহ্নিত করে শেষ করুন')}</p>`}</div>`;
+  return `<div class="journey-handoff"><button type="button" class="button primary" data-journey="finish"${canFinishPlanting(plan) ? '' : ' disabled'}>${t('Finish my plan →', 'আমার পরিকল্পনা শেষ করুন →')}</button>${canFinishPlanting(plan) ? '' : `<p class="note">${finishNote(plan)}</p>`}</div>`;
 }
 
 const reviewKey = plan => JSON.stringify([plan.updatedAt, plan.reviews]);

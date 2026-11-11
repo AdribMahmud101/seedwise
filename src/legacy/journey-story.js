@@ -3,6 +3,9 @@ import { getPlan, nextStep, stepStatus, allSeasonsReviewed, subscribe, startPlan
 import { guide } from './planty-guide.js';
 import { plantyMascot } from './planty.js';
 
+// Season label: keep Aman and Boro distinct (both are rice).
+const seasonCropName = (s) => ({ aman: 'Aman rice', boro: 'Boro rice' })[s.crop] || (s.crop ? s.crop[0].toUpperCase() + s.crop.slice(1) : '');
+
 // --- State and Persistence ---
 const OWN_STORAGE_KEY = 'ropon_season_plan_v1';
 const DEMO_STORAGE_KEY = 'ropon_season_plan_demo_v1';
@@ -179,7 +182,7 @@ export function getPageChecklist(page = activePage) {
     const nonFallow = plan?.rotation?.seasons?.filter(s => s.crop !== 'fallow') ?? [];
     if (nonFallow.length > 0) {
       const summaryText = nonFallow.map(s => {
-        const crop = s.crop === 'aman' || s.crop === 'boro' ? 'Aman' : capitalize(s.crop);
+        const crop = seasonCropName(s);
         const cropBn = s.cropBn || s.crop;
         const confirmed = plan?.planting?.[s.key]?.confirmedAt != null;
         return `${t(crop, cropBn)} ${confirmed ? '✓' : '○'}`;
@@ -439,7 +442,7 @@ export function handleContinue() {
       const seasons = plan?.rotation?.seasons?.filter(s => s.crop !== 'fallow') ?? [];
       const unconfirmed = seasons.find(s => !plan.planting[s.key]?.confirmedAt);
       if (unconfirmed) {
-        const crop = unconfirmed.crop === 'aman' || unconfirmed.crop === 'boro' ? 'Aman' : capitalize(unconfirmed.crop);
+        const crop = seasonCropName(unconfirmed);
         const cropBn = unconfirmed.cropBn || unconfirmed.crop;
         reason = t(`Mark ${crop} ‘Looks good ✓’ first`, `আগে ${cropBn} ‘ঠিক আছে ✓’ চিহ্নিত করুন`);
       }
