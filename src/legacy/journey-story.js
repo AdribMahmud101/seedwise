@@ -2,7 +2,7 @@ import { t, esc } from './ui.js';
 import { getPlan, nextStep, stepStatus, allSeasonsReviewed, subscribe, startPlan, confirmField, fieldSnapshot, confirmRotation, rotationSnapshot, confirmPlanting, markPlanGenerated, importPlanJSON, resetPlan } from './journey.js';
 import { guide } from './planty-guide.js';
 import { plantyMascot } from './planty.js';
-import { canFinishPlanting, finishNote } from './journey-bar.js';
+import { canFinishPlanting, finishNote, showExitPrompt } from './journey-bar.js';
 
 // Season label: keep Aman and Boro distinct (both are rice).
 const seasonCropName = (s) => ({ aman: 'Aman rice', boro: 'Boro rice' })[s.crop] || (s.crop ? s.crop[0].toUpperCase() + s.crop.slice(1) : '');
@@ -312,6 +312,7 @@ export function renderCoach(container) {
       <div class="coach-actions">
         <button type="button" class="button coach-show-me" data-coach="show-me">${t('Show me', 'আমাকে দেখান')}</button>
         <button type="button" class="button ghost coach-collapse" data-coach="hide">${t('Hide', 'লুকান')}</button>
+        <button type="button" class="button ghost coach-exit" data-coach="exit" style="margin-left:auto;">${t('Exit plan', 'বের হন')}</button>
         <button type="button" class="coach-stop" data-coach="stop">${t('Stop guide', 'নির্দেশিকা বন্ধ')}</button>
       </div>
     </aside>
@@ -336,6 +337,8 @@ function attachCoachEvents(host) {
       coachDismissed = true;
       guide.stop();
       renderCoach();
+    } else if (action === 'exit') {
+      showExitPrompt();
     } else if (action === 'show-me') {
       runShowMe();
     }

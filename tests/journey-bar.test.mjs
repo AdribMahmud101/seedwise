@@ -138,7 +138,7 @@ test('hand-offs confirm snapshots, celebrate, and show hints after the destinati
     journey.confirmPlanting();
     await bar.journeyAction('finish');
     assert.equal(journey.stepStatus().planting, 'done');
-    assert.equal(destinations.at(-1), 'plan');
+    assert.equal(destinations.at(-1), 'plans');
     assert.equal(celebrate.mock.calls.length, 3);
   } finally { globalThis.document = oldDocument; }
 });

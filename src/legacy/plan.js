@@ -7,6 +7,7 @@ import { getPlan, importPlanJSON, markPlanGenerated, stepStatus } from './journe
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setPlannerSeason } from './planner.js';
+import { recommendedSettings } from './planner-controls.js';
 
 const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_BN = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
@@ -191,7 +192,9 @@ export function waterChartSVG(rows, { lang = 'en', uid = 'w1' } = {}) {
     const rain = Math.max(0, row.rainMm ?? 0) * scale;
     svg += `<rect x="${pad + labelW}" y="${y + 4}" width="${need.toFixed(1)}" height="11" rx="3" fill="#3d8a9e"><title>${esc(needLabel)}: ${(row.needMm ?? 0).toFixed(0)} mm</title></rect>`;
     svg += `<rect x="${pad + labelW}" y="${y + 19}" width="${rain.toFixed(1)}" height="11" rx="3" fill="#8fc1d4"><title>${esc(rainLabel)}: ${(row.rainMm ?? 0).toFixed(0)} mm</title></rect>`;
-    svg += `<text x="${pad + labelW + Math.max(need, rain) + 6}" y="${y + 24}" class="plan-cal-legend">${((row.needMm ?? 0)).toFixed(0)}/${((row.rainMm ?? 0)).toFixed(0)}</text>`;
+    const needText = `${needLabel} ${((row.needMm ?? 0)).toFixed(0)} mm`;
+    const rainText = `${rainLabel} ${((row.rainMm ?? 0)).toFixed(0)} mm`;
+    svg += `<text x="${pad + labelW + Math.max(need, rain) + 6}" y="${y + 24}" class="plan-cal-legend">${needText} · ${rainText}</text>`;
   });
   const label = lang === 'bn' ? 'পানির চাহিদা ও বৃষ্টি' : 'Water need vs rain';
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(label)}" class="plan-water-svg">${svg}</svg>`;
@@ -342,7 +345,7 @@ export function extractPlanFromHTML(html) {
   return JSON.stringify(JSON.parse(match[1]));
 }
 
-function cropGlyph(crop) {
+export function cropGlyph(crop) {
   const shapes = {
     rice: '<path d="M12 22V5m0 8C5 13 5 8 5 6c5 0 7 3 7 7Zm0 6c7 0 7-5 7-7-5 0-7 3-7 7Z"/>',
     aman: '<path d="M12 22V5m0 8C5 13 5 8 5 6c5 0 7 3 7 7Zm0 6c7 0 7-5 7-7-5 0-7 3-7 7Z"/>',
@@ -393,6 +396,15 @@ function field3dCard(plan, activeKey) {
     <div class="plan-static-layout">${planTopViewSVG(plan, activeKey, { lang: state.lang, uid: 'hero' })}</div></div></section>`;
 }
 
+export function spacingTruth(settings) {
+  if (!settings) return truth('RECOMMENDED');
+  const defaults = recommendedSettings(settings.crop);
+  const isChanged = settings.custom ||
+    settings.rowSpacingCm !== defaults.row ||
+    settings.withinRowCm !== defaults.spacing;
+  return isChanged ? truth('FARMER_REPORTED') : truth('RECOMMENDED');
+}
+
 function numbersCard(plan) {
   const planted = (plan.rotation?.seasons ?? []).filter(season => season.crop !== 'fallow');
   const tiles = planted.map(season => {
@@ -403,7 +415,7 @@ function numbersCard(plan) {
     const usableHa = plan.field.areaHa * settings.usableAreaPct / 100;
     return `<div class="plan-tile"><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b>
       <strong><span data-plan-count="${total ?? 0}" data-places="${seed ? 1 : 0}">${num(total ?? 0, seed ? 1 : 0)}</span> <small>${unit}</small></strong> ${truth('SCENARIO')}
-      <span>${seed ? t('Broadcast · no rows', 'ছিটিয়ে বপন · সারি নেই') : `${num(settings.rowSpacingCm)}×${num(settings.withinRowCm)} cm`} ${truth('FARMER_REPORTED')}</span>
+      <span>${seed ? t('Broadcast · no rows', 'ছিটিয়ে বপন · সারি নেই') : `${num(settings.rowSpacingCm)}×${num(settings.withinRowCm)} cm`} ${spacingTruth(settings)}</span>
       <span>${num(usableHa, 2)} ha ${t('usable', 'চাষযোগ্য')} ${truth('SCENARIO')}</span></div>`;
   }).join('');
   const monthly = planMonthly(plan);
@@ -479,7 +491,8 @@ export function plan() {
   if (!current?.field || !current?.rotation) return emptyPlan();
   const planted = current.rotation.seasons.filter(season => season.crop !== 'fallow');
   if (!planted.some(season => season.key === active3dKey)) active3dKey = planted[0]?.key ?? null;
-  return `<div class="plan-page">` + header(
+  const backLink = `<div class="plan-back-bar"><a class="button ghost plan-back-link" href="#plans">← ${t('My plans', 'আমার পরিকল্পনা')}</a></div>`;
+  return `<div class="plan-page">${backLink}` + header(
     t('Your plan  /  04', 'আপনার পরিকল্পনা  /  ০৪'),
     t('Your plan', 'আপনার পরিকল্পনা'),
     t('Your finished season plan — numbers, steps, and file.', 'আপনার চূড়ান্ত পরিকল্পনা — সংখ্যা, ধাপ ও ফাইল।'),

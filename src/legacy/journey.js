@@ -2,6 +2,8 @@ import { areaHa, capacity, PLANTING, polygonValid, rotationEvidence, STRATEGIES 
 import { clampPlannerValue, recommendedSettings } from './planner-controls.js';
 
 const STORAGE_KEY = 'ropon_season_plan_v1';
+const SAVED_PLANS_KEY = 'ropon_saved_plans_v1';
+const MIGRATION_KEY = 'ropon_saved_plans_migrated_v1';
 const VERSION = 1;
 const STEPS = ['field', 'rotation', 'planting', 'plan'];
 const listeners = new Set();
@@ -319,6 +321,182 @@ export function resetPlan() {
 }
 
 // Check if all non-fallow seasons in the rotation have been confirmed (confirmedAt set)
+export function defaultPlanName(plan) {
+  const fieldName = plan?.field?.name || 'My field';
+  const rotationShort = plan?.rotation?.name || 'Rotation';
+  return `${fieldName} · ${rotationShort}`;
+}
+
+function readSavedListRaw() {
+  try {
+    const raw = globalThis.localStorage?.getItem(SAVED_PLANS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedListRaw(list) {
+  try {
+    globalThis.localStorage?.setItem(SAVED_PLANS_KEY, JSON.stringify(list));
+  } catch (error) {
+    console.warn('Could not persist saved plans list', error);
+  }
+}
+
+function validateSavedEntry(entry) {
+  if (!object(entry)) return null;
+  if (!text(entry.id)) return null;
+  if (!text(entry.name)) return null;
+  if (entry.status !== 'draft' && entry.status !== 'ready') return null;
+  if (!date(entry.createdAt) || !date(entry.updatedAt)) return null;
+  if (!entry.plan) return null;
+  try {
+    const plan = validatePlan(entry.plan);
+    if (plan.mode === 'demo') return null;
+    return {
+      id: entry.id,
+      name: entry.name,
+      status: entry.status,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      plan,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function migrateActivePlanOnce() {
+  if (typeof globalThis.localStorage === 'undefined') return;
+  try {
+    if (globalThis.localStorage.getItem(MIGRATION_KEY)) return;
+    const active = getPlan();
+    if (active && active.mode !== 'demo') {
+      const list = listPlans();
+      if (!list.some(item => item.id === active.id)) {
+        const isReady = active.steps?.plan === 'done' && !!active.plan?.generatedAt;
+        const entry = {
+          id: active.id,
+          name: defaultPlanName(active),
+          status: isReady ? 'ready' : 'draft',
+          createdAt: active.createdAt || new Date().toISOString(),
+          updatedAt: active.updatedAt || new Date().toISOString(),
+          plan: copy(active),
+        };
+        const valid = validateSavedEntry(entry);
+        if (valid) {
+          writeSavedListRaw([valid, ...list]);
+        }
+      }
+    }
+    globalThis.localStorage.setItem(MIGRATION_KEY, 'done');
+  } catch (error) {
+    console.warn('Migration of active plan failed', error);
+  }
+}
+
+export function listPlans() {
+  const rawList = readSavedListRaw();
+  if (!Array.isArray(rawList)) return [];
+  const validList = [];
+  let corruptedFound = false;
+  for (const item of rawList) {
+    const validated = validateSavedEntry(item);
+    if (validated) validList.push(validated);
+    else corruptedFound = true;
+  }
+  if (corruptedFound) {
+    writeSavedListRaw(validList);
+  }
+  return validList.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
+export function getSavedPlan(id) {
+  if (!id) return null;
+  const list = listPlans();
+  return list.find(item => item.id === id) || null;
+}
+
+export function savePlan(planToSave, { status = 'draft', name } = {}) {
+  if (!planToSave || planToSave.mode === 'demo') return null;
+  const validated = validatePlan(planToSave);
+  const now = new Date().toISOString();
+  const list = listPlans();
+  const index = list.findIndex(item => item.id === validated.id);
+  const entryName = name?.trim() || (index >= 0 ? list[index].name : defaultPlanName(validated));
+  const entry = {
+    id: validated.id,
+    name: entryName,
+    status: status === 'ready' ? 'ready' : 'draft',
+    createdAt: index >= 0 ? list[index].createdAt : validated.createdAt || now,
+    updatedAt: now,
+    plan: copy(validated),
+  };
+  const validEntry = validateSavedEntry(entry);
+  if (!validEntry) throw new TypeError('Cannot save invalid plan');
+  if (index >= 0) {
+    list[index] = validEntry;
+  } else {
+    list.unshift(validEntry);
+  }
+  writeSavedListRaw(list);
+  return validEntry;
+}
+
+export function openPlan(id) {
+  const entry = getSavedPlan(id);
+  if (!entry) return null;
+  return save(copy(entry.plan));
+}
+
+export function renamePlan(id, newName) {
+  if (!text(newName)) return null;
+  const list = listPlans();
+  const index = list.findIndex(item => item.id === id);
+  if (index < 0) return null;
+  list[index].name = newName.trim();
+  list[index].updatedAt = new Date().toISOString();
+  writeSavedListRaw(list);
+  return list[index];
+}
+
+export function duplicatePlan(id) {
+  const entry = getSavedPlan(id);
+  if (!entry) return null;
+  const now = new Date().toISOString();
+  const newId = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `plan-${Date.now()}`;
+  const duplicatedPlanSnapshot = copy(entry.plan);
+  duplicatedPlanSnapshot.id = newId;
+  duplicatedPlanSnapshot.createdAt = now;
+  duplicatedPlanSnapshot.updatedAt = now;
+  const dupEntry = {
+    id: newId,
+    name: `${entry.name} (Copy)`,
+    status: entry.status,
+    createdAt: now,
+    updatedAt: now,
+    plan: duplicatedPlanSnapshot,
+  };
+  const valid = validateSavedEntry(dupEntry);
+  if (!valid) return null;
+  const list = listPlans();
+  list.unshift(valid);
+  writeSavedListRaw(list);
+  return valid;
+}
+
+export function deletePlan(id) {
+  const list = listPlans();
+  const filtered = list.filter(item => item.id !== id);
+  writeSavedListRaw(filtered);
+  const active = getPlan();
+  if (active?.id === id) {
+    resetPlan();
+  }
+  return true;
+}
+
 export function allSeasonsReviewed(plan) {
   if (!plan?.rotation) return false;
   const nonFallowSeasons = plan.rotation.seasons.filter(season => season.crop !== 'fallow');
