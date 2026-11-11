@@ -989,6 +989,78 @@ small {
   border-radius: 2px;
   margin-right: 5px;
 }
+/* Seasonal outlook fan charts + satellite water check timelines */
+.outlook-band {
+  fill: #cfdde2;
+  opacity: 0.8;
+}
+.outlook-p50 {
+  stroke-width: 2.4;
+  fill: none;
+}
+.outlook-clim {
+  stroke: #8a8f7f;
+  stroke-width: 1.8;
+  stroke-dasharray: 5, 4;
+  fill: none;
+}
+.legend-band {
+  width: 12px;
+  height: 8px;
+  display: inline-block;
+  background: #cfdde2;
+  border-radius: 2px;
+  margin-right: 5px;
+}
+.legend-dash {
+  width: 14px;
+  height: 0;
+  display: inline-block;
+  border-top: 2px dashed #8a8f7f;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.legend-hollow {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border: 2px solid #8a8f7f;
+  border-radius: 50%;
+  margin-right: 5px;
+  box-sizing: border-box;
+}
+.flood-dot-clear {
+  background: #2b6b7a;
+  border-radius: 50%;
+}
+.flood-clear {
+  fill: #2b6b7a;
+}
+.flood-cloud {
+  fill: none;
+  stroke: #a3a897;
+  stroke-width: 1.4;
+}
+.flood-headline {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.outlook-row {
+  font-size: 13px;
+}
+.rotation-outlook-line {
+  display: block;
+  margin-top: 4px;
+}
+.check-list {
+  margin: 8px 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.check-list li {
+  margin: 4px 0;
+}
 .timeline-strip {
   display: flex;
   gap: 3px;
@@ -3512,6 +3584,15 @@ dialog .modal-body {
     .chart text:nth-of-type(n + 5):nth-of-type(even) {
       display: none;
     }
+  }
+  /* Compact outlook/flood SVGs keep their own label size; never hide their few labels. */
+  .chart.outlook-fan text,
+  .chart.flood-timeline text {
+    font-size: 12px;
+  }
+  .chart.outlook-fan text:nth-of-type(n + 5):nth-of-type(even),
+  .chart.flood-timeline text:nth-of-type(n + 5):nth-of-type(even) {
+    display: inline;
   }
   .map-overline .map-chip-text {
     white-space: normal;

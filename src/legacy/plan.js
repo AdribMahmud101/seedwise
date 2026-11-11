@@ -1,8 +1,10 @@
 import {
   state, earth, agronomy, allFields, polygon, t, esc, num,
   nasaBadge, truth, header, panel, tag, button, toast, repaint, download,
+  outlook as outlookPack, floodFields,
 } from './ui.js';
 import { monthlyRotationWater, CROP_KC } from './engine.js';
+import { outlookPlanHint, outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { getPlan, getReadyPlan, editReadyPlan, importPlanJSON, markPlanGenerated, stepStatus } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
@@ -114,8 +116,8 @@ export function calendarSVG(seasons, { nowMonth = new Date().getMonth(), lang = 
 }
 
 // Deterministic step-by-step list from the plan: one sow item per planted
-// season in rotation order, then conditional soil/irrigation items. ≤10 items.
-export function deriveChecklist(plan) {
+// season in rotation order, then conditional soil/irrigation/outlook items. ≤10 items.
+export function deriveChecklist(plan, outlookHint = null) {
   const items = [];
   const seasons = plan?.rotation?.seasons ?? [];
   for (const season of seasons) {
@@ -145,6 +147,14 @@ export function deriveChecklist(plan) {
   }
   if (seasons.some(season => season.crop === 'boro')) {
     items.push({ id: 'irrig-boro', en: 'Check irrigation before Boro sowing', bn: 'বোরোর আগে সেচ নিশ্চিত করুন' });
+  }
+  const winter = seasons.find(season =>
+    season.crop !== 'fallow' && season.sowMonth === 11 && plan.planting?.[season.key]);
+  if (outlookHint?.novRain === 'above' && winter?.crop === 'potato') {
+    items.push({ id: 'outlook-drainage', en: 'Outlook: November rain above usual — check drainage before potato', bn: 'আউটলুক: নভেম্বরে বেশি বৃষ্টি — আলুর আগে পানি নিষ্কাশন দেখুন' });
+  } else if (outlookHint?.novRain === 'below' && winter) {
+    const name = cropLabel(winter.crop, 'en'), nameBn = cropLabel(winter.crop, 'bn');
+    items.push({ id: 'outlook-irrigation', en: `Outlook: November rain below usual — plan irrigation for ${name}`, bn: `আউটলুক: নভেম্বরে কম বৃষ্টি — ${nameBn}-এর জন্য সেচের ব্যবস্থা করুন` });
   }
   items.push({ id: 'well-reading', en: 'Add a well water reading', bn: 'কূপের পানির মাপ যোগ করুন' });
   return items.slice(0, 10);
@@ -266,9 +276,13 @@ export function planTopViewSVG(plan, seasonKey, { lang = 'en', uid = 't1' } = {}
 
 // Trimmed payload for /api/plan-summary (the worker whitelists again).
 export function summaryPayload(plan) {
+  const outlook = outlookSummaryLine(plan.field?.id, outlookPack, state.lang);
+  const flood = floodSummaryLine(plan.field?.id, floodFields, state.lang);
   return {
     mode: plan.mode,
     field: plan.field ? { id: plan.field.id, name: plan.field.name, areaHa: plan.field.areaHa } : null,
+    ...(outlook ? { outlook } : {}),
+    ...(flood ? { flood } : {}),
     rotation: plan.rotation ? { id: plan.rotation.id, name: plan.rotation.name,
       seasons: plan.rotation.seasons.map(season => ({ key: season.key, crop: season.crop,
         cropBn: season.cropBn, sowMonth: season.sowMonth, harvestMonth: season.harvestMonth })) } : null,
@@ -323,7 +337,7 @@ export function buildExportHTML(plan, { monthly = null, lang = 'en', nowMonth = 
   }).join('');
   const tabs = planted.map((season, i) =>
     `<button type="button" data-season="${esc(season.key)}" aria-selected="${i === 0}">${esc(cropLabel(season.crop, lang))}</button>`).join('');
-  const checklist = deriveChecklist(plan).map(item => `<li>☐ ${esc(bn ? item.bn : item.en)}</li>`).join('');
+  const checklist = deriveChecklist(plan, outlookPlanHint(plan.field?.id, outlookPack)).map(item => `<li>☐ ${esc(bn ? item.bn : item.en)}</li>`).join('');
   const embedded = JSON.stringify(plan).replaceAll('<', '\\u003c');
   const links = sourceLinks.slice(0, 8).map(source =>
     `<a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.name || source.title || source.url)} ↗</a>`).join(' · ');
@@ -440,7 +454,7 @@ function numbersCard(plan) {
 
 function checklistCard(plan) {
   const done = plan.checklist ?? {};
-  const items = deriveChecklist(plan).map(item =>
+  const items = deriveChecklist(plan, outlookPlanHint(plan.field?.id, outlookPack)).map(item =>
     `<li><label><input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}${getPlan() ? '' : ' disabled'}><span>${esc(t(item.en, item.bn))}</span></label></li>`).join('');
   return `<section class="panel"><div class="panel-header"><h2>${t('What to do, step by step', 'ধাপে ধাপে কী করবেন')}</h2></div>
     <div class="panel-body"><ul class="plan-check" id="plan-checklist">${items}</ul></div></section>`;

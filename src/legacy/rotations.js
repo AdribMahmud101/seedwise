@@ -2,6 +2,7 @@ import {
   nasaBadge,
   state,
   agronomy,
+  outlook as outlookPack,
   persist,
   t,
   esc,
@@ -30,6 +31,7 @@ import { getCachedPower } from './powerlive.js';
 import { rotationEvidence } from './engine.js';
 import { plannerAction, setPlantCrop } from './planner.js';
 import * as rotationTool from './rotation-tool.js';
+import { outlookSeasonLine } from './outlook-flood.js';
 import { confirmRotation, getPlan, rotationSnapshot, subscribe } from './journey.js';
 import { journeyRotationCTA } from './journey-bar.js';
 
@@ -178,6 +180,7 @@ function rankedCards() {
         </div>
         <div class="rotation-cost-badge">
           ${nasaBadge(['imerg', 'eto'])} <span>${t('Irrigation cost:', 'সেচ খরচ:')} <strong>৳${num(costTk)}</strong> / ${t('season', 'মৌসুম')} (${num(pumpHours, 1)} ${t('hrs @ 45,000 L/hr', 'ঘণ্টা @ ৪৫,০০০ লি/ঘণ্টা')}) ${truth('SCENARIO')}</span>
+          ${outlookSeasonLine(state.fieldId, r.months, outlookPack)}
         </div>
         ${r.issues.length ? `<div class="rotation-warning">${tag(t('Needs review', 'যাচাই দরকার'), 'amber')} ${r.issues.map((v) => esc(t(v, issueBn[v]))).join(' ')}</div>` : ''}
         <details class="disclosure">
