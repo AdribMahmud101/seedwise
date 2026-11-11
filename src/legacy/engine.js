@@ -259,19 +259,20 @@ export function rankRotations(weights, options = {}) {
       (b.score ?? -1) - (a.score ?? -1)
   );
 }
-// Compare covered months using the same weather year and representative crop coefficients.
+// Representative crop coefficients shared by the rotation comparison and the plan page.
 // The calculation excludes storage, carryover, paddy seepage and application losses.
+export const CROP_KC = Object.freeze({
+  aman: 1.1,
+  boro: 1.1,
+  mustard: 0.85,
+  potato: 0.95,
+  pulse: 0.85,
+  fallow: 0,
+});
 export function monthlyRotationWater(monthly, rotationId) {
   const strategy = STRATEGIES.find((s) => s.id === rotationId);
   if (!strategy) throw new RangeError(`Unknown rotation: ${rotationId}`);
-  const coefficients = {
-    aman: 1.1,
-    boro: 1.1,
-    mustard: 0.85,
-    potato: 0.95,
-    pulse: 0.85,
-    fallow: 0,
-  };
+  const coefficients = CROP_KC;
   return strategy.months.map((crop, i) => {
     const m = monthly[i];
     const needMm = finite(m?.et0) ? m.et0 * coefficients[crop] : null;

@@ -4,6 +4,7 @@ import {
   agronomy,
   persist,
   t,
+  deskNo,
   esc,
   num,
   area,
@@ -41,9 +42,10 @@ function symptomList() {
 }
 function clinic() {
   const tab = state.tabs.clinic;
+  const [deskEn, deskBn] = deskNo(5);
   return (
     header(
-      t('Field care  /  05', 'ফসলের যত্ন  /  ০৫'),
+      t(`Field care  /  ${deskEn}`, `ফসলের যত্ন  /  ${deskBn}`),
       t('Crop clinic', 'ফসলের চিকিৎসাঘর'),
       t(
         'Describe what you see. Get field checks to try and a note to take to an extension officer.',

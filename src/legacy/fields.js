@@ -10,6 +10,7 @@ import {
   archive,
   persist,
   t,
+  deskNo,
   esc,
   num,
   monthName,
@@ -792,10 +793,11 @@ function home() {
 }
 function seasonView() {
   const f = field();
+  const [deskEn, deskBn] = deskNo(4);
   if (f.custom || !archive?.fields?.[f.id]?.monthly) {
     return (
       header(
-        t("Season archive  /  04", "মৌসুমের খাতা  /  ০৪"),
+        t(`Season archive  /  ${deskEn}`, `মৌসুমের খাতা  /  ${deskBn}`),
         t("Past seasons", "পুরনো মৌসুম"),
         t(
           "Replay five years. Choose a year and a month to read the regional record.",
@@ -834,7 +836,7 @@ function seasonView() {
   );
   return (
     header(
-      t("Season archive  /  04", "মৌসুমের খাতা  /  ০৪"),
+      t(`Season archive  /  ${deskEn}`, `মৌসুমের খাতা  /  ${deskBn}`),
       t("Past seasons", "পুরনো মৌসুম"),
       t(
         "Replay five years. Choose a year and a month to read the regional record.",

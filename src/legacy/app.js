@@ -1,4 +1,6 @@
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
+import { getPlan } from './journey.js';
+import { plan, mountPlan, disposePlan, planAction, planChange } from './plan.js';
 import { boundaryAction, boundarySubmit } from "./boundary.js";
 import { fieldReport, printReport } from "./report.js";
 import {
@@ -65,6 +67,7 @@ const pages = [
   ["field", "My field", "আমার জমি", home],
   ["rotations", "Rotation studio", "ফসলচক্র বাছাই", rotations],
   ["planner", "Planting planner", "বপনের পরিকল্পনা", planner],
+  ["plan", "Your plan", "আপনার পরিকল্পনা", plan],
   ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
   ["clinic", "Crop clinic", "ফসলের চিকিৎসাঘর", clinic],
   ["water", "Water & resilience", "পানি ও সহনশীলতা", water],
@@ -88,8 +91,9 @@ function render() {
   document.body.classList.toggle("lang-bn", state.lang === "bn");
   document.title = `${title} · Ropon Radar`;
   // Research desk (Research lab, Evidence register) hidden from the menu to keep the app minimal (owner, 11 Nov); routes still work by URL.
+  // Your plan appears as 04 only once a season plan exists; later numbers shift consistently.
   const nav = pages
-    .filter(([id]) => id !== "research")
+    .filter(([id]) => id !== "research" && (id !== "plan" || getPlan()))
     .map(
       ([id, en, bn], i) =>
         `<button data-go="${id}" class="nav-item ${id === current[0] ? "active" : ""}" ${id === current[0] ? 'aria-current="page"' : ""} title="${esc(t(en, bn))}">${icon(id)}<span>${t(en, bn)}</span><span class="number">0${i + 1}</span></button>`,
@@ -105,6 +109,8 @@ function render() {
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();
   else disposePlanner();
+  if (current[0] === "plan") mountPlan();
+  else disposePlan();
   if (current[0] === "rotations") {
     mountRotations();
   } else {
@@ -188,6 +194,7 @@ document.addEventListener("click", (event) => {
   fieldAction(action, value);
   rotationAction(action, value);
   plannerAction(action, value);
+  planAction(action, value);
   clinicAction(action, value);
   waterAction(action, value);
   recoveryAction(action, value);
@@ -234,6 +241,7 @@ document.addEventListener("change", (event) => {
     return;
   }
   plannerChange(el);
+  planChange(el);
   recoveryChange(el);
   clinicChange(el);
   researchChange(el);

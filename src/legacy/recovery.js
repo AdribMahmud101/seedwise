@@ -5,6 +5,7 @@ import {
   archive,
   persist,
   t,
+  deskNo,
   esc,
   num,
   monthName,
@@ -374,9 +375,10 @@ function recovery() {
   const a = draft(),
     r = result(),
     saved = state.recoverySaves?.[key()];
+  const [deskEn, deskBn] = deskNo(7);
   return (
     header(
-      t("Resilience desk / 07", "সহনশীলতার ডেস্ক / ০৭"),
+      t(`Resilience desk / ${deskEn}`, `সহনশীলতার ডেস্ক / ${deskBn}`),
       t("A way forward after disaster", "দুর্যোগের পর আবার শুরু"),
       t(
         "Protect people. Check the field. Find the next planting opportunity.",

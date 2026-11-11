@@ -96,6 +96,10 @@ const cropIds = {
   potato: 'potato',
   mungbean: 'mungbean',
 };
+function setPlannerSeason(key) {
+  plannerSeasonKey = key;
+  plannerPlanId = getPlan()?.id ?? null;
+}
 function setPlantCrop(id) {
   if (!Object.hasOwn(PLANTING, id)) return;
   Object.assign(state.planner, { ...recommendedSettings(id), usable: state.planner.usable });
@@ -594,6 +598,7 @@ function plannerChange(el) {
 }
 
 export {
+  setPlannerSeason,
   setPlantCrop,
   planner,
   drawPlanner,
