@@ -1,0 +1,25 @@
+# PLANPAGE2 · "Your plan" page (#plan) — redo, quality bar is HIGH (journey finale, owner's winning factor)
+
+A previous attempt was rejected: unstyled giant SVG icons filling the screen, JS errors ("Cannot read properties of undefined (reading 'map')"), no 3D, text-arrow calendar, its own tests failing, and an unnecessary rewrite of worker/index.js. Do NOT repeat. Keep diffs focused; the existing /api/planty code in worker/index.js must stay intact (add a route, don't rewrite).
+
+Available (read first): `src/legacy/journey.js` (getPlan, plan.field/rotation{seasons}/planting{seasonKey}, stepStatus, reviewReasons, exportPlanJSON/importPlanJSON, demoPlan, allSeasonsReviewed), `src/legacy/journey-bar.js` (stepper + "Finish my plan →" → #plan), `src/legacy/planty-guide.js` (guide.show/sequence/celebrate/hint), `src/legacy/planty.js` (plantyMascot, askPlanty), `src/legacy/planner3d.js` + planner3d-helpers.js (realistic crops 3D; mount it read-only), planner count function, rotation data (water need/saving), `nasaBadge(key)`, truth labels, `t(en,bn)`. Styles: app/style.css (+ planner3d.css).
+
+Route **#plan** "Your plan" / "আপনার পরিকল্পনা": in nav as 04 only when a plan exists (renumber following items consistently) and as step ④ of the journey bar. If no plan: friendly empty state linking to start. Mobile first; calm, eye-catching, very short plain words; every number from the plan/engines (never invented), with truth labels.
+
+Sections:
+1. **Hero card**: Planty (happy pose image, ≤72 px), field name + area, "Plan ready ✓" date, the rotation as a horizontal ribbon of season chips (small crop icon ≤20 px, crop name, months); demo ribbon when mode 'demo'.
+2. **Season calendar chart** (inline SVG, responsive): 12 month columns, one row per season with coloured bars sow→grow→harvest, fallow gaps hatched, current-month marker, legend. Readable at 360 px (scroll horizontally inside the card if needed).
+3. **3D planned field**: mount planner3d read-only in a card (height ~360 px phone / 440 px desktop) with season chips to switch crop+spacing (uses its smooth transitions). No console errors if WebGL unavailable → static fallback note.
+4. **Your numbers**: per season tiles (plants/positions, seed if available, spacing, usable area) with count-up tween; one bar chart (SVG) of water need vs rain per season and the rotation's saving vs rice–fallow–rice from existing data, with NASA badges where the inputs are NASA.
+5. **What to do, step by step**: deterministic checklist from the plan (≤10 items, each ≤12 words, e.g. "Jul: transplant Aman at 20×20 cm", "Before potato: soil test for P and K", "Add a well water reading"), checkboxes persisted in the plan.
+6. **Planty's summary**: new route in worker/index.js `POST /api/plan-summary` reusing the existing guards/helpers (size limit, whitelist of plan fields, rate limit, Muse Ember `muse-ember-1.0` with max_tokens 1500 + reasoning_effort 'low', 20 s timeout) → 80–140 words, user's language, ONLY from the plan JSON; label "AI summary — check with your extension officer"; loading skeleton; graceful fallback.
+7. **Edit**: compact "Edit field / rotation / a season" chips → navigate to the right page/tab.
+8. **Export**: "Download plan (.html)" = single self-contained offline file (inline CSS + inline SVG charts + static top-view SVG of the layout + embedded plan JSON + small inline JS for season tabs and spacing/usable recalculation using the same formula; no external requests except clickable source links); "Print / Save as PDF" (print CSS); "Continue later" (import .html/.json back via importPlanJSON from #plan or the #field start card).
+9. Guide: on first arrival `guide.celebrate()`, then `guide.sequence` (calendar → checklist → Download), skippable.
+Icons: size every SVG explicitly (width/height attributes + CSS); no unbounded SVGs.
+Tests: route from demoPlan(); empty state; calendar geometry; checklist derivation; export contains plan JSON + recalc code + no external script/style URLs; /api/plan-summary validation/whitelist/mocked upstream; /api/planty tests still pass unchanged; import round-trip.
+Verify in a real browser (Chrome headless) at 1366×768 and 412×915@2.625 with demoPlan: zero console errors, screenshots of each section attached under helper/prompts/PLANPAGE2_*.png. Commit as soon as it works.
+Acceptance: eslint no-undef clean on changed src (`npx eslint@8 --no-eslintrc --env browser,es2022 --parser-options=sourceType:module --parser-options=ecmaVersion:latest --rule 'no-undef:error' <files>`); `npm test` ALL pass; `npm run build`; `npx wrangler deploy --dry-run`. Never deploy, never touch secrets, package-lock.json or node_modules. Commit.
+
+
+NOTE (PLANPAGE3): a second attempt (PLANPAGE2) was also rejected: 18 failing tests and an off-brief rewrite. Work in small verified steps: run `npm test` after each section; do not leave failing tests.
