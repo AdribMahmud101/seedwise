@@ -30,6 +30,16 @@ import { getCachedPower } from './powerlive.js';
 import { rotationEvidence } from './engine.js';
 import { setPlantCrop } from './planner.js';
 import * as rotationTool from './rotation-tool.js';
+import { confirmRotation, getPlan, rotationSnapshot } from './journey.js';
+
+function syncSeasonRotation(id = getSelectedRotationId()) {
+  if (!agronomy || !field()) return;
+  try {
+    confirmRotation(rotationSnapshot(id, state.weights, agronomy));
+  } catch (error) {
+    console.warn('Season rotation could not be saved', error);
+  }
+}
 
 // Studio 3D integration state
 let studioOpened = false;
@@ -280,7 +290,9 @@ function rotationOptionsFor(activeId) {
 /**
  * Get selected rotation ID
  */
-function getSelectedRotationId() {
+export function getSelectedRotationId() {
+  const plan = getPlan();
+  if (plan?.rotation && plan.field.id === field()?.id) return plan.rotation.id;
   if (activeRotationId) return activeRotationId;
   const items = ranking();
   return items.length > 0 ? items[0].id : 'mustard';
@@ -678,8 +690,9 @@ export async function openStudio3d() {
     const opts = {
       rotations: rotationOptionsFor(rotId),
       onRotationSelect: (id) => {
-        if (id === activeRotationId) return;
+        if (id === getSelectedRotationId()) return;
         activeRotationId = id;
+        syncSeasonRotation(id);
         openStudio3d();
       },
     };
@@ -793,6 +806,7 @@ function rotations() {
  * Lifecycle hook
  */
 export async function mountRotations() {
+  if (!getPlan()?.rotation) syncSeasonRotation();
   // Pre-load data for question panels
   await Promise.all([
     getSoilProfileData(),
@@ -973,6 +987,7 @@ function method() {
 function rotationAction(action, value) {
   if (action === 'preview-3d') {
     activeRotationId = value;
+    syncSeasonRotation(value);
     openStudio3d();
     document.querySelector('#studio-3d-host')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -991,12 +1006,15 @@ function rotationAction(action, value) {
     }
     state.weights = weights;
     persist();
+    syncSeasonRotation();
     repaint();
   }
   if (action === 'score-method') method();
   if (action === 'save-rotation') {
     const r = ranking().find((v) => v.id === value);
     if (!r) return;
+    activeRotationId = value;
+    syncSeasonRotation(value);
     const item = {
       fieldId: state.fieldId,
       rotation: r.id,
@@ -1029,6 +1047,8 @@ function rotationAction(action, value) {
       );
   }
   if (action === 'layout-for') {
+    activeRotationId = value;
+    syncSeasonRotation(value);
     setPlantCrop(
       {
         baseline: 'rice',
@@ -1048,6 +1068,7 @@ function rotationInput(el) {
   if (el.dataset.weight) {
     state.weights[mapPriorityKey(el.dataset.weight)] = +el.value;
     persist();
+    syncSeasonRotation();
     document.querySelector(`#value-${el.dataset.weight}`).textContent = num(+el.value);
     document.querySelector('#rotation-list').innerHTML = rankedCards();
   }

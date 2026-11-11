@@ -1,5 +1,6 @@
-import { areaHa } from "./engine.js";
+import { areaHa, mean } from "./engine.js";
 import { getCachedPower } from "./powerlive.js";
+import { confirmField, fieldSnapshot, getPlan, subscribe } from "./journey.js";
 
 const storageKey = "ropon-radar.workspace.3";
 const defaults = {
@@ -41,6 +42,7 @@ const state = { ...structuredClone(defaults), ...saved };
 for (const key of ["weights", "planner", "clinic", "tabs", "water"])
   state[key] = { ...defaults[key], ...saved[key] };
 let earth, agronomy, archive, smap, hlsField;
+let lastSeasonField = null;
 async function loadData() {
   const responses = await Promise.all(
     ["data/earth-data.json", "data/agronomy.json", "data/history.json", "data/smap.json", "data/hls-field.json"].map(
@@ -54,10 +56,45 @@ async function loadData() {
   );
   if (!allFields().some((f) => f.id === state.fieldId))
     state.fieldId = "mithapukur";
+  applySeasonPlan(getPlan());
+  try {
+    syncSeasonField();
+  } catch (error) {
+    // Unavailable season storage must not block prepared data or workspace startup.
+    console.warn("Season plan could not be saved", error);
+  }
 }
+function syncSeasonField() {
+  const selected = field();
+  if (!selected) return;
+  const snapshot = fieldSnapshot(selected, polygon(), profile());
+  const serialized = JSON.stringify(snapshot);
+  if (getPlan()?.field && serialized === lastSeasonField) return;
+  confirmField(snapshot);
+  lastSeasonField = serialized;
+}
+function applySeasonPlan(plan) {
+  const snapshot = plan?.field;
+  if (!snapshot || !earth) return;
+  if (!allFields().some(selected => selected.id === snapshot.id)) {
+    if (!snapshot.outline) return;
+    state.customFields.push({ id: snapshot.id, name: snapshot.name, custom: true, imagery: [],
+      lat: mean(snapshot.outline.map(point => point[0])), lon: mean(snapshot.outline.map(point => point[1])) });
+  }
+  state.fieldId = snapshot.id;
+  state.profiles[snapshot.id] = structuredClone(snapshot.constraints);
+  if (snapshot.outline) {
+    if (JSON.stringify(snapshot.outline) === JSON.stringify(basePolygon(field()))) delete state.boundaries[snapshot.id];
+    else state.boundaries[snapshot.id] = structuredClone(snapshot.outline);
+  }
+  if (plan.rotation) state.weights = { ...plan.rotation.priorities };
+  lastSeasonField = JSON.stringify(fieldSnapshot(field(), polygon(), profile()));
+}
+subscribe(applySeasonPlan);
 function persist() {
   try {
     localStorage.setItem(storageKey, JSON.stringify({ ...state, month: undefined }));
+    syncSeasonField();
     return true;
   } catch {
     toast(
@@ -282,6 +319,8 @@ const siteNames = {
 };
 function fieldName(f = field()) {
   if (!f) return "";
+  const seasonField = getPlan()?.field;
+  if (seasonField?.id === f.id && seasonField.name !== f.name) return seasonField.name;
   if (siteNames[f.id]) return t(f.name, siteNames[f.id]);
   if (f.name_bn && state.lang === "bn") return f.name_bn;
   return f.name || t("My field", "আমার জমি");
@@ -328,21 +367,28 @@ function polygon() {
   return state.boundaries[state.fieldId] || basePolygon();
 }
 function area() {
+  const seasonField = getPlan()?.field;
+  if (seasonField?.id === state.fieldId) return seasonField.areaHa;
   return areaHa(polygon());
 }
 // Example Aman harvest: 10 Nov of the current year (an editable demo assumption, not a forecast).
 function defaultHarvest(today = new Date()) {
   return `${today.getFullYear()}-11-10`;
 }
-function profile() {
+function defaultPriorities() {
+  return { ...defaults.weights };
+}
+function defaultProfile() {
   return {
     crop: "aman",
     harvest: defaultHarvest(),
     irrigation: "reliable",
     budget: "medium",
     floodDays: 0,
-    ...state.profiles[state.fieldId],
   };
+}
+function profile() {
+  return { ...defaultProfile(), ...state.profiles[state.fieldId] };
 }
 function setProfile(values) {
   state.profiles[state.fieldId] = { ...profile(), ...values };
@@ -663,6 +709,8 @@ export {
   polygon,
   area,
   profile,
+  defaultPriorities,
+  defaultProfile,
   setProfile,
   cropName,
   icon,

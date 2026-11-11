@@ -21,6 +21,30 @@ import { PLANTING, capacity } from './engine.js';
 import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext } from './planner-controls.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
+import { getPlan, setPlanting } from './journey.js';
+
+let plannerSeasonKey = null;
+function plannerSeason(plan, crop) {
+  const seasons = plan.rotation.seasons;
+  const matching = seasons.filter(season => plan.planting[season.key].crop === crop);
+  return matching.find(season => season.key === plannerSeasonKey) ?? matching[0] ??
+    seasons.find(season => season.key === plannerSeasonKey) ?? seasons[0];
+}
+
+function syncSeasonPlanting() {
+  const plan = getPlan();
+  if (!plan?.rotation || plan.field.id !== field()?.id) return;
+  const crop = state.planner.crop;
+  // shortcut: no season selector yet; crop matches select a season, otherwise edits stay on the current season.
+  const season = plannerSeason(plan, crop);
+  plannerSeasonKey = season.key;
+  try {
+    setPlanting(season.key, { crop, rowSpacingCm: state.planner.row,
+      withinRowCm: state.planner.spacing, usableAreaPct: state.planner.usable });
+  } catch (error) {
+    console.warn('Season planting could not be saved', error);
+  }
+}
 
 const cropIds = {
   rice: 'aman',
@@ -32,6 +56,7 @@ function setPlantCrop(id) {
   if (!Object.hasOwn(PLANTING, id)) return;
   Object.assign(state.planner, { ...recommendedSettings(id), usable: state.planner.usable });
   persist();
+  syncSeasonPlanting();
 }
 function cropIcon(crop) {
   const shapes = {
@@ -85,6 +110,14 @@ function plannerResult() {
 }
 function planner() {
   const p = state.planner;
+  const plan = getPlan();
+  if (plan?.rotation && plan.field.id === field()?.id) {
+    const season = plannerSeason(plan, p.crop);
+    plannerSeasonKey = season.key;
+    const settings = plan.planting[season.key];
+    Object.assign(p, { crop: settings.crop, row: settings.rowSpacingCm,
+      spacing: settings.withinRowCm, usable: settings.usableAreaPct });
+  }
   if (!Object.hasOwn(PLANTING, p.crop)) Object.assign(p, recommendedSettings('rice'));
   for (const name of ['usable', 'row', 'spacing']) {
     if (p.crop === 'mustard' && name !== 'usable') continue;
@@ -379,6 +412,7 @@ function plannerAction(action, value) {
   if (action === 'plan-reset') {
     Object.assign(state.planner, recommendedSettings(state.planner.crop));
     persist();
+    syncSeasonPlanting();
     repaint();
     document.querySelector('.plan-reset')?.focus({ preventScroll: true });
   }
@@ -433,6 +467,7 @@ function plannerInput(el) {
   if (el.type === 'number' && (el.value === '' || Number(el.value) < min || Number(el.value) > max)) return;
   if (syncPlannerControl(el, state.planner) === null) return;
   persist();
+  syncSeasonPlanting();
   updatePlannerResults();
 }
 function plannerChange(el) {
@@ -445,6 +480,7 @@ function plannerChange(el) {
     if (el.value === '' || !Number.isFinite(Number(el.value))) el.value = state.planner[el.name];
     syncPlannerControl(el, state.planner);
     persist();
+    syncSeasonPlanting();
     updatePlannerResults();
   }
 }
