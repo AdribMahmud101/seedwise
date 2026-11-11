@@ -25,7 +25,7 @@ import { PLANTING, capacity } from './engine.js';
 import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext } from './planner-controls.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
-import { getPlan, setPlanting } from './journey.js';
+import { getPlan, getReadyPlan, setPlanting } from './journey.js';
 import { journeyFinishCTA } from './journey-bar.js';
 
 let plannerSeasonKey = null;
@@ -67,6 +67,7 @@ function seasonLabel(season) {
   return esc(t(season.crop === 'fallow' ? 'Fallow' : cropName(season.crop), season.cropBn));
 }
 function seasonTabs(plan = seasonPlan()) {
+  if (!plan && getReadyPlan()) return '';
   if (!plan) return `<p class="note plan-rotation-note"><a href="#rotations">${t('Choose a rotation first to plan every season', 'প্রতি মৌসুমের পরিকল্পনা করতে আগে ফসলচক্র বাছুন')}</a></p>`;
   const selected = activeSeason(plan);
   return `<div class="plan-season-tabs" role="tablist" aria-label="${t('Rotation seasons', 'ফসলচক্রের মৌসুম')}">${plan.rotation.seasons.map((season, index) => {

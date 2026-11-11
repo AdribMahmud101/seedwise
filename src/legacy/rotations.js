@@ -969,6 +969,7 @@ function setupQuestionPanelEvents() {
  * Lifecycle hook - cleanup
  */
 export function disposeRotations() {
+  studioBuildToken++;
   studioOpened = false;
   activeRotationId = null;
   previewedRotationId = null;

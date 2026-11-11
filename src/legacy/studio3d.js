@@ -2025,6 +2025,7 @@ async function buildGroundTexture(data) {
 }
 
 async function buildSurroundings(data) {
+  const targetScene = scene;
   disposeGroup(surroundingsGroup);
   surroundingsGroup = null;
   disposeGroup(shadowPlane);
@@ -2037,6 +2038,7 @@ async function buildSurroundings(data) {
 
   if (showSurroundings) {
     const tex = await buildGroundTexture(data);
+    if (isDisposed || scene !== targetScene) return;
     const size = radius * 8;
     const geom = new THREE.PlaneGeometry(size, size, 1, 1);
     geom.rotateX(-Math.PI / 2);
@@ -4562,7 +4564,11 @@ export async function mountStudio3d(container, data, opts = {}) {
     initThree(host);
 
     if (loader) loader.querySelector(".studio-loading-text").textContent = t("Sampling terrain…", "ভূ-উচ্চতা মাপা হচ্ছে…");
-    if (!elevationSampler) elevationSampler = await createElevationSampler(data);
+    if (!elevationSampler) {
+      const sampler = await createElevationSampler(data);
+      if (isDisposed || containerEl !== container) return;
+      elevationSampler = sampler;
+    }
 
     // Default vertical auto-exaggeration so relief is visible (~0.25 * block width)
     const b = outlineBounds(data.field.outlineM);
@@ -4581,10 +4587,12 @@ export async function mountStudio3d(container, data, opts = {}) {
 
     if (loader) loader.querySelector(".studio-loading-text").textContent = t("Building your field…", "জমির ৩ডি মডেল তৈরি হচ্ছে…");
     await buildFieldBlock(data, currentCutaway);
+    if (isDisposed || containerEl !== container) return;
 
     if (loader) loader.querySelector(".studio-loading-text").textContent = t("Placing crops…", "ফসল সাজানো হচ্ছে…");
     buildPlantsAndRoots(data, currentMonthIdx);
     await buildSurroundings(data);
+    if (isDisposed || containerEl !== container) return;
 
     fitCameras(data);
     updateShadowLight();
@@ -4612,6 +4620,7 @@ export async function mountStudio3d(container, data, opts = {}) {
     if (!introAnim) idleLastInputMs = performance.now() - IDLE_RESUME_DELAY_S * 1000;
     bindIdleListeners();
   } catch (err) {
+    if (isDisposed || containerEl !== container) return;
     console.error("Studio3D initialization error:", err);
     showFallbackMessage(t("Failed to initialize 3D Studio.", "৩ডি স্টুডিও চালু করা যায়নি।"));
   }
@@ -5255,6 +5264,7 @@ function onVisibilityChange() {
 
 export function disposeStudio3d() {
   isDisposed = true;
+  buildToken++;
   stopIntroAnimation(true);
   stopAnimation();
   if (playTimer) clearInterval(playTimer);

@@ -374,7 +374,10 @@ export function runShowMe(customReason = null) {
 export function updateHandOffs(page = activePage) {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
   const plan = getPlan();
-  if (!plan) return;
+  if (!plan) {
+    document.querySelectorAll?.('.journey-field-inline, #planner-finish-slot, #journey-finish-slot').forEach(slot => { slot.innerHTML = ''; });
+    return;
+  }
 
   const checklist = getPageChecklist(page);
   // Checklist is "otherwise complete" if all items except the final action are done

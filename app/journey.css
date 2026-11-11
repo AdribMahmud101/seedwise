@@ -1,6 +1,10 @@
 .workspace:has(.journey-shell) > .topbar { position: sticky; top: 0; z-index: 41; background: #fffef9; }
 #journey-bar-slot:has(.journey-shell) { position: sticky; top: var(--journey-top, 60px); z-index: 40; }
 .journey-shell { z-index: 40; background: #fffef9; border-bottom: 1px solid var(--line); }
+.journey-ready { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px clamp(12px, 2vw, 28px); background: #f0f4e7; border-bottom: 1px solid var(--line); font-size: 13px; }
+.journey-ready button { border: 0; background: transparent; color: inherit; min-height: 44px; cursor: pointer; }
+.journey-ready [data-journey="own"] { padding: 0; text-decoration: underline; }
+.journey-ready > button { min-width: 44px; font-size: 20px; }
 .journey-bar { display: flex; align-items: center; gap: 18px; padding: 6px clamp(8px, 2vw, 28px); }
 .journey-bar ol { display: flex; flex: 1; min-width: 0; list-style: none; padding: 0; margin: 0; gap: 8px; }
 .journey-bar li { flex: 1; min-width: 0; }

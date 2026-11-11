@@ -5,6 +5,7 @@ import * as journey from '../src/legacy/journey.js';
 import * as plansPage from '../src/legacy/plans.js';
 import * as planPage from '../src/legacy/plan.js';
 import * as bar from '../src/legacy/journey-bar.js';
+import * as story from '../src/legacy/journey-story.js';
 import { state, basePolygon, defaultProfile, defaultPriorities } from '../src/legacy/ui.js';
 
 const storage = new Map();
@@ -159,7 +160,8 @@ test('finish routes to #plans and highlights new plan', async t => {
     await bar.journeyAction('finish');
 
     assert.equal(destinations.at(-1), 'plans');
-    assert.equal(storage.get('session:ropon_highlight_plan_id'), journey.getPlan().id);
+    assert.equal(journey.getPlan(), null);
+    assert.equal(storage.get('session:ropon_highlight_plan_id'), journey.listPlans()[0].id);
     assert.equal(journey.listPlans()[0].status, 'ready');
   } finally {
     globalThis.document = oldDoc;
@@ -204,4 +206,147 @@ test('water chart label reads Need ... mm · Rain ... mm', () => {
   const svg = planPage.waterChartSVG([{ label: 'Rice', needMm: 463, rainMm: 728 }], { lang: 'en' });
   assert.match(svg, /Need 463 mm · Rain 728 mm/);
   assert.doesNotMatch(svg, />463\/728</);
+});
+
+function saveReady(rotationId = 'legume') {
+  journey.startPlan();
+  journey.confirmField(field());
+  journey.confirmRotation(journey.rotationSnapshot(rotationId, defaultPriorities(), agronomy));
+  journey.confirmPlanting();
+  return journey.savePlan(journey.getPlan(), { status: 'ready' });
+}
+
+test('Ready ends the journey; strip replaces all running controls and can be dismissed', async t => {
+  t.mock.method(globalThis, 'setTimeout', () => 0);
+  const ready = saveReady();
+  assert.equal(journey.getPlan(), null);
+  assert.equal(storage.has('ropon_season_plan_v1'), false);
+  assert.equal(journey.getReadyPlan().id, ready.id);
+  for (const page of ['field', 'rotations', 'planner']) {
+    const html = bar.journeyBar(page);
+    assert.match(html, /✓ Your plan is ready/);
+    assert.match(html, /View in My plans/);
+    assert.match(html, /Start a new plan/);
+    assert.doesNotMatch(html, /journey-shell|journey-continue|exit-prompt|data-journey="finish"/);
+    assert.equal(bar.journeyReview(page), '');
+  }
+  assert.equal(bar.journeyFieldCTA(), '');
+  assert.equal(bar.journeyRotationCTA('legume'), '');
+  assert.equal(bar.journeyFinishCTA(), '');
+  assert.equal(bar.journeyStart(), '');
+  state.lang = 'bn';
+  assert.match(bar.journeyBar('planner'), /আপনার পরিকল্পনা তৈরি/);
+  assert.match(bar.journeyBar('planner'), /নতুন পরিকল্পনা শুরু করুন/);
+  await bar.journeyAction('dismiss-ready');
+  assert.equal(bar.journeyBar('planner'), '');
+  journey.startPlan();
+  assert.match(bar.journeyBar('planner'), /journey-bar/);
+  assert.equal(journey.getReadyPlan(), null);
+});
+
+test('Ready opens read-only without coach; Edit explicitly resumes the same plan as draft', t => {
+  const ready = saveReady();
+  const snapshot = structuredClone(ready.plan);
+  globalThis.location = { hash: '' };
+  t.after(() => { delete globalThis.location; });
+  plansPage.plansAction('open', ready.id);
+  assert.equal(location.hash, 'plan');
+  assert.equal(journey.getPlan(), null);
+  const html = planPage.plan();
+  assert.match(html, /← My plans/);
+  assert.match(html, /Edit this plan/);
+  assert.match(html, /Plan ready ✓/);
+  assert.doesNotMatch(html, /plan-edit-season|Edit field|Edit rotation/);
+  assert.match(html, /data-check="[^"]+" disabled/);
+  planPage.planChange({ matches: selector => selector === '[data-check]', dataset: { check: 'well-reading' }, checked: true });
+  assert.deepEqual(journey.getSavedPlan(ready.id).plan, snapshot);
+
+  const host = { innerHTML: 'old coach', className: 'coach-host' };
+  globalThis.document = { querySelector: () => null };
+  t.after(() => { delete globalThis.document; });
+  for (const page of ['plan', 'field', 'rotations', 'planner']) {
+    story.setStoryPage(page, () => {});
+    story.renderCoach(host);
+    assert.equal(host.innerHTML, '');
+  }
+  planPage.planAction('plan-edit');
+  assert.equal(location.hash, 'planner');
+  assert.equal(journey.getPlan().id, ready.id);
+  assert.equal(journey.getSavedPlan(ready.id).status, 'draft');
+  assert.match(bar.journeyBar('planner'), /journey-bar/);
+  story.setStoryPage('planner', () => {});
+  story.renderCoach(host);
+  assert.match(host.innerHTML, /coach-card|coach-bubble/);
+});
+
+test('legacy active Ready snapshots detach on reload; saved contents remain intact', async () => {
+  const ready = saveReady();
+  storage.set('ropon_season_plan_v1', JSON.stringify(ready.plan));
+  storage.delete('session:ropon_ready_plan_id');
+  const reloaded = await import(`../src/legacy/journey.js?plansfix=${Date.now()}`);
+  assert.equal(reloaded.getPlan(), null);
+  assert.equal(reloaded.getReadyPlan().id, ready.id);
+  assert.deepEqual(reloaded.getSavedPlan(ready.id).plan, ready.plan);
+});
+
+test('empty drafts are rejected by save and migration; Exit shows Nothing to save yet', async t => {
+  journey.startPlan();
+  assert.equal(journey.savePlan(journey.getPlan()), null);
+  journey.migrateActivePlanOnce();
+  assert.deepEqual(journey.listPlans(), []);
+  const toast = { textContent: '', classList: { add() {}, remove() {} } };
+  const modal = { close() {}, classList: { remove() {} } };
+  globalThis.document = { querySelector: selector => selector === '#toast' ? toast : selector === '#modal' ? modal : null };
+  t.after(() => { delete globalThis.document; });
+  bar.mountJourney('field', () => {}, () => true);
+  await bar.journeyAction('exit-draft');
+  assert.equal(toast.textContent, 'Nothing to save yet');
+  assert.equal(journey.getPlan(), null);
+  assert.deepEqual(journey.listPlans(), []);
+});
+
+test('incomplete drafts use a dated New plan name; confirmed field drafts still save', () => {
+  journey.startPlan();
+  const expected = `New plan · ${journey.getPlan().createdAt.slice(0, 10)}`;
+  assert.equal(journey.defaultPlanName(journey.getPlan()), expected);
+  journey.confirmField(field());
+  const draft = journey.savePlan(journey.getPlan());
+  assert.equal(draft.name, expected);
+  assert.equal(journey.listPlans().length, 1);
+  assert.doesNotMatch(plansPage.plans(), /My field · Rotation|Field · 0(?:\.00)? ha/);
+});
+
+test('crop labels use full English names and cropBn across saved cards, calendars and plan', () => {
+  for (const rotationId of ['legume', 'mustard', 'baseline']) saveReady(rotationId);
+  const names = ['Aman rice', 'Boro rice', 'Potato', 'Mustard', 'Mungbean', 'Fallow'];
+  const html = plansPage.plans();
+  for (const name of names) assert.match(html, new RegExp(`<b>${name}</b>`));
+  assert.doesNotMatch(html, /<b>(aman|boro|potato|mustard|mungbean|fallow)<\/b>/);
+  for (const entry of journey.listPlans()) {
+    journey.openPlan(entry.id);
+    const page = planPage.plan();
+    for (const season of entry.plan.rotation.seasons) {
+      assert.ok(page.includes(planPage.cropLabel(season.crop, 'en')));
+    }
+  }
+  state.lang = 'bn';
+  const bn = plansPage.plans();
+  for (const entry of journey.listPlans()) {
+    journey.openPlan(entry.id);
+    const page = planPage.plan();
+    for (const season of entry.plan.rotation.seasons) {
+      assert.ok(bn.includes(`<b>${season.cropBn}</b>`));
+      assert.ok(page.includes(season.cropBn));
+    }
+  }
+});
+
+test('failed Ready persistence keeps the active journey recoverable', t => {
+  journey.startPlan(); journey.confirmField(field()); journey.confirmRotation(rotation()); journey.confirmPlanting();
+  const active = journey.getPlan();
+  t.mock.method(localStorage, 'setItem', () => { throw new Error('Storage full'); });
+  t.mock.method(console, 'warn', () => {});
+  assert.throws(() => journey.savePlan(active, { status: 'ready' }), /Could not save plan/);
+  assert.deepEqual(journey.getPlan(), active);
+  assert.deepEqual(journey.listPlans(), []);
 });

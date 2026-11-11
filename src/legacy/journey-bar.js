@@ -1,7 +1,7 @@
 import { t, esc, state, field, polygon, profile, agronomy, toast, repaint, modal, close } from './ui.js';
 import { getPlan, startPlan, demoPlan, confirmField, fieldSnapshot, confirmRotation,
-  rotationSnapshot, confirmPlanting, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe,
-  savePlan, resetPlan } from './journey.js';
+  rotationSnapshot, confirmPlanting, markPlanGenerated, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe,
+  savePlan, resetPlan, getReadyPlan } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setStoryPage, handleContinue, startRahimDemo, updateHandOffs, renderCoach } from './journey-story.js';
@@ -24,6 +24,10 @@ const dismissed = new Map();
 
 export function journeyBar(page) {
   const plan = getPlan();
+  if (!plan && ['field', 'rotations', 'planner'].includes(page) && getReadyPlan() &&
+    !globalThis.sessionStorage?.getItem('ropon_ready_strip_dismissed')) {
+    return `<aside class="journey-ready" role="status"><span>${t('✓ Your plan is ready', '✓ আপনার পরিকল্পনা তৈরি')} — <a href="#plans">${t('View in My plans', 'আমার পরিকল্পনায় দেখুন')}</a> · <button type="button" data-journey="own">${t('Start a new plan', 'নতুন পরিকল্পনা শুরু করুন')}</button></span><button type="button" data-journey="dismiss-ready" aria-label="${t('Dismiss ready reminder', 'পরিকল্পনা তৈরির বার্তা বন্ধ করুন')}">×</button></aside>`;
+  }
   if (!plan || !stepFor(page)) return '';
   const statuses = stepStatus();
   const labels = { done: t('Done', 'সম্পন্ন'), current: t('Current step', 'বর্তমান ধাপ'),
@@ -37,7 +41,7 @@ export function journeyBar(page) {
 }
 
 export function journeyStart() {
-  if (getPlan()) return '';
+  if (getPlan() || getReadyPlan()) return '';
   return `<section class="journey-start"><div>${plantyMascot('happy')}<div><h2>${t('Your field. Your next season.', 'আপনার জমি। আপনার পরের মৌসুম।')}</h2><p>${t('Choose your field, compare rotations, and make a planting plan.', 'জমি বেছে নিন, ফসলচক্র তুলনা করুন, বপনের পরিকল্পনা করুন।')}</p></div></div><div class="journey-start-actions"><button type="button" class="button primary" data-journey="own">${t('Plan my season', 'আমার মৌসুমের পরিকল্পনা')}</button><button type="button" class="button" data-journey="demo">${t("Watch Rahim's journey", 'রহিমের পরিকল্পনা দেখুন')}</button><label class="button plan-import">${t('Continue later', 'পরে চালিয়ে যান')}<input type="file" data-plan-import accept=".html,.json,application/json,text/html" hidden></label></div></section>`;
 }
 
@@ -230,8 +234,9 @@ export async function journeyAction(action, value) {
     } else if (action === 'finish') {
       if (!canFinishPlanting(getPlan())) return;
       confirmPlanting();
-      const plan = getPlan();
+      const plan = markPlanGenerated({});
       savePlan(plan, { status: 'ready' });
+      if (plan.mode === 'demo') resetPlan();
       celebrate('planting', t('Planting confirmed!', 'বপনের মাপ নিশ্চিত হয়েছে!'));
       sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
       navigate('plans');
@@ -241,7 +246,7 @@ export async function journeyAction(action, value) {
       close();
       const plan = getPlan();
       if (plan && plan.mode !== 'demo') {
-        savePlan(plan, { status: 'draft' });
+        if (!savePlan(plan, { status: 'draft' })) toast(t('Nothing to save yet', 'এখনও সংরক্ষণ করার কিছু নেই'));
       }
       resetPlan();
       navigate('plans');
@@ -251,6 +256,9 @@ export async function journeyAction(action, value) {
       close();
       resetPlan();
       navigate('plans');
+    } else if (action === 'dismiss-ready') {
+      sessionStorage.setItem('ropon_ready_strip_dismissed', 'true');
+      refreshJourney();
     } else if (action === 'dismiss') {
       dismissed.set(stepFor(route), reviewKey(getPlan()));
       refreshJourney();
