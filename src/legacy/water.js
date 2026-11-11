@@ -5,6 +5,7 @@ import {
   smap,
   persist,
   t,
+  deskNo,
   esc,
   num,
   monthName,
@@ -138,9 +139,10 @@ function smapCard() {
 
 function water() {
   const id = state.tabs.water;
+  const [deskEn, deskBn] = deskNo(6);
   return (
     header(
-      t("Land & water  /  06", "জমি ও পানি  /  ০৬"),
+      t(`Land & water  /  ${deskEn}`, `জমি ও পানি  /  ${deskBn}`),
       t("Water & resilience", "পানি ও সহনশীলতা"),
       t(
         "Use the regional record to test an irrigation plan, read local soil evidence, or prepare for a disrupted season.",

@@ -110,6 +110,12 @@ function persist() {
 function t(english, bangla) {
   return state.lang === "bn" && bangla ? bangla : english;
 }
+const bnDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+// Page numbers follow the nav: once a season plan exists, #plan takes 04 and later pages shift by one.
+function deskNo(base) {
+  const n = base + (getPlan() ? 1 : 0);
+  return [`0${n}`, `০${bnDigits[n]}`];
+}
 function esc(value) {
   return String(value ?? "").replace(
     /[&<>"']/g,
@@ -701,6 +707,7 @@ export {
   loadData,
   persist,
   t,
+  deskNo,
   esc,
   num,
   monthName,
