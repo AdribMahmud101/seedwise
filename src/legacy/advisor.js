@@ -225,3 +225,40 @@ export function customPlanBanner() {
     <p class="note">${t('3D shows each crop in its share of the land (generic tree / bush / field-crop models; colours and spacing suggested by AI — general guidance, not measurements). Plant counts use your usable area.', '৩ডি-তে প্রতিটি ফসল তার জমির অংশে (সাধারণ গাছ/ঝোপ/মাঠফসলের মডেল; রং ও দূরত্ব এআই প্রস্তাবিত — সাধারণ নির্দেশনা)।')}</p>
   </section>`;
 }
+
+// ---- Custom plan: planting settings for the crops chosen in the Rotation studio ----
+const CUSTOM_KEY_SET = 'ropon_custom_plan_v1';
+function saveCustom(p) { try { localStorage.setItem(CUSTOM_KEY_SET, JSON.stringify(p)); } catch { /* ignore */ } }
+export function customSettingsPanel() {
+  const p = getCustomPlan();
+  if (!p) return '';
+  const rotation = p.mode === 'rotation';
+  const usable = Number(state.planner?.usable) || 88;
+  const total = p.planting.reduce((a, c) => a + customCount(area(), usable, rotation ? { ...c, sharePct: 100 } : c), 0);
+  const slider = (i, key, label, min, max, step, value, unit) => `<label class="cs-row"><span>${label}</span>
+    <input type="range" name="custom-${key}" data-idx="${i}" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${esc(label)}">
+    <output>${value}${unit}</output></label>`;
+  return `<section class="panel plan-settings cs-panel"><div class="panel-header"><div><span class="eyebrow">${t('Your crops · from Rotation studio', 'আপনার ফসল · ফসলচক্র থেকে')}</span>
+    <h2>${t('Planting settings', 'বপনের মাপ')}</h2></div></div><div class="panel-body">
+    <p class="note">${t('Crops are set by your custom plan. Adjust spacing and the land split here; to change crops, go back to the decision helper.', 'ফসল আপনার কাস্টম পরিকল্পনা থেকে। দূরত্ব ও জমির ভাগ এখানে বদলান; ফসল বদলাতে সিদ্ধান্ত সহায়কে ফিরুন।')}
+      <a href="#rotations" class="cs-change">${t('Change crops', 'ফসল বদলান')}</a></p>
+    ${!rotation && p.planting.length === 2 ? `<div class="cs-split"><div class="cs-split-head"><span><i style="background:${esc(p.planting[0].color)}"></i>${esc(p.planting[0].crop)} ${p.planting[0].sharePct}%</span><span>${esc(p.planting[1].crop)} ${p.planting[1].sharePct}%<i style="background:${esc(p.planting[1].color)}"></i></span></div>
+      <input type="range" name="custom-split" min="10" max="90" step="5" value="${Math.round(p.planting[0].sharePct)}" aria-label="${t('Land split', 'জমির ভাগ')}"><small>${t('Land split between the two crops', 'দুই ফসলের জমির ভাগ')}</small></div>` : ''}
+    ${p.planting.map((c, i) => `<div class="cs-crop"><div class="cs-crop-head"><i style="background:${esc(c.color)}"></i><strong>${esc(c.crop)}</strong>
+      <small>${rotation ? t('whole field in its season', 'নিজের মৌসুমে পুরো জমি') : `${c.sharePct}% ${t('of the field', 'জমির')}`} · ~${customCount(area(), usable, rotation ? { ...c, sharePct: 100 } : c).toLocaleString()} ${t('plants', 'চারা')}</small></div>
+      ${slider(i, 'row', t('Row spacing', 'সারির দূরত্ব'), c.model === 'tree' ? 200 : 10, c.model === 'tree' ? 1200 : 150, c.model === 'tree' ? 50 : 5, c.rowSpacingCm, ' cm')}
+      ${slider(i, 'within', t('Within-row spacing', 'সারিতে দূরত্ব'), c.model === 'tree' ? 200 : 5, c.model === 'tree' ? 1200 : 120, c.model === 'tree' ? 50 : 5, c.withinRowCm, ' cm')}</div>`).join('')}
+    <p class="cs-total">${t('Total plants', 'মোট চারা')}: <strong>~${total.toLocaleString()}</strong> <span class="truth">◌ ${t('Scenario', 'কাল্পনিক')}</span></p>
+    <p class="note">${t('Spacing suggested by AI (general guidance). Usable area comes from your field widths.', 'দূরত্ব এআই প্রস্তাবিত (সাধারণ নির্দেশনা)। চাষযোগ্য জমি আপনার জমির মাপ থেকে।')}</p>
+  </div></section>`;
+}
+// Returns true if the input belonged to the custom panel (caller re-renders).
+export function customInput(el) {
+  if (!el?.name?.startsWith('custom-')) return false;
+  const p = getCustomPlan(); if (!p) return false;
+  const v = Number(el.value);
+  if (el.name === 'custom-split' && p.planting.length === 2) { p.planting[0].sharePct = v; p.planting[1].sharePct = 100 - v; }
+  else { const c = p.planting[Number(el.dataset.idx)]; if (!c) return false; if (el.name === 'custom-row') c.rowSpacingCm = v; if (el.name === 'custom-within') c.withinRowCm = v; }
+  saveCustom(p);
+  return true;
+}

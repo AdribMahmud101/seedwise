@@ -1,4 +1,4 @@
-import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason } from './advisor.js';
+import { customPlanFor3d, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput } from './advisor.js';
 import {
   state,
   agronomy,
@@ -169,6 +169,7 @@ function usableNote() {
     : `<p class="note plan-usable-note">${t('From your field widths', 'আপনার জমির মাপ থেকে')} · <a href="#field">${t('Edit on My field', 'আমার জমিতে বদলান')}</a></p>`;
 }
 function plannerSettings() {
+  if (getCustomPlan()) return customSettingsPanel();
   const p = state.planner;
   const plan = seasonPlan();
   const season = activeSeason(plan);
@@ -637,6 +638,7 @@ function updatePlannerResults() {
   schedulePlanner3d();
 }
 function plannerInput(el) {
+  if (customInput(el)) { const host = document.querySelector('.plan-settings'); if (host) host.outerHTML = plannerSettings(); const b = document.querySelector('.adv-plan-banner'); if (b) b.outerHTML = customPlanBanner(); schedulePlanner3d(); return; }
   if (!el.closest('#plant-controls') || el.name === 'plantCrop') return;
   const { min, max } = controlLimits(state.planner.crop, el.name);
   // Keep partial number drafts editable; commit and clamp on change.
