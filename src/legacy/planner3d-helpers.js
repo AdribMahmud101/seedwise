@@ -69,16 +69,27 @@ export function plannerRowLayout(outlineM, rowCm, plantCm, usable = 100) {
   const b = outlineBounds(outlineM);
   if (!(b.width > 0 && b.height > 0)) return empty;
   const span = Math.max(b.width, b.height);
-  const readable = (cm) => span / 70 + (cm / 100) * Math.max(1, span / 12);
-  const row = readable(rowCm), plant = readable(plantCm);
+  const displayScale = Math.max(1, Math.ceil(span / 10));
+  const rowStep = Math.max(1, Math.ceil(span / 18 / (rowCm / 100) + Math.max(1, span / 12)));
+  const plantStep = Math.max(1, Math.ceil(span / 18 / (plantCm / 100) + Math.max(1, span / 12)));
+  const row = rowCm / 100 * rowStep, plant = plantCm / 100 * plantStep;
   const rowsAlongX = b.width >= b.height;
   const spacingX = rowsAlongX ? plant : row;
   const spacingY = rowsAlongX ? row : plant;
   const reserve = (1 - Math.sqrt(usable / 100)) * Math.min(b.width, b.height) / 2;
-  const positions = plantPositionsInPolygon(outlineM, spacingX, spacingY)
-    .filter(([x, y]) => distToPolygonEdge(x, y, outlineM) >= reserve);
+  const trueX = (rowsAlongX ? plantCm : rowCm) / 100;
+  const trueY = (rowsAlongX ? rowCm : plantCm) / 100;
+  const inset = Math.max(reserve, Math.min(spacingX, spacingY, b.width, b.height) * 0.3);
+  const positions = [];
+  const startX = trueX / 2 + Math.max(0, Math.floor((Math.min(spacingX, b.width) - trueX) / (2 * trueX))) * trueX;
+  const startY = trueY / 2 + Math.max(0, Math.floor((Math.min(spacingY, b.height) - trueY) / (2 * trueY))) * trueY;
+  for (let x = b.minX + startX; x < b.maxX; x += spacingX) {
+    for (let y = b.minY + startY; y < b.maxY; y += spacingY) {
+      if (pointInPolygon(x, y, outlineM) && distToPolygonEdge(x, y, outlineM) >= inset) positions.push([x, y]);
+    }
+  }
   const rowCount = new Set(positions.map((p) => p[rowsAlongX ? 1 : 0])).size;
-  return { positions, rowCount, spacingX, spacingY };
+  return { positions, rowCount, spacingX, spacingY, displayScale, rowStep, plantStep };
 }
 
 export function ringSignedArea(ring) {
@@ -214,37 +225,34 @@ export function matchPlantPositions(oldPositions, newPositions) {
 }
 
 // Camera framing for ~85% width fill
-export function computeFieldFraming({ bounds, aspect = 1.5, fovDeg = 38, targetWidthRatio = 0.85, elevationDeg = 24, yawDeg = 14 }) {
-  const b = bounds || { width: 30, height: 30, cx: 0, cy: 0, radius: 15 };
-  const width = Math.max(1, b.width);
-  const height = Math.max(1, b.height);
-  const target = [b.cx, 0, -b.cy];
-  
-  const vFov = (fovDeg * Math.PI) / 180;
-  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-  
-  // To fill ~targetWidthRatio (85%) of viewport width:
-  // Visible width at distance d is 2 * d * tan(hFov / 2).
-  // 2 * d * tan(hFov / 2) * targetWidthRatio >= effectiveSpan.
-  const el = (elevationDeg * Math.PI) / 180;
-  const yaw = (yawDeg * Math.PI) / 180;
-  const effectiveSpan = Math.max(width, height * Math.cos(el));
-  const distance = (effectiveSpan / (2 * Math.tan(hFov / 2) * targetWidthRatio));
-  
-  const safeDistance = Math.max(5, distance);
-  const position = [
-    target[0] + Math.cos(el) * Math.sin(yaw) * safeDistance,
-    target[1] + Math.sin(el) * safeDistance,
-    target[2] + Math.cos(el) * Math.cos(yaw) * safeDistance,
-  ];
-
-  return {
-    target,
-    position,
-    distance: safeDistance,
-    elevationDeg,
-    yawDeg,
-  };
+export function computeFieldFraming({ bounds, aspect = 1.5, fovDeg = 38, targetWidthRatio = 0.86,
+  elevationDeg = 36, yawDeg = 24, depthM = 0, topM = 0 }) {
+  const b = bounds || { width: 30, height: 30, cx: 0, cy: 0 };
+  const width = Math.max(1, b.width), height = Math.max(1, b.height);
+  const target = [b.cx, (topM - depthM) / 2, -b.cy];
+  const tanV = Math.tan(fovDeg * Math.PI / 360) * targetWidthRatio;
+  const tanH = tanV * Math.max(0.1, aspect);
+  const el = elevationDeg * Math.PI / 180;
+  let distance = 5;
+  // Solve all eight projected corners, including the full ±5° idle yaw and 1% dolly.
+  for (const offset of [-5, 0, 5]) {
+    const yaw = (yawDeg + offset) * Math.PI / 180;
+    for (const x of [-width / 2, width / 2]) {
+      for (const y of [-depthM - target[1], topM - target[1]]) {
+        for (const z of [-height / 2, height / 2]) {
+          const right = x * Math.cos(yaw) - z * Math.sin(yaw);
+          const up = -x * Math.sin(el) * Math.sin(yaw) + y * Math.cos(el) - z * Math.sin(el) * Math.cos(yaw);
+          const toward = x * Math.cos(el) * Math.sin(yaw) + y * Math.sin(el) + z * Math.cos(el) * Math.cos(yaw);
+          distance = Math.max(distance, toward + Math.max(Math.abs(right) / tanH, Math.abs(up) / tanV));
+        }
+      }
+    }
+  }
+  distance /= 0.99;
+  const yaw = yawDeg * Math.PI / 180;
+  const position = [target[0] + Math.cos(el) * Math.sin(yaw) * distance,
+    target[1] + Math.sin(el) * distance, target[2] + Math.cos(el) * Math.cos(yaw) * distance];
+  return { target, position, distance, elevationDeg, yawDeg };
 }
 
 

@@ -7,11 +7,11 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { buildStudioData, FAO56_CROP_LIMITS } from "./studiodata.js";
 import {
-  outlineBounds, ringSignedArea, canopyVisualHeight, idleCameraSway,
+  outlineBounds, ringSignedArea, idleCameraSway,
   IDLE_RESUME_DELAY_S,
-  fitCameraToBlock, fitTopView, plannerRowLayout,
-  capPlantPositions, MAX_PLANTS_PER_FIELD, computeFieldFraming,
-  easeOutCubic, easeInOutCubic, rowStaggerProgress, matchPlantPositions,
+  fitTopView, plannerRowLayout,
+  computeFieldFraming,
+  easeOutCubic, easeInOutCubic,
 } from "./planner3d-helpers.js";
 import {
   introCameraParams,
@@ -234,6 +234,7 @@ function makeHeightAt(data) {
   const outlineM = data?.field?.outlineM || [];
   const isLowGround = data?.ground?.class === "low";
   const scaleX = 111195.08 * Math.cos((lat * Math.PI) / 180);
+  if (["aman", "boro", "rice"].includes(data.months[0]?.cropId)) return () => 0;
   const base = elevationSampler ? elevationSampler(lon, lat) : 0;
   const hasBase = Number.isFinite(base);
 
@@ -269,23 +270,12 @@ function buildTopTexture(data) {
   // Crop-season ground: tilled soil with a very light crop-tinted wash. A
   // desaturated base keeps the 3D clumps readable against the surface instead
   // of hiding them in a solid mat of the same green.
-  ctx.fillStyle = "#a8906b";
+  ctx.fillStyle = "#493122";
   ctx.fillRect(0, 0, 512, 512);
-  ctx.fillStyle = "rgba(142,112,76,0.55)";
-  for (let y = 14; y < 512; y += 28) ctx.fillRect(0, y, 512, 6);
-  const tint = stageColor(month.cropId, month.stage);
-  const r = parseInt(tint.slice(1, 3), 16);
-  const g = parseInt(tint.slice(3, 5), 16);
-  const b = parseInt(tint.slice(5, 7), 16);
-  ctx.fillStyle = `rgba(${r},${g},${b},0.14)`;
-  ctx.fillRect(0, 0, 512, 512);
-  ctx.strokeStyle = "rgba(64,44,26,0.38)";
-  ctx.lineWidth = 2.5;
-  for (let y = 18; y < 512; y += 28) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(512, y);
-    ctx.stroke();
+  for (let i = 0; i < 16000; i++) {
+    const x = deterministic(i, 11) * 512, y = deterministic(i, 12) * 512;
+    ctx.fillStyle = i % 2 ? 'rgba(21,14,9,0.23)' : 'rgba(133,97,60,0.22)';
+    ctx.fillRect(x, y, 1 + deterministic(i, 13) * 3, 1.5);
   }
 
   const texture = new THREE.CanvasTexture(cvs);
@@ -620,6 +610,7 @@ function buildFieldBlock(data) {
 
   blockGroup = new THREE.Group();
   blockGroup.add(topMesh, wallMesh, boundary);
+  buildCropGround(data, heightAt, bounds, ringM);
   if (undersideMesh) blockGroup.add(undersideMesh);
   ensureFloatGroup();
   floatGroup.add(blockGroup);
@@ -631,6 +622,67 @@ function buildFieldBlock(data) {
   currentBlock.bounds = bounds;
 }
 
+function buildWaterTexture() {
+  if (textureCache.has('paddy-water')) return textureCache.get('paddy-water');
+  const cvs = document.createElement('canvas');
+  cvs.width = cvs.height = 512;
+  const ctx = cvs.getContext('2d');
+  ctx.fillStyle = '#6aada4';
+  ctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 160; i++) {
+    const x = deterministic(i, 21) * 512, y = deterministic(i, 22) * 512;
+    ctx.strokeStyle = i % 3 ? 'rgba(209,235,220,0.22)' : 'rgba(32,91,82,0.12)';
+    ctx.lineWidth = 0.6 + deterministic(i, 23);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + 7, y - 2, x + 12 + deterministic(i, 24) * 14, y);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(cvs);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  textureCache.set('paddy-water', texture);
+  return texture;
+}
+
+function buildCropGround(data, heightAt, bounds, ringM) {
+  const cropId = data.months[0]?.cropId;
+  const layout = plannerRowLayout(data.field.outlineM, data.planner.row, data.planner.spacing, data.planner.usable);
+  const scale = layout.displayScale || 1;
+  const soil = new THREE.MeshStandardMaterial({ color: 0x59402c, roughness: 0.96 });
+  if (['aman', 'boro', 'rice'].includes(cropId)) {
+    const water = new THREE.Mesh(buildSurfaceGeometry(ringM, () => 0.035 * scale, bounds),
+      new THREE.MeshStandardMaterial({ map: buildWaterTexture(), roughness: 0.16, metalness: 0.12,
+        transparent: true, opacity: 0.72, side: THREE.DoubleSide }));
+    water.receiveShadow = true;
+    blockGroup.add(water);
+    const path = new THREE.CurvePath();
+    ringM.forEach(([x, y], i) => {
+      const [nx, ny] = ringM[(i + 1) % ringM.length];
+      path.add(new THREE.LineCurve3(new THREE.Vector3(x, 0, -y), new THREE.Vector3(nx, 0, -ny)));
+    });
+    const bund = new THREE.Mesh(new THREE.TubeGeometry(path, ringM.length * 3, scale * 0.14, 8, true), soil);
+    bund.receiveShadow = bund.castShadow = true;
+    blockGroup.add(bund);
+  } else if (cropId === 'potato') {
+    const alongX = bounds.width >= bounds.height;
+    const rowSpacing = alongX ? layout.spacingY : layout.spacingX;
+    const plantSpacing = alongX ? layout.spacingX : layout.spacingY;
+    // A short ridge per sampled position follows concave outlines without crossing missing rows.
+    const geometry = new THREE.CylinderGeometry(rowSpacing * 0.22, rowSpacing * 0.22, plantSpacing * 0.98, 10);
+    const ridges = new THREE.InstancedMesh(geometry, soil, layout.positions.length);
+    const dummy = new THREE.Object3D();
+    layout.positions.forEach(([x, y], i) => {
+      dummy.rotation.set(alongX ? 0 : Math.PI / 2, 0, alongX ? Math.PI / 2 : 0);
+      dummy.position.set(x, heightAt(x, -y) - rowSpacing * 0.07, -y);
+      dummy.updateMatrix();
+      ridges.setMatrixAt(i, dummy.matrix);
+    });
+    ridges.castShadow = ridges.receiveShadow = true;
+    blockGroup.add(ridges);
+  } else soil.dispose();
+}
+
 function mergeClumpParts(parts) {
   const nonIndexed = parts.map((g) => (g.index ? g.toNonIndexed() : g));
   parts.forEach((geometry, i) => {
@@ -639,14 +691,17 @@ function mergeClumpParts(parts) {
   let total = 0;
   for (const g of nonIndexed) total += g.attributes.position.count;
   const positions = new Float32Array(total * 3);
+  const colors = new Float32Array(total * 3).fill(1);
   let offset = 0;
   for (const g of nonIndexed) {
     positions.set(g.attributes.position.array, offset * 3);
+    if (g.attributes.color) colors.set(g.attributes.color.array, offset * 3);
     offset += g.attributes.position.count;
     g.dispose();
   }
   const merged = new THREE.BufferGeometry();
   merged.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  merged.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   merged.computeVertexNormals();
   return merged;
 }
@@ -660,107 +715,100 @@ function buildClumpGeometry(cropId, heightM, spreadM, stage = "grow", lod = "hig
   // Use crop-specific config for enhanced realism
   const config = CROP_CONFIG[cropId] || CROP_CONFIG.rice;
 
-  if (cropId === "aman" || cropId === "boro" || cropId === "rice") {
-    const parts = [];
-    const blades = isLow ? 5 : 8;
-    for (let k = 0; k < blades; k++) {
-      const angle = (k / blades) * Math.PI * 2 + Math.sin(k * 11.3) * 0.22;
-      const c = Math.cos(angle);
-      const s = Math.sin(angle);
-      const bladeH = h * (config.heightFactor + Math.abs(Math.sin(k * 3.7)) * 0.28);
-      const baseW = Math.max(0.012, r * config.leafWidth);
-      const midW = baseW * 0.68;
-      const tipW = baseW * 0.16;
-      const lean = r * (config.leafLean + Math.abs(Math.cos(k * 2.1)) * 0.26);
-      const bx0 = -baseW * s, bz0 = baseW * c;
-      const bx1 = baseW * s, bz1 = -baseW * c;
-      const mx = lean * c * 0.55, mz = lean * s * 0.55;
-      const mX0 = mx - midW * s, mZ0 = mz + midW * c;
-      const mX1 = mx + midW * s, mZ1 = mz - midW * c;
-      const tx = lean * c, tz = lean * s;
-      const tX0 = tx - tipW * s, tZ0 = tz + tipW * c;
-      const tX1 = tx + tipW * s, tZ1 = tz - tipW * c;
-      const g = new THREE.BufferGeometry();
-      const verts = [
-        bx0, 0, bz0,       bx1, 0, bz1,       mX0, bladeH * 0.5, mZ0,
-        bx1, 0, bz1,       mX1, bladeH * 0.5, mZ1,  mX0, bladeH * 0.5, mZ0,
-        mX0, bladeH * 0.5, mZ0, mX1, bladeH * 0.5, mZ1, tX0, bladeH, tZ0,
-        mX1, bladeH * 0.5, mZ1, tX1, bladeH, tZ1,     tX0, bladeH, tZ0,
-      ];
-      g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-      parts.push(g);
-    }
-    if (stage !== "establish") {
-      const panicles = isLow ? 2 : (stage === "mature" ? 4 : 3);
-      for (let p = 0; p < panicles; p++) {
-        const panAngle = (p / panicles) * Math.PI * 2 + 0.35;
-        const pc = Math.cos(panAngle), ps = Math.sin(panAngle);
-        const panH = h * 0.28;
-        const pan = new THREE.ConeGeometry(r * 0.08, panH, 4);
-        pan.rotateZ(0.48 * pc); pan.rotateX(0.48 * ps);
-        pan.translate(pc * r * 0.38, h * 0.92, ps * r * 0.38);
-        parts.push(pan);
+  const parts = [];
+  const paint = (geometry, color) => {
+    const c = new THREE.Color(color);
+    const colors = new Float32Array(geometry.attributes.position.count * 3);
+    for (let i = 0; i < colors.length; i += 3) c.toArray(colors, i);
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    parts.push(geometry);
+  };
+  const stem = (from, to, radius = h * 0.012) => {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to);
+    const direction = b.clone().sub(a);
+    const geometry = new THREE.CylinderGeometry(radius * 0.65, radius, direction.length(), 5);
+    geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()));
+    geometry.translate(...a.add(b).multiplyScalar(0.5).toArray());
+    paint(geometry, '#45862b');
+  };
+  // Folded, tapered leaf ribbons catch light along their midrib and arch at the tips.
+  const leaf = (base, angle, length, width, rise, color) => {
+    const vertices = [];
+    const point = (t, side) => {
+      const w = Math.sin(Math.PI * t) * width * side;
+      return [base[0] + Math.cos(angle) * length * t - Math.sin(angle) * w,
+        base[1] + Math.sin(t * Math.PI * 0.72) * rise + (side === 0 ? width * 0.18 * Math.sin(Math.PI * t) : 0),
+        base[2] + Math.sin(angle) * length * t + Math.cos(angle) * w];
+    };
+    for (let k = 0; k < 7; k++) {
+      for (const side of [-1, 1]) {
+        const a = point(k / 7, 0), b = point(k / 7, side);
+        const c = point((k + 1) / 7, 0), d = point((k + 1) / 7, side);
+        vertices.push(...a, ...b, ...c, ...b, ...d, ...c);
       }
     }
-    const base = new THREE.ConeGeometry(r * 0.26, h * 0.5, 5);
-    base.translate(0, h * 0.25, 0); parts.push(base);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    paint(geometry, color);
+  };
+
+  if (cropId === 'aman' || cropId === 'boro' || cropId === 'rice') {
+    for (let k = 0; k < 12; k++) {
+      const angle = k * 2.39996;
+      leaf([Math.cos(angle) * r * 0.08, 0, Math.sin(angle) * r * 0.08], angle,
+        r * (0.9 + (k % 3) * 0.18), h * 0.036, h * (0.76 + (k % 4) * 0.08),
+        ['#389c28', '#66be32', '#269137'][k % 3]);
+    }
     return mergeClumpParts(parts);
   }
 
-  if (cropId === "mustard") {
-    const parts = [];
-    const stem = new THREE.CylinderGeometry(r * config.stemWidth, r * config.stemWidth * 2, h * config.heightFactor, 4);
-    stem.translate(0, h * 0.46, 0); parts.push(stem);
-    const leafCount = isLow ? 2 : config.leafCount;
-    for (let k = 0; k < leafCount; k++) {
-      const ang = (k / leafCount) * Math.PI * 2 + k * 0.5;
-      const leaf = new THREE.ConeGeometry(r * config.leafSize, h * 0.35, 3);
-      leaf.rotateZ(config.leafLean * Math.cos(ang)); leaf.rotateX(config.leafLean * Math.sin(ang));
-      leaf.translate(Math.cos(ang) * r * 0.3, h * 0.22, Math.sin(ang) * r * 0.3); parts.push(leaf);
+  if (cropId === 'mustard') {
+    stem([0, 0, 0], [0, h, 0]);
+    for (let k = 0; k < 6; k++) {
+      const angle = k * 2.39996;
+      leaf([0, h * (0.12 + k * 0.1), 0], angle, r * (0.92 - k * 0.09), r * 0.22,
+        h * 0.13, k % 2 ? '#438f31' : '#287b35');
     }
-    if (stage !== "establish") {
-      const topCluster = new THREE.IcosahedronGeometry(r * 0.32, 0);
-      topCluster.scale(1.1, 0.65, 1.1); topCluster.translate(0, h * 0.92, 0); parts.push(topCluster);
-      if (!isLow) {
-        for (let c = 0; c < 3; c++) {
-          const ca = (c / 3) * Math.PI * 2;
-          const sideCl = new THREE.IcosahedronGeometry(r * 0.16, 0);
-          sideCl.translate(Math.cos(ca) * r * 0.2, h * 0.82, Math.sin(ca) * r * 0.2); parts.push(sideCl);
+    for (let branch = 0; branch < 5; branch++) {
+      const angle = branch * 2.39996;
+      const x = branch ? Math.cos(angle) * r * 0.55 : 0;
+      const z = branch ? Math.sin(angle) * r * 0.55 : 0;
+      const y = h * (branch ? 0.78 + (branch % 2) * 0.1 : 1);
+      stem([0, h * 0.48, 0], [x, y, z], h * 0.008);
+      for (let flower = 0; flower < 7; flower++) {
+        const a = flower * 2.39996;
+        const fx = x + Math.cos(a) * r * 0.18, fz = z + Math.sin(a) * r * 0.18;
+        for (let petal = 0; petal < 4; petal++) {
+          const pa = petal * Math.PI / 2;
+          const geometry = new THREE.SphereGeometry(r * 0.065, 5, 3);
+          geometry.scale(1, 0.38, 1);
+          geometry.translate(fx + Math.cos(pa) * r * 0.06, y + flower * h * 0.008, fz + Math.sin(pa) * r * 0.06);
+          paint(geometry, petal % 2 ? '#ffe443' : '#f5c91b');
         }
       }
     }
     return mergeClumpParts(parts);
   }
 
-  if (cropId === "potato") {
-    const parts = []; const stem = new THREE.CylinderGeometry(r * config.stemWidth, r * config.stemWidth * 2, h * config.heightFactor, 4);
-    stem.translate(0, h * 0.22, 0); parts.push(stem);
-    const leaflets = isLow ? 3 : config.leafCount;
-    for (let k = 0; k < leaflets; k++) {
-      const ang = (k / leaflets) * Math.PI * 2 + (k % 2) * 0.3;
-      const dist = r * (0.35 + (k % 2) * 0.25);
-      const leaf = new THREE.IcosahedronGeometry(r * config.leafSize, 0);
-      leaf.scale(1.1, 0.45, 0.85); leaf.rotateY(ang);
-      leaf.translate(Math.cos(ang) * dist, h * (0.32 + (k % 3) * 0.18), Math.sin(ang) * dist); parts.push(leaf);
-    }
-    const center = new THREE.IcosahedronGeometry(r * 0.48, 0); center.scale(1, 0.55, 1);
-    center.translate(0, h * 0.55, 0); parts.push(center);
-    return mergeClumpParts(parts);
-  }
-
-  if (cropId === "mungbean" || cropId === "lentil") {
-    const parts = []; const center = new THREE.ConeGeometry(r * 0.24, h * config.heightFactor, 4);
-    center.translate(0, h * 0.22, 0); parts.push(center);
-    const clusters = isLow ? 2 : 3;
-    for (let t = 0; t < clusters; t++) {
-      const baseAng = (t / clusters) * Math.PI * 2 + t * 0.2; const dist = r * 0.42;
-      const clusterH = h * (0.35 + (t % 2) * 0.18);
-      for (let l = -1; l <= 1; l++) {
-        const leafAng = baseAng + l * 0.45;
-        const leaf = new THREE.IcosahedronGeometry(r * config.leafSize, 0);
-        leaf.scale(1, 0.4, 0.7); leaf.rotateY(leafAng);
-        leaf.translate(Math.cos(baseAng) * dist + Math.cos(leafAng) * r * 0.15, clusterH,
-          Math.sin(baseAng) * dist + Math.sin(leafAng) * r * 0.15); parts.push(leaf);
+  if (cropId === 'potato' || cropId === 'mungbean' || cropId === 'lentil') {
+    const potato = cropId === 'potato';
+    for (let branch = 0; branch < (potato ? 5 : 3); branch++) {
+      const angle = branch * 2.39996;
+      const bx = Math.cos(angle) * r * 0.38, bz = Math.sin(angle) * r * 0.38;
+      const by = h * (0.45 + (branch % 3) * 0.16);
+      stem([0, 0, 0], [bx, by, bz]);
+      if (potato) {
+        for (let k = 0; k < 3; k++) {
+          const t = 0.35 + k * 0.23;
+          for (const side of [-1, 1]) {
+            leaf([bx * t, by * t, bz * t], angle + side * 1.1, r * 0.65, r * 0.23, h * 0.15,
+              k % 2 ? '#287432' : '#195e29');
+          }
+        }
+      }
+      for (const side of [-1, 0, 1]) {
+        leaf([bx, by, bz], angle + side * 1.13, r * (side === 0 ? 0.77 : 0.62),
+          r * (potato ? 0.22 : 0.29), h * 0.18, potato ? '#24752e' : side === 0 ? '#45a343' : '#31883c');
       }
     }
     return mergeClumpParts(parts);
@@ -805,33 +853,36 @@ function buildPlants(data) {
   canvasHostEl.dataset.rowCount = layout.rowCount;
   
   // Cap instance count for performance, with honest note
-  const { positions: cappedPositions, totalCount, sampleStep, sampleRatioNote } = capPlantPositions(
-    positions,
-    isPhone() ? 4000 : 32000
-  );
-  canvasHostEl.dataset.plantCount = cappedPositions.length;
-  if (totalCount > cappedPositions.length && canvasHostEl) {
-    canvasHostEl.dataset.plantSampleNote = sampleRatioNote;
-  } else if (canvasHostEl) {
-    delete canvasHostEl.dataset.plantSampleNote;
-  }
-  
+  const cappedPositions = positions;
+  const totalCount = positions.length;
+  canvasHostEl.dataset.plantCount = positions.length;
+  const { displayScale, rowStep, plantStep } = layout;
+  const broadcast = month.cropId === 'mustard';
+  const note = document.documentElement.lang === 'bn'
+    ? `বোঝার সুবিধায় গাছ ×${displayScale} বড়; প্রতি ${rowStep} সারি ও ${plantStep} গাছ পরপর দেখানো। ${broadcast ? 'বীজের হিসাব ছিটিয়ে বপনের হার অনুযায়ী।' : 'গাছের হিসাব প্রকৃত দূরত্ব অনুযায়ী।'}`
+    : `Plants enlarged ×${displayScale}; every ${rowStep}th row and ${plantStep}th plant drawn for readability; ${broadcast ? 'seed uses the broadcast rate' : 'counts use true spacing'}.`;
+  canvasHostEl.dataset.plantSampleNote = note;
+  const chip = canvasHostEl.closest('.planner3d-stage-wrap')?.querySelector('.planner3d-crop-chip');
+  if (chip) chip.textContent = note;
   if (cappedPositions.length === 0) return;
 
-  const fieldSpan = Math.max(bounds.width, bounds.height);
-  const h = canopyVisualHeight(month, fieldSpan);
+  const h = month.canopyHeightM * month.stageFraction * displayScale;
   if (!(h > 0)) return;
 
   // Use LOD based on instance count: high detail for <10k, low for more
-  const lod = cappedPositions.length > 10000 ? "low" : "high";
-  const spacing = Math.min(spacingX, spacingY);
-  
-  const geom = buildClumpGeometry(month.cropId, h, spacing, month.stage, lod);
+  const lod = 'high';
+  const alongX = bounds.width >= bounds.height;
+  const trueSpacingX = (alongX ? data.planner.spacing : data.planner.row) / 100;
+  const trueSpacingY = (alongX ? data.planner.row : data.planner.spacing) / 100;
+  const ridgeHeight = (alongX ? spacingY : spacingX) * 0.15;
+  const spread = (month.cropId === 'potato' ? 0.8 : month.cropId === 'mungbean' ? 0.65 : 0.55) * displayScale;
+  const geom = buildClumpGeometry(month.cropId, h, spread, month.stage, lod);
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 0.9,
     metalness: 0,
-    flatShading: true,
+    vertexColors: true,
+    flatShading: false,
     side: THREE.DoubleSide,
   });
   
@@ -847,9 +898,9 @@ function buildPlants(data) {
       `.replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
-         float wind = uWindStrength * sin(uTime * 1.3 + position.y * 0.5 + instanceMatrix[12] * 0.1) * (0.5 + 0.5 * position.y);
-         transformed.x += cos(uTime * 0.7 + instanceMatrix[12] * 0.05) * wind;
-         transformed.z += sin(uTime * 0.7 + instanceMatrix[12] * 0.05) * wind;`
+         float wind = uWindStrength * sin(uTime * 1.3 + position.y * 0.5 + instanceMatrix[3].x * 0.1) * (0.5 + 0.5 * position.y);
+         transformed.x += cos(uTime * 0.7 + instanceMatrix[3].x * 0.05) * wind;
+         transformed.z += sin(uTime * 0.7 + instanceMatrix[3].x * 0.05) * wind;`
       );
       mat.userData.windShader = shader;
     };
@@ -859,11 +910,11 @@ function buildPlants(data) {
   mesh.castShadow = !isPhone();
   mesh.receiveShadow = false;
   const dummy = new THREE.Object3D();
-  const base = new THREE.Color(stageColor(month.cropId, month.stage));
+  const base = new THREE.Color(0xffffff);
   const colour = new THREE.Color();
 
   // Crop-specific size adjustments
-  const cropScale = month.cropId === "potato" ? 1.35 : month.cropId === "mustard" ? 1.15 : 1.0;
+  const cropScale = 1;
   // Stage scaling: seedlings smaller, harvest stumps shorter
   const stageScale = month.stage === "establish" ? 0.42 : month.stage === "harvest" ? 0.55 : 1.0;
 
@@ -873,9 +924,9 @@ function buildPlants(data) {
     const jitter = 0.82 + deterministic(i, 1) * 0.38;
     const yaw = deterministic(i, 2) * Math.PI * 2;
     dummy.position.set(
-      x + (deterministic(i, 3) - 0.5) * spacing * 0.18,
-      heightAt(x, z) + 0.015,
-      z + (deterministic(i, 4) - 0.5) * spacing * 0.18,
+      x + (deterministic(i, 3) - 0.5) * trueSpacingX * 0.18,
+      heightAt(x, z) + (month.cropId === "potato" ? ridgeHeight : 0.015),
+      z + (deterministic(i, 4) - 0.5) * trueSpacingY * 0.18,
     );
     dummy.rotation.set(0, yaw, 0);
     const sx = jitter * cropScale * stageScale;
@@ -917,81 +968,63 @@ function buildPlants(data) {
  * Old plants shrink/fade out, new plants grow in with row-wise stagger.
  */
 function startCropTransition(oldCropId, newCropId, newData) {
-  if (prefersReducedMotion || !oldCropId || oldCropId === newCropId) {
-    // No animation needed
+  if (prefersReducedMotion || !plantsGroup || !oldCropId || oldCropId === newCropId) {
+    buildPlants(newData);
     return;
   }
-
-  const oldPlants = plantsGroup?.userData.plants;
-  const oldMesh = plantsGroup?.children.find(c => c.isInstancedMesh);
-  
-  if (!oldMesh || !oldPlants) {
-    // No old plants to transition from
-    return;
-  }
-
+  const oldGroup = plantsGroup;
+  plantsGroup = null;
   // Build new plants (initially hidden/at zero scale)
   buildPlants(newData);
   const newMesh = plantsGroup?.children.find(c => c.isInstancedMesh);
-  
-  if (!newMesh) return;
-
-  const oldMat = oldMesh.material;
+  if (!newMesh) {
+    disposeGroup(oldGroup);
+    return;
+  }
+  const oldMat = oldGroup.children[0].material;
   const newMat = newMesh.material;
-  const oldBase = oldMesh.userData.baseMatrices;
   const newBase = newMesh.userData.baseMatrices;
   const newRowProgress = newMesh.userData.rowProgress || [];
   const newCount = newMesh.count;
-
   // Make materials transparent for fade
-  oldMat.transparent = true;
-  oldMat.opacity = 1.0;
-  newMat.transparent = true;
-  newMat.opacity = 0.0;
-
+  oldMat.transparent = newMat.transparent = true;
+  newMat.opacity = 0;
   const startTime = performance.now();
   const duration = 700; // ms for crop change
-
-  transitionAnim = { startTime, duration, oldMesh, newMesh, oldMat, newMat, newRowProgress, newCount };
-
+  transitionAnim = { oldGroup, newMesh, frameId: null };
   const animate = () => {
-    const elapsed = performance.now() - startTime;
-    const progress = Math.min(1, elapsed / duration);
+    if (!transitionAnim) return;
+    const progress = Math.min(1, (performance.now() - startTime) / duration);
     const eased = easeInOutCubic(progress);
-
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      // Clean up old mesh
-      transitionAnim = null;
-      if (oldMesh && oldMesh.parent) oldMesh.parent.remove(oldMesh);
-      oldMesh.geometry.dispose();
-      oldMat.dispose();
-      return;
-    }
-
     // Old plants: shrink and fade
-    oldMat.opacity = 1.0 - eased;
-    
+    oldMat.opacity = 1 - eased;
     // New plants: grow in with row-wise stagger
     const newArr = newMesh.instanceMatrix.array;
     for (let i = 0; i < newCount; i++) {
-      const rowP = newRowProgress[i] || 0;
-      const rowDelay = rowP * 0.3; // 30% stagger between rows
-      const rowEased = easeOutCubic(Math.min(1, (eased - rowDelay) / (1 - rowDelay + 0.001)));
-      const scale = rowEased;
-      
-      const offset = i * 16;
-      for (let c = 0; c < 12; c++) {
-        newArr[offset + c] = newBase[offset + c] * scale;
-      }
+      const rowDelay = (newRowProgress[i] || 0) * 0.3; // 30% stagger between rows
+      const scale = easeOutCubic((eased - rowDelay) / (1 - rowDelay));
+      for (let c = 0; c < 12; c++) newArr[i * 16 + c] = newBase[i * 16 + c] * scale;
     }
     newMesh.instanceMatrix.needsUpdate = true;
     newMat.opacity = eased;
+    if (progress < 1) transitionAnim.frameId = requestAnimationFrame(animate);
+    else finishCropTransition();
     requestRender();
   };
+  animate();
+}
 
-  requestAnimationFrame(animate);
+function finishCropTransition() {
+  if (!transitionAnim) return;
+  const { oldGroup, newMesh, frameId } = transitionAnim;
+  cancelAnimationFrame(frameId);
+  newMesh.instanceMatrix.array.set(newMesh.userData.baseMatrices);
+  newMesh.instanceMatrix.needsUpdate = true;
+  newMesh.material.opacity = 1;
+  newMesh.material.transparent = false;
+  // Clean up old mesh
+  disposeGroup(oldGroup);
+  transitionAnim = null;
 }
 
 /**
@@ -1150,7 +1183,7 @@ function applyIdleFloat(timeS, nowMs = performance.now()) {
 function createScene() {
   scene = new THREE.Scene();
   scene.background = buildSkyTexture();
-  scene.fog = new THREE.Fog(0xe2e8dc, 80, 450);
+  // Field units can span kilometres; distance fog would hide the crop colours.
 
   cameraPersp = new THREE.PerspectiveCamera(38, 1, 0.1, 10000);
   cameraPersp.position.set(0, 25, 35);
@@ -1162,10 +1195,10 @@ function createScene() {
 
   activeCamera = isTopView ? cameraOrtho : cameraPersp;
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x7a8560, 1.75);
+  const hemi = new THREE.HemisphereLight(0xeaf5ff, 0x617248, 2.1);
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xfff4df, 2.1);
+  const sun = new THREE.DirectionalLight(0xfffaf0, 2.8);
   sun.position.set(-28, 48, 24);
   scene.add(sun);
   scene.userData.sun = sun;
@@ -1180,7 +1213,8 @@ function createScene() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 3;
     sun.shadow.bias = -0.0006;
     sun.shadow.normalBias = 0.03;
   }
@@ -1248,30 +1282,16 @@ function fitPerspective(data) {
   if (!cameraPersp || !data) return;
   const b = outlineBounds(data.field.outlineM);
   const depth = currentBlock.depth || blockDepthM(b);
-  // Use computeFieldFraming for consistent ~85% width fill
-  const elevationDeg = 14;
-  const yawDeg = 10;
-  const margin = isPhone() ? 0.22 : 0.18;
-  
-  // Get framing that fills ~85% of viewport width
+  const elevationDeg = 36;
+  const yawDeg = 24;
   const framing = computeFieldFraming({
-    bounds: b,
-    aspect: hostAspect(),
-    fovDeg: cameraPersp.fov,
-    targetWidthRatio: 0.85,
-    elevationDeg,
-    yawDeg,
+    bounds: b, aspect: hostAspect(), fovDeg: cameraPersp.fov,
+    depthM: depth - currentBlock.topMin,
+    topM: currentBlock.topMax + Math.max(b.width, b.height) * 0.12,
+    targetWidthRatio: 0.88, elevationDeg, yawDeg,
   });
-
-  const distance = framing.distance * 0.92;
-  const el = (elevationDeg * Math.PI) / 180;
-  const yaw = (yawDeg * Math.PI) / 180;
-  const target = [framing.target[0], -depth * 0.45, framing.target[2]];
-  cameraPersp.position.set(
-    target[0] + Math.cos(el) * Math.sin(yaw) * distance,
-    target[1] + Math.sin(el) * distance,
-    target[2] + Math.cos(el) * Math.cos(yaw) * distance,
-  );
+  const { distance, target } = framing;
+  cameraPersp.position.set(...framing.position);
   cameraPersp.near = Math.max(0.05, distance * 0.02);
   cameraPersp.far = Math.max(200, distance * 8);
   cameraPersp.updateProjectionMatrix();
@@ -1616,8 +1636,8 @@ export async function mountPlanner3d(host, input) {
   const data = buildStudioData(input);
   const cropId = input.planner.crop === "rice" ? "aman" : input.planner.crop;
   // Planner owns the crop and spacing; no rotation or calendar selection applies.
-  data.months = [{ cropId, stage: cropId === "mustard" ? "mature" : "grow",
-    stageFraction: 1, canopyHeightM: FAO56_CROP_LIMITS[cropId].heightM }];
+  data.months = [{ cropId, stage: "grow",
+    stageFraction: 0.75, canopyHeightM: FAO56_CROP_LIMITS[cropId].heightM }];
   data.planner = { ...input.planner };
   const key = JSON.stringify([data.field.centroid, data.field.bboxLatLon, data.field.outlineM]);
   const refit = key !== elevationKey || host !== canvasHostEl;
@@ -1635,6 +1655,7 @@ export async function mountPlanner3d(host, input) {
   }
   if (token !== buildToken || !host.isConnected) return;
   
+  finishCropTransition();
   const oldCropId = currentData?.months[0]?.cropId;
   currentData = data;
   
@@ -1642,7 +1663,6 @@ export async function mountPlanner3d(host, input) {
   
   // Handle crop transition if crop changed
   if (oldCropId && oldCropId !== cropId) {
-    buildPlants(data);
     startCropTransition(oldCropId, cropId, data);
   } else {
     buildPlants(data);
@@ -1662,6 +1682,7 @@ export async function mountPlanner3d(host, input) {
 
 export function disposePlanner3d() {
   ++buildToken;
+  finishCropTransition();
   stopIntroAnimation(true);
   stopAnimation();
   if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
