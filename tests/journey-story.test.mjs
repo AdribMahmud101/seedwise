@@ -81,6 +81,7 @@ test('checklist state from plan + events per page', () => {
   assert.equal(checklist[1].id, 'plan-calendar');
   assert.equal(checklist[2].id, 'plan-task');
   assert.equal(checklist[3].id, 'plan-download');
+  assert.equal(checklist[1].done, false, 'calendar waits for the guide Next action');
 });
 
 test('Continue behaviour: incomplete triggers show-me target; complete allows handoff', () => {

@@ -103,20 +103,15 @@ export function initStoryListeners() {
       }
       renderCoach();
     }
-    // Check plan calendar viewed
-    if (target.closest('[data-plan-section="calendar"], .plan-calendar-wrap')) {
-      pageActivity.plan.calendarViewed = true;
-      renderCoach();
-    }
     // Check plan export/download clicked
-    if (target.closest('#plan-download, [data-action="export-html"], [data-plan-section="export"], [data-action="print"]')) {
+    if (event.isTrusted && target.closest('#plan-download, [data-action="export-html"], [data-plan-section="export"], [data-action="print"]')) {
       pageActivity.plan.downloaded = true;
       renderCoach();
     }
-    if (target.closest('#plan-seasons [role="tab"]')) pageActivity.planner.seasonOpened = true;
-    if (target.closest('[data-action="plan-confirm"]')) pageActivity.planner.seasonSaved = true;
-    if (target.closest('[data-journey="finish"]')) pageActivity.planner.seasonSaved = true;
-    if (target.closest('.plan-card:first-child [data-plans-action="open"]')) pageActivity.plan.opened = true;
+    if (event.isTrusted && target.closest('#plan-seasons [role="tab"]')) pageActivity.planner.seasonOpened = true;
+    if (event.isTrusted && target.closest('[data-action="plan-confirm"]')) pageActivity.planner.seasonSaved = true;
+    if (event.isTrusted && target.closest('[data-journey="finish"]')) pageActivity.planner.seasonSaved = true;
+    if (event.isTrusted && target.closest('.plan-card:first-child [data-plans-action="open"]')) pageActivity.plan.opened = true;
   }, { capture: true, passive: true });
 
   // Priority range inputs on #rotations
@@ -129,11 +124,11 @@ export function initStoryListeners() {
 
   // Checklist checkbox changes on #plan
   window.addEventListener('change', (event) => {
-    if (event.target?.matches('#plan-usable, #plan-usable-range, #plan-row, #plan-row-range, #plan-spacing, #plan-spacing-range, .plan-crops input')) {
+    if (event.isTrusted && event.target?.matches('#plan-usable, #plan-usable-range, #plan-row, #plan-row-range, #plan-spacing, #plan-spacing-range, .plan-crops input')) {
       pageActivity.planner.spacingChanged = true;
       renderCoach();
     }
-    if (event.target && (event.target.matches('#plan-checklist input[type="checkbox"], [data-plan-section="checklist"] input[type="checkbox"], .plan-checklist input[type="checkbox"]'))) {
+    if (event.isTrusted && event.target && (event.target.matches('#plan-checklist input[type="checkbox"], [data-plan-section="checklist"] input[type="checkbox"], .plan-checklist input[type="checkbox"]'))) {
       if (event.target.checked) {
         pageActivity.plan.taskChecked = true;
         renderCoach();
@@ -265,7 +260,7 @@ export function getPageChecklist(page = activePage) {
       done: plan?.steps.planting === 'done', target: '[data-journey="finish"]',
     });
   } else if (page === 'plans' || page === 'plan') {
-    const calendarDone = pageActivity.plan.calendarViewed || page === 'plan';
+    const calendarDone = pageActivity.plan.calendarViewed;
     const taskDone = pageActivity.plan.taskChecked;
     const downloadDone = pageActivity.plan.downloaded;
 
@@ -497,13 +492,20 @@ export function runHowtoShowMe(id) {
   coachCollapsed = false;
   renderCoach();
   if (typeof document === 'undefined') return;
-  const steps = step.micro.map(micro => ({
+  const onDone = id === 'plan-calendar' && (activePage === 'plan' || activePage === 'plans')
+    ? () => {
+      pageActivity.plan.calendarViewed = true;
+      renderCoach();
+    }
+    : undefined;
+  const steps = step.micro.map((micro, index) => ({
     target: micro.target,
     text: { en: micro.text.en, bn: micro.text.bn },
     action: micro.action,
     pose: 'pointing',
     timeout: 8000,
     inDialog: !!micro.inDialog,
+    onDone: index === step.micro.length - 1 ? onDone : undefined,
   }));
   guide.sequence(steps);
   watchGuideDialog(steps);
