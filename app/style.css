@@ -4061,3 +4061,20 @@ label.plan-import { cursor: pointer; }
   .plan-hero .plan-ribbon { overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
   .plan-hero .plan-ribbon .plan-chip { min-width: 118px; scroll-snap-align: start; }
 }
+
+/* Outlook fan + flood timeline: 320-unit viewBox. Cap the drawn width so labels stay ~10–15 px on screen. */
+.chart.outlook-fan,
+.chart.flood-timeline {
+  max-width: 520px;
+}
+.chart.outlook-fan svg,
+.chart.flood-timeline svg {
+  width: 100%;
+  height: auto;
+}
+.chart.outlook-fan text,
+.chart.flood-timeline text {
+  font-size: 9.5px !important;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  fill: #5f6f62;
+}
