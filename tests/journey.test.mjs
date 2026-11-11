@@ -247,6 +247,10 @@ test('all rotation calendars and counts match existing engine data, including Ne
       assert.equal(strategy.months[season.sowMonth - 1], calendarCrop);
       assert.equal(strategy.months[season.harvestMonth - 1], calendarCrop);
       const settings = journey.getPlan().planting[season.key];
+      if (season.crop === 'fallow') {
+        assert.equal(settings, undefined);
+        continue;
+      }
       const result = capacity(field().areaHa, settings.usableAreaPct, settings.crop,
         settings.crop === 'mustard' ? 0 : settings.rowSpacingCm / 100,
         settings.crop === 'mustard' ? 0 : settings.withinRowCm / 100);
@@ -292,6 +296,7 @@ test('field persistence and planner/rotation hooks preserve page state and sync 
     assert.equal(journey.getPlan().rotation.id, 'legume');
     assert.equal(getSelectedRotationId(), 'legume');
     const { setPlantCrop, plannerAction, planner } = await import('../src/legacy/planner.js');
+    plannerAction('plan-season', 'potato');
     state.planner.usable = 71;
     setPlantCrop('potato');
     assert.equal(journey.getPlan().planting.potato.usableAreaPct, 71);
