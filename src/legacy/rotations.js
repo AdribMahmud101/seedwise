@@ -167,7 +167,7 @@ function rankedCards() {
           <div class="rank-num">${String(i + 1).padStart(2, '0')}</div>
           <div>
             <div class="eyebrow">${r.id === 'baseline' ? t('Existing rotation', 'বর্তমান ফসলচক্র') : t(r.intent, r.bn)}</div>
-            <h2>${esc(t(r.crops.join(' → '), r.bnCrops?.join(' → ') || ''))} ${nasaBadge(['imerg', 'eto'])}</h2>
+            <h2>${esc(t(r.crops.join(' → '), r.bnCrops?.join(' → ') || ''))}</h2>
           </div>
           <div class="score">${r.score == null ? '—' : num(r.score)}<small>/100</small> ${r.score != null ? truth('SCENARIO') : ''}</div>
         </div>
@@ -177,7 +177,7 @@ function rankedCards() {
           <div><b>${t('What to check', 'কী দেখবেন')}</b><p>${esc(t(r.risk, riskBn[r.id]))}</p></div>
         </div>
         <div class="rotation-cost-badge">
-          <span>${t('Irrigation cost:', 'সেচ খরচ:')} <strong>৳${num(costTk)}</strong> / ${t('season', 'মৌসুম')} (${num(pumpHours, 1)} ${t('hrs @ 45,000 L/hr', 'ঘণ্টা @ ৪৫,০০০ লি/ঘণ্টা')}) ${truth('SCENARIO')}</span>
+          ${nasaBadge(['imerg', 'eto'])} <span>${t('Irrigation cost:', 'সেচ খরচ:')} <strong>৳${num(costTk)}</strong> / ${t('season', 'মৌসুম')} (${num(pumpHours, 1)} ${t('hrs @ 45,000 L/hr', 'ঘণ্টা @ ৪৫,০০০ লি/ঘণ্টা')}) ${truth('SCENARIO')}</span>
         </div>
         ${r.issues.length ? `<div class="rotation-warning">${tag(t('Needs review', 'যাচাই দরকার'), 'amber')} ${r.issues.map((v) => esc(t(v, issueBn[v]))).join(' ')}</div>` : ''}
         <details class="disclosure">
