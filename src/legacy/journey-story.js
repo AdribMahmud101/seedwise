@@ -121,7 +121,7 @@ export function getPageChecklist(page = activePage) {
   const items = [];
 
   if (page === 'field') {
-    // Field: ○ Check your plot on the map · ○ Check the area (0.09 ha) · ○ Set water & budget (Field constraints) · ○ Use this field
+    // Field: ○ Check your plot on the map · ○ Check the area (0.09 ha) · ○ Set irrigation & budget (Edit field assumptions) · ○ Use this field
     const mapChecked = pageActivity.field.mapChecked || !!(plan?.field);
     const areaChecked = pageActivity.field.areaChecked || !!(plan?.field?.areaHa);
     const constraintsSet = pageActivity.field.constraintsOpened || !!(plan?.field?.constraints && plan.field.constraints.budget && plan.field.constraints.irrigation);
@@ -144,7 +144,7 @@ export function getPageChecklist(page = activePage) {
     });
     items.push({
       id: 'field-constraints',
-      text: t('Set water & budget (Field constraints)', 'সেচ ও বাজেট ঠিক করুন (জমির শর্ত)'),
+      text: t('Set irrigation & budget (Edit field assumptions)', 'সেচ ও বাজেট ঠিক করুন (জমির তথ্য সম্পাদনা)'),
       done: constraintsSet,
       target: '[data-action="profile"], .field-bottom button',
     });
