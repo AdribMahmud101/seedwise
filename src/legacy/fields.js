@@ -474,10 +474,10 @@ function stats(months = field().monthly, period = "2024") {
   const defs = [
     [
       "wetness",
-      t("Wetness index (POWER, 0–1)", "আর্দ্রতা সূচক (POWER, ০–১)"),
-      "",
+      t("Soil wetness", "মাটির আর্দ্রতা"),
+      "index 0–1",
       "water",
-      t("NASA POWER · index from 0 to 1", "NASA POWER · সূচক ০ থেকে ১"),
+      t("POWER · index 0–1", "POWER · সূচক ০–১"),
       2,
       "MODELED",
       { source: "NASA POWER", date: f.custom ? `fetched ${retrievedDate}` : "2024", cell: "50km" },
@@ -487,13 +487,12 @@ function stats(months = field().monthly, period = "2024") {
   // Add SMAP tile if field is prepared
   const smapData = getSmapSurfaceForMonth(f.id, state.month);
   if (smapData) {
-    const statusLabel = smapData.status === "Dry" ? t("Dry", "শুষ্ক") : smapData.status === "Normal" ? t("Normal", "স্বাভাবিক") : t("Wet", "ভিজা");
     defs.push([
       "smap",
-      t("Soil water (SMAP)", "মাটির পানি (SMAP)"),
+      t("Soil water", "মাটির পানি"),
       "m³/m³",
       "water",
-      t("NASA SMAP L4 · 9 km", "NASA SMAP L4 · ৯ কিমি") + `<br><small>${statusLabel}</small>`,
+      t("SMAP L4 · 9 km", "SMAP L4 · ৯ কিমি"),
       2,
       "REMOTE_OBSERVED",
       { source: "NASA SMAP L4", date: "2024", cell: "9 km" },
@@ -502,8 +501,8 @@ function stats(months = field().monthly, period = "2024") {
     // For unprepared fields, add empty SMAP tile
     defs.push([
       "smap",
-      t("Soil water (SMAP)", "মাটির পানি (SMAP)"),
-      "",
+      t("Soil water", "মাটির পানি"),
+      "m³/m³",
       "water",
       t("Not prepared for this field", "এই জমির তথ্য প্রস্তুত নেই"),
       0,
@@ -525,7 +524,7 @@ function stats(months = field().monthly, period = "2024") {
     ],
     [
       "tmean",
-      t("Mean temperature", "গড় তাপমাত্রা"),
+      t("Temperature", "তাপমাত্রা"),
       "°C",
       "temp",
       t("POWER · monthly average", "POWER · মাসিক গড়"),
@@ -535,7 +534,7 @@ function stats(months = field().monthly, period = "2024") {
     ],
     [
       "et0",
-      t("Reference water use", "রেফারেন্স পানির চাহিদা"),
+      t("Water use", "পানির চাহিদা"),
       "mm",
       "sun",
       t("FAO-56 ETo · monthly total", "FAO-56 ETo · মাসের মোট"),
@@ -547,28 +546,29 @@ function stats(months = field().monthly, period = "2024") {
   
   return `<div class="data-row">${defs
     .map(([key, label, unit, symbol, foot, places, tag, opts]) => {
+      let value, values, color, badge = "", status = "";
       if (key === "smap") {
         // Special handling for SMAP tile
         if (!smapData) {
           // Empty state for unprepared fields
-          return `<article class="data-stat"><div class="stat-top">${label}${icon(symbol)}</div><div class="stat-value">—<small>${unit}</small></div>${spark(
-            Array(12).fill(null),
-            colors.wetness,
-          )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
+          values = Array(12).fill(null);
+          color = colors.wetness;
         } else {
           // SMAP tile with data - use 2024 monthly SFMC values for spark line
-          return `<article class="data-stat"><div class="stat-top">${label}${nasaBadge("smap")}${icon(symbol)}</div><div class="stat-value">${num(smapData.sfmc, places)}<small>${unit}</small></div>${spark(
-            smapData.monthly2024,
-            colors.smap,
-          )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
+          value = smapData.sfmc;
+          values = smapData.monthly2024;
+          color = colors.smap;
+          badge = nasaBadge("smap");
+          status = smapData.status === "Dry" ? t("Dry", "শুষ্ক") : smapData.status === "Normal" ? t("Normal", "স্বাভাবিক") : t("Wet", "ভিজা");
         }
       } else {
         // Regular tiles
-        return `<article class="data-stat"><div class="stat-top">${label}${Number.isFinite(m[key]) ? nasaBadge({ wetness: "wetness", rainGpm: "imerg", tmean: "power", et0: "eto" }[key], f.custom ? `2024 · ${t("retrieved", "সংগৃহীত")} ${retrievedDate}` : period) : ""}${icon(symbol)}</div><div class="stat-value">${num(m[key], places)}<small>${unit}</small></div>${spark(
-          months.map((v) => v[key]),
-          colors[key],
-        )}<div class="stat-foot">${foot}${tag ? " " + truth(tag, opts) : ""}</div></article>`;
+        value = m[key];
+        values = months.map((v) => v[key]);
+        color = colors[key];
+        badge = Number.isFinite(value) ? nasaBadge({ wetness: "wetness", rainGpm: "imerg", tmean: "power", et0: "eto" }[key], f.custom ? `2024 · ${t("retrieved", "সংগৃহীত")} ${retrievedDate}` : period) : "";
       }
+      return `<article class="data-stat"><div class="stat-top"><span>${label}</span>${icon(symbol)}</div><div class="stat-badge">${badge}</div><div class="stat-value"><span class="stat-number">${num(value, places)}<small>${unit}</small></span>${status ? `<span class="stat-status">${status}</span>` : ""}</div><div class="stat-spark">${spark(values, color)}</div><div class="stat-foot"><span class="stat-source" title="${esc(foot)}">${foot}</span><div class="stat-truth">${tag ? truth(tag, opts) : ""}</div></div></article>`;
     })
     .join("")}</div>`;
 }
