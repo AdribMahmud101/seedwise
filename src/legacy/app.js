@@ -1,5 +1,8 @@
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
-import { getPlan } from './journey.js';
+import { getPlan, listPlans, openPlan, approveRefinement, restorePreviousPlan } from './journey.js';
+import { requestReplay } from './plan-pipeline.js';
+import { parseRoute } from './routes.js';
+import { notificationId, mergeNotifications, unreadCount, readNotificationState, writeNotificationState, visibleNotifications } from './notifications.js';
 import { runShowMe } from './journey-story.js';
 import { plan, mountPlan, disposePlan, planAction, planChange } from './plan.js';
 import { plans, mountPlans, disposePlans, plansAction } from './plans.js';
@@ -10,6 +13,8 @@ import {
   state,
   earth,
   agronomy,
+  outlook,
+  floodFields,
   loadData,
   persist,
   t,
@@ -66,6 +71,8 @@ import {
   researchChange,
   researchSubmit,
 } from "./research.js";
+import { deriveChecklist } from './plan.js';
+import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 
 const pages = [
   ["field", "My field", "আমার জমি", home],
@@ -79,8 +86,93 @@ const pages = [
   ["plan", "Your plan", "আপনার পরিকল্পনা", plan],
   ["research", "Research lab", "গবেষণাগার", research],
 ];
+function route() {
+  const parsed = parseRoute(location.hash);
+  return { ...parsed, page: pages.find(p => p[0] === parsed.page) || pages[0] };
+}
 function page() {
-  return pages.find((p) => p[0] === location.hash.slice(1)) || pages[0];
+  return route().page;
+}
+const bellIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>';
+function panelHtml(items, store) {
+  const shown = visibleNotifications(items, store);
+  return `<section class="notification-panel" role="dialog" aria-label="${t('Notifications', 'বিজ্ঞপ্তি')}" tabindex="-1"><header><strong>${t('Notifications', 'বিজ্ঞপ্তি')}</strong><button data-notify="read-all">${t('Mark all read', 'সব পড়া হয়েছে')}</button></header>${shown.length ? `<ul>${shown.map(item => `<li class="notification-item ${store.read[item.id] ? '' : 'unread'}"><span class="notification-type">${item.type === 'disaster' ? '◈' : item.type === 'refine' ? '✦' : '✓'}</span><div class="notification-copy"><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><small>${relativeTime(item.createdAt)}</small>${item.type === 'refine' ? `<div class="refine-review">${(item.changes || []).map(change => `<p><b>${t('Season', 'মৌসুম')} ${change.season + 1}</b></p><div class="refine-compare"><div><small>${t('Current', 'বর্তমান')}</small><p>${esc(change.current || change.from)}</p></div><div><small>${t('Suggested', 'প্রস্তাবিত')}</small><p>${esc(change.suggested || change.to)}</p></div></div><p>${esc(change.why)}</p>`).join('')}<p>${t('Confidence', 'নিশ্চয়তা')}: ${esc(item.confidence || '')}</p><p>${(item.evidence || []).map(source => `<a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a>`).join(' · ')}</p><div><button data-notify="approve" data-id="${esc(item.id)}">${t('Approve', 'অনুমোদন')}</button><button data-notify="later" data-id="${esc(item.id)}">${t('Not now', 'এখন নয়')}</button></div></div>` : ''}<a href="#${esc(item.href)}" data-notify="open" data-id="${esc(item.id)}">${esc(item.cta)}</a></div><button class="notification-dismiss" data-notify="dismiss" data-id="${esc(item.id)}" aria-label="${t('Dismiss', 'বন্ধ করুন')}">×</button></li>`).join('')}</ul>` : `<p class="notification-empty">${t('Planty has nothing new for you yet. Keep growing!', 'প্ল্যান্টির নতুন কিছু নেই। এগিয়ে চলুন!')}</p>`}</section>`;
+}
+function relativeTime(value) {
+  const days = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 86400000));
+  if (!days) return t('Today', 'আজ');
+  return t(`${days} day${days === 1 ? '' : 's'} ago`, `${days} দিন আগে`);
+}
+function offerUndo(id) {
+  document.querySelector('.notification-undo')?.remove();
+  const button = document.createElement('button');
+  button.className = 'notification-undo';
+  button.textContent = t('Plan updated · Undo', 'পরিকল্পনা বদলেছে · ফিরিয়ে নিন');
+  button.onclick = () => {
+    if (restorePreviousPlan(id)) { requestReplay(); location.hash = `plan/${encodeURIComponent(id)}?refresh=${Date.now()}`; }
+    button.remove();
+  };
+  document.body.append(button);
+  setTimeout(() => button.remove(), 10000);
+}
+function renderNotifications() {
+  const button = document.querySelector('.notification-bell');
+  if (!button) return;
+  const store = readNotificationState();
+  const count = unreadCount(store.cache.items || [], store);
+  button.setAttribute('aria-label', t(`Notifications, ${count} unread`, `বিজ্ঞপ্তি, ${count}টি অপঠিত`));
+  const badge = button.querySelector('.notification-badge');
+  badge.textContent = count > 9 ? '9+' : count ? String(count) : '';
+  badge.hidden = count === 0;
+  const host = document.querySelector('.notification-host');
+  if (host?.classList.contains('open')) host.innerHTML = panelHtml(store.cache.items || [], store);
+}
+function relativeTask(plan, today = new Date()) {
+  return deriveChecklist(plan, null).filter(item => !plan.checklist?.[item.id]).map(item => {
+    const season = plan.rotation.seasons.find(s => item.id === `sow-${s.key}`);
+    const target = season ? new Date(today.getFullYear(), season.sowMonth - 1, 1) : today;
+    const days = Math.ceil((target - today) / 86400000);
+    return { item, season, days };
+  }).sort((a, b) => (a.days < 0 ? 1000 + Math.abs(a.days) : a.days) - (b.days < 0 ? 1000 + Math.abs(b.days) : b.days))[0];
+}
+async function refreshNotifications() {
+  const store = readNotificationState(), date = new Date().toISOString().slice(0, 10);
+  const entries = listPlans(), incoming = [], field = state.fieldId, name = fieldName(field);
+  try {
+    const response = await fetch(`/api/daily-brief?field=${encodeURIComponent(field)}`);
+    if (response.ok) {
+      const brief = await response.json();
+      incoming.push({ id: notificationId('disaster', brief.date, field), type: 'disaster', createdAt: `${brief.date}T00:00:00Z`, title: t(`Today's disaster outlook for ${name}: ${brief.headline}`, `আজ ${name}-এর দুর্যোগ পূর্বাভাস: ${brief.headline}`), body: brief.fallback ? t('Using prepared outlook and flood data.', 'প্রস্তুত আউটলুক ও বন্যার তথ্য দেখানো হচ্ছে।') : t('Daily model update is ready.', 'দৈনিক মডেল হালনাগাদ প্রস্তুত।'), cta: t('See analytics', 'বিশ্লেষণ দেখুন'), href: entries.length ? `plan/${encodeURIComponent(entries[0].id)}` : 'recovery' });
+    }
+  } catch { /* no fabricated alert */ }
+  const next = entries.map(entry => ({ entry, task: relativeTask(entry.plan) })).filter(x => x.task).sort((a, b) => a.task.days - b.task.days)[0];
+  if (next) {
+    const { entry, task } = next, due = task.days < 0 ? t('overdue', 'বাকি') : task.days === 0 ? t('today', 'আজ') : t(`in ${task.days} days`, `${task.days} দিনে`);
+    incoming.push({ id: notificationId('task', date, entry.id), type: 'task', createdAt: `${date}T00:00:00Z`, title: t('Next task in your plan', 'আপনার পরিকল্পনার পরের কাজ'), body: `${t(task.item.en, task.item.bn)} (${due})`, cta: t('Open plan', 'পরিকল্পনা খুলুন'), href: `plan/${encodeURIComponent(entry.id)}?section=plan-checklist` });
+  } else if (!entries.length) incoming.push({ id: notificationId('task', date), type: 'task', createdAt: `${date}T00:00:00Z`, title: t('Make your first plan', 'প্রথম পরিকল্পনা করুন'), body: t('Planty can help shape a plan for your field.', 'প্ল্যান্টি আপনার জমির পরিকল্পনায় সাহায্য করবে।'), cta: t('Open field', 'জমি দেখুন'), href: 'field' });
+  for (const entry of entries) {
+    const cacheKey = `refine:${date}:${entry.id}`;
+    if (Date.parse(store.cache[`refineDismissed:${entry.id}`] || '') > Date.now()) continue;
+    if (Object.hasOwn(store.cache, cacheKey)) { if (store.cache[cacheKey]) incoming.push(store.cache[cacheKey]); continue; }
+    try {
+      const response = await fetch('/api/rotation-advisor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: state.lang, mode: 'refine', crops: Object.values(entry.plan.planting).map(p => p.crop), plan: entry.plan, context: { fieldId: entry.plan.field.id, fieldName: entry.plan.field.name, areaHa: entry.plan.field.areaHa, outlook: outlookSummaryLine(entry.plan.field.id, outlook) || '', flood: floodSummaryLine(entry.plan.field.id, floodFields) || '' } }) });
+      if (!response.ok) continue;
+      const result = await response.json();
+      if (result.verdict !== 'refine') { store.cache[cacheKey] = null; continue; }
+      const changes = result.changes.map(change => {
+        const season = entry.plan.rotation.seasons[change.season], planting = result.newPlanting[change.season];
+        const settings = season && entry.plan.planting[season.key];
+        const months = season ? `${monthName(season.sowMonth - 1, true)}–${monthName(season.harvestMonth - 1, true)}` : '';
+        return { ...change, current: season ? `${season.crop} · ${months}${settings ? ` · ${settings.rowSpacingCm}×${settings.withinRowCm} cm` : ''}` : change.from,
+          suggested: `${planting?.crop || change.to}${planting ? ` · ${planting.rowSpacingCm}×${planting.withinRowCm} cm` : ''}` };
+      });
+      const item = { id: notificationId('refine', date, entry.id), type: 'refine', createdAt: `${date}T00:00:00Z`, title: t(`Planty suggests a better plan for ${entry.plan.field.name}`, `প্ল্যান্টি ${entry.plan.field.name}-এর জন্য ভালো পরিকল্পনা দিয়েছে`), body: t('Review crop changes and evidence before approval.', 'অনুমোদনের আগে ফসলের পরিবর্তন ও তথ্যসূত্র দেখুন।'), cta: t('Review suggestion', 'প্রস্তাব দেখুন'), href: `plan/${encodeURIComponent(entry.id)}`, planId: entry.id, changes, newPlanting: result.newPlanting, evidence: result.evidence, confidence: result.confidence };
+      store.cache[cacheKey] = item; incoming.push(item);
+    } catch { /* offline/API failure means no item */ }
+  }
+  store.cache.items = mergeNotifications(store.cache.items || [], incoming);
+  writeNotificationState(store);
+  renderNotifications();
 }
 function evidence() {
   modal(
@@ -107,7 +199,7 @@ function render() {
   document.querySelector("#app").innerHTML =
     `<a href="#main-content" class="skip">${t("Skip to content", "মূল অংশে যান")}</a><aside class="sidebar"><a class="brand" href="#field"><img src="/assets/mark.svg" alt=""><div><strong>SeedWise</strong></div></a><div class="nav-label">${t("FIELD WORKSPACE", "জমির কাজ")}</div><nav aria-label="${t("Workspace", "কর্মক্ষেত্র")}">${nav}</nav>
  <div class="side-bottom"><div class="region-mark"><i class="status-dot"></i><strong>${t("Rangpur field lab", "রংপুর মাঠ গবেষণা")}</strong></div><p>${t("Bangladesh · Three prepared sites", "বাংলাদেশ · তিনটি প্রস্তুত স্থান")}</p><div class="sidebar-foot"><span>24°–27° N</span><span>FIELD EDITION 01</span></div></div></aside><button class="nav-shade" data-action="menu" aria-label="${t("Close navigation", "মেনু বন্ধ করুন")}"></button>
- <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
+ <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="notification-host"><button class="notification-bell" aria-expanded="false">${bellIcon}<span class="notification-badge" hidden></span></button></div><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
  <div id="journey-bar-slot">${journeyBar(current[0])}</div>
  <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
   if (current[0] === "seasons") mountSeasonCharts();
@@ -129,6 +221,9 @@ function render() {
   } else {
     disposeLandscape();
   }
+  renderNotifications();
+  if (current[0] === 'plan' && route().param && location.hash.includes('?section=plan-checklist'))
+    requestAnimationFrame(() => document.querySelector('#plan-checklist')?.scrollIntoView({ behavior: 'smooth' }));
 }
 function navigate(id) {
   if (location.hash === "#" + id) {
@@ -142,6 +237,33 @@ initNasaBadges();
 document.addEventListener("click", (event) => {
   const el = event.target.closest("button,a");
   if (!el) return;
+  if (el.classList.contains('notification-bell')) {
+    const host = document.querySelector('.notification-host');
+    host.classList.toggle('open');
+    el.setAttribute('aria-expanded', String(host.classList.contains('open')));
+    if (host.classList.contains('open')) { renderNotifications(); host.querySelector('.notification-panel')?.focus(); }
+    return;
+  }
+  if (el.dataset.notify) {
+    const store = readNotificationState(), id = el.dataset.id;
+    const item = store.cache.items?.find(value => value.id === id);
+    if (el.dataset.notify === 'read-all') for (const item of store.cache.items || []) store.read[item.id] = true;
+    if (el.dataset.notify === 'dismiss' || el.dataset.notify === 'later') {
+      const expires = new Date(Date.now() + (el.dataset.notify === 'later' ? 7 : 30) * 86400000).toISOString();
+      store.dismissed[id] = expires;
+      if (el.dataset.notify === 'later' && item?.planId) store.cache[`refineDismissed:${item.planId}`] = expires;
+    }
+    if (el.dataset.notify === 'open') store.read[id] = true;
+    if (el.dataset.notify === 'approve') {
+      const saved = listPlans().find(value => value.id === item?.planId);
+      try { if (saved && approveRefinement(saved.id, item.changes, item.newPlanting)) { store.read[id] = true; requestReplay(); offerUndo(saved.id); location.hash = `plan/${encodeURIComponent(saved.id)}?refresh=${Date.now()}`; } }
+      catch { /* invalid suggestions stay unapproved */ }
+    }
+    writeNotificationState(store);
+    renderNotifications();
+    if (el.dataset.notify === 'open') document.querySelector('.notification-host')?.classList.remove('open');
+    return;
+  }
   if (el.dataset.journey) {
     event.preventDefault();
     void journeyAction(el.dataset.journey, el.dataset.value);
@@ -285,12 +407,26 @@ document.querySelector("#modal").addEventListener("click", (event) => {
   }
 });
 document.addEventListener("keydown", (e) => {
+  const host = document.querySelector('.notification-host.open');
+  if (e.key === 'Escape' && host) { host.classList.remove('open'); document.querySelector('.notification-bell')?.focus(); }
+  if (e.key === 'Tab' && host) {
+    const focusable = [...host.querySelectorAll('button,a[href]')];
+    if (focusable.length && e.shiftKey && document.activeElement === focusable[0]) { e.preventDefault(); focusable.at(-1).focus(); }
+    else if (focusable.length && !e.shiftKey && document.activeElement === focusable.at(-1)) { e.preventDefault(); focusable[0].focus(); }
+  }
   if (e.key === "Escape")
     document.querySelector(".sidebar")?.classList.remove("open");
 });
+document.addEventListener('click', event => {
+  const host = document.querySelector('.notification-host.open');
+  if (host && !host.contains(event.target)) { host.classList.remove('open'); document.querySelector('.notification-bell')?.setAttribute('aria-expanded', 'false'); }
+});
 window.addEventListener("hashchange", () => {
+  const currentRoute = route();
+  if (currentRoute.page[0] === 'plan' && currentRoute.param) openPlan(currentRoute.param);
   render();
   window.scrollTo(0, 0);
+  refreshNotifications();
 });
 window.addEventListener("workspace-render", render);
 window.addEventListener("resize", () => {
@@ -299,7 +435,10 @@ window.addEventListener("resize", () => {
 async function start() {
   try {
     await loadData();
+    const currentRoute = route();
+    if (currentRoute.page[0] === 'plan' && currentRoute.param) openPlan(currentRoute.param);
     render();
+    refreshNotifications();
   } catch (error) {
     console.error(error);
     document.querySelector("#app").innerHTML = stateError(
@@ -310,6 +449,9 @@ async function start() {
   }
 }
 start();
+setInterval(() => { if (document.visibilityState === 'visible') refreshNotifications(); }, 30 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshNotifications(); });
+window.addEventListener('ropon:plan', refreshNotifications);
 // In-app browsers resume tabs for days without reloading, so a resumed tab can run an old build.
 // When the tab comes back, compare the deployed build with the one this page loaded and refresh.
 let loadedBuild = null;

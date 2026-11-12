@@ -61,6 +61,17 @@ test('repeated planner saves update the same custom plan and retain its renamed 
   assert.equal(journey.listPlans()[0].name, 'My maize');
 });
 
+test('refinement approval updates custom crop data and supports undo', () => {
+  const first = saveCustomPlan();
+  const approved = journey.approveRefinement(first.id, [{ season: 0, from: 'Maize', to: 'Sorghum', why: 'Fits the field' }], [
+    { crop: 'Sorghum', model: 'maize', color: '#3f7f3a', fruitColor: null, heightM: 1.2,
+      rowSpacingCm: 80, withinRowCm: 30, sharePct: 60 },
+  ]);
+  assert.equal(approved.plan.rotation.customPlan.planting[0].crop, 'Sorghum');
+  assert.equal(approved.plan.rotation.customPlan.needsRecheck, false);
+  assert.equal(journey.restorePreviousPlan(first.id).plan.rotation.customPlan.planting[0].crop, 'Maize');
+});
+
 test('Open restores the saved field, calendar, spacing, split and custom 3D; edits save as draft', () => {
   const first = saveCustomPlan();
   localStorage.removeItem('ropon_custom_plan_v1');

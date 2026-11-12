@@ -158,7 +158,7 @@ async function readBody(request) {
 
 
 // ---- /api/rotation-advisor: AI decision helper for custom crops (grounded in public/data/agronomy.json) ----
-const ADVISOR_MODES = new Set(['rotation', 'single', 'mixed', 'orchard']);
+const ADVISOR_MODES = new Set(['rotation', 'single', 'mixed', 'orchard', 'refine']);
 const ADVISOR_VERDICTS = new Set(['recommended', 'possible_with_conditions', 'not_suitable']);
 const ADVISOR_STAGES = new Set(['sow', 'grow', 'harvest', 'fallow', 'orchard']);
 const ADVISOR_MODELS = new Set(['tree', 'shrub', 'herb', 'grass', 'vine', 'rice', 'potato', 'mustard', 'mungbean', 'wheat', 'maize']);
@@ -316,12 +316,30 @@ export function normaliseAdvice(parsed, sources) {
   };
 }
 
+export function normaliseRefinement(parsed, sources = []) {
+  if (!parsed || !['keep', 'refine'].includes(parsed.verdict)) return null;
+  const ids = new Set((sources || []).map(source => source.id));
+  const changes = (Array.isArray(parsed.changes) ? parsed.changes : []).slice(0, 12).flatMap(change => {
+    if (!change || !Number.isInteger(change.season) || change.season < 0 || change.season > 11 ||
+        typeof change.from !== 'string' || typeof change.to !== 'string' || typeof change.why !== 'string') return [];
+    return [{ season: change.season, from: change.from.slice(0, 80), to: change.to.slice(0, 80), why: change.why.slice(0, 240) }];
+  });
+  if (parsed.verdict === 'refine' && !changes.length) return null;
+  return { verdict: parsed.verdict, changes,
+    newPlanting: normalisePlanting(parsed.newPlanting),
+    evidence: cleanList(parsed.evidence, 6, 80).filter(id => ids.has(id)).map(id => {
+      const source = sources.find(item => item.id === id);
+      return { id, title: source.title, url: source.url };
+    }),
+    confidence: ['low', 'medium', 'high'].includes(parsed.confidence) ? parsed.confidence : 'low' };
+}
+
 export function sanitizeAdvisorRequest(body) {
   if (!body || typeof body !== 'object' || !['en', 'bn'].includes(body.lang) || !ADVISOR_MODES.has(body.mode)) return null;
   const crops = Array.isArray(body.crops)
     ? [...new Set(body.crops.filter(c => typeof c === 'string').map(c => c.trim().slice(0, 40)).filter(Boolean))].slice(0, 5)
     : [];
-  if (!crops.length) return null;
+  if (!crops.length && body.mode !== 'refine') return null;
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
   const context = {};
   const ctx = body.context && typeof body.context === 'object' && !Array.isArray(body.context) ? body.context : {};
@@ -331,7 +349,9 @@ export function sanitizeAdvisorRequest(body) {
     else if (typeof v === 'number' && Number.isFinite(v) && v >= 0) context[key] = v;
   }
   const category = ADVISOR_CATEGORIES.has(body.category) ? body.category : null;
-  return { lang: body.lang, mode: body.mode, category, crops, notes, context };
+  if (body.mode === 'refine' && (!body.plan || typeof body.plan !== 'object' || Array.isArray(body.plan))) return null;
+  return { lang: body.lang, mode: body.mode, category, crops, notes, context,
+    ...(body.mode === 'refine' ? { plan: sanitizePlan(body.plan) } : {}) };
 }
 
 async function rotationAdvisor(request, env, url) {
@@ -360,6 +380,25 @@ async function rotationAdvisor(request, env, url) {
   const tolerant = await loadTolerant(env, url.origin);
   const tolerantNote = tolerantShortlist(req.crops,
     tolerantHazards([req.context.outlook, req.context.flood, req.notes].filter(Boolean).join(' ')), tolerant);
+  if (req.mode === 'refine') {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35000);
+    try {
+      const response = await fetch('https://api.meta.ai/v1/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.MUSE_API_KEY}` }, signal: controller.signal,
+        body: JSON.stringify({ model: env.PLANTY_MODEL || 'muse-ember-1.0', max_tokens: 1600, reasoning_effort: 'low', temperature: 0.2,
+          messages: [
+            { role: 'system', content: `You are Planty. Review this saved Rangpur farm plan against its field, outlook, flood context and supplied agronomy evidence. Keep it unless a specific better crop, fruit, variety or spacing fits better. Never invent measurements, yields, prices or doses. Cite only supplied source ids. Return one JSON object in ${req.lang === 'bn' ? 'Bengali' : 'English'}: {"verdict":"keep|refine","changes":[{"season":0,"from":"current crop or spacing","to":"suggested crop or spacing","why":"reason"}],"newPlanting":[{"crop":"name","model":"tree|shrub|herb|grass|vine|rice|potato|mustard|mungbean|wheat|maize","rowSpacingCm":40,"withinRowCm":30,"sharePct":100}],"evidence":["source-id"],"confidence":"low|medium|high"}. season is zero-based rotation row. For verdict refine, provide at least one change.` },
+            { role: 'user', content: JSON.stringify({ plan: req.plan, context: req.context, research }) },
+          ] }),
+      });
+      if (!response.ok) return json({ error: 'unavailable' }, 503);
+      const data = await response.json();
+      const result = normaliseRefinement(parseModelJson(data?.choices?.[0]?.message?.content || ''), research?.sources);
+      return result ? json(result) : json({ error: 'unavailable' }, 503);
+    } catch { return json({ error: 'unavailable' }, 503); }
+    finally { clearTimeout(timeout); }
+  }
   const system = `You are Planty's crop decision helper for smallholder farmers in Rangpur, Bangladesh (Tista Meander Floodplain, humid subtropical monsoon: hot wet Jun–Oct, cool dry Nov–Feb, hot pre-monsoon Mar–May; low-lying fields can flood or waterlog in monsoon).
 The farmer proposes crops (mode: rotation = seasons in one year on the same field; single = one crop only; mixed = intercrop/hybrid on the same field; orchard = perennial fruit trees).
 Your job: judge suitability for THIS field honestly and build the best 12-month plan if it is reasonable.
@@ -398,10 +437,75 @@ For "planting": one entry per crop in YOUR recommended plan (empty if not_suitab
   }
 }
 
+const DAILY_FIELDS = ['mithapukur', 'pirganj', 'gangachara'];
+const FLOOD_URL = 'https://adribmahmud101--ropon-flood-flood.us-east.modal.run';
+const OUTLOOK_URL = 'https://adribmahmud101--ropon-outlook-outlook.us-east.modal.run';
+
+async function dailyBrief(field, env, date = new Date().toISOString().slice(0, 10)) {
+  if (!DAILY_FIELDS.includes(field)) return null;
+  const key = `${date}:${field}`;
+  const stored = await env.DAILY_BRIEF?.get(key, 'json');
+  if (stored) return stored;
+  const call = async (url, param) => {
+    try {
+      const response = await fetch(`${url}?${param}=${encodeURIComponent(field)}`, { signal: AbortSignal.timeout(30000) });
+      return response.ok ? await response.json() : null;
+    } catch { return null; }
+  };
+  let [flood, outlook] = await Promise.all([call(FLOOD_URL, 'field'), call(OUTLOOK_URL, 'site')]);
+  let fallback = false;
+  if (!flood || !outlook) {
+    try {
+      const origin = 'https://daily-brief.invalid';
+      const [floodPack, outlookPack] = await Promise.all([
+        env.ASSETS.fetch(new Request(`${origin}/data/flood-fields.json`)).then(r => r.json()),
+        env.ASSETS.fetch(new Request(`${origin}/data/outlook.json`)).then(r => r.json()),
+      ]);
+      flood ||= floodPack.fields?.[field] || null;
+      outlook ||= outlookPack.sites?.[field] || null;
+      fallback = true;
+    } catch { /* no prepared pack */ }
+  }
+  if (!flood && !outlook) return null;
+  const floodSite = flood?.fields?.[field] || flood;
+  const floodText = typeof flood?.headline === 'string' ? flood.headline : typeof flood?.summary === 'string' ? flood.summary : (() => {
+    const scenes = Array.isArray(floodSite?.scenes) ? floodSite.scenes : [];
+    const values = scenes.map(scene => scene?.water_fraction_buffer300m).filter(Number.isFinite);
+    const years = Object.keys(floodSite?.summary || {}).filter(year => /^\d{4}$/.test(year)).sort();
+    const span = years.length ? `${years[0]}–${years.at(-1)}` : '';
+    if (values.length && span) return Math.max(...values) < 0.01 ? `No standing water seen on clear satellite days in ${span}` : `Standing water seen near field on clear satellite days in ${span}`;
+    return '';
+  })();
+  const outlookSite = outlook?.sites?.[field] || outlook;
+  const rain = outlookSite?.rain_mm_day;
+  let outlookText = typeof outlook?.headline === 'string' ? outlook.headline : typeof outlook?.summary === 'string' ? outlook.summary : '';
+  if (!outlookText && rain?.beats_climatology === true && Array.isArray(rain.months) && rain.months.length) {
+    const forecast = rain.months.reduce((sum, month) => sum + (Number.isFinite(month.p50) ? month.p50 : 0), 0);
+    const usual = rain.months.reduce((sum, month) => sum + (Number.isFinite(month.climatology) ? month.climatology : 0), 0);
+    const verdict = usual <= 0 ? (forecast > 0 ? 'above' : 'near') : forecast / usual >= 1.2 ? 'above' : forecast / usual <= 0.8 ? 'below' : 'near';
+    const span = `${rain.months[0].month}–${rain.months.at(-1).month}`;
+    outlookText = `Rain outlook ${span}: ${verdict} usual`;
+  }
+  const headline = [floodText, outlookText].filter(Boolean).join(' · ') || (fallback ? 'Prepared model data has no summary line' : 'Model data has no summary line');
+  const level = flood?.level || flood?.risk || flood?.hazard || null;
+  const result = { date, field, flood, outlook, headline, level, fallback };
+  await env.DAILY_BRIEF?.put(key, JSON.stringify(result), { expirationTtl: 172800 });
+  return result;
+}
+
 export default {
+  async scheduled(_event, env, ctx) {
+    const date = new Date().toISOString().slice(0, 10);
+    ctx.waitUntil(Promise.all(DAILY_FIELDS.map(field => dailyBrief(field, env, date))));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (url.pathname === '/api/daily-brief') {
+      if (request.method !== 'GET') return json({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
+      const result = await dailyBrief(url.searchParams.get('field'), env);
+      return result ? json(result) : json({ error: 'unavailable' }, 503);
+    }
     if (url.pathname === '/api/rotation-advisor') return rotationAdvisor(request, env, url);
     if (url.pathname !== '/api/planty' && url.pathname !== '/api/plan-summary') return json({ error: 'not_found' }, 404);
     const planSummary = url.pathname === '/api/plan-summary';

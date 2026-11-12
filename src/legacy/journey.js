@@ -451,6 +451,7 @@ function validateSavedEntry(entry) {
   try {
     const plan = validatePlan(entry.plan);
     if (plan.mode === 'demo' || !plan.field) return null;
+    const previousVersion = entry.previousVersion ? validatePlan(entry.previousVersion) : null;
     return {
       id: entry.id,
       name: entry.name,
@@ -458,6 +459,7 @@ function validateSavedEntry(entry) {
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       plan,
+      ...(previousVersion ? { previousVersion } : {}),
     };
   } catch {
     return null;
@@ -515,7 +517,7 @@ export function getSavedPlan(id) {
   return list.find(item => item.id === id) || null;
 }
 
-export function savePlan(planToSave, { status = 'draft', name } = {}) {
+export function savePlan(planToSave, { status = 'draft', name, keepPrevious = false, checkerApproved = false } = {}) {
   if (!planToSave?.field || planToSave.mode === 'demo') return null;
   const validated = validatePlan(copy(planToSave));
   const custom = validated.rotation?.customPlan;
@@ -530,7 +532,7 @@ export function savePlan(planToSave, { status = 'draft', name } = {}) {
   const now = new Date().toISOString();
   const list = listPlans();
   const index = list.findIndex(item => item.id === validated.id);
-  if (custom && index >= 0 && !same(customPlanInputs(validated), customPlanInputs(list[index].plan))) {
+  if (custom && index >= 0 && !checkerApproved && !same(customPlanInputs(validated), customPlanInputs(list[index].plan))) {
     status = 'draft';
     custom.needsRecheck = true;
   }
@@ -543,6 +545,8 @@ export function savePlan(planToSave, { status = 'draft', name } = {}) {
     createdAt: index >= 0 ? list[index].createdAt : validated.createdAt || now,
     updatedAt: now,
     plan: copy(validated),
+    ...(index >= 0 && list[index].previousVersion ? { previousVersion: copy(list[index].previousVersion) } :
+      index >= 0 && keepPrevious ? { previousVersion: copy(list[index].plan) } : {}),
   };
   const validEntry = validateSavedEntry(entry);
   if (!validEntry) throw new TypeError('Cannot save invalid plan');
@@ -552,12 +556,67 @@ export function savePlan(planToSave, { status = 'draft', name } = {}) {
     list.unshift(validEntry);
   }
   if (!writeSavedListRaw(list)) throw new Error('Could not save plan');
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try { window.dispatchEvent(new CustomEvent('ropon:plan', { detail: copy(validated) })); } catch { /* storage save must not depend on observers */ }
+  }
   if (validEntry.status === 'ready') {
     globalThis.sessionStorage?.setItem(READY_PLAN_KEY, validEntry.id);
     globalThis.sessionStorage?.removeItem('ropon_ready_strip_dismissed');
     if (current?.id === validEntry.id) resetPlan();
   }
   return validEntry;
+}
+
+export function approveRefinement(id, changes, newPlanting = []) {
+  const entry = getSavedPlan(id);
+  if (!entry || !Array.isArray(changes)) return null;
+  const plan = copy(entry.plan);
+  for (const change of changes) {
+    const season = plan.rotation.seasons[change.season];
+    const settings = season && plan.planting[season.key];
+    if (!settings) continue;
+    const text = `${change.to || ''}`.toLowerCase();
+    const crop = ['boro', 'aman', 'mustard', 'potato', 'mungbean'].find(name => text.includes(name));
+    const proposal = newPlanting[change.season];
+    if (plan.rotation.customPlan && proposal?.crop) {
+      const custom = plan.rotation.customPlan, previous = custom.planting[change.season];
+      custom.planting[change.season] = { ...previous, ...proposal };
+      custom.calendar = custom.calendar.map(month => ({ ...month, crop: typeof month.crop === 'string'
+        ? month.crop.replaceAll(previous.crop, proposal.crop) : month.crop }));
+      custom.needsRecheck = false;
+      season.crop = proposal.crop;
+      season.cropBn = proposal.crop;
+      settings.crop = proposal.crop;
+      settings.source = 'ai';
+      settings.sharePct = proposal.sharePct;
+      settings.rowSpacingCm = proposal.rowSpacingCm;
+      settings.withinRowCm = proposal.withinRowCm;
+    } else if (crop) {
+      season.crop = crop;
+      settings.crop = ['boro', 'aman'].includes(crop) ? 'rice' : crop;
+    } else if (!plan.rotation.customPlan && !/\d+\s*[×x]\s*\d+/.test(text)) {
+      settings.variety = text.slice(0, 80);
+    }
+    const spacing = text.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/i);
+    if (spacing) {
+      settings.rowSpacingCm = Number(spacing[1]);
+      settings.withinRowCm = Number(spacing[2]);
+    }
+    settings.counts = countsFor(plan.field, settings);
+  }
+  plan.plan = { version: VERSION, generatedAt: null };
+  plan.steps.plan = 'todo';
+  plan.updatedAt = new Date().toISOString();
+  return savePlan(plan, { status: entry.status, keepPrevious: true, checkerApproved: true });
+}
+
+export function restorePreviousPlan(id) {
+  const entry = getSavedPlan(id);
+  if (!entry?.previousVersion) return null;
+  const restored = savePlan(entry.previousVersion, { status: entry.status, name: entry.name });
+  const list = listPlans(), index = list.findIndex(item => item.id === id);
+  if (index >= 0) { delete list[index].previousVersion; writeSavedListRaw(list); }
+  return restored;
 }
 
 export function openPlan(id) {
