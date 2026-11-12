@@ -1,162 +1,86 @@
-import { t, esc, num } from './ui.js';
+import { t, esc } from './ui.js';
+import { detectChatLanguage, summarizePlan, validClinicResponse, validSuggestion } from './planty-chat-helpers.js';
 
-let configured = false;
-
-function offlineAnswer(lang) {
-  return lang === 'bn'
-    ? 'Planty এখন ইন্টারনেটে সংযোগ করতে পারছে না — আপনার পরিকল্পনার হিসাব অফলাইনেও কাজ করে।'
-    : "Planty can't reach the internet right now — your planner numbers still work offline.";
-}
-
+export function plantyMascot(pose = 'idle') { return `<img class="planty-mascot planty-${pose}" src="/assets/planty/planty-96.webp" srcset="/assets/planty/planty-96.webp 1x, /assets/planty/planty-192.webp 2x, /assets/planty/planty-512.webp 4x" width="50" height="50" alt="" aria-hidden="true" decoding="async">`; }
+export function refreshPlantySuggestions() {}
+function offlineAnswer(lang) { return lang === 'bn' ? 'Planty এখন ইন্টারনেটে সংযোগ করতে পারছে না — আপনার পরিকল্পনার হিসাব অফলাইনেও কাজ করে।' : "Planty can't reach the internet right now — your planner numbers still work offline."; }
 export async function askPlanty({ question, context }) {
-  // This is the single backend boundary; only the Worker contacts the model.
+  if (globalThis.navigator?.onLine === false) return offlineAnswer(context.lang);
   const { lang, ...fieldContext } = context;
-  if (globalThis.navigator?.onLine === false) return offlineAnswer(lang);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
   try {
-    const response = await fetch('/api/planty', {
-      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, lang, context: fieldContext }), signal: controller.signal,
-    });
+    const response = await fetch('/api/planty', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, lang, context: fieldContext }) });
     const data = await response.json();
-    if (response.status === 503 && data?.error === 'not_configured') configured = false;
-    if (!response.ok || typeof data?.answer !== 'string' || !data.answer.trim()) return offlineAnswer(lang);
-    configured = true;
-    return data.answer;
-  } catch {
-    return offlineAnswer(lang);
-  } finally {
-    clearTimeout(timeout);
-  }
+    return response.ok && typeof data.answer === 'string' && data.answer.trim() ? data.answer : offlineAnswer(lang);
+  } catch { return offlineAnswer(lang); }
 }
-
-export function plantyMascot(pose = 'idle') {
-  return `<img class="planty-mascot planty-${pose}" src="/assets/planty/planty-96.webp" srcset="/assets/planty/planty-96.webp 1x, /assets/planty/planty-192.webp 2x, /assets/planty/planty-512.webp 4x" width="50" height="50" alt="" aria-hidden="true" decoding="async">`;
+const CHAT_KEY = 'ropon_planty_chat_v1';
+const quickReplies = [
+  ['Is my plan flood-safe?', 'আমার পরিকল্পনা কি বন্যার ঝুঁকি থেকে নিরাপদ?'],
+  ['What do I do this month?', 'এই মাসে আমার কী করা উচিত?'],
+  ['Better crop for my field?', 'আমার জমির জন্য ভালো ফসল কোনটি?'],
+];
+let open = false, tab = 'chat', messages = [], planId = null, attached = true, diagnosis = null, result = null, imageData = '', imageSize = { width: 0, height: 0 }, imageStats = null, maskMode = 'mask', returnFocus;
+function getMessages(id) {
+  if (planId !== null && id !== planId) { diagnosis = null; messages = []; try { sessionStorage.setItem(CHAT_KEY, '[]'); } catch {} }
+  planId = id;
+  try { messages = JSON.parse(sessionStorage.getItem(CHAT_KEY) || '[]').filter(x => x.planId === id).slice(-40); }
+  catch { messages = []; }
 }
-
-export function plantySuggestions(planner) {
-  const cropNames = {
-    rice: t('Aman rice', 'আমন ধান'), potato: t('potatoes', 'আলু'),
-    mustard: t('broadcast mustard', 'ছিটিয়ে বোনা সরিষা'), mungbean: t('mungbean', 'মুগ'),
-  };
-  return [
-    planner.crop === 'mustard'
-      ? t('How is broadcast mustard seed calculated?', 'ছিটিয়ে বোনা সরিষার বীজের হিসাব কীভাবে হয়?')
-      : t(`Is ${num(planner.row)}×${num(planner.spacing)} cm right for ${cropNames[planner.crop]}?`, `${cropNames[planner.crop]}-এর জন্য ${num(planner.row)}×${num(planner.spacing)} সেমি কি ঠিক?`),
-    t('How much seed do I need?', 'আমার কতটা বীজ লাগবে?'),
-    t('What if I leave 15% for bunds?', 'আইলের জন্য ১৫% রাখলে কী হবে?'),
-    t(`What does ${num(planner.usable)}% usable area mean?`, `${num(planner.usable)}% চাষযোগ্য জমি মানে কী?`),
-  ];
+function msg(m) { return `<article class="planty-message ${m.role}"><small>${m.role === 'user' ? t('You', 'আপনি') : 'Planty'}</small><p>${esc(m.text)}</p>${m.suggestion ? suggestionMarkup(m.suggestion) : ''}</article>`; }
+function suggestionMarkup(s) { return `<section class="planty-suggestion-card"><strong>${t('Plan suggestion', 'পরিকল্পনার প্রস্তাব')}</strong><p>${esc(s.changes.map(x => `${x.from} → ${x.to}: ${x.why}`).join(' · '))}</p><button type="button" data-apply-suggestion>${t('Apply to plan', 'পরিকল্পনায় যোগ করুন')}</button><button type="button" data-dismiss-suggestion>${t('Not now', 'এখন নয়')}</button></section>`; }
+export function plantyPanel() {
+  return `<button type="button" class="planty-launch" aria-haspopup="dialog" aria-expanded="${open}">🌱 <span>${t('Ask Planty', 'প্ল্যান্টিকে জিজ্ঞেস করুন')}</span></button>
+  <div class="planty-modal" ${open ? '' : 'hidden'}><div class="planty-backdrop" data-close-planty></div><section class="planty-window" role="dialog" aria-modal="true" aria-labelledby="planty-title" tabindex="-1">
+  <header class="planty-header"><div class="planty-brand"><span>🌱</span><div><h2 id="planty-title">Ask Planty</h2><small>${t('Your field companion', 'আপনার জমির সঙ্গী')}</small></div></div><button type="button" class="planty-close" aria-label="${t('Close Planty', 'বন্ধ করুন')}">×</button></header>
+  <div class="planty-tabs" role="tablist" aria-label="Planty"><button role="tab" id="planty-tab-chat" aria-controls="planty-chat" data-tab="chat">${t('Chat', 'কথা')}</button><button role="tab" id="planty-tab-clinic" aria-controls="planty-clinic" data-tab="clinic">${t('Clinic', 'চিকিৎসা')}</button></div>
+  <div id="planty-chat" class="planty-view" role="tabpanel" aria-labelledby="planty-tab-chat"><div class="planty-chat-meta"><div class="planty-attach"></div><div class="planty-page-context"></div></div><div class="planty-messages" role="log" aria-live="polite"></div><div class="planty-quick">${quickReplies.map(([en,bn]) => `<button type="button" data-quick-en="${esc(en)}" data-quick-bn="${esc(bn)}">${t(en,bn)}</button>`).join('')}</div><form class="planty-form"><label class="sr-only" for="planty-question">${t('Ask Planty', 'Planty-কে প্রশ্ন করুন')}</label><input id="planty-question" maxlength="600" autocomplete="off" placeholder="${t('Ask anything about your field…', 'জমি নিয়ে যেকোনো প্রশ্ন করুন…')}"><button type="submit">${t('Send', 'পাঠান')} ↗</button></form><div class="planty-diagnosis-chip" hidden></div></div>
+  <div id="planty-clinic" class="planty-view" role="tabpanel" aria-labelledby="planty-tab-clinic" hidden><div class="clinic-intro"><span>FIELD IMAGE CHECK</span><h3>${t('What is happening to your crop?', 'ফসলে কী হয়েছে?')}</h3><p>${t('A photo helps Planty check visible signs. This is a guide, not a lab diagnosis.', 'ছবিতে দেখা লক্ষণ যাচাই করতে Planty সাহায্য করবে। এটি প্রাথমিক ধারণা, পরীক্ষাগারের নিশ্চিত মত নয়।')}</p></div><div class="clinic-controls"><label>${t('Crop', 'ফসল')}<select class="clinic-crop"><option value="auto">${t('Guess from photo', 'ছবি দেখে অনুমান')}</option>${['rice','potato','wheat','maize','mustard','lentil','mungbean','jute','tomato','chilli','mango','banana'].map(c=>`<option value="${c}">${c}</option>`).join('')}</select></label><label class="clinic-upload">📷 ${t('Take or choose photo', 'ছবি তুলুন বা বাছুন')}<input class="clinic-file" type="file" accept="image/*" capture="environment"></label><label>${t('Optional note', 'অতিরিক্ত তথ্য')}<input class="clinic-note" maxlength="300" placeholder="${t('When did it start?', 'কখন থেকে হয়েছে?')}"></label></div><div class="clinic-error" role="status" hidden></div><div class="clinic-photo-host"></div><div class="clinic-result-host"></div><button class="clinic-submit" type="button" disabled>${t('Check this photo', 'ছবি যাচাই করুন')} <span>✦</span></button></div>
+  <footer class="planty-footnote">${t('For urgent crop loss, call DAE extension service 16123.', 'জরুরি ফসল ক্ষতিতে কৃষি পরামর্শ সেবা ১৬১২৩ নম্বরে ফোন করুন।')}</footer></section></div>`;
 }
-
-function suggestions(planner) {
-  return plantySuggestions(planner).map(question => `<button type="button" class="planty-suggestion" data-question="${esc(question)}">${esc(question)}</button>`).join('');
+function local(e, b) { return t(e, b); }
+function cropImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), image = new Image();
+    image.onload = () => { let scale = Math.min(1, 1024 / Math.max(image.width, image.height)); const c = document.createElement('canvas'); let data; for (let i=0; i<6; i++) { c.width = Math.max(1, Math.round(image.width * scale)); c.height = Math.max(1, Math.round(image.height * scale)); c.getContext('2d').drawImage(image, 0, 0, c.width, c.height); const sample=document.createElement('canvas');sample.width=16;sample.height=16;const sx=sample.getContext('2d');sx.drawImage(c,0,0,16,16);const px=sx.getImageData(0,0,16,16).data;imageStats=[0,1,2].map(channel=>Math.round(Array.from({length:256},(_,n)=>px[n*4+channel]).reduce((sum,v)=>sum+v,0)/256)); data = c.toDataURL('image/jpeg', i < 2 ? .82 : .68); if (data.length <= 2650000) break; scale *= .8; } URL.revokeObjectURL(url); if (data.length > 2650000) { reject(new Error('image_too_large')); return; } imageSize = { width:c.width, height:c.height }; resolve(data); };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image_read_failed')); }; image.src = url;
+  });
 }
-
-let messages = [];
-let open = false;
-let draft = '';
-let returnFocus = null;
-let activeRequest = 0;
-
-export function plantyPanel(planner) {
-  return `<div class="planty-shade" hidden></div><aside id="planty-panel" class="planty-panel" aria-labelledby="planty-title" ${open ? '' : 'hidden'}>
-    <header class="planty-header">${plantyMascot()}<div><h2 id="planty-title">Planty</h2><span>${t('Your planting companion', 'আপনার বপনের সঙ্গী')}</span></div><button type="button" class="planty-close" aria-label="${t('Close Planty', 'Planty বন্ধ করুন')}">×</button></header>
-    <div class="planty-body"><div class="planty-greeting"><strong>${t('A little help to get growing.', 'চাষের শুরুতে একটু সহায়তা।')}</strong><p>${t('Hi, I’m Planty. Your current crop and settings travel with each question.', 'আমি Planty। প্রতিটি প্রশ্নের সঙ্গে আপনার ফসল ও বর্তমান সেটিংস যুক্ত থাকবে।')}</p><span class="planty-status" ${configured ? 'hidden' : ''}>${t('AI connection not set up', 'এআই সংযোগ চালু হয়নি')}</span></div>
-    <div class="planty-suggestions" aria-label="${t('Suggested questions', 'প্রস্তাবিত প্রশ্ন')}">${suggestions(planner)}</div>
-    <div class="planty-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="${t('Conversation', 'কথোপকথন')}">${messages.map(message => messageMarkup(message)).join('')}</div></div>
-    <form id="planty-form"><label class="sr-only" for="planty-question">${t('Ask Planty', 'Planty-কে প্রশ্ন করুন')}</label><input id="planty-question" placeholder="${t('Ask about this plan…', 'এই পরিকল্পনা নিয়ে প্রশ্ন…')}" autocomplete="off" maxlength="600" value="${esc(draft)}" required><button type="submit" aria-label="${t('Send question', 'প্রশ্ন পাঠান')}">${t('Send', 'পাঠান')} <span aria-hidden="true">↗</span></button></form>
-    <p class="planty-footnote">${t('AI answers can be wrong — check with your local extension officer.', 'এআইয়ের উত্তর ভুল হতে পারে — স্থানীয় কৃষি কর্মকর্তার পরামর্শ নিন।')}</p></aside>
-    <button type="button" class="planty-launch" aria-controls="planty-panel" aria-expanded="${open}">${plantyMascot('happy')}<span>${t('Ask Planty', 'Planty-কে বলুন')}</span><span class="planty-launch-dot" aria-hidden="true"></span></button>`;
+function renderClinic(host) {
+  const resultHost = host.querySelector('.clinic-result-host'), photoHost = host.querySelector('.clinic-photo-host');
+  if (imageData) photoHost.innerHTML = `<div class="clinic-mask-toggle" role="group" aria-label="${local('Segmentation display','সেগমেন্টেশন দেখুন')}">${[['mask',local('Mask','মাস্ক')],['outline',local('Outline','সীমানা')],['original',local('Original','মূল ছবি')]].map(([v,label])=>`<button type="button" data-mask-mode="${v}" aria-pressed="${maskMode===v}">${label}</button>`).join('')}</div><div class="clinic-image"><img src="${imageData}" alt="${local('Uploaded crop photo','আপলোড করা ফসলের ছবি')}">${result ? `<canvas class="clinic-overlay" ${maskMode==='original'?'hidden':''}></canvas>` : ''}</div>`;
+  if (!result) { resultHost.innerHTML = ''; return; }
+  const top = result.diagnoses[0];
+  resultHost.innerHTML = `<section class="clinic-coverage"><div><b>${Math.round(result.lesionAreaPct)}%</b><span>${local('visible lesion area','ক্ষতিগ্রস্ত অংশ')}</span></div><div class="clinic-meter"><i style="width:${Math.min(100,result.lesionAreaPct)}%"></i></div><div class="clinic-mask-legend"><i></i>${local('leaf area','পাতার অংশ')} <i class="lesion"></i>${local('lesion regions','দাগের অংশ')}</div></section>${result.diagnoses.length?result.diagnoses.map((d,i)=>`<article class="clinic-diagnosis"><div class="clinic-diagnosis-head"><strong>${esc(t(d.name.en,d.name.bn))}</strong><span>${Math.round(d.confidence*100)}%</span></div><div class="clinic-confidence"><i style="--confidence:${d.confidence*100}%"></i></div><small>${i===0?local('Most likely','সবচেয়ে সম্ভাব্য'):local('Also consider','এটিও হতে পারে')}</small><ul>${d.why.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h4>${local('Next steps','পরের করণীয়')}</h4><ul>${d.actions.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><div class="clinic-sources">${d.sources.map(source=>`<a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a>`).join(' · ')}</div></article>`).join(''):`<p class="clinic-low-confidence">${local('No likely match. Take a clear close photo in daylight or ask DAE 16123.','সম্ভাব্য রোগ মেলেনি। দিনের আলোতে কাছে থেকে পরিষ্কার ছবি তুলুন বা DAE ১৬১২৩-এ ফোন করুন।')}</p>`}${top && top.confidence < .5 ? `<p class="clinic-low-confidence">${local('Confidence is low. Take a clear close photo in daylight and ask a local officer.','নিশ্চয়তা কম। দিনের আলোতে কাছে থেকে পরিষ্কার ছবি তুলুন এবং কৃষি কর্মকর্তাকে দেখান।')}</p>` : ''}${top?`<button type="button" data-ask-diagnosis>${local('Ask Planty about this','এ বিষয়ে Planty-কে জিজ্ঞেস করুন')}</button>`:''}`;
+  const canvas=resultHost.previousElementSibling.querySelector('canvas');
+  if(canvas){ const img=canvas.previousElementSibling; canvas.width=img.naturalWidth||imageSize.width; canvas.height=img.naturalHeight||imageSize.height; const ctx=canvas.getContext('2d'); for(const s of result.segments){if(!s.mask?.data||!s.box)continue;const raw=atob(s.mask.data),pixels=Uint8Array.from(raw,ch=>ch.charCodeAt(0)),mask=document.createElement('canvas');mask.width=s.mask.width;mask.height=s.mask.height;const mctx=mask.getContext('2d'),frame=mctx.createImageData(mask.width,mask.height),color=s.kind==='leaf'?[40,220,117]:[255,84,45];for(let i=0;i<pixels.length;i++){const on=pixels[i]===1;if(!on)continue;const edge=i%s.mask.width===0||i%s.mask.width===s.mask.width-1||i<s.mask.width||i>=pixels.length-s.mask.width||pixels[i-1]===0||pixels[i+1]===0||pixels[i-s.mask.width]===0||pixels[i+s.mask.width]===0;const draw=maskMode==='outline'?edge:true;if(draw){frame.data[i*4]=color[0];frame.data[i*4+1]=color[1];frame.data[i*4+2]=color[2];frame.data[i*4+3]=maskMode==='outline'?245:105;}}mctx.putImageData(frame,0,0);const [x,y,w,h]=s.box;ctx.drawImage(mask,x*canvas.width,y*canvas.height,w*canvas.width,h*canvas.height);} }
 }
-
-function messageMarkup(message) {
-  return `<div class="planty-message ${message.role}"><small>${message.role === 'user' ? t('You', 'আপনি') : 'Planty'}</small><p>${esc(message.text)}</p></div>`;
-}
-
-export function refreshPlantySuggestions(planner) {
-  const host = document.querySelector('.planty-suggestions');
-  if (host) host.innerHTML = suggestions(planner);
-}
-
 export function mountPlanty(getContext) {
-  const panel = document.querySelector('#planty-panel');
-  const launch = document.querySelector('.planty-launch');
-  const shade = document.querySelector('.planty-shade');
-  const input = panel.querySelector('input');
-  const form = panel.querySelector('form');
-  const mobile = window.matchMedia('(max-width: 700px)');
-  const setOpen = (value, focus = true) => {
-    if (value && focus) returnFocus = document.activeElement;
-    open = value;
-    panel.hidden = !open;
-    shade.hidden = !open || !mobile.matches;
-    launch.setAttribute('aria-expanded', String(open));
-    document.querySelector('.planner-workbench').classList.toggle('planty-open', open);
-    panel.setAttribute('role', mobile.matches ? 'dialog' : 'complementary');
-    if (mobile.matches && open) panel.setAttribute('aria-modal', 'true');
-    else panel.removeAttribute('aria-modal');
-    document.body.classList.toggle('planty-sheet-open', open && mobile.matches);
-    if (focus && open) input.focus({ preventScroll: true });
-    if (focus && !open) (returnFocus?.isConnected ? returnFocus : launch).focus({ preventScroll: true });
-  };
-  launch.onclick = () => setOpen(!open);
-  panel.querySelector('.planty-close').onclick = () => setOpen(false);
-  shade.onclick = () => setOpen(false);
-  panel.onkeydown = event => {
-    if (event.key === 'Escape') { event.preventDefault(); setOpen(false); }
-    if (event.key === 'Tab' && mobile.matches) {
-      const controls = [...panel.querySelectorAll('button:not(:disabled), input')];
-      const first = controls[0], last = controls.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }
-  };
-  input.oninput = () => { draft = input.value; };
-  panel.querySelector('.planty-suggestions').onclick = event => {
-    const chip = event.target.closest('[data-question]');
-    if (!chip) return;
-    input.value = chip.dataset.question;
-    form.requestSubmit();
-  };
-  const append = message => {
-    messages.push(message);
-    panel.querySelector('.planty-messages').insertAdjacentHTML('beforeend', messageMarkup(message));
-    const body = panel.querySelector('.planty-body');
-    body.scrollTop = body.scrollHeight;
-  };
-  form.onsubmit = async event => {
-    event.preventDefault();
-    const question = input.value.trim();
-    if (!question || question.length > 600 || form.querySelector('button').disabled) return;
-    const request = ++activeRequest;
-    const context = getContext();
-    append({ role: 'user', text: question });
-    draft = input.value = '';
-    form.querySelector('button').disabled = true;
-    panel.querySelector('.planty-header .planty-mascot').outerHTML = plantyMascot('thinking');
-    panel.querySelector('.planty-messages').setAttribute('aria-busy', 'true');
-    try {
-      const text = await askPlanty({ question, context });
-      if (request === activeRequest) {
-        append({ role: 'assistant', text });
-        panel.querySelector('.planty-status').hidden = configured;
-      }
-    } catch {
-      if (request === activeRequest) append({ role: 'assistant', text: offlineAnswer(context.lang) });
-    } finally {
-      form.querySelector('button').disabled = false;
-      panel.querySelector('.planty-header .planty-mascot').outerHTML = plantyMascot('happy');
-      panel.querySelector('.planty-messages').setAttribute('aria-busy', 'false');
-    }
-  };
-  const resize = () => setOpen(open, false);
-  mobile.addEventListener('change', resize);
-  setOpen(open, false);
-  return () => {
-    ++activeRequest;
-    mobile.removeEventListener('change', resize);
-    document.body.classList.remove('planty-sheet-open');
-  };
+  const modal = document.querySelector('.planty-modal'), launch = document.querySelector('.planty-launch'), panel = modal.querySelector('.planty-window'), input = modal.querySelector('#planty-question'), form = modal.querySelector('.planty-form');
+  let activeRequest = 0, attachedEntry = null;
+  const context = () => getContext() || {};
+  function refresh() {
+    const ctx=context(), entry=ctx.plan || null, summary=entry&&summarizePlan(entry), id=summary?.id || '';
+    getMessages(id); attachedEntry=entry;
+    modal.querySelector('.planty-attach').innerHTML=summary&&attached?`<span>${local('Attached:', 'যুক্ত:')} ${esc(summary.name)}</span><button type="button" data-detach aria-label="${local('Detach plan','পরিকল্পনা বাদ দিন')}">×</button>`:'';
+    modal.querySelector('.planty-page-context').textContent=[ctx.page||'',ctx.fieldName||ctx.fieldId||''].filter(Boolean).join(' · ');
+    modal.querySelector('.planty-messages').innerHTML=messages.map(msg).join('');
+    modal.querySelectorAll('[role="tab"]').forEach(el=>{const selected=el.dataset.tab===tab;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;});
+    modal.querySelectorAll('.planty-view').forEach(el=>el.hidden=el.id!==`planty-${tab}`);
+    const chip=modal.querySelector('.planty-diagnosis-chip');chip.hidden=!diagnosis;chip.innerHTML=diagnosis?`${local('Clinic attached:','যুক্ত রোগ:')} ${esc(t(diagnosis.name.en,diagnosis.name.bn))} <button type="button" data-detach-diagnosis aria-label="${local('Remove diagnosis','রোগের তথ্য বাদ দিন')}">×</button>`:'';
+  }
+  function setOpen(value) { if(value&&!open) returnFocus=document.activeElement; open=value; modal.hidden=!open;launch.setAttribute('aria-expanded',String(open)); document.body.classList.toggle('planty-modal-open',open); if(open){refresh();panel.focus();}else if(returnFocus?.isConnected)returnFocus.focus(); }
+  const reveal = (element, text) => { const paragraph=element.querySelector('p');if(!paragraph)return;if(matchMedia('(prefers-reduced-motion: reduce)').matches){paragraph.textContent=text;return;}paragraph.textContent='';let index=0;const timer=setInterval(()=>{if(!paragraph.isConnected){clearInterval(timer);return;}paragraph.textContent=text.slice(0,index+=4);if(index>=text.length)clearInterval(timer);},8); };
+  launch.onclick=()=>setOpen(true); modal.querySelector('.planty-close').onclick=()=>setOpen(false);modal.querySelector('[data-close-planty]').onclick=()=>setOpen(false);
+  modal.querySelector('.planty-tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;refresh();}};
+  modal.querySelector('.planty-tabs').onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const tabs=[...modal.querySelectorAll('[role="tab"]')];const index=tabs.indexOf(e.target);const next=e.key==='Home'?0:e.key==='End'?1:1-index;e.preventDefault();tab=tabs[next].dataset.tab;refresh();tabs[next].focus();};
+  modal.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();setOpen(false);}if(e.key==='Tab'){const els=[...panel.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href]')].filter(x=>!x.closest('[hidden]'));if(e.shiftKey&&document.activeElement===els[0]){e.preventDefault();els.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===els.at(-1)){e.preventDefault();els[0].focus();}}};
+  modal.querySelector('.planty-attach').onclick=e=>{if(e.target.closest('[data-detach]')){attached=false;refresh();}};
+  modal.querySelector('.planty-diagnosis-chip').onclick=e=>{if(e.target.closest('[data-detach-diagnosis]')){diagnosis=null;refresh();}};
+  modal.querySelector('.planty-quick').onclick=e=>{const b=e.target.closest('[data-quick-en]');if(b){input.value=t(b.dataset.quickEn,b.dataset.quickBn);form.requestSubmit();}};
+  modal.querySelector('.planty-messages').onclick=e=>{if(e.target.closest('[data-apply-suggestion]')){const data=messages.at(-1)?.suggestion;window.dispatchEvent(new CustomEvent('planty:apply-suggestion',{detail:{suggestion:data,plan:attachedEntry}}));}if(e.target.closest('[data-dismiss-suggestion]')){messages.at(-1).suggestion=null;refresh();}};
+  form.onsubmit=async e=>{e.preventDefault();const question=input.value.trim();if(!question)return;const ctx=context(),summary=attached&&ctx.plan?summarizePlan(ctx.plan):null, language=detectChatLanguage(question,ctx.lang);const user={role:'user',text:question,planId:summary?.id||''};messages.push(user);modal.querySelector('.planty-messages').insertAdjacentHTML('beforeend',msg(user));input.value='';const button=form.querySelector('button');button.disabled=true;const req=++activeRequest;try{const response=await fetch('/api/planty-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question,lang:language,appLang:ctx.lang,context:{...ctx,plan:summary,page:ctx.page,diagnosis:diagnosis||undefined},history:messages.slice(-8).map(({role,text})=>({role,text}))})});const data=await response.json();if(!response.ok||typeof data.answer!=='string')throw Error('unavailable');const answer={role:'assistant',text:data.answer,planId:summary?.id||'',suggestion:validSuggestion(data.suggestion)?data.suggestion:null};if(req===activeRequest){messages.push(answer);try{sessionStorage.setItem(CHAT_KEY,JSON.stringify(messages.slice(-40)));}catch{}const log=modal.querySelector('.planty-messages');log.insertAdjacentHTML('beforeend',msg(answer));reveal(log.lastElementChild,answer.text);}}catch{if(req===activeRequest){const m={role:'assistant',text:local('Planty is offline right now. Try again when your connection returns.','Planty এখন সংযোগ পাচ্ছে না। পরে আবার চেষ্টা করুন।'),planId:summary?.id||''};messages.push(m);modal.querySelector('.planty-messages').insertAdjacentHTML('beforeend',msg(m));}}finally{button.disabled=false;}};
+  const cropInput=modal.querySelector('.clinic-file');cropInput.onchange=async()=>{const file=cropInput.files[0];if(!file)return;try{imageData=await cropImage(file);result=null;renderClinic(modal.querySelector('#planty-clinic'));modal.querySelector('.clinic-submit').disabled=false;}catch{const error=modal.querySelector('.clinic-error');error.textContent=local('Could not prepare this photo under 2 MB. Try a smaller image.','ছবিটি ২ মেগাবাইটের নিচে করা যায়নি। ছোট ছবি দিন।');error.hidden=false;}};
+  modal.querySelector('.clinic-submit').onclick=async()=>{const btn=modal.querySelector('.clinic-submit'), error=modal.querySelector('.clinic-error');if(!imageData)return;btn.disabled=true;error.hidden=true;btn.textContent=local('Checking image…','ছবি দেখা হচ্ছে…');try{const response=await fetch('/api/clinic-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imageData,width:imageSize.width,height:imageSize.height,colorMean:imageStats,crop:modal.querySelector('.clinic-crop').value,note:modal.querySelector('.clinic-note').value,lang:context().lang||'en'})});const data=await response.json();if(!response.ok||!validClinicResponse(data,new Set(data.knownDiseaseIds||[])))throw Error('invalid');result=data;renderClinic(modal.querySelector('#planty-clinic'));}catch{error.textContent=local('Analysis is unavailable. No diagnosis was made. Try again later or contact an extension officer.','বিশ্লেষণ পাওয়া যায়নি। কোনো রোগ নির্ণয় করা হয়নি। পরে চেষ্টা করুন বা কৃষি কর্মকর্তার সঙ্গে কথা বলুন।');error.hidden=false;}finally{btn.textContent=local('Check this photo','ছবি যাচাই করুন');btn.disabled=!imageData;}};
+  modal.querySelector('#planty-clinic').onclick=e=>{const mode=e.target.closest('[data-mask-mode]');if(mode){maskMode=mode.dataset.maskMode;renderClinic(modal.querySelector('#planty-clinic'));return;}if(e.target.closest('[data-ask-diagnosis]')){diagnosis=result?.diagnoses?.[0]||null;tab='chat';refresh();input.value=diagnosis?`${local('Tell me more about','সম্পর্কে বলুন')} ${diagnosis.name.en}.`:'';input.focus();}};
+  window.addEventListener('ropon:plan',refresh);if(location.hash==='#clinic'){tab='clinic';setOpen(true);}else if(open){setOpen(true);}else refresh();return()=>{++activeRequest;window.removeEventListener('ropon:plan',refresh);document.body.classList.remove('planty-modal-open');};
 }

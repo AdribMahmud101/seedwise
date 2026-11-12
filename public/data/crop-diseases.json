@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "region": "Rangpur, Bangladesh",
+  "dataset": {
+    "name": "PlantVillage",
+    "url": "https://github.com/spMohanty/PlantVillage-Dataset",
+    "paper": "https://doi.org/10.1109/ACCESS.2016.2617239",
+    "note": "Research image labels guide disease vocabulary; dataset images are not local prevalence or field-performance evidence."
+  },
+  "diseases": [
+    {
+      "id": "rice_blast",
+      "crop": "rice",
+      "names": {
+        "en": "Rice blast",
+        "bn": "ধানের ব্লাস্ট"
+      },
+      "cause": "Magnaporthe oryzae",
+      "symptoms": [
+        "Diamond-shaped leaf lesions with pale centres and dark margins",
+        "Neck infection can make panicles turn white"
+      ],
+      "lookAlikes": [
+        "brown spot",
+        "leaf scald"
+      ],
+      "triggers": [
+        "humid weather",
+        "long leaf wetness",
+        "susceptible crop stage"
+      ],
+      "management": [
+        "Use locally recommended resistant varieties",
+        "Avoid excessive nitrogen and keep field observations frequent",
+        "Remove infected crop residue where practical",
+        "Ask DAE before any pesticide use"
+      ],
+      "sources": [
+        {
+          "id": "brri_blast",
+          "title": "BRRI rice disease management resources",
+          "url": "https://brri.gov.bd/pages/static-pages/6922dff0933eb65569e24bf8"
+        },
+        {
+          "id": "irri_blast",
+          "title": "IRRI Rice Knowledge Bank: blast",
+          "url": "https://www.knowledgebank.irri.org/training/fact-sheets/pest-management/diseases/item/blast"
+        }
+      ]
+    },
+    {
+      "id": "rice_brown_spot",
+      "crop": "rice",
+      "names": {
+        "en": "Rice brown spot",
+        "bn": "ধানের বাদামি দাগ"
+      },
+      "cause": "Bipolaris oryzae",
+      "symptoms": [
+        "Small oval brown lesions, often with a yellow halo",
+        "Lesions can enlarge and merge on leaves"
+      ],
+      "lookAlikes": [
+        "blast",
+        "bacterial leaf streak"
+      ],
+      "triggers": [
+        "warm humid weather",
+        "plant stress"
+      ],
+      "management": [
+        "Use healthy seed and locally recommended varieties",
+        "Keep balanced crop nutrition and remove heavily infected residue",
+        "Seek local advice when lesions spread"
+      ],
+      "sources": [
+        {
+          "id": "brri_disease",
+          "title": "BRRI rice disease management",
+          "url": "https://riceprofile.brri.gov.bd/index.php/cultivation/disease"
+        },
+        {
+          "id": "irri_brown_spot",
+          "title": "IRRI Rice Knowledge Bank: brown spot",
+          "url": "https://www.knowledgebank.irri.org/training/fact-sheets/pest-management/diseases/item/brown-spot"
+        }
+      ]
+    },
+    {
+      "id": "potato_late_blight",
+      "crop": "potato",
+      "names": {
+        "en": "Potato late blight",
+        "bn": "আলুর মড়ক"
+      },
+      "cause": "Phytophthora infestans",
+      "symptoms": [
+        "Irregular water-soaked dark lesions",
+        "White growth may appear at lesion edges in humid conditions"
+      ],
+      "lookAlikes": [
+        "early blight",
+        "frost injury"
+      ],
+      "triggers": [
+        "cool humid weather",
+        "prolonged leaf wetness"
+      ],
+      "management": [
+        "Use healthy seed tubers and resistant varieties where available",
+        "Remove volunteer potato plants and infected debris",
+        "Avoid handling wet plants and get local confirmation quickly"
+      ],
+      "sources": [
+        {
+          "id": "cornell_late_blight",
+          "title": "Cornell: late blight of potato and tomato",
+          "url": "https://vegetables.cornell.edu/pest-management/disease-factsheets/late-blight-of-potato-and-tomato/"
+        }
+      ]
+    },
+    {
+      "id": "wheat_leaf_rust",
+      "crop": "wheat",
+      "names": {
+        "en": "Wheat leaf rust",
+        "bn": "গমের পাতার মরিচা"
+      },
+      "cause": "Puccinia triticina",
+      "symptoms": [
+        "Small orange-brown powdery pustules, mainly on leaf blades"
+      ],
+      "lookAlikes": [
+        "stripe rust",
+        "leaf spots"
+      ],
+      "triggers": [
+        "mild temperatures",
+        "humid conditions"
+      ],
+      "management": [
+        "Grow locally recommended resistant varieties",
+        "Monitor nearby fields and remove volunteer wheat",
+        "Ask extension staff about local alerts"
+      ],
+      "sources": [
+        {
+          "id": "cimmyt_rust",
+          "title": "CIMMYT: wheat rust diseases",
+          "url": "https://rusttracker.cimmyt.org/wp-content/uploads/2011/11/rustdiseases.pdf"
+        }
+      ]
+    },
+    {
+      "id": "maize_gray_leaf_spot",
+      "crop": "maize",
+      "names": {
+        "en": "Gray leaf spot",
+        "bn": "ভুট্টার ধূসর পাতার দাগ"
+      },
+      "cause": "Cercospora zeae-maydis species complex",
+      "symptoms": [
+        "Long rectangular grey to tan lesions between veins",
+        "Lesions can join and dry leaf tissue"
+      ],
+      "lookAlikes": [
+        "northern corn leaf blight",
+        "common rust"
+      ],
+      "triggers": [
+        "warm humid weather",
+        "infected residue"
+      ],
+      "management": [
+        "Rotate crops and manage infected residue",
+        "Use locally adapted resistant hybrids",
+        "Avoid prolonged leaf wetness where irrigation is managed"
+      ],
+      "sources": [
+        {
+          "id": "extension_maize_disease",
+          "title": "University of Minnesota Extension: gray leaf spot",
+          "url": "https://extension.umn.edu/corn-pest-management/gray-leaf-spot-corn"
+        }
+      ]
+    },
+    {
+      "id": "mustard_alternaria",
+      "crop": "mustard",
+      "names": {
+        "en": "Alternaria blight",
+        "bn": "সরিষার অল্টারনারিয়া ঝলসানো"
+      },
+      "cause": "Alternaria brassicae and related Alternaria species",
+      "symptoms": [
+        "Dark round spots with concentric rings",
+        "Spots may occur on leaves, stems and pods"
+      ],
+      "lookAlikes": [
+        "downy mildew",
+        "bacterial leaf spot"
+      ],
+      "triggers": [
+        "cool humid weather",
+        "infected seed or residue"
+      ],
+      "management": [
+        "Use clean seed and suitable varieties",
+        "Rotate with non-brassica crops and remove infected residues",
+        "Ask DAE before treatment"
+      ],
+      "sources": [
+        {
+          "id": "bamis_mustard",
+          "title": "Bangladesh DAE BAMIS: mustard diseases",
+          "url": "https://www.bamis.gov.bd/en/diseases/1/all/44/"
+        }
+      ]
+    },
+    {
+      "id": "mungbean_yellow_mosaic",
+      "crop": "mungbean",
+      "names": {
+        "en": "Mungbean yellow mosaic",
+        "bn": "মুগের হলুদ মোজাইক"
+      },
+      "cause": "Mungbean yellow mosaic virus complex, transmitted by whiteflies",
+      "symptoms": [
+        "Uneven yellow and green mosaic patches",
+        "Leaves may become smaller and plants stunted"
+      ],
+      "lookAlikes": [
+        "nutrient deficiency",
+        "leaf curl"
+      ],
+      "triggers": [
+        "whitefly activity",
+        "nearby infected legumes"
+      ],
+      "management": [
+        "Remove early infected plants where practical",
+        "Control weeds that host whiteflies",
+        "Use resistant varieties and monitor whiteflies"
+      ],
+      "sources": [
+        {
+          "id": "csisa_mungbean",
+          "title": "CSISA: improve mungbean production in Bangladesh",
+          "url": "https://csisa.org/wp-content/uploads/sites/2/2014/06/Easy-to-use-methods-to-improve-mungbean-production-in-Bangladesh.pdf"
+        }
+      ]
+    },
+    {
+      "id": "lentil_rust",
+      "crop": "lentil",
+      "names": {
+        "en": "Lentil rust",
+        "bn": "মসুরের মরিচা"
+      },
+      "cause": "Uromyces viciae-fabae",
+      "symptoms": [
+        "Small cinnamon-brown powdery pustules on leaves and stems"
+      ],
+      "lookAlikes": [
+        "Ascochyta blight",
+        "nutrient stress"
+      ],
+      "triggers": [
+        "mild humid weather"
+      ],
+      "management": [
+        "Use clean seed and locally recommended varieties",
+        "Rotate crops and remove volunteer legumes",
+        "Consult local extension staff if disease spreads"
+      ],
+      "sources": [
+        {
+          "id": "icarda_lentil",
+          "title": "ICARDA lentil disease resources",
+          "url": "https://www.icarda.org/research/crop-improvement/lentil"
+        }
+      ]
+    },
+    {
+      "id": "jute_anthracnose",
+      "crop": "jute",
+      "names": {
+        "en": "Jute anthracnose",
+        "bn": "পাটের অ্যানথ্রাকনোজ"
+      },
+      "cause": "Colletotrichum species",
+      "symptoms": [
+        "Dark sunken spots on stems or leaves",
+        "Stem lesions can expand under wet conditions"
+      ],
+      "lookAlikes": [
+        "stem canker",
+        "insect injury"
+      ],
+      "triggers": [
+        "warm rainy weather",
+        "splashing water"
+      ],
+      "management": [
+        "Use healthy seed and avoid moving infected debris",
+        "Improve airflow and remove badly affected plants",
+        "Seek local confirmation"
+      ],
+      "sources": [
+        {
+          "id": "bau_jute",
+          "title": "Sher-e-Bangla Agricultural University: jute disease management study",
+          "url": "https://jsau.sau.ac.bd/efficacy-of-management-practices-for-controlling-some-jute-diseases-in-bangladesh/"
+        }
+      ]
+    },
+    {
+      "id": "tomato_early_blight",
+      "crop": "tomato",
+      "names": {
+        "en": "Tomato early blight",
+        "bn": "টমেটোর আগাম ঝলসানো"
+      },
+      "cause": "Alternaria solani",
+      "symptoms": [
+        "Brown leaf spots with concentric rings, often on older leaves",
+        "Yellowing can develop around spots"
+      ],
+      "lookAlikes": [
+        "late blight",
+        "Septoria leaf spot"
+      ],
+      "triggers": [
+        "warm wet weather",
+        "infected residue"
+      ],
+      "management": [
+        "Remove affected lower leaves and crop debris",
+        "Use mulch and avoid overhead watering",
+        "Rotate crops and use healthy transplants"
+      ],
+      "sources": [
+        {
+          "id": "cornell_tomato_blight",
+          "title": "Cornell vegetable disease factsheets",
+          "url": "https://vegetables.cornell.edu/pest-management/disease-factsheets/early-blight-of-potato-and-tomato/"
+        }
+      ]
+    },
+    {
+      "id": "chilli_anthracnose",
+      "crop": "chilli",
+      "names": {
+        "en": "Chilli anthracnose",
+        "bn": "মরিচের অ্যানথ্রাকনোজ"
+      },
+      "cause": "Colletotrichum species",
+      "symptoms": [
+        "Sunken dark lesions on fruit, sometimes with concentric rings",
+        "Small dark spots can occur on leaves"
+      ],
+      "lookAlikes": [
+        "bacterial spot",
+        "sunscald"
+      ],
+      "triggers": [
+        "warm humid weather",
+        "rain during fruiting"
+      ],
+      "management": [
+        "Remove infected fruits and plant debris",
+        "Use clean seed and rotate crops",
+        "Avoid overhead irrigation where possible"
+      ],
+      "sources": [
+        {
+          "id": "kau_chilli",
+          "title": "Kerala Agricultural University: chilli anthracnose",
+          "url": "https://celkau.in/crops/Vegetables/chilli/anthracnose.php"
+        }
+      ]
+    },
+    {
+      "id": "mango_anthracnose",
+      "crop": "mango",
+      "names": {
+        "en": "Mango anthracnose",
+        "bn": "আমের অ্যানথ্রাকনোজ"
+      },
+      "cause": "Colletotrichum gloeosporioides species complex",
+      "symptoms": [
+        "Dark irregular leaf spots and blossom blight",
+        "Dark sunken fruit lesions may develop"
+      ],
+      "lookAlikes": [
+        "bacterial canker",
+        "sooty mould"
+      ],
+      "triggers": [
+        "warm wet weather",
+        "humid canopy"
+      ],
+      "management": [
+        "Prune for airflow and remove infected plant material",
+        "Harvest carefully to avoid fruit wounds",
+        "Ask a local horticulture officer for orchard-specific advice"
+      ],
+      "sources": [
+        {
+          "id": "tnau_mango",
+          "title": "Tamil Nadu Agricultural University: mango anthracnose",
+          "url": "https://agritech.tnau.ac.in/crop_protection/mango_1.html"
+        }
+      ]
+    },
+    {
+      "id": "banana_sigatoka",
+      "crop": "banana",
+      "names": {
+        "en": "Black Sigatoka",
+        "bn": "কলার কালো সিগাটোকা"
+      },
+      "cause": "Pseudocercospora fijiensis",
+      "symptoms": [
+        "Narrow reddish-brown streaks that enlarge into dark leaf spots",
+        "Severe damage causes leaf drying"
+      ],
+      "lookAlikes": [
+        "yellow Sigatoka",
+        "leaf scorch"
+      ],
+      "triggers": [
+        "warm humid weather",
+        "leaf wetness"
+      ],
+      "management": [
+        "Remove badly affected leaves and improve airflow",
+        "Maintain balanced nutrition and clean planting material",
+        "Contact extension staff for local management advice"
+      ],
+      "sources": [
+        {
+          "id": "fao_sigatoka",
+          "title": "FAO: integrated management of black Sigatoka",
+          "url": "https://www.fao.org/4/as177e/as177e.pdf"
+        },
+        {
+          "id": "dpird_sigatoka",
+          "title": "NSW DPIRD: black Sigatoka symptoms",
+          "url": "https://www.dpird.nsw.gov.au/dpi/biosecurity/plant-biosecurity/insect-pests-plant-diseases/black-sigatoka"
+        }
+      ]
+    }
+  ]
+}
