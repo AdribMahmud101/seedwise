@@ -827,3 +827,18 @@ li.done .rr-check-dot {
 .rr-risk-list li > div { grid-column: 2 / -1; }
 .rr-risk-list li > .rr-conf { grid-column: 2; }
 .rr-risk-list li > .rr-conf + * { grid-column: 3; justify-self: start; }
+/* Model strip + neutral strength meters (replace confidence pills) */
+.rr-models { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 2px; }
+.rr-models-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6b766d; }
+.rr-model { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; color: #24392c; background: #eef3e6; border: 1px solid #d5e0c8; }
+.rr-model b { font-weight: 700; }
+.rr-live { width: 8px; height: 8px; border-radius: 50%; background: #2f8f46; box-shadow: 0 0 0 0 rgba(47, 143, 70, .5); animation: rr-live 2s ease-out infinite; }
+@keyframes rr-live { 0% { box-shadow: 0 0 0 0 rgba(47, 143, 70, .5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(47, 143, 70, 0); } }
+.rr-strength { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #4b564d; }
+.rr-meter { position: relative; width: 64px; height: 6px; border-radius: 999px; background: #e7ebe2; overflow: hidden; }
+.rr-meter i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, #7fae8c, #2f6f4a); animation: rr-meter-in 1s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes rr-meter-in { from { width: 0; } }
+.rr-risk-list li { grid-template-columns: 12px 1fr; }
+.rr-risk-list li > .rr-strength { grid-column: 2; }
+.rr-risk-list li > .rr-strength + *, .rr-risk-list li > div + .nasa-badge, .rr-risk-list li > div + [class*="nasa"] { grid-column: 2; justify-self: start; }
+@media (prefers-reduced-motion: reduce) { .rr-live, .rr-meter i { animation: none; } }
