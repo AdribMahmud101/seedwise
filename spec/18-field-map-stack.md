@@ -2,7 +2,7 @@
 
 *As of 9 Nov 2026.*
 
-The field map is a static web page. Leaflet draws the 2D field map, MapLibre GL draws the 3D landscape, and every layer is either a pre-built offline file or a free online imagery service. There is no server and no database; Cloudflare serves the files at <https://roponradar.onefusionlab.systems>.
+The field map is a static web page. Leaflet draws the 2D field map, MapLibre GL draws the 3D landscape, and every layer is either a pre-built offline file or a free online imagery service. There is no server and no database; Cloudflare serves the files at <https://seedwise.onefusionlab.systems>.
 
 It covers the three pilot sites (Mithapukur, Pirganj, Gangachara) plus any field a farmer starts, and lives in two views: `#field` (2D field map) and `#water` ("Your land in 3D").
 

@@ -9,5 +9,5 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
-  "routes": [{ "pattern": "roponradar.onefusionlab.systems", "custom_domain": true }]
+  "routes": [{ "pattern": "seedwise.onefusionlab.systems", "custom_domain": true }, { "pattern": "roponradar.onefusionlab.systems", "custom_domain": true }]
 }
