@@ -66,7 +66,7 @@ test('Open restores the saved field, calendar, spacing, split and custom 3D; edi
   localStorage.removeItem('ropon_custom_plan_v1');
   state.fieldId = earth.fields[1].id;
   plansAction('open', first.id);
-  assert.equal(location.hash.replace('#', ''), 'planner');
+  assert.equal(location.hash.replace('#', ''), 'plan');
   planner();
   assert.equal(state.fieldId, site.id);
   assert.deepEqual(customPlanFor3d().calendar, custom().calendar);
@@ -303,7 +303,7 @@ test('saved field and custom plan build a valid Ready plan without an active jou
   assert.equal(journey.getPlan(), null);
   assert.match(planner(), /data-action="plan-save"[^>]*>Save as my plan/);
   plannerAction('plan-save');
-  assert.equal(location.hash, '#plans');
+  assert.equal(location.hash, '#plan');
   assert.equal(journey.getPlan(), null);
   const [entry] = journey.listPlans();
   assert.equal(entry.status, 'ready');

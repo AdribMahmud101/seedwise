@@ -173,7 +173,8 @@ function handlePlansAction(action, value) {
       if (action === 'edit' && entry.status === 'ready') editReadyPlan();
       const settings = Object.values(entry.plan.planting)[0];
       Object.assign(state.planner, { usable: settings.usableAreaPct, usableSource: settings.usableSource });
-      location.hash = 'planner';
+      // Ready plans open their report (Planty pipeline); Edit goes to the planner.
+      location.hash = action === 'open' && entry.status === 'ready' ? 'plan' : 'planner';
     } else if (entry.status === 'ready') {
       location.hash = 'plan';
     } else {

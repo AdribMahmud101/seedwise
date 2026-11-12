@@ -101,7 +101,8 @@ function savePlannerPlan() {
     state.planner.savedPlanId = saved.id;
     persist();
     sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
-    location.hash = '#plans';
+    // Open the new plan's report so Planty's generation pipeline plays right away.
+    location.hash = '#plan';
   } catch (error) {
     if (!active) resetPlan();
     console.warn('Planner plan could not be saved', error);

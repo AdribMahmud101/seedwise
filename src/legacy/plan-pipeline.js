@@ -94,7 +94,7 @@ export function hazardsFor(plan, floodPack, outlookPack) {
     if (rainVerdict(p50, clim) === 'below') hazards.push('drought');
   }
   const seasons = plan?.rotation?.seasons ?? [];
-  if (seasons.some(s => s.crop === 'boro' || (s.crop !== 'fallow' && s.sowMonth === 11))) hazards.push('cold');
+  if (seasons.some(s => s.crop === 'boro' || (s.crop !== 'fallow' && s.sowMonth === 11)) || planCropList(plan).some(c => /boro/i.test(c))) hazards.push('cold');
   return [...new Set(hazards)];
 }
 
@@ -497,7 +497,11 @@ export function pipelineRunner(plan, packs, lang = 'en') {
     // 5. Disaster-tolerant crops (RAG shortlist only)
     setState('varieties', 'busy', skeleton);
     await later(() => {}, 700);
-    const matches = pickTolerantVarieties(planCropList(plan), hazardsFor(plan, packs.flood, packs.outlook), tolerant);
+    // No field-level hazard detected → use Rangpur's regional hazards (research report scope), labelled as regional.
+    const fieldHazards = hazardsFor(plan, packs.flood, packs.outlook);
+    let matches = pickTolerantVarieties(planCropList(plan), fieldHazards, tolerant);
+    const regional = !matches.length;
+    if (regional) matches = pickTolerantVarieties(planCropList(plan), ['flood', 'submergence', 'drought', 'cold'], tolerant);
     if (!matches.length) hide('varieties');
     else {
       const rows = matches.map(v => {
@@ -505,7 +509,7 @@ export function pipelineRunner(plan, packs, lang = 'en') {
         const src = v.sources?.[0];
         return `<li><b>${esc(v.variety)}</b> · ${esc(v.tolerance)} <span class="plg-evidence">${esc(label)}</span>${src ? ` <a href="${esc(src)}" target="_blank" rel="noopener">${esc(bn ? 'উৎস ↗' : 'Source ↗')}</a>` : ''}</li>`;
       }).join('');
-      setState('varieties', 'done', `<ul class="plg-list">${rows}</ul><p class="note">${esc(bn ? 'গবেষণা সংক্ষিপ্ত তালিকা — বীজের মজুত যাচাই করা হয়নি।' : 'Research shortlist — seed stock unverified.')}</p>`);
+      setState('varieties', 'done', `${regional ? `<p class="note">${esc(bn ? 'এই জমিতে নির্দিষ্ট ঝুঁকি পাওয়া যায়নি — রংপুরের আঞ্চলিক ঝুঁকি (বন্যা, খরা, শীত) অনুযায়ী:' : 'No field-specific hazard found — matched to Rangpur regional risks (flood, drought, cold):')}</p>` : ''}<ul class="plg-list">${rows}</ul><p class="note">${esc(bn ? 'গবেষণা সংক্ষিপ্ত তালিকা — বীজের মজুত যাচাই করা হয়নি।' : 'Research shortlist — seed stock unverified.')}</p>`);
       done.add('varieties');
     }
 
