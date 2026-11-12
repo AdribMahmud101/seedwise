@@ -4402,9 +4402,9 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
   .main[data-page="field"] .page-head p { margin: 0; max-width: none; font-size: 13px; white-space: nowrap; }
   .main[data-page="field"] .page-head h1 { margin: 0; font-size: 25px; white-space: nowrap; }
   .main[data-page="field"] .page-head-actions { grid-column: 2; grid-row: 2; gap: 6px; }
-  .main[data-page="field"] .page-head-actions .button { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+  .main[data-page="field"] .page-head-actions .button { min-height: 36px; padding: 6px 11px; font-size: 13.5px; }
   .main[data-page="field"] .field-selector { grid-column: 1; grid-row: 2; flex: none; gap: 5px; margin: 0; }
-  .main[data-page="field"] .field-chip { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+  .main[data-page="field"] .field-chip { min-height: 36px; padding: 6px 11px; font-size: 13.5px; }
   .main[data-page="field"] .field-overview { height: clamp(440px, calc(100dvh - 300px), 700px); min-height: 0; grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); gap: 12px; }
   .main[data-page="field"] .field-overview > .panel { min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
   .main[data-page="field"] .field-overview > .panel:first-child { display: flex; flex-direction: column; }
