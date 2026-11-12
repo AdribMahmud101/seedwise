@@ -203,7 +203,13 @@ document.addEventListener('ropon:report-ready', async () => {
   if (!consumeToastSequence()) return;
   await refreshNotifications();
   const store = readNotificationState();
-  playToastSequence(visibleNotifications(store.cache.items || [], store).filter(item => !store.read[item.id]), {
+  const items = visibleNotifications(store.cache.items || [], store);
+  // Right after a plan is completed, the next toast always points to today's disaster analytics for that field
+  // (built from the same real model headline, even if the morning outlook toast was already dismissed).
+  const brief = items.find(item => item.type === 'disaster');
+  const followUp = brief && { ...brief, id: `${brief.id}:after-plan`, title: t('Your plan is ready — check today\'s disaster analytics', 'পরিকল্পনা তৈরি — আজকের দুর্যোগ বিশ্লেষণ দেখুন'),
+    body: brief.title, cta: t('See analytics', 'বিশ্লেষণ দেখুন'), href: 'recovery' };
+  playToastSequence([...(followUp && !store.read[followUp.id] ? [followUp] : []), ...items.filter(item => !store.read[item.id] && item.type !== 'disaster')], {
     persist: true, onDismiss: markToastRead,
     onShow: () => {
       const bell = document.querySelector('.notification-bell');
