@@ -131,6 +131,8 @@ let placesData = null;
 let powerLoading = false;
 let powerError = null;
 let fieldCtaObserver = null;
+let fieldIndicatorPosition = null;
+let fieldSelectorObserver = null;
 
 async function loadCustomPower(f = field(), fetchFn = fetch) {
   if (!f || !f.custom) return;
@@ -453,6 +455,8 @@ function setField(id) {
 function disposeMap() {
   fieldCtaObserver?.disconnect();
   fieldCtaObserver = null;
+  fieldSelectorObserver?.disconnect();
+  fieldSelectorObserver = null;
   if (tapMarker) {
     tapMarker.remove();
     tapMarker = null;
@@ -756,22 +760,26 @@ function home() {
       ) +
         button(t("Find a field", "জমি খুঁজুন"), "search", "primary", "search"),
     )}${chips()}</div>` +
-    `<div class="grid-two field-overview"><section class="panel"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
+    `<div class="grid-two field-overview"><section class="panel field-map-card"><div class="panel-header"><h2>${t("Field map", "জমির মানচিত্র")}</h2><div class="panel-header-actions">${tag(t("Satellite imagery", "স্যাটেলাইট ছবি"), "green")}</div></div>
+ <div class="map-shell">
+   <div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div>
  <div class="map-switcher">
    <div class="map-segmented" role="tablist" aria-label="${t("Map layer switcher", "মানচিত্রের স্তর নির্বাচন")}">
-     <button type="button" class="button ${layerMode === "high-detail" ? "active" : ""}" data-action="set-layer-mode" data-value="high-detail" role="tab" aria-selected="${layerMode === "high-detail"}" ${!online ? "disabled" : ""} title="${!online ? t("Needs internet", "ইন্টারনেট প্রয়োজন") : ""}" aria-label="${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}">${icon("camera", 14)} <span class="label-full">${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}</span><span class="label-short">${t("Photo", "ছবি")}</span>${!online ? ` <small class="layer-offline-note">(${t("needs internet", "ইন্টারনেট প্রয়োজন")})</small>` : ""}</button>
+     <button type="button" class="button ${layerMode === "high-detail" ? "active" : ""}" data-action="set-layer-mode" data-value="high-detail" role="tab" aria-selected="${layerMode === "high-detail"}" ${!online ? "disabled" : ""} title="${!online ? t("Needs internet", "ইন্টারনেট প্রয়োজন") : t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}" aria-label="${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}">${icon("camera", 14)} <span class="label-full">${t("High detail (online)", "উচ্চ স্পষ্টতা (অনলাইন)")}</span><span class="label-short">${t("Photo", "ছবি")}</span>${!online ? ` <small class="layer-offline-note">(${t("needs internet", "ইন্টারনেট প্রয়োজন")})</small>` : ""}</button>
      <button type="button" class="button ${layerMode === "natural" ? "active" : ""}" data-action="set-layer-mode" data-value="natural" role="tab" aria-selected="${layerMode === "natural"}" title="${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}" aria-label="${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}">${icon("layers", 14)} <span class="label-full">${t("Natural colour 10 m (offline)", "প্রাকৃতিক রং ১০ মি (অফলাইন)")}</span><span class="label-short">${t("Colour 10 m", "রং ১০ মি")}</span></button>
      <button type="button" class="button ${layerMode === "ndvi" ? "active" : ""}" data-action="set-layer-mode" data-value="ndvi" role="tab" aria-selected="${layerMode === "ndvi"}" title="${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}" aria-label="${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}">${icon("tree", 14)} <span class="label-full">${t("Greenness NDVI (offline)", "সবুজভাব NDVI (অফলাইন)")}</span><span class="label-short">${t("NDVI", "NDVI")}</span></button>
    </div>
+   <details class="map-layers-menu">
+     <summary>${icon("layers", 16)} ${t("Layers", "স্তর")}<span class="disclosure-mark" aria-hidden="true">+</span></summary>
+     <div class="map-layers-panel">
    <div class="map-subcontrols">
      <div class="map-opacity-control">
        <label for="layer-opacity-slider">${t("Opacity", "স্বচ্ছতা")}:</label>
        <input type="range" id="layer-opacity-slider" name="layerOpacity" min="0.1" max="1.0" step="0.05" value="${layerOpacity}" title="${t("Adjust imagery opacity to view field outline", "জমির সীমানা স্পষ্ট দেখতে ছবির স্বচ্ছতা কমান-বাড়ান")}">
      </div>
-     <button type="button" class="button small ${showOsmContext ? "primary" : ""}" data-action="toggle-osm-context">${icon("field", 14)} ${t("Context lines", "রাস্তা ও নদী")}</button>
+     <button type="button" class="button small ${showOsmContext ? "primary" : ""}" data-action="toggle-osm-context" aria-pressed="${showOsmContext}">${icon("field", 14)} ${t("Context lines", "রাস্তা ও নদী")}</button>
      <button type="button" class="button small ${showLowGround ? "primary" : ""}" data-action="toggle-low-ground" aria-pressed="${showLowGround && !!lowGroundSite}" ${lowGroundSite ? "" : "hidden"}>${icon("water", 14)} ${t("Low ground", "নিচু জমি")}</button>
    </div>
- </div>
  ${showTimeline ? `
  <div class="map-timeline">
    <span class="map-timeline-label">${icon("seasons", 14)} ${t("Observation date", "পর্যবেক্ষণের তারিখ")}:</span>
@@ -785,17 +793,20 @@ function home() {
    </div>
    <span class="map-timeline-status">${isDateReliable ? `<span class="tag green">✓ ${t("Clear observation", "পরিষ্কার ছবি")}</span>` : `<span class="tag amber">⊘ ${t("No reliable observation", "নির্ভরযোগ্য পর্যবেক্ষণ নেই")}</span>`}</span>
  </div>` : ""}
- <div class="map-shell">
-   <div id="field-map" class="field-map" role="region" aria-label="${t("Interactive Rangpur field map", "রংপুরের ইন্টার‌্যাক্টিভ মানচিত্র")}"></div>
-   <div class="map-overline" id="map-label">${chipHtml}</div>
-   <div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div>
- </div>
  ${legendHtml}
  ${showLowGround && lowGroundSite ? `<div class="map-legend-bar low-ground-legend">
    <span class="legend-swatch low-ground-swatch" aria-hidden="true"></span>
    <span class="low-ground-description">${t("Lower than land around it — water may collect after heavy rain. Approximate (30 m, includes trees)", "আশেপাশের জমির চেয়ে নিচু — ভারী বৃষ্টির পর পানি জমতে পারে। আনুমানিক (৩০ মি, গাছের উচ্চতাও অন্তর্ভুক্ত)")}</span>
    ${truth("MODELED")} ${nasaBadge("nasadem")}
  </div>` : ""}
+     </div>
+   </details>
+ </div>
+ <div class="map-footer">
+ <details class="map-info">
+   <summary>${icon("pin", 14)} ${t("Source & location", "উৎস ও অবস্থান")}<span class="map-info-coordinates">${num(f.lat, 3)}° N · ${num(f.lon, 3)}° E</span><span class="disclosure-mark" aria-hidden="true">+</span></summary>
+   <div class="map-info-body"><div class="map-overline" id="map-label">${chipHtml}</div><div class="map-bottom">N ↑ &nbsp; ${num(f.lat, 3)}° N &nbsp; ${num(f.lon, 3)}° E</div></div>
+ </details>
  <div class="map-actions">
    <div class="map-controls">
      <button type="button" class="button small ${pickMapMode ? "primary" : ""} map-action-btn" data-action="toggle-pick-map" data-value="" title="${pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন")}" aria-label="${pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন")}">${icon("pin")}<span class="label-full">${pickMapMode ? t("Cancel pick", "পয়েন্ট বাতিল") : t("Pick on map", "মানচিত্রে বাছুন")}</span><span class="label-short">${pickMapMode ? t("Cancel", "বাতিল") : t("Pick", "বাছুন")}</span></button>
@@ -803,8 +814,9 @@ function home() {
      <button type="button" class="button small ${drawMode ? "primary" : ""} map-action-btn" data-action="draw" data-value="" title="${drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা")}" aria-label="${drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা")}">${icon("draw")}<span class="label-full">${drawMode ? t("Editing corners…", "কোণ বদল হচ্ছে…") : t("Edit boundary", "সীমানা সম্পাদনা")}</span><span class="label-short">${drawMode ? t("Editing", "সম্পাদনা") : t("Boundary", "সীমানা")}</span></button>
      ${hasCustomBoundary && !drawMode ? button(t("Reset outline", "আগের সীমানা"), "reset-demo", "small ghost") : ""}
    </div>
- </div><div id="inspect-sheet" class="inspect-sheet" aria-live="polite"></div><div id="drawing-help"></div></section>
- <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${boundaryTruth}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(net.netHa)}">${num(net.netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${num(net.netHa * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div><dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div><dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div><dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
+ </div>
+ </div></div><div id="inspect-sheet" class="inspect-sheet" aria-live="polite"></div><div id="drawing-help"></div></section>
+ <section class="panel"><div class="field-card"><div class="field-intro"><div class="eyebrow">${t("Plot dossier", "জমির পরিচয়")} / ${plotDossierNum}</div><h2>${esc(fieldName())}</h2><div class="location">${dossierLocation}</div></div><dl class="field-meta"><div><dt>${t("Boundary area", "জমির আয়তন")}</dt><dd class="large" title="${units(area())}">${num(area(), 2)} <small>ha</small></dd><small class="unit-note">${num(area() * 2.47105381, 2)} ac · ${num(area() * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${boundaryTruth}</div><div><dt>${t("Cultivable area", "চাষযোগ্য আয়তন")} ${button(t("Edit", "বদলান"), "edit-net-area", "ghost small net-area-edit")}</dt><dd class="large" title="${units(net.netHa)}">${num(net.netHa, 2)} <small>ha</small></dd><small class="unit-note">${num(net.netPct, 1)}% ${t("of gross", "মোট আয়তনের")} · ${num(net.netHa * 247.105381, 1)} ${t("decimals", "শতক")}</small> ${isNetEdited(f.id) ? truth("FARMER_REPORTED", { source: "Farmer inputs", date: "2024" }) : truth("SCENARIO", { source: "Default bunds", date: "2024" })}</div><div class="field-detail">${icon("field", 16)}<dt>${t("Field boundary", "জমির সীমানা")}</dt><dd>${boundaryLabel}</dd></div><div class="field-detail">${icon("tree", 16)}<dt>${t("Planning crop", "পরিকল্পনার ফসল")}</dt><dd>${cropName(p.crop)}</dd></div><div class="field-detail">${icon("seasons", 16)}<dt>${t("Expected harvest", "সম্ভাব্য ফসল তোলা")}</dt><dd>${esc(p.harvest)} ${truth("SCENARIO", { source: "Planning assumption", date: "2024" })}</dd></div></dl>
  <div class="field-recommend"><div class="eyebrow">${t("Next decision", "পরবর্তী সিদ্ধান্ত")}</div><h3>${first ? t(first.crops.join(" → "), first.bnCrops.join(" → ")) : t("Review field constraints", "জমির শর্ত দেখুন")}</h3><p>${t("Compare four full rotations using your priorities and the winter planting window.", "আপনার অগ্রাধিকার ও বপনের সময় ধরে চারটি ফসলচক্র তুলনা করুন।")}</p><div class="next-step-hint">${t("Next step 2 of 4 · Rotation studio — pick crops for this field", "পরের ধাপ ২/৪ · ফসলচক্র স্টুডিও — এই জমির জন্য ফসল বাছুন")}</div>${goButton(t("Explore rotations", "ফসলচক্র দেখুন"), "rotations", "primary full")}</div></div>
  <div class="field-bottom">${icon("draw", 13)}${button(t("Edit field assumptions", "জমির অনুমান বদলান"), "profile", "ghost small")}</div></section></div>
  <aside class="field-mobile-cta" hidden>${goButton(t("Next: Rotation studio → Explore rotations", "পরের ধাপ: ফসলচক্র স্টুডিও → ফসলচক্র দেখুন"), "rotations", "primary")}</aside>
@@ -1087,6 +1099,26 @@ async function mountMap() {
   if (selectedChip && typeof selectedChip.scrollIntoView === "function") {
     selectedChip.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
   }
+  if (selectedChip) {
+    const selector = selectedChip.closest(".field-selector");
+    const measure = () => ({ left: selectedChip.parentElement.offsetLeft, width: selectedChip.parentElement.offsetWidth });
+    const previous = fieldIndicatorPosition || measure();
+    selector.style.setProperty("--active-left", `${previous.left}px`);
+    selector.style.setProperty("--active-width", `${previous.width}px`);
+    // Commit the previous position before animating the new selection after a repaint.
+    selector.getBoundingClientRect();
+    const updateIndicator = () => {
+      fieldIndicatorPosition = measure();
+      selector.style.setProperty("--active-left", `${fieldIndicatorPosition.left}px`);
+      selector.style.setProperty("--active-width", `${fieldIndicatorPosition.width}px`);
+    };
+    updateIndicator();
+    fieldSelectorObserver = new ResizeObserver(updateIndicator);
+    fieldSelectorObserver.observe(selector);
+    fieldSelectorObserver.observe(selectedChip.parentElement);
+  }
+  const mapInfo = document.querySelector(".map-info");
+  if (mapInfo) mapInfo.open = window.matchMedia("(min-width: 701px)").matches;
   const el = document.querySelector("#field-map");
   if (!el || !window.L) return;
   await loadMapData();
