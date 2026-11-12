@@ -102,7 +102,8 @@ export function hazardsFor(plan, floodPack, outlookPack) {
 const RICE = new Set(['rice', 'aman', 'boro']);
 export function pickTolerantVarieties(planCrops, hazards, pack, limit = 4) {
   const varieties = Array.isArray(pack?.varieties) ? pack.varieties : [];
-  const norm = planCrops.map(c => (RICE.has(c) ? 'rice' : c));
+  // Custom plans use names like "Aman rice": match per word as well as the whole name.
+  const norm = planCrops.flatMap(c => { const w = String(c).toLowerCase().split(/\s+/); return [...w, String(c).toLowerCase(), ...(w.some(x => RICE.has(x) || x === 'rice') ? ['rice'] : [])]; });
   const scored = [];
   for (const v of varieties) {
     if (!v?.variety || !Array.isArray(v.crops)) continue;
