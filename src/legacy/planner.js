@@ -51,14 +51,12 @@ function plannerSaveSource() {
 
 function plannerSaveCTA() {
   const active = getPlan();
-  if (active && !(active.rotation?.customPlan && getSavedPlan(active.id))) return '';
   const source = plannerSaveSource();
   return `<div class="plan-save plan-save-footer">${button(active ? t('Save plan', 'পরিকল্পনা সংরক্ষণ') : t('Save as my plan', 'আমার পরিকল্পনা হিসেবে সংরক্ষণ'), 'plan-save', 'primary')}${source.message ? `<p class="note" role="status"><a href="#${source.route}">${source.message}</a></p>` : ''}</div>`;
 }
 
 function savePlannerPlan() {
   const active = getPlan();
-  if (active && !(active.rotation?.customPlan && getSavedPlan(active.id))) return;
   const source = plannerSaveSource();
   if (source.message) { toast(source.message); return; }
   try {

@@ -375,9 +375,9 @@ test('custom summary uses each crop spacing and shares, with Scenario / AI label
   assert.match(planner(), /আমার পরিকল্পনা হিসেবে সংরক্ষণ/);
 });
 
-test('active journeys retain their existing finish actions', () => {
+test('active journeys can also save straight from the planner', () => {
   journey.startPlan();
-  assert.doesNotMatch(planner(), /data-action="plan-save"/);
+  assert.match(planner(), /data-action="plan-save"/);
 });
 
 test('direct standard layout choices persist without starting a journey', async () => {
