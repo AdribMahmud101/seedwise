@@ -55,6 +55,47 @@ import {
 import { getSmapSurfaceForMonth } from "./water.js";
 import { netArea, polygonPerimeterM, DEFAULT_NET_INPUTS } from "./netarea.js";
 import { outlookCard, floodCard, outlookSite, rainVerdict, backtestYears } from "./outlook-flood.js";
+import { mountBarChart, mountLineChart } from "./charts-react.js";
+
+let seasonChartDisposers = [];
+
+export function disposeSeasonCharts() {
+  seasonChartDisposers.forEach((dispose) => dispose());
+  seasonChartDisposers = [];
+}
+
+export function mountSeasonCharts() {
+  disposeSeasonCharts();
+  document.querySelectorAll("#main-content .sw-chart").forEach((el) => {
+    const props = JSON.parse(el.dataset.chartProps);
+    seasonChartDisposers.push(el.dataset.chart === "annual-rain"
+      ? mountBarChart(el, props)
+      : mountLineChart(el, props));
+  });
+}
+
+function chartPlaceholder(type, props, label) {
+  return `<div class="sw-chart" data-chart="${type}" data-chart-props="${esc(JSON.stringify(props))}" role="img" aria-label="${esc(label)}"></div>`;
+}
+
+function seasonLineChart(series, months, options) {
+  if (!series.some((s) => s.values.some(finiteNum))) return `<p class="empty">${t("No valid observations", "বৈধ পর্যবেক্ষণ নেই")}</p>`;
+  const keys = series.map((s, i) => `s${i}`);
+  const labels = months.map((_, i) => monthName(i, true));
+  const data = months.map((_, i) => Object.fromEntries([
+    ["month", labels[i]],
+    ...series.map((s, j) => [keys[j], finiteNum(s.values[i]) ? s.values[i] : null]),
+  ]));
+  const props = {
+    data,
+    series: series.map((s, i) => ({ key: keys[i], label: s.label, color: s.color, dash: s.dash })),
+    unit: options.unit,
+    max: options.max,
+    selected: labels[state.month],
+  };
+  return `<div class="chart-legend">${series.map((s) => `<span><i class="legend-dot" style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}<span>${esc(options.unit)}</span></div>` +
+    chartPlaceholder("monthly-lines", props, options.description);
+}
 
 export function netInputsFor(fieldId = state.fieldId) {
   const saved = state.netInputs?.[fieldId];
@@ -873,20 +914,9 @@ function yearBars(archiveMonths, year) {
     total: archiveMonths.filter((v) => v.month.startsWith(String(y))).reduce((a, v) => a + (finiteNum(v.rainGpm) ? v.rainGpm : 0), 0),
   }));
   if (!totals.every((r) => finiteNum(r.total))) return "";
-  const width = 320, height = 168, left = 40, right = 10, top = 18, bottom = 24;
-  const hi = Math.max(...totals.map((r) => r.total), 1);
-  const slot = (width - left - right) / totals.length, bw = Math.min(44, slot * 0.55);
-  const y = (v) => top + ((hi - v) * (height - top - bottom)) / hi;
-  let svg = "";
-  for (let j = 0; j <= 2; j++) {
-    const v = (hi * j) / 2;
-    svg += `<line class="grid" x1="${left}" y1="${y(v).toFixed(1)}" x2="${width - right}" y2="${y(v).toFixed(1)}"/><text x="${left - 5}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end">${num(v, 0)}</text>`;
-  }
-  totals.forEach((r, i) => {
-    const cx = left + slot * (i + 0.5), sel = r.y === year;
-    svg += `<text x="${cx.toFixed(1)}" y="${(y(r.total) - 5).toFixed(1)}" text-anchor="middle" class="yearbar-val">${num(r.total, 0)}</text><rect x="${(cx - bw / 2).toFixed(1)}" y="${y(r.total).toFixed(1)}" width="${bw.toFixed(1)}" height="${(height - bottom - y(r.total)).toFixed(1)}" class="yearbar${sel ? " selected" : ""}"><title>${r.y} · ${num(r.total, 1)} mm</title></rect><text x="${cx.toFixed(1)}" y="${height - 6}" text-anchor="middle" class="yearbar-year${sel ? " selected" : ""}">${r.y}</text>`;
-  });
-  return `<div class="chart-legend"><span><i class="legend-dot" style="background:#517e8b"></i>GPM IMERG</span><span>mm / year</span></div><div class="chart-frame"><svg class="chart yearbars" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Annual rainfall by year", "বছর অনুযায়ী বার্ষিক বৃষ্টি"))}">${svg}</svg></div>`;
+  const props = { data: totals.map(({ y, total }) => ({ year: y, total })), selected: year };
+  return `<div class="chart-legend"><span><i class="legend-dot" style="background:#517e8b"></i>GPM IMERG</span><span>mm / year</span></div>` +
+    chartPlaceholder("annual-rain", props, t("Annual rainfall by year", "বছর অনুযায়ী বার্ষিক বৃষ্টি"));
 }
 
 // GRACE groundwater anomaly months (2024 only in the shipped file).
@@ -988,7 +1018,7 @@ function seasonView() {
     `<div class="notice section-space">${monthName()} ${year} · ${t("Rainfall", "বৃষ্টি")} <b>${num(m.rainGpm, 1)} mm</b> ${truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" })}. ${t("Same-month average in the other four archive years", "আর্কাইভের বাকি চার বছরে একই মাসের গড়")} <b>${num(comparisonMean, 1)} mm</b> ${nasaBadge("imerg", "2021–2025")}. ${t("This is a short historical comparison.", "এটি স্বল্পমেয়াদি ঐতিহাসিক তুলনা।")}</div>` +
     `<div class="grid-equal section-space">${panel(
       t("Where the rain went", "কোন মাসে কত বৃষ্টি"),
-      chart(
+      seasonLineChart(
         [
           {
             label: "GPM IMERG",
@@ -1002,16 +1032,17 @@ function seasonView() {
             dash: true,
           },
         ],
+        months,
         {
           unit: "mm / month",
-          description: "Monthly rainfall estimated by two products",
+          description: t("Monthly rainfall estimated by two products", "দুটি পণ্যের মাসিক বৃষ্টির অনুমান"),
         },
       ) +
         `<p class="note">${t("The wettest IMERG month was", "IMERG অনুযায়ী সবচেয়ে বেশি বৃষ্টি")} ${monthName(months.indexOf(wet))} (${num(wet.rainGpm, 1)} mm). ${t("The driest was", "সবচেয়ে কম")} ${monthName(months.indexOf(dry))} (${num(dry.rainGpm, 1)} mm).</p>` + truth("REMOTE_OBSERVED", { source: "NASA GPM IMERG", date: "2024", cell: "10km" }) + " " + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }), nasaBadge(["imerg", "power"], String(year)),
     )}
  ${panel(
    t("How wet the soil was", "মাটি কতটা ভেজা ছিল"),
-   chart(
+   seasonLineChart(
      [
        {
          label: t("Surface layer", "উপরিভাগ"),
@@ -1025,10 +1056,11 @@ function seasonView() {
          dash: true,
        },
      ],
+     months,
      {
        unit: t("wetness index 0–1", "আর্দ্রতা সূচক ০–১"),
        max: 1,
-       description: "POWER surface and root-zone wetness",
+       description: t("POWER surface and root-zone wetness", "POWER-এর উপরিভাগ ও শিকড়ের স্তরের আর্দ্রতা"),
      },
    ) +
      `<p class="note">${t("These regional model indices describe relative wetness. A soil probe can supply a local reading.", "এলাকার মডেল থেকে আপেক্ষিক আর্দ্রতা পাওয়া যায়। জমির নিজস্ব মাপের জন্য মাটির সেন্সর ব্যবহার করুন।")}</p>` + truth("MODELED", { source: "NASA POWER", date: "2024", cell: "50km" }), nasaBadge("wetness", String(year)),

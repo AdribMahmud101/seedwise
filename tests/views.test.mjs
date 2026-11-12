@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { state, loadData, truth, stateEmpty, stateError, exampleBanner } from "../src/legacy/ui.js";
+import { state, archive, loadData, truth, stateEmpty, stateError, exampleBanner } from "../src/legacy/ui.js";
 import { home, seasonView, formatNdvi, queryNdvi, projectWgs84ToUtm45N, fieldAction, getLayerMode, setLayerMode } from "../src/legacy/fields.js";
 import { rotations } from "../src/legacy/rotations.js";
 import { planner } from "../src/legacy/planner.js";
@@ -563,6 +563,32 @@ test("no '%' after wetness value in #field and #seasons", async () => {
       assert.ok(!wetnessIndexMatch[0].includes("%"), `No % after wetness index in #seasons ${lang}`);
     }
   }
+});
+
+test("#seasons emits accessible Recharts mounts with the unchanged archive series", async () => {
+  globalThis.document = { baseURI: new URL("../public/", import.meta.url).href };
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(url, "utf8")),
+  });
+  await loadData();
+  state.lang = "en";
+  state.fieldId = "mithapukur";
+  state.historyYear = 2024;
+  state.month = 10;
+  const html = seasonView();
+  const charts = [...html.matchAll(/<div class="sw-chart" data-chart="([^"]+)" data-chart-props="([^"]+)" role="img" aria-label="([^"]+)"><\/div>/g)];
+  const props = charts.map(([, type, json, label]) => ({ type, data: JSON.parse(json.replaceAll("&quot;", '"')), label }));
+  assert.deepEqual(props.map((chart) => chart.type), ["monthly-lines", "monthly-lines", "annual-rain"]);
+  assert.ok(props.every((chart) => chart.label));
+  const annual = props[2].data;
+  assert.equal(annual.selected, 2024);
+  assert.deepEqual(annual.data.map(({ year }) => year), [2021, 2022, 2023, 2024, 2025]);
+  assert.deepEqual(annual.data.map(({ year, total }) => total), [2021, 2022, 2023, 2024, 2025].map((year) =>
+    archive.fields.mithapukur.monthly.filter((row) => row.month.startsWith(String(year))).reduce((sum, row) => sum + (Number.isFinite(row.rainGpm) ? row.rainGpm : 0), 0),
+  ));
+  assert.deepEqual(props[0].data.data.map(({ s0 }) => s0), archive.fields.mithapukur.monthly.filter((row) => row.month.startsWith("2024")).map((row) => row.rainGpm));
+  assert.ok(html.includes("GPM IMERG") && html.includes("Estimated"));
 });
 
 test("truth badges in #field and #seasons have proper source, date, cell info", async () => {
