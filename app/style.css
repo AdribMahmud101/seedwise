@@ -4305,7 +4305,7 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
   .main[data-page="planner"] .planner-compact-head > p { display: none; }
   .main[data-page="planner"] .planner-head-line .field-chip { min-height: 30px; }
   .main[data-page="planner"] .planner-compact-head .page-head-actions .button { min-height: 32px; }
-  .main[data-page="planner"] #plant-controls { display: flex; flex: 1; flex-direction: column; min-height: 100%; }
+  .main[data-page="planner"] #plant-controls { display: flex; flex: 1; flex-direction: column; min-height: 0; } /* flex:1 already fills; 100% stopped it scrolling and hid the sticky Save */
   .main[data-page="planner"] #plan-seasons:empty { display: none; }
   .main[data-page="planner"] .planner3d-panel > .panel-header:not(#studio-3d-host *) { min-height: 30px; padding: 2px 10px; }
   .main[data-page="planner"] .planner3d-panel > .panel-header h2:not(#studio-3d-host *) { font-size: 14px; }
