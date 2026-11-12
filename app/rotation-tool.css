@@ -1772,9 +1772,16 @@ body:has(#rotation-list) :is(.nav-item, .brand) {
 .rot-choose-main { font-weight: 700; font-size: 15px; }
 .rot-choose-sub { font-size: 12px; opacity: 0.85; display: flex; gap: 8px; align-items: center; }
 .rot-choose-score { padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); }
-.rot-choose-pulse { animation: rot-choose-glow 2.4s ease-in-out infinite; }
-@keyframes rot-choose-glow { 0%, 100% { box-shadow: 0 6px 18px rgba(36, 57, 44, 0.22), 0 0 0 0 rgba(122, 176, 92, 0.45); } 50% { box-shadow: 0 6px 18px rgba(36, 57, 44, 0.22), 0 0 0 8px rgba(122, 176, 92, 0); } }
-@media (prefers-reduced-motion: reduce) { .rot-choose-pulse { animation: none; } }
+/* Visible ripple: two soft rings expand from the button in turn; gentle lift on hover, press-in on tap. */
+.rot-choose-pulse { position: relative; isolation: isolate; overflow: visible; transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease; }
+.rot-choose-pulse::before, .rot-choose-pulse::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; border: 2px solid rgba(122, 176, 92, 0.75); pointer-events: none; animation: rot-choose-ring 2.8s cubic-bezier(.22,.61,.36,1) infinite; }
+.rot-choose-pulse::after { animation-delay: 1.4s; }
+@keyframes rot-choose-ring { 0% { transform: scale(1); opacity: .9; } 80%, 100% { transform: scale(1.18, 1.45); opacity: 0; } }
+.rot-choose-pulse .rot-choose-main { display: inline-block; }
+.rot-choose-pulse:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(36, 57, 44, 0.3); }
+.rot-choose-pulse:active { transform: translateY(0) scale(.97); transition-duration: .12s; }
+.rot-choose-pulse:hover::before, .rot-choose-pulse:hover::after, .rot-choose-pulse:focus-visible::before, .rot-choose-pulse:focus-visible::after { animation-play-state: paused; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .rot-choose-pulse::before, .rot-choose-pulse::after { animation: none; opacity: 0; } .rot-choose-pulse, .rot-choose-pulse:hover { transform: none; } }
 @media (max-width: 700px) {
   .rot-choose-slot { margin-left: 0; width: 100%; }
   .rot-choose-btn { width: 100%; }
