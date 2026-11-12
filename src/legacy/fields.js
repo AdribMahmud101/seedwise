@@ -827,15 +827,6 @@ function home() {
        "পোকা, পাতার ক্ষতি বা মাটির সমস্যা লিখুন",
      ),
    ],
-   [
-     "research",
-     "research",
-     t("Add a field observation", "পর্যবেক্ষণ যোগ করুন"),
-     t(
-       "Connect rain, soil tests and measured yields",
-       "বৃষ্টি, মাটি ও ফলনের রেকর্ড রাখুন",
-     ),
-   ],
  ]
    .map(
      ([route, symbol, name, sub]) =>
