@@ -138,7 +138,7 @@ function advisorSteps(context) {
 }
 
 function checkStepsHtml() {
-  return `<div class="adv-checking" aria-live="polite"><span class="adv-check-planty">${plantyMascot('thinking')}</span><ol>${ui.checkSteps.map(([label, badge], i) => `<li class="${i < ui.stepIndex ? 'done' : i === ui.stepIndex ? ui.stepError ? 'failed' : 'active' : ''}"><span class="adv-step-mark" aria-hidden="true">${i < ui.stepIndex ? '✓' : i === ui.stepIndex ? ui.stepError ? '✕' : '<i></i>' : ''}</span><span>${label}</span>${badge}</li>`).join('')}</ol></div>`;
+  return `<div class="adv-checking" aria-live="polite" tabindex="-1"><span class="adv-check-planty">${plantyMascot('thinking')}</span><ol>${ui.checkSteps.map(([label, badge], i) => `<li class="${i < ui.stepIndex ? 'done' : i === ui.stepIndex ? ui.stepError ? 'failed' : 'active' : ''}"><span class="adv-step-mark" aria-hidden="true">${i < ui.stepIndex ? '✓' : i === ui.stepIndex ? ui.stepError ? '✕' : '<i></i>' : ''}</span><span>${label}</span>${badge}</li>`).join('')}</ol></div>`;
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -146,6 +146,8 @@ async function runChecks(context, resultPromise) {
   ui.checkSteps = advisorSteps(context);
   ui.stepIndex = 0; ui.stepError = false;
   rerender();
+  // Bring Planty's working steps into view as soon as a check starts (preset tap or Check button).
+  requestAnimationFrame(() => { const el = document.querySelector('#advisor-card .adv-checking'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.focus?.({ preventScroll: true }); });
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     ui.stepIndex = resultPromise ? ui.checkSteps.length - 1 : ui.checkSteps.length;
     rerender();
