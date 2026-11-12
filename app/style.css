@@ -4679,3 +4679,16 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .notification-panel button[data-notify="approve"] { min-height: 40px; padding: 8px 18px; border-radius: 10px; background: #2f6946; color: #fff; font-weight: 700; box-shadow: 0 6px 16px rgba(47, 105, 70, .25); }
 .notification-panel button[data-notify="approve"]:hover { background: #24573a; }
 .notification-panel button[data-notify="later"] { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; color: #4b564d; }
+/* Planty chat Markdown */
+.planty-md { margin-top: 4px; font-size: 14.5px; line-height: 1.6; color: #24392c; }
+.planty-md > :first-child { margin-top: 0; } .planty-md > :last-child { margin-bottom: 0; }
+.planty-md p { margin: 0 0 8px; }
+.planty-md h3, .planty-md h4, .planty-md h5 { margin: 12px 0 6px; font-size: 15px; font-weight: 700; color: #1d2a22; }
+.planty-md ul, .planty-md ol { margin: 4px 0 10px; padding-left: 20px; }
+.planty-md li { margin: 3px 0; padding-left: 2px; }
+.planty-md ul li::marker { color: #4d8558; }
+.planty-md ol li::marker { color: #4d8558; font-weight: 700; }
+.planty-md strong { color: #1d3a29; font-weight: 700; }
+.planty-md code { padding: 1px 6px; border-radius: 6px; background: #e3eadb; font-size: .92em; }
+.planty-md a { color: #2f6946; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.planty-md blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #a9c66e; background: #f4f7ee; border-radius: 0 8px 8px 0; color: #4b564d; }

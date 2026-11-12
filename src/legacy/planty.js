@@ -1,3 +1,4 @@
+import { renderMarkdown } from './markdown.js';
 import { t, esc } from './ui.js';
 import { detectChatLanguage, summarizePlan, validClinicResponse, validSuggestion } from './planty-chat-helpers.js';
 
@@ -26,7 +27,7 @@ function getMessages(id) {
   try { messages = JSON.parse(sessionStorage.getItem(CHAT_KEY) || '[]').filter(x => x.planId === id).slice(-40); }
   catch { messages = []; }
 }
-function msg(m) { return `<article class="planty-message ${m.role}"><small>${m.role === 'user' ? t('You', 'আপনি') : 'Planty'}</small><p>${esc(m.text)}</p>${m.suggestion ? suggestionMarkup(m.suggestion) : ''}</article>`; }
+function msg(m) { return `<article class="planty-message ${m.role}"><small>${m.role === 'user' ? t('You', 'আপনি') : 'Planty'}</small>${m.role === 'user' ? `<p>${esc(m.text)}</p>` : `<div class="planty-md">${renderMarkdown(m.text)}</div>`}${m.suggestion ? suggestionMarkup(m.suggestion) : ''}</article>`; }
 function suggestionMarkup(s) { return `<section class="planty-suggestion-card"><strong>${t('Plan suggestion', 'পরিকল্পনার প্রস্তাব')}</strong><p>${esc(s.changes.map(x => `${x.from} → ${x.to}: ${x.why}`).join(' · '))}</p><button type="button" data-apply-suggestion>${t('Apply to plan', 'পরিকল্পনায় যোগ করুন')}</button><button type="button" data-dismiss-suggestion>${t('Not now', 'এখন নয়')}</button></section>`; }
 export function plantyPanel() {
   return `<button type="button" class="planty-launch" aria-haspopup="dialog" aria-expanded="${open}">🌱 <span>${t('Ask Planty', 'প্ল্যান্টিকে জিজ্ঞেস করুন')}</span></button>
@@ -69,7 +70,8 @@ export function mountPlanty(getContext) {
     const chip=modal.querySelector('.planty-diagnosis-chip');chip.hidden=!diagnosis;chip.innerHTML=diagnosis?`${local('Clinic attached:','যুক্ত রোগ:')} ${esc(t(diagnosis.name.en,diagnosis.name.bn))} <button type="button" data-detach-diagnosis aria-label="${local('Remove diagnosis','রোগের তথ্য বাদ দিন')}">×</button>`:'';
   }
   function setOpen(value) { if(value&&!open) returnFocus=document.activeElement; open=value; modal.hidden=!open;launch.setAttribute('aria-expanded',String(open)); document.body.classList.toggle('planty-modal-open',open); if(open){refresh();panel.focus();}else if(returnFocus?.isConnected)returnFocus.focus(); }
-  const reveal = (element, text) => { const paragraph=element.querySelector('p');if(!paragraph)return;if(matchMedia('(prefers-reduced-motion: reduce)').matches){paragraph.textContent=text;return;}paragraph.textContent='';let index=0;const timer=setInterval(()=>{if(!paragraph.isConnected){clearInterval(timer);return;}paragraph.textContent=text.slice(0,index+=4);if(index>=text.length)clearInterval(timer);},8); };
+  // Typewriter reveal that renders Markdown as it grows (never shows raw ** or - markers).
+  const reveal = (element, text) => { const body=element.querySelector('.planty-md');if(!body)return;if(matchMedia('(prefers-reduced-motion: reduce)').matches){body.innerHTML=renderMarkdown(text);return;}body.innerHTML='';let index=0;const timer=setInterval(()=>{if(!body.isConnected){clearInterval(timer);return;}index=Math.min(text.length,index+4);body.innerHTML=renderMarkdown(text.slice(0,index));const log=body.closest('.planty-messages');if(log)log.scrollTop=log.scrollHeight;if(index>=text.length)clearInterval(timer);},8); };
   launch.onclick=()=>setOpen(true); modal.querySelector('.planty-close').onclick=()=>setOpen(false);modal.querySelector('[data-close-planty]').onclick=()=>setOpen(false);
   modal.querySelector('.planty-tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;refresh();}};
   modal.querySelector('.planty-tabs').onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const tabs=[...modal.querySelectorAll('[role="tab"]')];const index=tabs.indexOf(e.target);const next=e.key==='Home'?0:e.key==='End'?1:1-index;e.preventDefault();tab=tabs[next].dataset.tab;refresh();tabs[next].focus();};
