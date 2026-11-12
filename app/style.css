@@ -4999,3 +4999,5 @@ body:has(.journey-start) .field-guide-btn { display: none; }
 .cal-sources a { color: #315c3d; }
 .calendar-page .cal-drawer button[data-cal-ask] { width: 100%; }
 .cal-drawer { height: auto; }
+/* drawer has its own Ask button; avoid the floating launcher covering it */
+body:has(#calendar-page .cal-drawer) .planty-launch { opacity: 0; pointer-events: none; }
