@@ -461,6 +461,7 @@ function disposeMap() {
   if (sheet) sheet.innerHTML = "";
   if (leafletMap) {
     lastView = { fieldId: mountedFieldId, regional, center: leafletMap.getCenter(), zoom: leafletMap.getZoom() };
+    leafletMap.stop();
     leafletMap.off();
     leafletMap.remove();
     leafletMap = null;

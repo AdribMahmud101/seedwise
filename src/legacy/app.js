@@ -1,3 +1,4 @@
+import { consumeToastSequence, playToastSequence } from './notify-toast.js';
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
 import { getPlan, listPlans, openPlan, approveRefinement, restorePreviousPlan } from './journey.js';
 import { requestReplay } from './plan-pipeline.js';
@@ -125,7 +126,8 @@ function renderNotifications() {
   badge.textContent = count > 9 ? '9+' : count ? String(count) : '';
   badge.hidden = count === 0;
   const host = document.querySelector('.notification-host');
-  if (host?.classList.contains('open')) host.innerHTML = panelHtml(store.cache.items || [], store);
+  const pop = host?.querySelector('.notification-pop');
+  if (pop) pop.innerHTML = host.classList.contains('open') ? panelHtml(store.cache.items || [], store) : '';
 }
 function relativeTask(plan, today = new Date()) {
   return deriveChecklist(plan, null).filter(item => !plan.checklist?.[item.id]).map(item => {
@@ -158,7 +160,14 @@ async function refreshNotifications() {
       const response = await fetch('/api/rotation-advisor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: state.lang, mode: 'refine', crops: Object.values(entry.plan.planting).map(p => p.crop), plan: entry.plan, context: { fieldId: entry.plan.field.id, fieldName: entry.plan.field.name, areaHa: entry.plan.field.areaHa, outlook: outlookSummaryLine(entry.plan.field.id, outlook) || '', flood: floodSummaryLine(entry.plan.field.id, floodFields) || '' } }) });
       if (!response.ok) continue;
       const result = await response.json();
-      if (result.verdict !== 'refine') { store.cache[cacheKey] = null; continue; }
+      if (result.verdict !== 'refine') {
+        const ev = result.evidence?.[0];
+        const review = { id: notificationId('review', date, entry.id), type: 'review', createdAt: `${date}T00:00:00Z`,
+          title: t(`Planty re-checked your ${entry.plan.field.name} plan: still the best fit ✓`, `প্ল্যান্টি ${entry.plan.field.name}-এর পরিকল্পনা আবার দেখেছে: এখনও সেরা ✓`),
+          body: ev ? `${t('Evidence', 'প্রমাণ')}: ${ev.title}` : t('No better crop found for this season.', 'এই মৌসুমে এর চেয়ে ভালো ফসল পাওয়া যায়নি।'),
+          cta: t('Open plan', 'পরিকল্পনা খুলুন'), href: `plan/${encodeURIComponent(entry.id)}`, confidence: result.confidence };
+        store.cache[cacheKey] = review; incoming.push(review); continue;
+      }
       const changes = result.changes.map(change => {
         const season = entry.plan.rotation.seasons[change.season], planting = result.newPlanting[change.season];
         const settings = season && entry.plan.planting[season.key];
@@ -176,6 +185,19 @@ async function refreshNotifications() {
   writeNotificationState(store);
   renderNotifications();
 }
+// After the user completes a plan, play the real notifications as a timed toast sequence (judges see it once).
+document.addEventListener('ropon:report-ready', async () => {
+  if (!consumeToastSequence()) return;
+  await refreshNotifications();
+  const store = readNotificationState();
+  playToastSequence(visibleNotifications(store.cache.items || [], store).filter(item => !store.read[item.id]), {
+    onShow: () => {
+      const bell = document.querySelector('.notification-bell');
+      bell?.classList.remove('bell-bump'); void bell?.offsetWidth; bell?.classList.add('bell-bump'); // restart the shake per toast
+    },
+  });
+});
+
 function evidence() {
   modal(
     t("Evidence register", "তথ্যসূত্রের খাতা"),
@@ -201,7 +223,7 @@ function render() {
   document.querySelector("#app").innerHTML =
     `<a href="#main-content" class="skip">${t("Skip to content", "মূল অংশে যান")}</a><aside class="sidebar"><a class="brand" href="#field"><img src="/assets/mark.svg" alt=""><div><strong>SeedWise</strong></div></a><div class="nav-label">${t("FIELD WORKSPACE", "জমির কাজ")}</div><nav aria-label="${t("Workspace", "কর্মক্ষেত্র")}">${nav}</nav>
  <div class="side-bottom"><div class="region-mark"><i class="status-dot"></i><strong>${t("Rangpur field lab", "রংপুর মাঠ গবেষণা")}</strong></div><p>${t("Bangladesh · Three prepared sites", "বাংলাদেশ · তিনটি প্রস্তুত স্থান")}</p><div class="sidebar-foot"><span>24°–27° N</span><span>FIELD EDITION 01</span></div></div></aside><button class="nav-shade" data-action="menu" aria-label="${t("Close navigation", "মেনু বন্ধ করুন")}"></button>
- <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="notification-host"><button class="notification-bell" aria-expanded="false">${bellIcon}<span class="notification-badge" hidden></span></button></div><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
+ <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="notification-host"><button class="notification-bell" aria-expanded="false">${bellIcon}<span class="notification-badge" hidden></span></button><div class="notification-pop"></div></div><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
  <div id="journey-bar-slot">${journeyBar(current[0])}</div>
  <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
   if (current[0] === "seasons") mountSeasonCharts();
@@ -241,9 +263,10 @@ document.addEventListener("click", (event) => {
   if (!el) return;
   if (el.classList.contains('notification-bell')) {
     const host = document.querySelector('.notification-host');
-    host.classList.toggle('open');
-    el.setAttribute('aria-expanded', String(host.classList.contains('open')));
-    if (host.classList.contains('open')) { renderNotifications(); host.querySelector('.notification-panel')?.focus(); }
+    if (host.classList.contains('open')) { closeNotifications(); return; }
+    host.classList.add('open');
+    el.setAttribute('aria-expanded', 'true');
+    renderNotifications(); host.querySelector('.notification-panel')?.focus();
     return;
   }
   if (el.dataset.notify) {
@@ -263,7 +286,7 @@ document.addEventListener("click", (event) => {
     }
     writeNotificationState(store);
     renderNotifications();
-    if (el.dataset.notify === 'open') document.querySelector('.notification-host')?.classList.remove('open');
+    if (el.dataset.notify === 'open') closeNotifications();
     return;
   }
   if (el.dataset.journey) {
@@ -410,7 +433,7 @@ document.querySelector("#modal").addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (e) => {
   const host = document.querySelector('.notification-host.open');
-  if (e.key === 'Escape' && host) { host.classList.remove('open'); document.querySelector('.notification-bell')?.focus(); }
+  if (e.key === 'Escape' && host) { closeNotifications(); document.querySelector('.notification-bell')?.focus(); }
   if (e.key === 'Tab' && host) {
     const focusable = [...host.querySelectorAll('button,a[href]')];
     if (focusable.length && e.shiftKey && document.activeElement === focusable[0]) { e.preventDefault(); focusable.at(-1).focus(); }
@@ -419,9 +442,16 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape")
     document.querySelector(".sidebar")?.classList.remove("open");
 });
+function closeNotifications() {
+  const host = document.querySelector('.notification-host.open');
+  if (!host) return;
+  host.classList.remove('open');
+  host.querySelector('.notification-pop')?.replaceChildren();
+  document.querySelector('.notification-bell')?.setAttribute('aria-expanded', 'false');
+}
 document.addEventListener('click', event => {
   const host = document.querySelector('.notification-host.open');
-  if (host && !host.contains(event.target)) { host.classList.remove('open'); document.querySelector('.notification-bell')?.setAttribute('aria-expanded', 'false'); }
+  if (host && event.target.isConnected && !host.contains(event.target)) closeNotifications();
 });
 window.addEventListener("hashchange", () => {
   const currentRoute = route();

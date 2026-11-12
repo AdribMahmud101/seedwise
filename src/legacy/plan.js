@@ -778,6 +778,7 @@ function finishPipeline(pipeline, current, summaryPromise) {
   pipeline.querySelector('.plg-skip')?.remove();
   const heading = pipeline.querySelector('.plg-head h2');
   if (heading) heading.textContent = t('Report ready ✓', 'প্রতিবেদন তৈরি ✓');
+  document.dispatchEvent?.(new CustomEvent('ropon:report-ready'));
   const mascot = pipeline.querySelector('.plg-planty');
   if (mascot) mascot.innerHTML = plantyMascot('happy');
   revealReport();

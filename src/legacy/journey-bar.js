@@ -1,3 +1,4 @@
+import { queueToastSequence } from './notify-toast.js';
 import { t, esc, state, field, polygon, profile, agronomy, toast, repaint, modal, close } from './ui.js';
 import { getPlan, startPlan, demoPlan, confirmField, fieldSnapshot, confirmRotation,
   rotationSnapshot, confirmPlanting, markPlanGenerated, stepStatus, nextStep, reviewReasons, allSeasonsReviewed, subscribe,
@@ -239,6 +240,7 @@ export async function journeyAction(action, value) {
       if (plan.mode === 'demo') resetPlan();
       celebrate('planting', t('Planting confirmed!', 'বপনের মাপ নিশ্চিত হয়েছে!'));
       sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
+      queueToastSequence();
       navigate('plans');
     } else if (action === 'exit-prompt') {
       showExitPrompt();

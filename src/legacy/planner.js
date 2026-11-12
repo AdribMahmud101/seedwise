@@ -1,3 +1,4 @@
+import { queueToastSequence } from './notify-toast.js';
 import { webglAvailable } from './webgl-probe.js';
 import { customPlanFor3d, customCount, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput, customSeasonToggle } from './advisor.js';
 import { recommendedSetupChanges } from './recommended-setup.js';
@@ -100,6 +101,7 @@ function savePlannerPlan() {
     persist();
     sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
     // Open the new plan's report so Planty's generation pipeline plays right away.
+    queueToastSequence();
     location.hash = '#plan';
   } catch (error) {
     if (!active) resetPlan();
