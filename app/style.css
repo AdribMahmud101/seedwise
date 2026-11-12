@@ -4004,7 +4004,8 @@ dialog .modal-body {
   [data-page="planner"] .planner3d-panel > .panel-header h2 { margin: 0; font-size: 16px; }
   [data-page="planner"] .planner3d-stage-wrap { flex: 1; min-height: 0; }
   [data-page="planner"] .planner3d-toolbar { flex-wrap: nowrap; gap: 6px; padding: 5px 8px; }
-  [data-page="planner"] .planner3d-toolbar .cs-season-toggle { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; gap: 4px; padding: 0; overflow-x: auto; border: 0; background: transparent; white-space: nowrap; }
+  [data-page="planner"] .planner3d-toolbar { flex-wrap: wrap; row-gap: 6px; }
+  [data-page="planner"] .planner3d-toolbar .cs-season-toggle { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; gap: 6px; padding: 0; border: 0; background: transparent; white-space: nowrap; }
   [data-page="planner"] .planner3d-toolbar .cs-season-toggle button { flex: none; min-height: 34px; padding: 3px 8px; font-size: 11px; }
   [data-page="planner"] .planner3d-toolbar .cs-wy-note { flex: 0 0 150px; font-size: 10px; white-space: normal; }
   [data-page="planner"] .planner3d-view-toggle { flex: none; flex-wrap: nowrap; gap: 2px; padding: 2px; }
@@ -4282,17 +4283,17 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .main[data-page="planner"] .planner-compact-head .page-head-actions { gap: 6px; }
 .main[data-page="planner"] .planner-compact-head .page-head-actions .button { min-height: 36px; padding: 6px 10px; }
 .main[data-page="planner"] .planner-compact-head > p { flex-basis: 100%; margin: 0; font-size: 12px; }
-.main[data-page="planner"] .adv-plan-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; margin: 0 0 8px; padding: 6px 10px; border-left-width: 4px; }
-.main[data-page="planner"] .adv-plan-head { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; gap: 8px; }
+.main[data-page="planner"] .adv-plan-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 10px; padding: 10px 16px; border-left-width: 4px; }
+.main[data-page="planner"] .adv-plan-head { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; gap: 12px; }
 .main[data-page="planner"] .adv-verdict { flex: none; border-radius: 999px; padding: 3px 8px; background: var(--adv); color: white; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .main[data-page="planner"] .adv-plan-head h2 { margin: 0; font-size: 14px; line-height: 1.25; }
 .main[data-page="planner"] .adv-plan-head > .button { margin-left: auto; flex: none; min-height: 28px; height: 28px; padding: 2px 8px; }
-.main[data-page="planner"] .adv-plan-crops { flex: 0 1 auto; gap: 5px; margin: 0; }
+.main[data-page="planner"] .adv-plan-crops { flex: 0 1 auto; gap: 8px; margin: 0; }
 .main[data-page="planner"] .adv-plan-crop { gap: 5px; min-height: 30px; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
 .main[data-page="planner"] button.adv-plan-crop { min-height: 28px; }
 .main[data-page="planner"] .adv-plan-crop i { width: 8px; height: 8px; }
 .main[data-page="planner"] .adv-plan-crop strong, .main[data-page="planner"] .adv-plan-crop small { display: inline; font-size: 11px; }
-.main[data-page="planner"] .adv-plan-details { flex: 0 0 auto; font-size: 11px; }
+.main[data-page="planner"] .adv-plan-details { flex: 0 0 auto; margin-left: auto; align-self: center; font-size: 12px; }
 .main[data-page="planner"] .adv-plan-details[open] { flex-basis: 100%; }
 .main[data-page="planner"] .adv-plan-details summary { cursor: pointer; color: var(--muted); }
 .main[data-page="planner"] .adv-plan-details ul { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 5px 0; padding-left: 18px; }
