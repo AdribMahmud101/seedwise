@@ -1,3 +1,4 @@
+import { cropMonths } from './advisor.js';
 import { webglAvailable } from './webgl-probe.js';
 import {
   state, earth, agronomy, allFields, polygon, t, esc, num,
@@ -410,9 +411,15 @@ function field3dCard(plan, activeKey) {
   const planted = (plan.rotation?.seasons ?? []).filter(season => season.crop !== 'fallow');
   const chips = planted.map(season =>
     `<button type="button" class="plan-chip${season.key === activeKey ? ' active' : ''}" data-action="plan-season3d" data-value="${esc(season.key)}" aria-pressed="${season.key === activeKey}">${cropGlyph(season.crop)}<span>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</span></button>`).join('');
+  // Custom (AI) plans show the whole year at once: each season's crop in its own strip.
+  const wholeYear = !!plan.rotation?.customPlan;
+  const toolbar = `<div class="planner3d-toolbar plan3d-toolbar">${wholeYear ? `<span class="plan3d-whole">${t('Whole year', 'সারা বছর')} · ${planted.map(season => esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))).join(' + ')}</span><small class="plan3d-whole-note">${t('Each part of the field shows one season’s crop — in reality each crop uses the whole field in its season.', 'জমির প্রতিটি অংশে এক মৌসুমের ফসল — বাস্তবে প্রতিটি ফসল নিজ মৌসুমে পুরো জমি নেয়।')}</small>` : ''}<div class="planner3d-view-toggle" role="group" aria-label="${t('Field view', 'জমির দৃশ্য')}">
+    <button type="button" class="planner3d-view-btn${plan3dView !== 'top' ? ' active' : ''}" data-action="plan3d-view" data-value="3d" aria-pressed="${plan3dView !== 'top'}">${t('3D', '৩ডি')}</button>
+    <button type="button" class="planner3d-view-btn${plan3dView === 'top' ? ' active' : ''}" data-action="plan3d-view" data-value="top" aria-pressed="${plan3dView === 'top'}">${t('Top', 'উপর থেকে')}</button></div>
+    <div class="planner3d-zoom-controls"><button type="button" class="planner3d-ctrl-btn" data-action="plan3d-zoom" data-value="1" aria-label="${t('Zoom in', 'কাছে আনুন')}">+</button><button type="button" class="planner3d-ctrl-btn" data-action="plan3d-zoom" data-value="-1" aria-label="${t('Zoom out', 'দূরে নিন')}">−</button></div></div>`;
   return `<section class="panel plan-3d"><div class="panel-header"><h2>${t('Your field in 3D', '৩ডি-তে আপনার জমি')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
-    <div class="panel-body"><div class="plan-chip-row" role="group" aria-label="${t('Season to preview', 'কোন মৌসুম দেখবেন')}">${chips}</div>
-    <div class="planner3d-stage-wrap plan-stage"><div class="planner3d-stage-canvas-host plan-canvas-host" tabindex="0" role="region" aria-label="${t('Field model. Drag to rotate.', 'জমির মডেল। ঘোরাতে টানুন।')}"><canvas id="plan-model" class="planner-canvas" aria-label="${t('Planting rows in 3D', '৩ডি-তে সারির নকশা')}"></canvas></div>
+    <div class="panel-body">${wholeYear ? '' : `<div class="plan-chip-row" role="group" aria-label="${t('Season to preview', 'কোন মৌসুম দেখবেন')}">${chips}</div>`}
+    <div class="planner3d-stage-wrap plan-stage">${toolbar}<div class="planner3d-stage-canvas-host plan-canvas-host" tabindex="0" role="region" aria-label="${t('Field model. Drag to rotate.', 'জমির মডেল। ঘোরাতে টানুন।')}"><canvas id="plan-model" class="planner-canvas" aria-label="${t('Planting rows in 3D', '৩ডি-তে সারির নকশা')}"></canvas></div>
     <div class="planner3d-footer"><span class="planner3d-crop-chip">${t('Illustrative · rows drawn at readable scale', 'কাল্পনিক · বোঝার সুবিধায় সারি বড় করে দেখানো')}</span></div></div>
     <p class="note plan-fallback-note" hidden>${t('3D is not available here — the layout below shows the same plan.', 'এখানে ৩ডি নেই — নিচের নকশায় একই পরিকল্পনা দেখুন।')}</p>
     <div class="plan-static-layout">${planTopViewSVG(plan, activeKey, { lang: state.lang, uid: 'hero' })}</div></div></section>`;
@@ -508,6 +515,17 @@ function emptyPlan() {
 }
 
 let active3dKey = null;
+let plan3dView = '3d';
+
+// Whole-year custom model: every planted season as an equal strip, AI model/colour + saved spacing.
+function wholeYearCustom(plan) {
+  const custom = plan.rotation.customPlan;
+  const seasons = plan.rotation.seasons.filter(season => season.crop !== 'fallow' && plan.planting[season.key]);
+  const share = Math.round(1000 / Math.max(1, seasons.length)) / 10;
+  return { ...custom, planting: seasons.map(season => ({
+    ...(custom.planting?.[plan.rotation.seasons.indexOf(season)] || {}), ...plan.planting[season.key], sharePct: share,
+    label: `${plan.planting[season.key].crop} · ${cropMonths(custom.calendar, plan.planting[season.key].crop) || t('its season', 'নিজ মৌসুম')}` })) };
+}
 
 export function plan() {
   const current = displayPlan();
@@ -611,10 +629,8 @@ function schedulePlan3d() {
         field: planField, polygon: outline, agronomy, soilProfile,
         // Custom plans have no built-in rotation id ("custom" made buildStudioData throw); the
         // previewed season's own model/colour/height come from the AI plan, spacing from settings.
-        ...(fresh.rotation.customPlan
-          ? { custom: { ...fresh.rotation.customPlan, planting: [{ ...(fresh.rotation.customPlan.planting?.[fresh.rotation.seasons.findIndex(s => s.key === active3dKey)] || {}), ...settings, sharePct: 100 }] } }
-          : { rotationId: fresh.rotation.id }),
-        planner: { crop: settings.crop, row: settings.rowSpacingCm, spacing: settings.withinRowCm, usable: settings.usableAreaPct },
+        ...(fresh.rotation.customPlan ? { custom: wholeYearCustom(fresh) } : { rotationId: fresh.rotation.id }),
+        planner: { crop: settings.crop, row: settings.rowSpacingCm, spacing: settings.withinRowCm, usable: settings.usableAreaPct, view: plan3dView },
         net: { inputs: fresh.field.netInputs ?? netInputsFor(fresh.field.id),
           edited: fresh.field.netEdited ?? isNetEdited(fresh.field.id) },
       });
@@ -790,6 +806,16 @@ export function planAction(action, value) {
     repaint();
   } else if (action === 'plan-edit') {
     if (editReadyPlan()) location.hash = 'planner';
+  } else if (action === 'plan3d-view') {
+    plan3dView = value === 'top' ? 'top' : '3d';
+    document.querySelectorAll('[data-action="plan3d-view"]').forEach(control => {
+      const on = control.dataset.value === plan3dView;
+      control.classList.toggle('active', on);
+      control.setAttribute('aria-pressed', String(on));
+    });
+    planner3dModule?.setPlanner3dView(plan3dView);
+  } else if (action === 'plan3d-zoom') {
+    planner3dModule?.zoomPlanner3d(Number(value));
   } else if (action === 'plan-season3d') {
     const current = displayPlan();
     if (!current?.planting[value]) return;
