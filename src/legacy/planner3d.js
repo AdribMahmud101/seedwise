@@ -2148,7 +2148,9 @@ function fitPerspective(data) {
   });
   // Closer default on bigger previews (owner: field looked small); phones keep more margin.
   const hostW = renderer?.domElement?.clientWidth || 0;
-  const zoom = hostW >= 820 ? 0.7 : hostW >= 560 ? 0.8 : 0.9;
+  // Wide, short previews are height-bound, so the field looks small: zoom in further there.
+  const wide = hostAspect() > 2.2 ? 0.85 : 1;
+  const zoom = (hostW >= 820 ? 0.7 : hostW >= 560 ? 0.8 : 0.9) * wide;
   const target = framing.target;
   const distance = framing.distance * zoom;
   cameraPersp.position.set(...framing.position.map((v, i) => target[i] + (v - target[i]) * zoom));
