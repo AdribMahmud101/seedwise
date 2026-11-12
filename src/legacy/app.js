@@ -1,5 +1,6 @@
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
 import { getPlan } from './journey.js';
+import { runShowMe } from './journey-story.js';
 import { plan, mountPlan, disposePlan, planAction, planChange } from './plan.js';
 import { plans, mountPlans, disposePlans, plansAction } from './plans.js';
 import { boundaryAction, boundarySubmit } from "./boundary.js";
@@ -174,6 +175,10 @@ document.addEventListener("click", (event) => {
   const action = el.dataset.action,
     value = el.dataset.value;
   if (!action) return;
+  if (action === "guide-field") {
+    runShowMe();
+    return;
+  }
   if (action === "menu") {
     const open = document.querySelector(".sidebar").classList.toggle("open");
     document
