@@ -147,7 +147,7 @@ async function runChecks(context, resultPromise) {
   ui.stepIndex = 0; ui.stepError = false;
   rerender();
   // Bring Planty's working steps into view as soon as a check starts (preset tap or Check button).
-  requestAnimationFrame(() => { const el = document.querySelector('#advisor-card .adv-checking'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.focus?.({ preventScroll: true }); });
+  globalThis.requestAnimationFrame?.(() => { const el = document.querySelector('#advisor-card .adv-checking'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.focus?.({ preventScroll: true }); });
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     ui.stepIndex = resultPromise ? ui.checkSteps.length - 1 : ui.checkSteps.length;
     rerender();
