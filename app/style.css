@@ -4175,7 +4175,10 @@ label.plan-import { cursor: pointer; }
 }
 
 /* My plans (#plans) saved plans list & cards */
-.plan-back-bar { margin-bottom: 12px; }
+.plan-back-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 20px; }
+.plan-back-bar > .button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.plan-back-bar > .button.primary { border-color: transparent; }
+.plan-back-bar > .plan-back-link + .button { margin-left: auto; } /* back on the left, actions on the right */
 .plan-back-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; text-decoration: none; color: #233d2b; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); }
 .plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-top: 14px; }
 .plan-card { background: #fffefb; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); transition: border-color .2s, box-shadow .2s; }
