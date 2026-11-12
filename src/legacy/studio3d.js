@@ -1,3 +1,4 @@
+import { webglAvailable } from './webgl-probe.js';
 
 async function loadS1WaterData() {
   if (s1WaterData !== null) return s1WaterData;
@@ -264,17 +265,7 @@ const shadowTextureCache = new Map();
 
 /* ------------------------------------------------------------ capabilities */
 
-export function hasWebGL() {
-  try {
-    const c = document.createElement("canvas");
-    return Boolean(
-      window.WebGLRenderingContext &&
-        (c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl")),
-    );
-  } catch (e) {
-    return false;
-  }
-}
+export function hasWebGL() { return webglAvailable(); }
 
 function isPhone() {
   return typeof window !== "undefined" && window.innerWidth <= 600;
@@ -5415,6 +5406,7 @@ export function disposeStudio3d() {
   }
   if (renderer) {
     renderer.dispose();
+    renderer.forceContextLoss(); // free the GL context now; leaked ones made Chrome drop the planner's
     renderer = null;
   }
   if (canvas?.parentNode) canvas.parentNode.removeChild(canvas);

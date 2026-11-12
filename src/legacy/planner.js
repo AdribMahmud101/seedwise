@@ -1,3 +1,4 @@
+import { webglAvailable } from './webgl-probe.js';
 import { customPlanFor3d, customCount, clearCustomPlan, customPlanBanner, setCustomSeason, getCustomPlan, customSettingsPanel, customInput, customSeasonToggle } from './advisor.js';
 import { recommendedSetupChanges } from './recommended-setup.js';
 import {
@@ -500,16 +501,7 @@ let plannerVersion = 0;
 let disposePlanty = null;
 let resultFrame = null;
 
-function hasPlannerWebGL() {
-  try {
-    const probe = document.createElement('canvas');
-    const context = window.WebGLRenderingContext && (probe.getContext('webgl2') || probe.getContext('webgl'));
-    context?.getExtension('WEBGL_lose_context')?.loseContext();
-    return Boolean(context);
-  } catch {
-    return false;
-  }
-}
+function hasPlannerWebGL() { return webglAvailable(); }
 
 function schedulePlanner3d() {
   clearTimeout(plannerTimer);

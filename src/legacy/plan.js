@@ -1,3 +1,4 @@
+import { webglAvailable } from './webgl-probe.js';
 import {
   state, earth, agronomy, allFields, polygon, t, esc, num,
   nasaBadge, truth, header, panel, tag, button, toast, repaint, download,
@@ -571,16 +572,7 @@ let planHost = null;
 let planVersion = 0;
 let summaryRequest = 0;
 
-function hasWebGL() {
-  try {
-    const probe = document.createElement('canvas');
-    const context = window.WebGLRenderingContext && (probe.getContext('webgl2') || probe.getContext('webgl'));
-    context?.getExtension('WEBGL_lose_context')?.loseContext();
-    return Boolean(context);
-  } catch {
-    return false;
-  }
-}
+function hasWebGL() { return webglAvailable(); }
 
 function planFieldInput(current) {
   const found = allFields().find(item => item.id === current.field.id);

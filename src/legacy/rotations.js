@@ -1,3 +1,4 @@
+import { webglAvailable } from './webgl-probe.js';
 import {
   nasaBadge,
   state,
@@ -291,17 +292,6 @@ function studioNoWebglCard() {
 }
 
 // Local WebGL probe so rotations.js never statically imports three.js.
-function webglAvailable() {
-  try {
-    const c = document.createElement('canvas');
-    return Boolean(
-      window.WebGLRenderingContext &&
-        (c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'))
-    );
-  } catch {
-    return false;
-  }
-}
 
 function setSkeletonProgress(host, frac) {
   const fill = host?.querySelector('.studio-skeleton-fill');

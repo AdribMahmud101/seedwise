@@ -1,3 +1,4 @@
+import { webglAvailable } from './webgl-probe.js';
 /**
  * LAND3D - 3D landscape of Mithapukur, Pirganj, and Gangachara.
  * Lazy-loads MapLibre GL JS v5 only when scrolled into view (IntersectionObserver).
@@ -74,17 +75,7 @@ function frameCamera(map) {
   return INITIAL_CAMERA;
 }
 
-function hasWebGL() {
-  try {
-    const canvas = document.createElement("canvas");
-    return Boolean(
-      window.WebGLRenderingContext &&
-        (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")),
-    );
-  } catch (e) {
-    return false;
-  }
-}
+function hasWebGL() { return webglAvailable(); }
 
 function loadMapLibre() {
   if (window.maplibregl) return Promise.resolve(window.maplibregl);
