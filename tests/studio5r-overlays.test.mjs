@@ -50,8 +50,8 @@ test('pins expose disclosure state and bilingual details remain outside the canv
       for (const pin of pins) assert.match(pin, /aria-expanded="false" aria-controls="studio-soil-popover"/);
       assert.equal((html.match(/id="studio-soil-popover"/g) || []).length, 1);
       assert.ok(html.indexOf('class="studio-soil-layers"') > html.indexOf('class="studio-model-caption"'));
-      assert.match(html, /role="tablist"/);
-      assert.match(html, lang === 'en' ? /Cross-section A–A′/ : /আড়াআড়ি ছেদ A–A′/);
+      assert.doesNotMatch(html, /studio-inspection|data-inspection-tab|probe-card|transect-card|svg-transect/);
+      assert.equal((html.match(/class="soil-info"/g) || []).length, 6);
       assert.match(html, lang === 'en' ? /Soil layers/ : /মাটির স্তরসমূহ/);
       assert.match(html, lang === 'en' ? /Unknown — add local reading/ : /অজানা — স্থানীয় তথ্য দিন/);
     }
