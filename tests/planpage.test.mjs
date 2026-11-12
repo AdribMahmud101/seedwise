@@ -166,6 +166,62 @@ test('calendar geometry follows sow→grow→harvest across New Year with gaps a
   assert.match(bn, /বপন/);
 });
 
+test('rotation overview shares calendar months, marks today and leaves fallow and gaps muted', () => {
+  const current = ready('baseline');
+  const html = planPage.rotationOverview(current, { nowMonth: 0, lang: 'en' });
+  const months = [...html.matchAll(/<div class="plan-overview-month"[^>]*>([\s\S]*?)(?=<div class="plan-overview-month"|<\/div><\/div>\s*<ul)/g)];
+  assert.equal(months.length, 12);
+  assert.equal((html.match(/aria-current="date"/g) ?? []).length, 1);
+  assert.match(months[0][0], /aria-current="date"/);
+  assert.match(months[0][1], /<small>Now<\/small>/);
+  const geometry = planPage.calendarGeometry(current.rotation.seasons);
+  months.forEach((month, index) => {
+    assert.equal((month[1].match(/segment planted/g) ?? []).length,
+      geometry.rows.filter(row => row.crop !== 'fallow' && row.months.includes(index)).length);
+  });
+  assert.match(html, /Aman rice/);
+  assert.match(html, /Field rest/);
+  const potatoPlan = ready('legume');
+  const potato = potatoPlan.rotation.seasons.find(season => season.crop === 'potato');
+  potatoPlan.rotation.seasons = [potato];
+  const partial = planPage.rotationOverview(potatoPlan, { nowMonth: 6 });
+  assert.equal((partial.match(/segment planted/g) ?? []).length, 4); // Nov, Dec, Jan, Feb
+  assert.match(partial, /aria-label="Gap"/);
+  assert.match(partial, /Nov → Feb/);
+  assert.match(partial, /60 × 25 cm/);
+});
+
+test('rotation overview uses full custom crop names, Bengali labels and saved spacing', () => {
+  const current = { rotation: { customPlan: { planting: [{ color: '#123abc' }] }, seasons: [
+    { key: 'custom-0', crop: 'Aman rice', cropBn: 'আমন ধান', sowMonth: 7, harvestMonth: 11 },
+    { key: 'custom-1', crop: '<Wheat>', sowMonth: 11, harvestMonth: 3 },
+  ] }, planting: { 'custom-0': { rowSpacingCm: 24, withinRowCm: 18 } } };
+  const en = planPage.rotationOverview(current, { nowMonth: 10, lang: 'en' });
+  assert.match(en, /<b>Aman rice<\/b>/);
+  assert.match(en, /24 × 18 cm/);
+  assert.match(en, /--season-color:#123abc/);
+  assert.match(en, /&lt;Wheat&gt;/);
+  assert.ok(!en.includes('<Wheat>'));
+  const bn = planPage.rotationOverview(current, { nowMonth: 10, lang: 'bn' });
+  assert.match(bn, /আমন ধান/);
+  assert.match(bn, /জুলাই → নভে/);
+  assert.match(bn, /24 × 18 সেমি/);
+  assert.match(bn, /<small>এখন<\/small>/);
+});
+
+test('report keeps hero and overview first, and counts only current checklist tasks', () => {
+  const current = ready('legume');
+  journey.importPlanJSON(JSON.stringify({ ...current, checklist: { 'sow-aman': true, 'old-task': true } }));
+  const html = planPage.plan();
+  assert.ok(html.indexOf('panel plan-hero') < html.indexOf('panel plan-overview'));
+  assert.ok(html.indexOf('panel plan-overview') < html.indexOf('Your numbers'));
+  assert.match(html, /id="plan-task-count" role="status">1 of 5 done/);
+  assert.match(html, /id="plan-task-progress" value="1" max="5"/);
+  assert.match(html, /<input type="checkbox" data-check="sow-aman" checked/);
+  assert.match(html, /class="plan-task-month">Jul/);
+  assert.match(html, /class="plan-task-text">transplant Aman rice/);
+});
+
 test('checklist derives one sow item per season plus conditional steps, each short', () => {
   for (const id of ['legume', 'mustard', 'potato', 'baseline']) {
     const items = planPage.deriveChecklist(ready(id));

@@ -2,12 +2,12 @@ import { cropMonths } from './advisor.js';
 import { webglAvailable } from './webgl-probe.js';
 import {
   state, earth, agronomy, allFields, polygon, t, esc, num,
-  nasaBadge, truth, header, panel, tag, button, toast, repaint, download,
+  nasaBadge, truth, header, tag, button, toast, repaint, download,
   outlook as outlookPack, floodFields, smap as smapPack, graceGroundwater as gracePack,
 } from './ui.js';
 import { monthlyRotationWater, CROP_KC } from './engine.js';
 import { outlookPlanHint, outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
-import { getPlan, getReadyPlan, editReadyPlan, importPlanJSON, markPlanGenerated, stepStatus, savePlan } from './journey.js';
+import { getPlan, getReadyPlan, defaultPlanName, editReadyPlan, importPlanJSON, markPlanGenerated, stepStatus, savePlan } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setPlannerSeason } from './planner.js';
@@ -390,19 +390,52 @@ function heroCard(plan) {
   const ready = (plan.steps?.plan === 'done' && generated) || getReadyPlan()?.id === plan.id;
   const date = (generated ?? plan.updatedAt ?? '').slice(0, 10);
   const seasons = plan.rotation?.seasons ?? [];
+  const saved = getReadyPlan();
+  const name = saved?.id === plan.id ? saved.name : defaultPlanName(plan);
   const names = state.lang === 'bn' ? MONTH_BN : MONTH_EN;
   const chips = seasons.map(season =>
     `<span class="plan-chip plan-crop-${esc(season.crop)}">${cropGlyph(season.crop)}<span><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b><small>${esc(names[season.sowMonth - 1])}–${esc(names[season.harvestMonth - 1])}</small></span></span>`).join('');
   return `<section class="panel plan-hero"><div class="plan-hero-top"><span class="plan-planty">${plantyMascot('happy')}</span>
     <div><div class="eyebrow">${ready ? t('Plan ready ✓', 'পরিকল্পনা তৈরি ✓') : t('Draft plan', 'খসড়া পরিকল্পনা')} · ${esc(date)}</div>
-    <h2>${esc(plan.field?.name ?? t('My field', 'আমার জমি'))}</h2>
-    <p>${num(plan.field?.areaHa ?? 0, 2)} ha · ${esc(plan.rotation?.name ?? '')} ${truth('SCENARIO')}</p></div></div>
+    <h2>${esc(name)}</h2>
+    <p>${esc(plan.field?.name ?? t('My field', 'আমার জমি'))} · ${esc(plan.rotation?.name ?? '')} ${truth('SCENARIO')}</p></div></div>
     ${plan.mode === 'demo' ? `<p class="plan-demo-ribbon">${tag(t("Demo — Rahim's field", 'ডেমো — রহিমের জমি'), 'amber')}</p>` : ''}
+    <dl class="plan-hero-stats"><div><dt>${t('Field area', 'জমির আয়তন')}</dt><dd>${num(plan.field.areaHa, 2)} <small>ha</small></dd></div>
+    <div><dt>${t('Planted seasons', 'চাষের মৌসুম')}</dt><dd>${num(seasons.filter(season => season.crop !== 'fallow').length)}</dd></div></dl>
     <div class="plan-ribbon" role="list" aria-label="${t('Rotation seasons', 'ফসলচক্রের মৌসুম')}">${chips}</div></section>`;
 }
 
+export function rotationOverview(plan, { nowMonth = new Date().getMonth(), lang = state.lang } = {}) {
+  const bn = lang === 'bn';
+  const names = bn ? MONTH_BN : MONTH_EN;
+  const seasons = plan.rotation?.seasons ?? [];
+  const { rows } = calendarGeometry(seasons, nowMonth);
+  const labels = rows.map(row => bn ? row.cropBn || cropLabel(row.crop, lang) : cropLabel(row.crop, lang));
+  const colors = rows.map((row, i) => {
+    const customColor = plan.rotation.customPlan?.planting?.[i]?.color;
+    const palette = [CROP_BAR.aman, CROP_BAR.boro, CROP_BAR.mustard, CROP_BAR.potato, CROP_BAR.mungbean];
+    return /^#[0-9a-f]{6}$/i.test(customColor) ? customColor : (CROP_BAR[row.crop] ?? palette[i % palette.length]).grow;
+  });
+  const months = names.map((name, month) => {
+    const active = rows.filter(row => row.months.includes(month));
+    return `<div class="plan-overview-month"${month === nowMonth ? ' aria-current="date"' : ''}><span>${esc(name)}</span>
+      <div class="plan-overview-bands" aria-label="${esc(active.map(row => labels[rows.indexOf(row)]).join(', ') || (bn ? 'খালি' : 'Gap'))}">${rows.map((row, i) =>
+        `<i class="plan-overview-segment${row.months.includes(month) && row.crop !== 'fallow' ? ' planted' : ''}" style="--season-color:${colors[i]}" title="${esc(labels[i])}"></i>`).join('')}</div>
+      ${month === nowMonth ? `<small>${bn ? 'এখন' : 'Now'}</small>` : ''}</div>`;
+  }).join('');
+  const details = rows.map((row, i) => {
+    const season = seasons[i];
+    const settings = plan.planting?.[row.key];
+    return `<li style="--season-color:${colors[i]}"><b>${esc(labels[i])}</b><span>${esc(names[season.sowMonth - 1])} → ${esc(names[season.harvestMonth - 1])}</span>
+      ${row.crop === 'fallow' ? `<small>${bn ? 'জমির বিশ্রাম' : 'Field rest'}</small>` : settings ? `<small>${esc(settings.rowSpacingCm)} × ${esc(settings.withinRowCm)} ${bn ? 'সেমি' : 'cm'}</small>` : ''}</li>`;
+  }).join('');
+  return `<section class="panel plan-overview"><div class="panel-header"><div><div class="eyebrow">${bn ? 'এক নজরে' : 'At a glance'}</div><h2>${bn ? 'ফসলচক্রের সংক্ষিপ্ত চিত্র' : 'Rotation overview'}</h2></div></div>
+    <div class="panel-body"><div class="plan-scroll" tabindex="0" role="region" aria-label="${bn ? 'বারো মাসের ফসলচক্র, পাশে স্ক্রল করুন' : 'Twelve-month rotation, scroll sideways'}"><div class="plan-overview-strip">${months}</div></div>
+    <ul class="plan-overview-seasons">${details}</ul><p class="note">${bn ? 'সারি × গাছের দূরত্ব। ফিকে মাসে জমি বিশ্রামে থাকে।' : 'Row × within-row spacing. Muted months rest.'}</p></div></section>`;
+}
+
 function calendarCard(plan) {
-  return panel(t('Season calendar', 'মৌসুমের ক্যালেন্ডার'),
+  return reportCard(t('Month by month', 'মাস অনুযায়ী'), t('Season calendar', 'মৌসুমের ক্যালেন্ডার'),
     `<div class="plan-scroll" id="plan-calendar" tabindex="0" role="region" aria-label="${t('Season calendar, scroll sideways', 'মৌসুমের ক্যালেন্ডার, পাশে স্ক্রল করুন')}">${calendarSVG(plan.rotation.seasons, { lang: state.lang, uid: 'cal' })}</div>
     <p class="note">${t('Sow, grow, and harvest months for each season. Hatched months rest.', 'প্রতি মৌসুমের বপন, বৃদ্ধি ও ফসল তোলার মাস। ডোরাকাটা মাসে জমি বিশ্রামে থাকে।')}</p>`);
 }
@@ -417,7 +450,7 @@ function field3dCard(plan, activeKey) {
     <button type="button" class="planner3d-view-btn${plan3dView !== 'top' ? ' active' : ''}" data-action="plan3d-view" data-value="3d" aria-pressed="${plan3dView !== 'top'}">${t('3D', '৩ডি')}</button>
     <button type="button" class="planner3d-view-btn${plan3dView === 'top' ? ' active' : ''}" data-action="plan3d-view" data-value="top" aria-pressed="${plan3dView === 'top'}">${t('Top', 'উপর থেকে')}</button></div>
     <div class="planner3d-zoom-controls"><button type="button" class="planner3d-ctrl-btn" data-action="plan3d-zoom" data-value="1" aria-label="${t('Zoom in', 'কাছে আনুন')}">+</button><button type="button" class="planner3d-ctrl-btn" data-action="plan3d-zoom" data-value="-1" aria-label="${t('Zoom out', 'দূরে নিন')}">−</button></div></div>`;
-  return `<section class="panel plan-3d"><div class="panel-header"><h2>${t('Your field in 3D', '৩ডি-তে আপনার জমি')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
+  return `<section class="panel plan-3d"><div class="panel-header"><div><div class="eyebrow">${t('Field preview', 'জমির পূর্বরূপ')}</div><h2>${t('Your field in 3D', '৩ডি-তে আপনার জমি')}</h2></div>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
     <div class="panel-body">${wholeYear ? '' : `<div class="plan-chip-row" role="group" aria-label="${t('Season to preview', 'কোন মৌসুম দেখবেন')}">${chips}</div>`}
     <div class="planner3d-stage-wrap plan-stage">${toolbar}<div class="planner3d-stage-canvas-host plan-canvas-host" tabindex="0" role="region" aria-label="${t('Field model. Drag to rotate.', 'জমির মডেল। ঘোরাতে টানুন।')}"><canvas id="plan-model" class="planner-canvas" aria-label="${t('Planting rows in 3D', '৩ডি-তে সারির নকশা')}"></canvas></div>
     <div class="planner3d-footer"><span class="planner3d-crop-chip">${t('Illustrative · rows drawn at readable scale', 'কাল্পনিক · বোঝার সুবিধায় সারি বড় করে দেখানো')}</span></div></div>
@@ -462,41 +495,50 @@ function numbersCard(plan) {
         ? `${t('Saves', 'বাঁচে')} <b>~${num(saving, 0)} mm</b> ${t('shortfall vs rice–fallow–rice', 'ঘাটতি ভাত–পতিত–ভাতের চেয়ে কম')} ${truth('MODELED', { source: 'IMERG/POWER FAO-56', date: '2024' })}`
         : `${t('Same water as rice–fallow–rice', 'ভাত–পতিত–ভাতের সমান পানি')} ${truth('MODELED', { source: 'IMERG/POWER FAO-56', date: '2024' })}`}</p>`;
   }
-  return `<section class="panel"><div class="panel-header"><h2>${t('Your numbers', 'আপনার সংখ্যা')}</h2></div>
-    <div class="panel-body"><div class="plan-tiles">${tiles}</div>${water}</div></section>`;
+  return reportCard(t('Planting & water', 'বপন ও পানি'), t('Your numbers', 'আপনার সংখ্যা'),
+    `<div class="plan-tiles">${tiles}</div>${water}`);
+}
+
+function reportCard(eyebrow, title, body) {
+  return `<section class="panel"><div class="panel-header"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2></div></div><div class="panel-body">${body}</div></section>`;
 }
 
 function checklistCard(plan) {
   const done = plan.checklist ?? {};
-  const items = deriveChecklist(plan, outlookPlanHint(plan.field?.id, outlookPack)).map(item =>
-    `<li><label><input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}${displayPlan() ? '' : ' disabled'}><span>${esc(t(item.en, item.bn))}</span></label></li>`).join('');
-  return `<section class="panel"><div class="panel-header"><h2>${t('What to do, step by step', 'ধাপে ধাপে কী করবেন')}</h2></div>
+  const tasks = deriveChecklist(plan, outlookPlanHint(plan.field?.id, outlookPack));
+  const completed = tasks.filter(item => done[item.id]).length;
+  const items = tasks.map(item => {
+    const season = plan.rotation.seasons.find(season => item.id === `sow-${season.key}`);
+    const text = t(item.en, item.bn);
+    const month = season ? (state.lang === 'bn' ? MONTH_BN : MONTH_EN)[season.sowMonth - 1] : null;
+    return `<li><label>${month ? `<span class="plan-task-month">${esc(month)}</span>` : `<span class="plan-task-month plan-task-anytime">${t('Prep', 'প্রস্তুতি')}</span>`}<input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}${displayPlan() ? '' : ' disabled'}><span class="plan-task-tick" aria-hidden="true"></span><span class="plan-task-text">${esc(month ? text.slice(text.indexOf(':') + 1).trim() : text)}</span></label></li>`;
+  }).join('');
+  return `<section class="panel plan-tasks"><div class="panel-header"><div><div class="eyebrow">${t('Your next steps', 'পরবর্তী কাজ')}</div><h2>${t('What to do, step by step', 'ধাপে ধাপে কী করবেন')}</h2>
+    <div class="plan-task-progress"><span id="plan-task-count" role="status">${num(completed)} ${t('of', 'টি /')} ${num(tasks.length)} ${t('done', 'টি সম্পন্ন')}</span><progress id="plan-task-progress" value="${completed}" max="${tasks.length}" aria-labelledby="plan-task-count"></progress></div></div></div>
     <div class="panel-body"><ul class="plan-check" id="plan-checklist">${items}</ul></div></section>`;
 }
 
 function summaryCard() {
-  return `<section class="panel"><div class="panel-header"><h2>${t("Planty's summary", 'Planty-এর সারসংক্ষেপ')}</h2></div>
-    <div class="panel-body"><div class="plan-summary" id="plan-summary-body" role="status" aria-live="polite"><div class="plan-skeleton" aria-hidden="true"><span></span><span></span><span></span></div></div>
-    <p class="note">${t('AI summary — check with your extension officer', 'এআই সারসংক্ষেপ — কৃষি কর্মকর্তার পরামর্শ নিন')}</p></div></section>`;
+  return reportCard(t('From Planty', 'Planty-এর পরামর্শ'), t("Planty's summary", 'Planty-এর সারসংক্ষেপ'),
+    `<div class="plan-summary" id="plan-summary-body" role="status" aria-live="polite"><div class="plan-skeleton" aria-hidden="true"><span></span><span></span><span></span></div></div>
+    <p class="note">${t('AI summary — check with your extension officer', 'এআই সারসংক্ষেপ — কৃষি কর্মকর্তার পরামর্শ নিন')}</p>`);
 }
 
 function editCard(plan) {
   const planted = (plan.rotation?.seasons ?? []).filter(season => season.crop !== 'fallow');
   const seasons = planted.map(season =>
     `<button type="button" class="plan-chip" data-action="plan-edit-season" data-value="${esc(season.key)}">${cropGlyph(season.crop)}<span>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</span></button>`).join('');
-  return `<section class="panel"><div class="panel-header"><h2>${t('Edit', 'বদলান')}</h2></div>
-    <div class="panel-body"><div class="plan-chip-row">
+  return reportCard(t('Make it yours', 'নিজের মতো করুন'), t('Edit', 'বদলান'), `<div class="plan-chip-row">
     <a class="plan-chip" href="#field">${t('Edit field', 'জমি বদলান')}</a>
-    <a class="plan-chip" href="#rotations">${t('Edit rotation', 'ফসলচক্র বদলান')}</a>${seasons}</div></div></section>`;
+    <a class="plan-chip" href="#rotations">${t('Edit rotation', 'ফসলচক্র বদলান')}</a>${seasons}</div>`);
 }
 
 function exportCard() {
-  return `<section class="panel"><div class="panel-header"><h2>${t('Keep your plan', 'পরিকল্পনা রাখুন')}</h2></div>
-    <div class="panel-body plan-export"><div class="plan-chip-row">
+  return reportCard(t('Save & share', 'সংরক্ষণ ও শেয়ার'), t('Keep your plan', 'পরিকল্পনা রাখুন'), `<div class="plan-export"><div class="plan-chip-row">
     ${button(t('Download plan (.html)', 'পরিকল্পনা ডাউনলোড (.html)'), 'plan-download', 'primary', 'download').replace('<button ', '<button id="plan-download" ')}
     ${button(t('Print / Save as PDF', 'ছাপুন / PDF'), 'plan-print', '', 'print')}
     <label class="button plan-import">${t('Continue later', 'পরে চালিয়ে যান')}<input type="file" data-plan-import accept=".html,.json,application/json,text/html" hidden></label></div>
-    <p class="note">${t('The file works offline. Open it anytime, or load it back here.', 'ফাইলটি অফলাইনে খোলে। যেকোনো সময় খুলুন, বা এখানে আবার লোড করুন।')}</p></div></section>`;
+    <p class="note">${t('The file works offline. Open it anytime, or load it back here.', 'ফাইলটি অফলাইনে খোলে। যেকোনো সময় খুলুন, বা এখানে আবার লোড করুন।')}</p></div>`);
 }
 
 export function importControl() {
@@ -533,8 +575,8 @@ export function plan() {
   const planted = current.rotation.seasons.filter(season => season.crop !== 'fallow');
   if (!planted.some(season => season.key === active3dKey)) active3dKey = planted[0]?.key ?? null;
   const backLink = `<div class="plan-back-bar"><a class="button ghost plan-back-link" href="#plans">← ${t('My plans', 'আমার পরিকল্পনা')}</a><button type="button" class="button ghost" data-action="plan-regenerate">↻ ${t('Regenerate report', 'প্রতিবেদন আবার বানান')}</button>${!getPlan() ? `<button type="button" class="button primary" data-action="plan-edit">${t('Edit this plan', 'এই পরিকল্পনা বদলান')}</button>` : ''}</div>`;
-  const report = heroCard(current) + calendarCard(current) + field3dCard(current, active3dKey) +
-    numbersCard(current) + checklistCard(current) + summaryCard() + (getPlan() ? editCard(current) : '') + exportCard();
+  const report = heroCard(current) + rotationOverview(current) + numbersCard(current) + checklistCard(current) +
+    summaryCard() + calendarCard(current) + field3dCard(current, active3dKey) + (getPlan() ? editCard(current) : '') + exportCard();
   // First open of a plan plays the generative Planty pipeline; later opens show the report directly.
   const play = shouldPlayPipeline(current);
   const head = header(
@@ -542,9 +584,9 @@ export function plan() {
     t('Your plan', 'আপনার পরিকল্পনা'),
     t('Your finished season plan — numbers, steps, and file.', 'আপনার চূড়ান্ত পরিকল্পনা — সংখ্যা, ধাপ ও ফাইল।'),
   );
-  if (!play) return `<div class="plan-page">${backLink}` + head + report + `</div>`;
+  if (!play) return `<div class="plan-page">${backLink}` + head + `<div class="plan-report">${report}</div></div>`;
   return `<div class="plan-page">${backLink}` + head + pipelineShell(current, state.lang) +
-    `<div class="plg-report plg-hidden plg-reveal">${report}</div></div>`;
+    `<div class="plg-report plg-hidden plg-reveal plan-report">${report}</div></div>`;
 }
 
 export async function fetchPlanSummary(plan, lang) {
@@ -786,6 +828,12 @@ function mountPipeline(current) {
 export function mountPlan() {
   const current = displayPlan();
   if (!current?.field || !current?.rotation) return;
+  document.querySelector('#plan-checklist')?.addEventListener('change', () => {
+    const tasks = document.querySelectorAll('#plan-checklist input[data-check]');
+    const completed = [...tasks].filter(task => task.checked).length;
+    document.querySelector('#plan-task-progress').value = completed;
+    document.querySelector('#plan-task-count').textContent = `${num(completed)} ${t('of', 'টি /')} ${num(tasks.length)} ${t('done', 'টি সম্পন্ন')}`;
+  });
   try {
     const statuses = stepStatus();
     if (getPlan() && statuses.plan !== 'done' && statuses.field === 'done' && statuses.rotation === 'done' && statuses.planting === 'done') {

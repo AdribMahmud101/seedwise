@@ -4137,6 +4137,43 @@ dialog .modal-body {
 }
 
 /* Your plan (#plan): journey finale, mobile first. */
+.plan-page { display: grid; gap: 24px; width: 100%; max-width: 1280px; min-width: 0; margin: 0 auto; }
+.plan-page > .page-head, .plan-page > .plan-back-bar { margin-bottom: 0; }
+.plan-page .page-head .eyebrow { margin-bottom: 8px; }
+.plan-report { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
+.plan-page .panel { min-width: 0; border-radius: 14px; border-color: #dce2d5; box-shadow: 0 4px 16px #24392c06; }
+.plan-page .panel-header { padding: 16px; gap: 12px; align-items: start; flex-wrap: wrap; border-bottom-color: #e6eadf; }
+.plan-page .panel-header > div { min-width: 0; flex: 1; }
+.plan-page .panel-header .eyebrow { margin-bottom: 8px; font-size: 10px; letter-spacing: .1em; color: var(--green); }
+.plan-page .panel-header h2 { font-size: 20px; line-height: 1.3; }
+.plan-page .panel-body { display: grid; gap: 16px; padding: 16px; min-width: 0; }
+.plan-page .panel-body > *, .plan-page .plan-export > * { min-width: 0; margin: 0; }
+.plan-page .plan-export { display: grid; gap: 16px; }
+.plan-page .plan-chip-row { margin: 0; }
+.plan-page .plan-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.plan-page .plan-scroll { max-width: 100%; overscroll-behavior-x: contain; }
+.plan-page .plg-head { padding: 16px; }
+.plan-page .plg-steps { margin: 0; padding: 0 16px 16px; }
+.plan-page .plg-steps::before { left: 27px; }
+.plan-page .plg-step { gap: 12px; padding: 8px 0; }
+.plan-hero-stats { display: flex; flex-wrap: wrap; gap: 24px; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid #d6e2c8; }
+.plan-hero-stats dt { color: var(--muted); font-size: 12px; }
+.plan-hero-stats dd { margin: 8px 0 0; font-size: 28px; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plan-hero-stats small { font-size: 14px; font-weight: 400; }
+.plan-overview-strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); min-width: 600px; padding-bottom: 8px; }
+.plan-overview-month { display: grid; align-content: start; gap: 8px; padding: 8px 0; text-align: center; border-radius: 8px; }
+.plan-overview-month > span { font-size: 12px; color: var(--muted); }
+.plan-overview-month[aria-current] { background: #e8efe0; }
+.plan-overview-month[aria-current] > span, .plan-overview-month small { color: var(--green); font-weight: 600; }
+.plan-overview-month small { font-size: 10px; }
+.plan-overview-bands { display: grid; gap: 8px; }
+.plan-overview-segment { display: block; height: 8px; background: #e8e9e0; }
+.plan-overview-segment.planted { background: var(--season-color); }
+.plan-overview-seasons { display: grid; gap: 12px; padding: 0; list-style: none; }
+.plan-overview-seasons li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding-left: 12px; border-left: 4px solid var(--season-color); font-size: 14px; }
+.plan-overview-seasons b { flex: 1 1 120px; overflow-wrap: anywhere; }
+.plan-overview-seasons span, .plan-overview-seasons small { color: var(--muted); font-size: 12px; }
+.plan-overview-seasons small { min-width: 96px; }
 .plan-hero-top { display: flex; gap: 12px; align-items: center; }
 .plan-planty .planty-mascot { width: 56px; height: 56px; max-width: 72px; max-height: 72px; }
 .plan-demo-ribbon { margin: 8px 0 0; }
@@ -4165,11 +4202,36 @@ button.plan-chip.active { background: #24392c; color: #f2f4ec; border-color: #24
 .plan-tile strong { font-size: 20px; }
 .plan-tile strong small { font-size: 12px; font-weight: normal; color: var(--muted); }
 .plan-tile span { font-size: 13px; }
+.plan-page .plan-tiles { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+.plan-page .plan-tile { gap: 8px; padding: 16px; border-radius: 14px; }
+.plan-page .plan-tile strong { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 30px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.plan-page .plan-tile strong > span { font-size: inherit; }
+.plan-page .plan-tile strong small { font-size: 13px; }
 .plan-check { list-style: none; padding: 0; margin: 0; }
 .plan-check li { border-bottom: 1px solid var(--line); }
 .plan-check li:last-child { border-bottom: 0; }
 .plan-check label { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 6px 2px; font-size: 15px; cursor: pointer; }
 .plan-check input { width: 22px; height: 22px; flex: none; accent-color: #2f6b26; }
+.plan-page .plan-check { display: grid; gap: 8px; }
+.plan-page .plan-check li { border: 1px solid #e3e7dc; border-radius: 12px; background: #fafbf5; transition: background .2s; }
+.plan-page .plan-check label { position: relative; gap: 12px; padding: 12px; min-height: 64px; font-size: 14px; }
+.plan-page .plan-check input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.plan-task-month { flex: none; width: 48px; padding: 8px 0; border-radius: 8px; background: #e8efde; color: var(--green); text-align: center; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.plan-task-anytime { background: #eeeee6; color: #596151; font-size: 10px; }
+.plan-task-tick { position: relative; flex: none; width: 24px; height: 24px; border: 2px solid #a5b49a; border-radius: 8px; background: var(--surface); transition: background .2s, border-color .2s; }
+.plan-task-tick::after { content: ''; position: absolute; left: 7px; top: 3px; width: 6px; height: 11px; border: solid white; border-width: 0 2px 2px 0; opacity: 0; transform: rotate(45deg) scale(.5); transition: opacity .2s, transform .2s; }
+.plan-check input:checked + .plan-task-tick { background: var(--green); border-color: var(--green); }
+.plan-check input:checked + .plan-task-tick::after { opacity: 1; transform: rotate(45deg) scale(1); }
+.plan-check input:focus-visible + .plan-task-tick { outline: 3px solid var(--gold); outline-offset: 3px; }
+.plan-check input:checked ~ .plan-task-text { color: var(--muted); text-decoration: line-through; }
+.plan-page .plan-check li:has(input:checked) { background: #f0f3e9; }
+.plan-task-text { min-width: 0; overflow-wrap: anywhere; }
+.plan-task-progress { display: grid; gap: 8px; margin-top: 16px; }
+.plan-task-progress span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.plan-task-progress progress { appearance: none; width: 100%; height: 8px; border: 0; border-radius: 8px; overflow: hidden; background: #e6eadf; accent-color: var(--green); }
+.plan-task-progress progress::-webkit-progress-bar { background: #e6eadf; }
+.plan-task-progress progress::-webkit-progress-value { border-radius: 8px; background: var(--green); transition: width .2s; }
+.plan-task-progress progress::-moz-progress-bar { border-radius: 8px; background: var(--green); }
 .plan-summary p { font-size: 15px; margin: 0 0 8px; }
 .plan-skeleton span { display: block; height: 14px; border-radius: 7px; margin: 8px 0; background: linear-gradient(90deg, #e3e8da 25%, #f1f4ea 50%, #e3e8da 75%); background-size: 200% 100%; animation: plan-shimmer 1.4s ease-in-out infinite; }
 .plan-skeleton span:last-child { width: 62%; }
@@ -4181,6 +4243,14 @@ label.plan-import { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .plan-skeleton span { animation: none; }
+  .plan-page .plan-check li, .plan-task-tick, .plan-task-tick::after { transition: none; }
+  .plan-task-progress progress::-webkit-progress-value { transition: none; }
+}
+@media (min-width: 1100px) {
+  .plan-report { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .plan-report > .plan-hero, .plan-report > .plan-overview { grid-column: 1 / -1; }
+  .plan-page .panel-header { padding: 24px 24px 16px; }
+  .plan-page .panel-body { padding: 24px; }
 }
 @media print {
   .journey-shell, .plan-chip-row button, .plan-chip-row .plan-import, .plan-stage,
@@ -4226,25 +4296,26 @@ label.plan-import { cursor: pointer; }
 /* Your plan hero: roomy card, big title, demo ribbon in the corner, rotation as a connected season ribbon. */
 .panel.plan-hero {
   position: relative;
-  padding: clamp(18px, 3vw, 28px);
-  border-radius: 16px;
+  padding: 24px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #f6f8ef 0%, #eef4e6 100%);
   border: 1px solid #d6e2c8;
 }
-.plan-hero .plan-hero-top { gap: 16px; align-items: center; padding-right: 150px; }
+.plan-hero .plan-hero-top { gap: 16px; align-items: center; min-width: 0; }
+.plan-hero-top > div { min-width: 0; }
 .plan-hero .plan-planty .planty-mascot { width: 72px; height: 72px; }
 .plan-hero .eyebrow { color: #3f6b4a; letter-spacing: .12em; }
-.plan-hero h2 { font-size: clamp(26px, 3.2vw, 34px); margin: 4px 0 6px; line-height: 1.1; }
-.plan-hero .plan-hero-top p { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.plan-hero .plan-demo-ribbon { position: absolute; top: 16px; right: 18px; margin: 0; }
-.plan-hero .plan-ribbon { gap: 0; padding: 18px 0 4px; align-items: stretch; }
+.plan-hero h2 { font-size: clamp(22px, 2.4vw, 30px); margin: 8px 0; line-height: 1.2; overflow-wrap: anywhere; }
+.plan-hero .plan-hero-top p { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.plan-hero .plan-demo-ribbon { position: static; margin: 16px 0 0; }
+.plan-hero .plan-ribbon { gap: 12px; flex-wrap: wrap; padding: 24px 0 0; align-items: stretch; }
 .plan-hero .plan-ribbon .plan-chip {
-  flex: 1 0 auto; min-width: 128px; gap: 10px; padding: 10px 14px; border-radius: 12px;
+  flex: 1 1 128px; min-width: 0; gap: 8px; padding: 12px; border-radius: 12px;
   background: #fffef9; border: 1px solid #d9dfcf; border-left: 4px solid var(--crop, #6c8f5a);
 }
-.plan-hero .plan-ribbon .plan-chip + .plan-chip { margin-left: 22px; position: relative; }
+.plan-hero .plan-ribbon .plan-chip + .plan-chip { margin-left: 0; position: relative; }
 .plan-hero .plan-ribbon .plan-chip + .plan-chip::before {
-  content: "→"; position: absolute; left: -18px; top: 50%; transform: translateY(-50%); color: #7d9a76; font-size: 14px;
+  content: none;
 }
 .plan-hero .plan-chip b { font-size: 14px; }
 .plan-hero .plan-crop-aman, .plan-hero .plan-crop-boro, .plan-hero .plan-crop-rice { --crop: #3f8f4a; }
@@ -4256,9 +4327,7 @@ label.plan-import { cursor: pointer; }
 @media (max-width: 700px) {
   .plan-hero .plan-hero-top { padding-right: 0; align-items: flex-start; }
   .plan-hero .plan-planty .planty-mascot { width: 56px; height: 56px; }
-  .plan-hero .plan-demo-ribbon { position: static; margin: 10px 0 0; }
-  .plan-hero .plan-ribbon { overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
-  .plan-hero .plan-ribbon .plan-chip { min-width: 118px; scroll-snap-align: start; }
+  .panel.plan-hero { padding: 16px; }
 }
 
 /* Outlook fan + flood timeline: 320-unit viewBox. Cap the drawn width so labels stay ~10–15 px on screen. */
