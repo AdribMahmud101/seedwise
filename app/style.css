@@ -4694,3 +4694,13 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .planty-md blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #a9c66e; background: #f4f7ee; border-radius: 0 8px 8px 0; color: #4b564d; }
 .planty-attach span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .planty-attach span i { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #2f6946; color: #fff; font-size: 10px; font-style: normal; }
+/* Clinic: field photo chips */
+.clinic-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0 4px; }
+.clinic-examples > span { font-size: 12px; color: #627266; }
+.clinic-examples > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.clinic-example { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px 4px 4px; border: 1px solid #d0dacb; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; color: #34583e; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease, border-color .2s; }
+.clinic-example img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.clinic-example:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(36, 57, 44, .12); border-color: #9db38f; }
+.clinic-example[aria-pressed="true"] { border-color: #2f6946; box-shadow: 0 0 0 2px #2f6946 inset; background: #eef4e6; }
+.clinic-credit { margin: 6px auto 0; max-width: 430px; text-align: center; font-size: 11px; color: #748176; }
+.clinic-credit a { color: #4d6b55; }
