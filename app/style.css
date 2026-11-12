@@ -4879,3 +4879,6 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
     & *, & *::before, & *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   }
 }
+/* Phones: keep Ask Planty above the pinned field "Next" bar */
+body:has(.field-mobile-cta) .planty-launch { bottom: calc(80px + env(safe-area-inset-bottom)); }
+@media (min-width: 1100px) { body:has(.field-mobile-cta) .planty-launch { bottom: max(16px, env(safe-area-inset-bottom)); } }
