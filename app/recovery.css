@@ -789,3 +789,35 @@ li.done .rr-check-dot {
 .rr-check-btn:hover { background: #f1efe4; }
 .rr-ready-body li.done .rr-check-btn:hover { background: #dfe6d4; }
 .rr-check-btn:focus-visible { outline: 2px solid #2b4a39; outline-offset: 2px; }
+/* Today's analytics box — always first on the page */
+.rr-risk { margin: 14px 0 18px; padding: 18px 20px; border-radius: 18px; background: #fdfcf7; border: 1px solid #e3dfd0; box-shadow: 0 10px 28px rgba(36, 57, 44, .08); }
+.rr-risk-head { display: flex; gap: 16px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; }
+.rr-risk-head.rr-ok { background: linear-gradient(135deg, #e6f1df, #f3f8ee); }
+.rr-risk-head.rr-watch { background: linear-gradient(135deg, #fbefd2, #fdf7e8); }
+.rr-risk-head.rr-warn { background: linear-gradient(135deg, #f7d9d3, #fcefec); }
+.rr-risk-mark { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; font-size: 26px; font-weight: 800; color: #fff; background: #8a948c; animation: rr-mark-in .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+.rr-ok .rr-risk-mark { background: #2f8f46; box-shadow: 0 0 0 6px rgba(47, 143, 70, .15); }
+.rr-watch .rr-risk-mark { background: #c9952a; box-shadow: 0 0 0 6px rgba(201, 149, 42, .18); }
+.rr-warn .rr-risk-mark { background: #b8452f; box-shadow: 0 0 0 6px rgba(184, 69, 47, .18); animation: rr-mark-in .6s cubic-bezier(.2, 1.4, .4, 1) both, rr-pulse 2s ease-in-out 1s infinite; }
+.rr-risk-head b { display: block; margin: 2px 0 4px; font-size: 22px; font-family: var(--serif, inherit); color: #1d2a22; }
+.rr-risk-head p { margin: 0; font-size: 14px; line-height: 1.5; color: #3d463f; }
+.rr-risk-list { list-style: none; margin: 14px 0 6px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.rr-risk-list li { display: grid; grid-template-columns: 12px 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 6px; align-items: start; padding: 12px 14px; border-radius: 12px; border: 1px solid #ebe7da; background: #fff; }
+.rr-risk-list li > div { grid-column: 2; }
+.rr-risk-list li > .rr-conf, .rr-risk-list li > .nasa-badge, .rr-risk-list li > [class*="nasa"] { grid-column: 2; justify-self: start; }
+.rr-risk-list b { font-size: 14px; }
+.rr-risk-list p { margin: 3px 0 0; font-size: 13px; line-height: 1.45; color: #4b564d; }
+.rr-dot { width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; }
+.rr-dot.rr-ok { background: #2f8f46; } .rr-dot.rr-watch { background: #c9952a; } .rr-dot.rr-warn { background: #b8452f; }
+.rr-conf { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid; }
+.rr-conf-high { color: #2b6b3a; border-color: #b5d3ba; background: #eef6ef; }
+.rr-conf-medium { color: #7a5a14; border-color: #e6cf98; background: #fbf4e2; }
+.rr-conf-low { color: #8a3b2c; border-color: #e6b9ad; background: #fbefec; }
+.rr-risk-foot { margin: 8px 2px 0; font-size: 12px; }
+.rr-risk-skeleton { display: grid; gap: 10px; } .rr-risk-skeleton i { height: 18px; border-radius: 8px; background: linear-gradient(90deg, #eeeadf, #f8f6ef, #eeeadf); background-size: 200% 100%; animation: rr-shimmer 1.2s linear infinite; }
+.rr-risk-skeleton i:first-child { height: 56px; }
+@keyframes rr-mark-in { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes rr-pulse { 50% { box-shadow: 0 0 0 12px rgba(184, 69, 47, 0); } }
+@keyframes rr-shimmer { to { background-position: -200% 0; } }
+@media (max-width: 720px) { .rr-risk { padding: 14px; } .rr-risk-list { grid-template-columns: 1fr; } .rr-risk-head b { font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { .rr-risk-mark, .rr-warn .rr-risk-mark, .rr-risk-skeleton i { animation: none; } }

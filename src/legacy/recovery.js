@@ -1,3 +1,4 @@
+import { riskStatus } from './recovery-risk.js';
 import {
   nasaBadge,
   state,
@@ -118,6 +119,44 @@ function pathSteps(a) {
     })
     .join("")}</ol><p class="note">${t("Follow the action card. When access is confirmed safe, choose the last stage to check readiness and planting dates.", "নির্দেশনা কার্ড অনুসরণ করুন। প্রবেশ নিরাপদ নিশ্চিত হলে প্রস্তুতি ও রোপণের তারিখ দেখতে শেষ ধাপ বেছে নিন।")}</p></section>`;
 }
+// ---- Today's risk box (always at the top): /api/daily-brief, fetched once per field per day ----
+const riskCache = new Map();
+const MONTH = (ym, bn) => new Date(`${ym}-01T00:00:00Z`).toLocaleString(bn ? 'bn-BD' : 'en', { month: 'long', timeZone: 'UTC' });
+function riskBoxHtml(brief) {
+  if (brief === undefined) return `<div class="rr-risk-skeleton"><i></i><i></i><i></i></div>`;
+  if (!brief) return `<div class="rr-risk-head"><span class="rr-risk-mark">?</span><div><b>${t("Today's analytics are unavailable", "আজকের বিশ্লেষণ পাওয়া যাচ্ছে না")}</b><p>${t("Check your connection. Nothing is assumed safe.", "সংযোগ দেখুন। কিছুই নিরাপদ ধরা হয়নি।")}</p></div></div>`;
+  const r = riskStatus(brief), bn = state.lang === "bn";
+  const head = { ok: ["✓", "All clear today", "আজ সব ঠিক আছে"], watch: ["!", "Keep an eye on this", "নজর রাখুন"], warn: ["⚠", "Warning", "সতর্কতা"] }[r.level];
+  const conf = (c) => `<span class="rr-conf rr-conf-${c}">${t(`${c} confidence`, { high: "উচ্চ আস্থা", medium: "মাঝারি আস্থা", low: "কম আস্থা" }[c])}</span>`;
+  const lv = (l) => `<i class="rr-dot rr-${l}" aria-hidden="true"></i>`;
+  const rows = r.signals.map((s) => {
+    if (s.id === "flood") return `<li>${lv(s.level)}<div><b>${t("Flood (satellite AI)", "বন্যা (স্যাটেলাইট এআই)")}</b><p>${s.value ? t(`Water seen near the field: up to ${s.value}% within 300 m.`, `জমির কাছে পানি: ৩০০ মিটারে সর্বোচ্চ ${num(s.value)}%।`) : t(`No standing water seen within 300 m on clear days (${s.years} monsoons).`, `পরিষ্কার দিনে ৩০০ মিটারে পানি দেখা যায়নি (${s.years})।`)} ${t(`Only ${s.usable} of ${s.found} scenes were cloud-free.`, `${num(s.found)}টির মধ্যে ${num(s.usable)}টি ছবি মেঘমুক্ত।`)}</p></div>${conf(s.confidence)}${nasaBadge("prithvi", s.years)}</li>`;
+    if (s.id === "dry") return `<li>${lv(s.level)}<div><b>${t("Dry soil (forecast)", "মাটির শুষ্কতা (পূর্বাভাস)")}</b><p>${t(`${MONTH(s.month)}: root-zone soil ${Math.abs(s.value)}% ${s.value < 0 ? "drier" : "wetter"} than normal.`, `${MONTH(s.month, 1)}: শিকড়ের মাটি স্বাভাবিকের চেয়ে ${num(Math.abs(s.value))}% ${s.value < 0 ? "শুকনো" : "ভেজা"}।`)}</p></div>${conf(s.confidence)}${nasaBadge("power", s.month.slice(0, 4))}</li>`;
+    if (s.id === "rain") return `<li>${lv(s.level)}<div><b>${t("Rain (forecast)", "বৃষ্টি (পূর্বাভাস)")}</b><p>${t(`${MONTH(s.month)}: about ${s.mm} mm expected (normal ${s.normal} mm, up to ${s.high} mm).`, `${MONTH(s.month, 1)}: প্রায় ${num(s.mm)} মিমি (স্বাভাবিক ${num(s.normal)} মিমি, সর্বোচ্চ ${num(s.high)} মিমি)।`)}</p></div>${conf(s.confidence)}${nasaBadge("power", s.month.slice(0, 4))}</li>`;
+    return `<li>${lv(s.level)}<div><b>${t("Heat (forecast)", "তাপ (পূর্বাভাস)")}</b><p>${t(`${MONTH(s.month)}: ${s.c} °C, ${s.value >= 0 ? "+" : ""}${s.value} °C vs normal.`, `${MONTH(s.month, 1)}: ${num(s.c, 1)} °সে, স্বাভাবিকের তুলনায় ${s.value >= 0 ? "+" : ""}${num(s.value, 1)} °সে।`)}</p></div>${conf(s.confidence)}${nasaBadge("power", s.month.slice(0, 4))}</li>`;
+  }).join("");
+  const flagged = r.signals.filter((s) => s.level !== "ok");
+  const comment = !flagged.length
+    ? t("Nothing unusual for this field right now. Keep normal care and check again tomorrow.", "এই জমিতে এখন অস্বাভাবিক কিছু নেই। স্বাভাবিক যত্ন নিন, কাল আবার দেখুন।")
+    : flagged.map((s) => ({ flood: t("Water was seen near the field — check drains and low corners.", "জমির কাছে পানি দেখা গেছে — নালা ও নিচু কোণ দেখুন।"), dry: t("Soil is drying faster than normal — plan irrigation and mulch before sowing.", "মাটি স্বাভাবিকের চেয়ে বেশি শুকাচ্ছে — বপনের আগে সেচ ও মালচের ব্যবস্থা করুন।"), rain: t("Heavy rain is possible — keep drains open.", "ভারী বৃষ্টি হতে পারে — নালা খোলা রাখুন।"), heat: t("Warmer than normal — water in the early morning.", "স্বাভাবিকের চেয়ে গরম — ভোরে পানি দিন।") }[s.id])).join(" ");
+  return `<div class="rr-risk-head rr-${r.level}"><span class="rr-risk-mark" aria-hidden="true">${head[0]}</span><div><span class="eyebrow">${t("Today's analytics", "আজকের বিশ্লেষণ")} · ${esc(r.date || "")}${r.fallback ? ` · ${t("prepared data", "প্রস্তুত তথ্য")}` : ` · ${t("live models", "লাইভ মডেল")}`}</span><b>${t(head[1], head[2])}</b><p>${comment}</p></div></div>
+  <ul class="rr-risk-list">${rows}</ul>
+  <p class="note rr-risk-foot">${t("Flood: Prithvi-EO-2.0 (NASA/IBM) on NASA HLS satellite images. Forecast: Chronos model on NASA POWER, checked against past seasons. Updated every morning (06:00 BDT). Advisory only — follow official warnings (BMD, FFWC).", "বন্যা: NASA HLS ছবিতে Prithvi-EO-2.0 (NASA/IBM)। পূর্বাভাস: NASA POWER-এ Chronos মডেল, আগের মৌসুমে যাচাই করা। প্রতিদিন সকাল ৬টায় হালনাগাদ। শুধু পরামর্শ — সরকারি সতর্কবার্তা (BMD, FFWC) মানুন।")}</p>`;
+}
+const riskKey = () => `${state.fieldId}:${new Date().toISOString().slice(0, 10)}`;
+function loadRisk() {
+  const k = riskKey();
+  if (riskCache.has(k) || typeof document === "undefined" || typeof fetch === "undefined") return; // browser only
+  riskCache.set(k, undefined);
+  fetch(`/api/daily-brief?field=${encodeURIComponent(state.fieldId)}`)
+    .then((res) => (res.ok ? res.json() : null)).catch(() => null)
+    .then((brief) => {
+      riskCache.set(k, brief);
+      const box = typeof document === "undefined" ? null : document.querySelector?.("#rr-risk");
+      if (box && k === riskKey()) { box.innerHTML = riskBoxHtml(brief); box.classList.remove("rr-risk-loading"); }
+    });
+}
+
 function readinessChecks(a) {
   const list = [
     [a.ground === "workable", ["Ground stable and moist", "জমি স্থির ও আর্দ্র"], "ground"],
@@ -477,6 +516,7 @@ function recovery() {
     r = result(),
     saved = state.recoverySaves?.[key()];
   const [deskEn, deskBn] = deskNo(7);
+  loadRisk();
   return (
     header(
       t(`Resilience desk / ${deskEn}`, `সহনশীলতার ডেস্ক / ${deskBn}`),
@@ -487,6 +527,7 @@ function recovery() {
       ),
     ) +
     chips() +
+    `<section id="rr-risk" class="rr-risk rr-risk-loading" aria-live="polite">${riskBoxHtml(riskCache.get(riskKey()))}</section>` +
     `<div class="rr-intro"><span>${icon("recovery", 23)}</span><p>${t("Choose the situation you want to plan for. Conditions below come from you. This page does not monitor active emergencies.", "কোন পরিস্থিতির পরিকল্পনা চান বাছুন। নিচের পরিস্থিতি আপনার দেওয়া তথ্য। এখানে চলমান দুর্যোগ পর্যবেক্ষণ করা হয় না।")}</p></div>${emergency()}${hazardCards()}
  ${a.example ? exampleBanner() : ""}
  ${pathSteps(a)}
