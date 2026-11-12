@@ -3987,7 +3987,7 @@ dialog .modal-body {
   [data-page="planner"] .planner-workbench { display: block; }
   [data-page="planner"] .planner3d-layout {
     grid-template-columns: minmax(0, 1.2fr) minmax(340px, .8fr);
-    grid-template-rows: minmax(420px, calc(100dvh - 340px)) auto auto auto;
+    grid-template-rows: minmax(460px, calc(100dvh - 190px)) auto auto auto;
     gap: 12px;
     align-items: stretch;
   }
@@ -4011,7 +4011,7 @@ dialog .modal-body {
   [data-page="planner"] .planner3d-view-btn { min-height: 34px; padding: 4px 8px; }
   [data-page="planner"] .planner3d-zoom-controls { flex: none; gap: 4px; }
   [data-page="planner"] .planner3d-ctrl-btn { width: 34px; height: 34px; }
-  [data-page="planner"] .planner3d-stage-canvas-host { flex: 1; height: auto; min-height: max(300px, 46vh); }
+  [data-page="planner"] .planner3d-stage-canvas-host { flex: 1; height: auto; min-height: 300px; }
   [data-page="planner"] .planner3d-footer { flex: none; gap: 6px; padding: 5px 8px; font-size: 10px; }
   [data-page="planner"] .plan-live, [data-page="planner"] #plan-estimate { display: contents; }
   [data-page="planner"] .plan-result { grid-column: 1 / -1; grid-row: 2; }
