@@ -199,19 +199,28 @@ async function plantyChat(request, env, url) {
   if(!req)return json({error:'invalid_request'},400);
   const ip=request.headers.get('CF-Connecting-IP')||'unknown', now=Date.now();
   for(const [key,value] of requestsByIp)if(value.expires<=now)requestsByIp.delete(key);
-  const rate=requestsByIp.get(ip)||{count:0,expires:now+RATE_WINDOW_MS}; if(rate.count>=20)return json({error:'rate_limited'},429);rate.count++;requestsByIp.set(ip,rate);
+  const rate=requestsByIp.get(`chat:${ip}`)||{count:0,expires:now+RATE_WINDOW_MS}; if(rate.count>=40)return json({error:'rate_limited'},429);rate.count++;requestsByIp.set(`chat:${ip}`,rate); // own bucket: chat must not be starved by refine/summary calls
   if(!env.MUSE_API_KEY)return json({error:'not_configured'},503);
   const [research,tolerant]=await Promise.all([loadAgronomy(env,url.origin),loadTolerant(env,url.origin)]);
   const knowledge={agronomy:research,tolerantVarieties:tolerant};
   const language=req.lang==='banglish'?'Banglish (Bengali in Latin letters)':req.lang==='bn'?'simple Bengali':'English';
-  const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),30000);
+  const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),50000);
   try{
-    const response=await fetch('https://api.meta.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.MUSE_API_KEY}`},signal:controller.signal,
+    const ask=()=>fetch('https://api.meta.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.MUSE_API_KEY}`},signal:controller.signal,
       body:JSON.stringify({model:env.PLANTY_CHAT_MODEL||env.PLANTY_MODEL||'muse-ember-1.0',max_tokens:3000,reasoning_effort:'low',temperature:.25,messages:[
         {role:'system',content:`You are Planty, a warm, friendly farming friend for smallholders in Rangpur, Bangladesh. Answer in ${language}, in plain everyday words, like a helpful neighbour who knows farming: 2-5 short sentences, then (if useful) up to 3 short bullet tips, and end with one gentle follow-up question. Always be helpful: when the facts do not settle the question, give the best practical general guidance for Rangpur (Tista floodplain, Aman–Boro systems) and say briefly what would make the answer surer — never just refuse. Prefer options from the supplied rotations, tolerant varieties and the attached plan, and explain the trade-off in farmer terms (water, flood risk, labour, timing). Use the attached field/plan/outlook facts when present. Never invent measurements, yields, prices or chemical doses; mention source ids only from the supplied list (do not print raw ids in the answer text). Suggest DAE 16123 only for disease, chemicals or emergencies. If suggesting a plan change, return a JSON object with answer and suggestion: {"answer":"...","suggestion":{"changes":[{"season":0,"from":"...","to":"...","why":"..."}],"newPlanting":[{"crop":"...","model":"tree|shrub|herb|grass|vine|rice|potato|mustard|mungbean|wheat|maize","rowSpacingCm":40,"withinRowCm":30,"sharePct":100}],"evidence":["source-id"],"confidence":0.5}}. Otherwise suggestion must be null. Do not suggest changes without an attached plan.`},
         {role:'user',content:JSON.stringify({knowledge,context:req.context,history:req.history,question:req.question}).slice(0,22000)}]})});
-    if(!response.ok){console.error('planty-chat upstream',response.status,(await response.text()).slice(0,300));return json({error:'unavailable'},503);}const data=await response.json();const parsed=parseModelJson(data?.choices?.[0]?.message?.content||'');
-    const answer=typeof parsed?.answer==='string'?parsed.answer.trim().slice(0,1800):'';if(!answer){console.error('planty-chat unparsable',String(data?.choices?.[0]?.message?.content||'').slice(0,200));return json({error:'unavailable'},503);}
+    // The model occasionally returns an empty reply: retry once before reporting failure.
+    let parsed=null,answer='';
+    for(let attempt=0;attempt<2&&!answer;attempt++){
+      const response=await ask();
+      if(!response.ok){console.error('planty-chat upstream',response.status,(await response.text()).slice(0,300));continue;}
+      const data=await response.json();const content=data?.choices?.[0]?.message?.content||'';
+      parsed=parseModelJson(content)||(content.trim()&&!content.trim().startsWith('{')?{answer:content.trim(),suggestion:null}:null);
+      answer=typeof parsed?.answer==='string'?parsed.answer.trim().slice(0,1800):'';
+      if(!answer)console.error('planty-chat unparsable',String(content).slice(0,200));
+    }
+    if(!answer)return json({error:'unavailable'},503);
     const ids=new Set([...(research?.sources||[]).map(s=>s.id),...(tolerant?.varieties||[]).flatMap(v=>v.evidence||[])]);
     const suggestion=validChatSuggestion(parsed.suggestion,req.context.plan,ids);
     return json({answer,suggestion});
@@ -245,7 +254,7 @@ async function clinicAnalyze(request,env,url){
   if(Number(request.headers.get('Content-Length'))>CLINIC_BODY_BYTES||request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json')return json({error:'payload_too_large'},413);
   let body;try{const raw=await readBody(request,CLINIC_BODY_BYTES);if(raw===null)return json({error:'payload_too_large'},413);body=JSON.parse(raw)}catch{return json({error:'invalid_request'},400)}
   const match=typeof body?.image==='string'&&body.image.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);if(!match||match[1].length>2700000||!Number.isInteger(body.width)||!Number.isInteger(body.height)||body.width<1||body.height<1||body.width>1024||body.height>1024||!Array.isArray(body.colorMean)||body.colorMean.length!==3||!body.colorMean.every(n=>Number.isFinite(n)&&n>=0&&n<=255)||!DISEASE_CROPS.has(body.crop)&&body.crop!=='auto'||!['en','bn'].includes(body.lang))return json({error:'invalid_request'},400);
-  const now=Date.now(),ip=request.headers.get('CF-Connecting-IP')||'unknown';for(const [key,value]of requestsByIp)if(value.expires<=now)requestsByIp.delete(key);const rate=requestsByIp.get(ip)||{count:0,expires:now+RATE_WINDOW_MS};if(rate.count>=20)return json({error:'rate_limited'},429);rate.count++;requestsByIp.set(ip,rate);
+  const now=Date.now(),ip=request.headers.get('CF-Connecting-IP')||'unknown';for(const [key,value]of requestsByIp)if(value.expires<=now)requestsByIp.delete(key);const rate=requestsByIp.get(`clinic:${ip}`)||{count:0,expires:now+RATE_WINDOW_MS};if(rate.count>=20)return json({error:'rate_limited'},429);rate.count++;requestsByIp.set(`clinic:${ip}`,rate);
   if(!env.MUSE_API_KEY)return json({error:'not_configured'},503);
   const image=body.image;
   const call=async(model,payload,ms=45000)=>{const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{const r=await fetch('https://api.meta.ai/v1/responses',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.MUSE_API_KEY}`},signal:c.signal,body:JSON.stringify({model,...payload})});if(!r.ok)throw Error('upstream');return await r.json()}finally{clearTimeout(timer)}};
@@ -479,10 +488,11 @@ async function rotationAdvisor(request, env, url) {
 
   const now = Date.now();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const entry = requestsByIp.get(ip) || { count: 0, expires: now + RATE_WINDOW_MS };
+  const bucket = `advisor:${ip}`;
+  const entry = requestsByIp.get(bucket) || { count: 0, expires: now + RATE_WINDOW_MS };
   if (entry.expires <= now) { entry.count = 0; entry.expires = now + RATE_WINDOW_MS; }
   if (entry.count >= 20) return json({ error: 'rate_limited' }, 429);
-  entry.count++; requestsByIp.set(ip, entry);
+  entry.count++; requestsByIp.set(bucket, entry);
   if (!env.MUSE_API_KEY) return json({ error: 'not_configured' }, 503);
 
   const research = await loadAgronomy(env, url.origin);
@@ -651,10 +661,10 @@ export default {
     const now = Date.now();
     for (const [ip, entry] of requestsByIp) if (entry.expires <= now) requestsByIp.delete(ip);
     const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-    const entry = requestsByIp.get(ip) || { count: 0, expires: now + RATE_WINDOW_MS };
+    const entry = requestsByIp.get(`summary:${ip}`) || { count: 0, expires: now + RATE_WINDOW_MS };
     if (entry.count >= 20) return json({ error: 'rate_limited' }, 429);
     entry.count++;
-    requestsByIp.set(ip, entry);
+    requestsByIp.set(`summary:${ip}`, entry);
     if (!env.MUSE_API_KEY) return json({ error: 'not_configured' }, 503);
 
     const model = env.PLANTY_MODEL || 'muse-ember-1.0';
