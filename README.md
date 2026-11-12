@@ -1,6 +1,6 @@
-# Ropon Radar · Rangpur Field Lab
+# SeedWise · Rangpur Field Lab
 
-Ropon Radar is a Bengali and English field-planning demo for Mithapukur, Pirganj and Gangachara. It helps farmers decide what a plot can support after Aman and before the next rice season by combining dated Earth observations, local crop trials, farmer priorities and observations entered by farmers or extension officers. Farmers compare complete rotations and planting layouts, while researchers and extension officers add field evidence. The demo shows disagreements and gaps in the evidence, and the farmer keeps the final decision. [Live demo](https://roponradar.onefusionlab.systems).
+SeedWise is a Bengali and English field-planning demo for Mithapukur, Pirganj and Gangachara. It helps farmers decide what a plot can support after Aman and before the next rice season by combining dated Earth observations, local crop trials, farmer priorities and observations entered by farmers or extension officers. Farmers compare complete rotations and planting layouts, while researchers and extension officers add field evidence. The demo shows disagreements and gaps in the evidence, and the farmer keeps the final decision. [Live demo](https://roponradar.onefusionlab.systems).
 
 **NASA Space Apps Challenge 2026 · Rangpur pilot (Mithapukur · Pirganj · Gangachara)**
 

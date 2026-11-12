@@ -346,7 +346,7 @@ export function buildExportHTML(plan, { monthly = null, lang = 'en', nowMonth = 
   const embedded = JSON.stringify(plan).replaceAll('<', '\\u003c');
   const links = sourceLinks.slice(0, 8).map(source =>
     `<a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.name || source.title || source.url)} ↗</a>`).join(' · ');
-  return `<!doctype html><html lang="${bn ? 'bn' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · Ropon Radar</title><style>${EXPORT_CSS}</style></head>
+  return `<!doctype html><html lang="${bn ? 'bn' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · SeedWise</title><style>${EXPORT_CSS}</style></head>
 <body data-area-ha="${plan.field.areaHa}"><div class="wrap">
 <header class="hero"><h1>${esc(title)} ✓</h1><p>${esc(plan.field.name)} · ${plan.field.areaHa.toFixed(2)} ha · ${esc(plan.rotation.name)}</p><p>${esc(generated)}${plan.mode === 'demo' ? ' · Demo' : ''}</p></header>
 <section class="card"><h2>${bn ? 'মৌসুমের ক্যালেন্ডার' : 'Season calendar'}</h2><div class="scroll">${calendarSVG(seasons, { lang, nowMonth, uid: 'xcal' })}</div></section>
@@ -356,7 +356,7 @@ ${waterRows.length ? `<section class="card"><h2>${bn ? 'পানি' : 'Water'}
 <p>${saving !== null && saving > 0.5 ? esc(bn ? `ভাত–পতিত–ভাতের চেয়ে ${saving.toFixed(0)} মিমি কম সেচের ঘাটতি।` : `Saves ~${saving.toFixed(0)} mm shortfall vs rice–fallow–rice.`) : esc(bn ? 'ভাত–পতিত–ভাতের সমান পানির হিসাব।' : 'Same water as rice–fallow–rice.')}</p></section>` : ''}
 <section class="card"><h2>${bn ? 'কী করবেন' : 'What to do'}</h2><ul class="check">${checklist}</ul></section>
 ${links ? `<section class="card src"><h2>${bn ? 'উৎস' : 'Sources'}</h2><p>${links}</p></section>` : ''}
-<footer>Ropon Radar · ${esc(generated)} · ${bn ? 'অফলাইন ফাইল — ইন্টারনেট ছাড়াই খোলে।' : 'Offline file — opens without internet.'}</footer>
+<footer>SeedWise · ${esc(generated)} · ${bn ? 'অফলাইন ফাইল — ইন্টারনেট ছাড়াই খোলে।' : 'Offline file — opens without internet.'}</footer>
 </div><script id="ropon-plan-json" type="application/json">${embedded}</script><script>${EXPORT_JS}</script></body></html>`;
 }
 
@@ -839,7 +839,7 @@ export function planChange(element) {
         if (location.hash !== '#plan') location.hash = 'plan';
         else repaint();
       } catch {
-        toast(t('That file is not a Ropon plan', 'এই ফাইলটি রোপণ পরিকল্পনা নয়'));
+        toast(t('That file is not a SeedWise plan', 'এই ফাইলটি SeedWise পরিকল্পনা নয়'));
       }
     };
     reader.readAsText(file);

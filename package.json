@@ -1,5 +1,6 @@
 {
-  "name": "ropon-radar-rangpur",
+  "name": "seedwise",
+  "description": "SeedWise · Rangpur Field Lab — Bengali and English field-planning demo with NASA Earth observations.",
   "private": true,
   "type": "module",
   "version": "1.2.0",

@@ -148,14 +148,59 @@ small {
 }
 .boot {
   min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   place-content: center;
-  gap: 14px;
+  justify-items: center;
+  gap: 12px;
   text-align: center;
+  padding: 24px;
+  animation: boot-in 0.9s ease-out both;
+}
+.boot-mark {
+  width: 64px;
+  height: 64px;
+  animation: boot-in 0.9s ease-out both;
 }
 .wordmark {
-  font: 600 40px Bangla;
-  letter-spacing: -2px;
+  font:
+    400 clamp(34px, 8vw, 48px) / 1.1 Fraunces,
+    Bangla,
+    serif;
+  letter-spacing: -1px;
+  color: var(--ink);
+  animation: boot-in 0.9s 0.08s ease-out both;
+}
+.boot-tagline {
+  font-size: clamp(13px, 3.6vw, 15px);
+  color: var(--muted);
+  max-width: 34ch;
+  animation: boot-in 0.9s 0.16s ease-out both;
+}
+.boot-note {
+  font-size: 13px;
+  color: var(--muted);
+  opacity: 0.8;
+  animation: boot-in 0.9s 0.24s ease-out both;
+}
+@keyframes boot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot,
+  .boot-mark,
+  .wordmark,
+  .boot-tagline,
+  .boot-note {
+    animation: none;
+  }
 }
 .sidebar {
   position: fixed;

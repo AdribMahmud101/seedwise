@@ -11,10 +11,10 @@
 | Agronomy | Bangladesh Agricultural Research Council FRG 2024, Bangladesh rice and agricultural research sources, FAO-56 and published Rangpur trials. Individual source URLs and locators are included in agronomy.json. |
 | Soil nutrients (pH, SOC, total N, CEC) | ISRIC SoilGrids 2.0 (250 m resolution), WCS 2.0.1 GetCoverage at 0-15 cm depth. Values fetched per-site from maps.isric.org, converted to standard units (g/kg for SOC and N, cmol+/kg for CEC). OM derived as SOC × 1.724. BARC FRG-2018 interpretation classes applied. URLs, retrieval timestamps and raw-to-converted calculations preserved in soil-nutrients.json. |
 | Soil nutrients (P, K, S, Zn, B) | SRDI Upazila Nirdeshika (Land & Soil Resource Utilization Guide) for Mithapukur, Pirganj, Gangachara upazilas, Rangpur district. PDFs hosted at srdi.portal.gov.bd (TLS verify=False required). Where PDFs were unavailable at fetch time, all attempted URLs with HTTP status codes are documented in soil-nutrients.json under the `searched` array with `status: "no open source found"`. |
-| Administrative boundaries | geoBoundaries gbOpen BGD ADM3, release 9469f09, BBS / OCHA ROAP. CC BY 3.0 IGO. Rangpur geometry was supplied in the original Ropon Radar package. |
+| Administrative boundaries | geoBoundaries gbOpen BGD ADM3, release 9469f09, BBS / OCHA ROAP. CC BY 3.0 IGO. Rangpur geometry was supplied in the original SeedWise package. |
 | Map engine | Leaflet 1.9.4, BSD 2-Clause. Copyright Vladimir Agafonkin and contributors. |
 | Fonts | IBM Plex Sans and Mono, Fraunces and Noto Sans Bengali. SIL Open Font License 1.1. Self-hosted files supplied with the original project. |
-| Original Ropon Radar | Apache-2.0. Original color and type direction, fonts and district geometry were retained. The synthetic environmental demo generator is excluded. |
+| Original SeedWise | Apache-2.0. Original color and type direction, fonts and district geometry were retained. The synthetic environmental demo generator is excluded. |
 
 Sentinel-1 processing: `scripts/fetch-s1-water.py` reads the current pilot polygons through the app's `basePolygon` function. Each site uses one orbit and direction with all twelve months available, minimizing the total acquisition-time distance from each month's 15th at 00:00 UTC. Each monthly record selects the nearest acquisition within that month, with item ID breaking ties. Selection does not depend on water percentages.
 

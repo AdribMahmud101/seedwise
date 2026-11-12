@@ -92,7 +92,7 @@ function render() {
   const title = t(current[1], current[2]);
   document.documentElement.lang = state.lang;
   document.body.classList.toggle("lang-bn", state.lang === "bn");
-  document.title = `${title} · Ropon Radar`;
+  document.title = `${title} · SeedWise`;
   // Research desk and single Your plan hidden from the nav menu; My plans is always nav 04.
   const nav = pages
     .filter(([id]) => !["research", "plan", "water"].includes(id)) // water hidden by owner; route still works by URL
@@ -102,11 +102,11 @@ function render() {
     )
     .join("");
   document.querySelector("#app").innerHTML =
-    `<a href="#main-content" class="skip">${t("Skip to content", "মূল অংশে যান")}</a><aside class="sidebar"><a class="brand" href="#field"><img src="/assets/mark.svg" alt=""><div><strong>Ropon Radar</strong><small>রোপণ রাডার</small></div></a><div class="nav-label">${t("FIELD WORKSPACE", "জমির কাজ")}</div><nav aria-label="${t("Workspace", "কর্মক্ষেত্র")}">${nav}</nav>
+    `<a href="#main-content" class="skip">${t("Skip to content", "মূল অংশে যান")}</a><aside class="sidebar"><a class="brand" href="#field"><img src="/assets/mark.svg" alt=""><div><strong>SeedWise</strong></div></a><div class="nav-label">${t("FIELD WORKSPACE", "জমির কাজ")}</div><nav aria-label="${t("Workspace", "কর্মক্ষেত্র")}">${nav}</nav>
  <div class="side-bottom"><div class="region-mark"><i class="status-dot"></i><strong>${t("Rangpur field lab", "রংপুর মাঠ গবেষণা")}</strong></div><p>${t("Bangladesh · Three prepared sites", "বাংলাদেশ · তিনটি প্রস্তুত স্থান")}</p><div class="sidebar-foot"><span>24°–27° N</span><span>FIELD EDITION 01</span></div></div></aside><button class="nav-shade" data-action="menu" aria-label="${t("Close navigation", "মেনু বন্ধ করুন")}"></button>
  <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
  <div id="journey-bar-slot">${journeyBar(current[0])}</div>
- <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>ROPON RADAR &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
+ <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
   mountJourney(current[0], navigate, () => pages.some(([id]) => id === "plan"));
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();

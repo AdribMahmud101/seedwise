@@ -20,7 +20,7 @@ digest = hashlib.sha256()
 for p in files:
     digest.update(p.relative_to(root).as_posix().encode())
     digest.update(p.read_bytes())
-version = 'ropon-field-' + digest.hexdigest()[:12]
+version = 'seedwise-field-' + digest.hexdigest()[:12]
 assets = ['/' + p.relative_to(root).as_posix() for p in files if p.name != 'index.html'] + ['/']
 pilot_tiles = sorted('/' + p.relative_to(root).as_posix() for p in (root / 'tiles').rglob('*.png')) if (root / 'tiles').exists() else []
 worker = """const NAME = __NAME__;
@@ -32,7 +32,7 @@ self.addEventListener('install', event => {
 });
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(names => Promise.all(names.filter(n => n.startsWith('ropon-field-') && n !== NAME).map(n => caches.delete(n))))
+    caches.keys().then(names => Promise.all(names.filter(n => (n.startsWith('seedwise-field-') || n.startsWith('ropon-field-')) && n !== NAME).map(n => caches.delete(n))))
       .then(() => self.clients.claim())
       .then(() => {
         // Warm pilot-site tiles in the background after activate

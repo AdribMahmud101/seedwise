@@ -12,7 +12,7 @@
 | 1:45–1:55 | Water & resilience → flood scenario | “A hypothetical delay feeds back into rotation eligibility. Drainage and aftercare guide tree choices.” |
 | 1:55–2:00 | Printable field plan | “The farmer leaves with a plan, its assumptions and the next field checks.” |
 
-**30-second version.** “In Rangpur, the decision after Aman depends on time, water and what a family can afford. Ropon Radar combines five years of NASA regional conditions with published local crop trials. Farmers compare complete rotations and see how many planting positions their field could hold. Extension officers can add measured yields, soil tests and gauge readings. When sensors disagree, we show the difference. When clouds hide the field, we show the gap. The farmer keeps the final decision.”
+**30-second version.** “In Rangpur, the decision after Aman depends on time, water and what a family can afford. SeedWise combines five years of NASA regional conditions with published local crop trials. Farmers compare complete rotations and see how many planting positions their field could hold. Extension officers can add measured yields, soil tests and gauge readings. When sensors disagree, we show the difference. When clouds hide the field, we show the gap. The farmer keeps the final decision.”
 
 Use a clean browser profile for judging. Mark any example observation entered during the presentation as a demonstration. The prepared dataset and imagery work from the local server without a live NASA call.
 

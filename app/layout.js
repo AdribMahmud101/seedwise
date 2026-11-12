@@ -10,9 +10,9 @@ import "./planner3d.css";
 import "./plangen.css";
 
 export const metadata = {
-  title: "Ropon Radar · Rangpur Field Lab",
+  title: "SeedWise · Rangpur Field Lab",
   description:
-    "Explore crop rotations, field layouts and real NASA environmental observations for Rangpur. A farmer and research demonstration by Ropon Radar.",
+    "Explore crop rotations, field layouts and real NASA environmental observations for Rangpur. A farmer and research demonstration by SeedWise.",
   icons: { icon: "/assets/mark.svg" },
 };
 

@@ -33,7 +33,7 @@ We use full 512 px chips and one seed. The paper's mF1 does not match a macro F1
 different averaging. Our F1 values come from torchmetrics' macro F1 and from the identity F1 = 2·IoU/(1+IoU).
 Our result is about 0.5 points below the published one, which is within roughly 2 published standard deviations.
 
-## How it is used in Ropon Radar (`flood-fields.json`)
+## How it is used in SeedWise (`flood-fields.json`)
 NASA HLS v2.0 (S30 Sentinel-2 and L30 Landsat, surface reflectance, 30 m) from Microsoft Planetary Computer, Jun–Oct 2024 and 2025.
 For each field we read a 224×224 px (6.7 km) window centred on the field centroid, run the model, and report water fraction over
 clear pixels in a 2 km box and in a 300 m radius. Clear means HLS Fmask bits 0–3 (cirrus, cloud, adjacent, shadow) are not set.

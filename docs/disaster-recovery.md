@@ -34,4 +34,4 @@ The examples contain fictional conditions, conspicuously labelled in the workspa
 
 Unit checks cover active-event holds, dry and waterlogged ground, unresolved contamination, surviving crops, missing water, missed windows, next-crop collisions, unknown rice duration, invalid dates and source resolution. Rendering checks cover all three fields, both languages and all three examples. No emergency phone number is called during UI testing.
 
-The app stores entries locally. Qualified clearance is a user-entered assertion, not a certification issued by Ropon Radar. Extension validation, live hazard services, field soil samples and calibrated crop models remain production work.
+The app stores entries locally. Qualified clearance is a user-entered assertion, not a certification issued by SeedWise. Extension validation, live hazard services, field soil samples and calibrated crop models remain production work.

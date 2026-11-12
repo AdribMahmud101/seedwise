@@ -1,7 +1,7 @@
 # Data Audit: Route-by-Route NASA & Earth Observation Usage
 
 **Audit Date:** 2026-11-10  
-**Scope:** Complete codebase audit of data assets, client modules, upstream sources, licenses, and truth attribution across all application routes and views in Ropon Radar.  
+**Scope:** Complete codebase audit of data assets, client modules, upstream sources, licenses, and truth attribution across all application routes and views in SeedWise.  
 **Repository Branch:** `card/DATAAUDIT`  
 **Application Code Base:** Read-only inspection of `src/legacy/` and `public/data/`.
 
