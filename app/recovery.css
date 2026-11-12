@@ -821,3 +821,9 @@ li.done .rr-check-dot {
 @keyframes rr-shimmer { to { background-position: -200% 0; } }
 @media (max-width: 720px) { .rr-risk { padding: 14px; } .rr-risk-list { grid-template-columns: 1fr; } .rr-risk-head b { font-size: 19px; } }
 @media (prefers-reduced-motion: reduce) { .rr-risk-mark, .rr-warn .rr-risk-mark, .rr-risk-skeleton i { animation: none; } }
+/* Confidence + NASA badge sit side by side under each signal */
+.rr-risk-list li { grid-template-columns: 12px auto auto 1fr; align-items: center; }
+.rr-risk-list li > .rr-dot { align-self: start; }
+.rr-risk-list li > div { grid-column: 2 / -1; }
+.rr-risk-list li > .rr-conf { grid-column: 2; }
+.rr-risk-list li > .rr-conf + * { grid-column: 3; justify-self: start; }
