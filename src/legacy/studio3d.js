@@ -5302,7 +5302,7 @@ function togglePlay() {
       if (playBtn) playBtn.textContent = "▶";
       return;
     }
-    if (currentMonthIdx >= 11) currentMonthIdx = 0;
+    setStudioMonth(0); // owner: Play always replays the year from January
     playTimer = setInterval(() => {
       if (currentMonthIdx >= 11) {
         clearInterval(playTimer);
