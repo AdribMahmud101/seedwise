@@ -73,6 +73,25 @@ export function mountPlanty(getContext) {
   const modal = document.querySelector('.planty-modal'), launch = document.querySelector('.planty-launch'), panel = modal.querySelector('.planty-window'), input = modal.querySelector('#planty-question'), form = modal.querySelector('.planty-form');
   let activeRequest = 0, attachedEntry = null;
   const context = () => getContext() || {};
+  // Calendar → "Ask Planty about this week": open the chat and ask with the week's tasks and risk line (plan stays attached).
+  if (!window.__plantyCalendarAsk) {
+    window.__plantyCalendarAsk = true;
+    window.addEventListener('calendar:ask', (event) => {
+      const { tasks = [], risk = '' } = event.detail || {};
+      const list = tasks.map((task) => task.title).filter(Boolean).slice(0, 6).join('; ');
+      const q = [local('What should I do this week?', 'এই সপ্তাহে কী করব?'), list && `${local("This week's tasks", 'এই সপ্তাহের কাজ')}: ${list}.`, risk && `${local('Risk', 'ঝুঁকি')}: ${risk}.`].filter(Boolean).join(' ').slice(0, 590);
+      const m = document.querySelector('.planty-modal');
+      if (m?.hidden) document.querySelector('.planty-launch')?.click();
+      m?.querySelector('[role="tab"][data-tab="chat"]')?.click();
+      // Opening the window re-renders the chat, so fill and send on the next frames.
+      setTimeout(() => {
+        const field = document.querySelector('.planty-modal #planty-question'), chatForm = field?.closest('form');
+        if (!field || !chatForm) return;
+        field.value = q;
+        chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); // runs the chat's onsubmit handler
+      }, 250);
+    });
+  }
   function refresh() {
     const ctx=context(), entry=ctx.plan || null, summary=entry&&summarizePlan(entry), id=summary?.id || '';
     getMessages(id); attachedEntry=entry;

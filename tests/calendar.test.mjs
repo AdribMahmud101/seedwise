@@ -78,3 +78,9 @@ test('calendar matches plan crop names to agronomy ids', () => {
   assert.equal(matchCrop(list, 'potato')?.id, 'potato');
   assert.equal(matchCrop(list, 'Mango'), null);
 });
+
+test('calendar click handler checks valueless data attributes by presence', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../src/legacy/calendar.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /hasAttribute\([^)]*\)\s*!==\s*undefined/);
+  assert.doesNotMatch(src, /el\.dataset\.cal(Ask|Close|Undo)\b/);
+});
