@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calendarTasks, shiftSowDate, toggleCalendarTask } from '../src/legacy/calendar.js';
+import { calendarTasks, deriveSeasonBands, shiftSowDate, toggleCalendarTask, undatedChecklistTasks, validateSowDate } from '../src/legacy/calendar.js';
 import { taskReminderId } from '../src/legacy/notifications.js';
 
 const plan = () => ({
@@ -14,28 +14,47 @@ test('calendar task dates and shifted seasons stay correct across New Year', () 
   const task = calendarTasks(original, 2027)[0];
   assert.equal(task.date, null);
   assert.equal(task.month, 11);
-  const shifted = shiftSowDate(original, 'winter', '2028-01-15');
-  assert.equal(shifted.rotation.seasons[0].sowMonth, 1);
-  assert.equal(shifted.rotation.seasons[0].harvestMonth, 4);
-  assert.equal(shifted.rotation.seasons[0].sowDate, '2028-01-15');
-  assert.equal(calendarTasks(shifted, 2029)[0].date, '2029-01-15');
+  const shifted = shiftSowDate(original, 'winter', '2028-12-15');
+  assert.equal(shifted.rotation.seasons[0].sowMonth, 12);
+  assert.equal(shifted.rotation.seasons[0].harvestMonth, 3);
+  assert.equal(shifted.rotation.seasons[0].sowDate, '2028-12-15');
+  assert.equal(calendarTasks(shifted, 2029)[0].date, '2029-12-15');
 });
 
-test('sow shifts reject invalid dates and dates outside published agronomy window', () => {
+test('sow shifts validate the one-month plan limit and reject invalid dates', () => {
   const source = [{ id: 'mustard', sowingWindow: { start: '10-15', end: '11-15' } }];
-  assert.throws(() => shiftSowDate(plan(), 'winter', '2027-12-01', source), /outside the agronomy window/);
+  assert.throws(() => shiftSowDate(plan(), 'winter', '2028-01-01', source), /more than one month outside/);
   assert.throws(() => shiftSowDate(plan(), 'winter', '2027-02-31', source), /Invalid sow date/);
-  assert.equal(shiftSowDate(plan(), 'winter', '2027-10-15', source).rotation.seasons[0].sowMonth, 10);
+  assert.equal(shiftSowDate(plan(), 'winter', '2027-12-15', source).rotation.seasons[0].sowMonth, 12);
 });
 
 test('custom plan calendar moves the full season while retaining twelve unique months', () => {
   const custom = plan();
   custom.rotation.customPlan = { calendar: Array.from({ length: 12 }, (_, i) => ({ month: i + 1,
     crop: [11, 12, 1, 2].includes(i + 1) ? 'mustard' : 'fallow' })) };
-  const shifted = shiftSowDate(custom, 'winter', '2028-01-15');
+  const shifted = shiftSowDate(custom, 'winter', '2028-12-15');
   assert.deepEqual(shifted.rotation.customPlan.calendar.map(row => row.month), Array.from({ length: 12 }, (_, i) => i + 1));
   assert.equal(shifted.rotation.customPlan.calendar.find(row => row.month === 11).crop, 'Fallow');
-  assert.equal(shifted.rotation.customPlan.calendar.find(row => row.month === 4).crop, 'fallow + mustard');
+  assert.equal(shifted.rotation.customPlan.calendar.find(row => row.month === 2).crop, 'mustard');
+});
+
+test('season bands wrap across New Year and use published duration harvest ranges', () => {
+  const cropPlan = plan();
+  const aman = { ...cropPlan, rotation: { seasons: [{ key:'aman', crop:'aman', sowMonth:11, harvestMonth:3 }] }, planting:{ aman:{crop:'aman'} } };
+  const bands = deriveSeasonBands(aman, 2027, [{ id:'aman', label:'Aman rice', durationDays:[135,135] }]);
+  assert.ok(bands.some(band => band.date === '2027-01-15' && band.stage === 'grow'));
+  assert.ok(bands.some(band => band.date === '2027-03-16' && band.stage === 'harvest'));
+  const boro = { ...aman, rotation:{seasons:[{key:'boro',crop:'boro',sowMonth:7,harvestMonth:12,sowDate:'2027-07-15'}]}, planting:{boro:{crop:'boro'}} };
+  const durationBands = deriveSeasonBands(boro, 2027, [{id:'boro',label:'Boro rice',durationDays:[150,160]}]);
+  assert.equal(durationBands.find(band => band.stage === 'harvest').date, '2027-12-12');
+  assert.equal(durationBands.at(-1).date, '2027-12-22');
+});
+
+test('sowing validation blocks overlap with next season harvest and puts undated prep on this week', () => {
+  const rotation = { rotation:{seasons:[{key:'aman',crop:'aman',sowMonth:11,harvestMonth:3},{key:'boro',crop:'boro',sowMonth:3,harvestMonth:8}]}, planting:{aman:{crop:'aman'},boro:{crop:'boro'}} };
+  assert.throws(() => validateSowDate(rotation,'aman','2027-11-01',[{id:'aman',durationDays:[135,135]}]), /overlaps boro sowing/);
+  assert.deepEqual(undatedChecklistTasks(plan()).map(item=>item.id), ['well-reading']);
+  assert.equal(calendarTasks(plan(),2027)[0].date, null);
 });
 
 test('calendar checklist ticks preserve the shared plan checklist', () => {
