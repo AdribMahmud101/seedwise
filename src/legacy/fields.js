@@ -1,3 +1,4 @@
+import { plantyMascot } from "./planty.js";
 /* global L */
 import { projectWgs84ToUtm45N, pointInPoly } from "./spatial.js";
 import { units } from "./boundary.js";
@@ -752,6 +753,8 @@ function home() {
         "Find your plot, read the season, and plan what comes next.",
         "জমি খুঁজুন, মৌসুমের তথ্য দেখুন এবং পরের ফসল ঠিক করুন।",
       ),
+      // Guide me stays available after a plan exists (the welcome banner with its own Guide me hides then).
+      `<button type="button" class="button guide-me field-guide-btn" data-action="guide-field">${plantyMascot("pointing")}<span>${t("Guide me", "আমাকে পথ দেখান")}</span></button>` +
       goButton(
         t("Disaster recovery", "দুর্যোগের পর করণীয়"),
         "recovery",
