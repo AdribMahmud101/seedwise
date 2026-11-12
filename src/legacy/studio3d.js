@@ -102,8 +102,6 @@ import {
   waterTablePositions,
   sampleS1Water,
   transectEndpoints,
-  sampleTransectProfile,
-  lookupProbePoint,
   buildCalloutData,
   computeAutoExaggeration,
   usdaTextureClass,
@@ -198,7 +196,6 @@ let proposedDrain = false;
 let outletBlocked = false;
 let soilOverrides = null; // { ph, om, p, gwDepthM }
 let ndviRelativeOverride = null; // null = auto (within-field at ≥95 % one class), true/false = legend toggle
-let probeUV = { u: 0.5, v: 0.5 };
 let s1WaterData = null; // lazy loaded from /data/s1-water.json
 let waterTableData = null; // lazy loaded from /data/water-table.json
 let smapData = null; // lazy loaded from /data/smap.json
@@ -209,7 +206,6 @@ let contourLinesGroup = null;
 let transect3dGroup = null;
 let glassFrameGroup = null;
 let edgeTreesGroup = null;
-let probePinMesh = null;
 let cameraEasing = null;
 let hoveredBandId = null;
 let introAnim = null; // STUDIO5M first load intro animation state
@@ -1389,7 +1385,6 @@ async function buildFieldBlock(data, cutawayFraction) {
     scene.userData.version = (scene.userData.version || 0) + 1;
   }
 
-  renderTransectSVG();
   buildGlassFrame(ringM, topMin, bottomY, effectiveMaxX, cutawayFraction);
   buildEdgeTrees(ringM, heightAt);
   if (legendResized) onResize();
@@ -1531,7 +1526,6 @@ async function runSurfaceCrossfade(prevMode) {
     for (const { mat, to } of waterMats) mat.opacity = to;
     updateSurfaceLegend(prevLegend);
     buildPlantsAndRoots(data, currentMonthIdx);
-    updateProbeCard();
     requestRender();
     return true;
   }
@@ -1579,7 +1573,6 @@ async function runSurfaceCrossfade(prevMode) {
   fade.tween.start();
   updateSurfaceLegend(prevLegend);
   buildPlantsAndRoots(data, currentMonthIdx);
-  updateProbeCard();
   requestRender();
   return true;
 }
@@ -1590,7 +1583,6 @@ function switchSurfaceMode(prevMode) {
   const afterBuild = () => {
     if (!currentData) return;
     buildPlantsAndRoots(currentData, currentMonthIdx);
-    updateProbeCard();
     requestRender();
   };
   if (!currentData || !blockGroup || !findTopMesh()) {
@@ -2775,7 +2767,7 @@ function studioFreeRegion() {
     return { region: { left: 0.015, right, top: top / h, bottom: bottom / h },
       preferredCentreY: (top + bottom) / (2 * h) };
   }
-  const cards = [...canvasHostEl.querySelectorAll('.studio-probe-card, .studio-transect-card, .studio-surface-legend')]
+  const cards = [...canvasHostEl.querySelectorAll('.studio-surface-legend')]
     .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
   const bottom = Math.min(h - 16, ...cards.map((r) => r.top - rect.top - 16));
   const top = Math.max(overlayBottom, controlsBottom) + 16;
@@ -3215,7 +3207,7 @@ function sync3DCallouts() {
   const block = { left:Math.min(...projected.map(p => p.x)), right:Math.max(...projected.map(p => p.x)),
     top:Math.min(...projected.map(p => p.y)), bottom:Math.max(...projected.map(p => p.y)) };
   const { width, height } = canvasSize();
-  const obstacles = [...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-compass, .studio-interaction-hint, .studio-touch-hint, .studio-probe-card, .studio-transect-card, .studio-surface-legend')]
+  const obstacles = [...canvasHostEl.querySelectorAll('.studio-overlay-tl, .studio-stage-controls, .studio-compass, .studio-interaction-hint, .studio-touch-hint, .studio-surface-legend')]
     .filter(el => !el.closest('dialog') && getComputedStyle(el).visibility !== 'hidden')
     .map(el => el.getBoundingClientRect()).filter(r => r.width && r.height)
     .map(r => ({left:r.left-canvasRect.left-6, right:r.right-canvasRect.left+6,
@@ -3244,137 +3236,6 @@ function sync3DCallouts() {
     leaderLayoutCache = {key,anchors};
   }
   positionSoilPopover();
-}
-
-function renderTransectSVG() {
-  const svg = containerEl?.querySelector('#svg-transect');
-  if (!svg || !currentData || !currentBlock.bounds) return;
-  const b = currentBlock.bounds;
-  const heightAt = makeHeightAt(currentData);
-  let lastFiniteH = 0;
-
-  const [a, end] = currentBlock.transect;
-  if (!a || !end) { svg.innerHTML = ""; return; }
-  const profile = sampleTransectProfile({
-    u0: (a[0] - b.minX) / b.width,
-    v0: (a[1] - b.minY) / b.height,
-    u1: (end[0] - b.minX) / b.width,
-    v1: (end[1] - b.minY) / b.height,
-    steps: 36,
-    sampleElevationFn: (u, v) => {
-      const x = b.minX + u * b.width;
-      const z = -(b.minY + v * b.height);
-      const h = heightAt(x, z); return Number.isFinite(h) ? (lastFiniteH = h) : lastFiniteH; // off-grid samples are NaN
-    },
-    rainMm: rainScenarioMm,
-    proposedDrain,
-    outletBlocked,
-    width: 290,
-    height: 64,
-  });
-
-  if (!Number.isFinite(profile.minE) || !Number.isFinite(profile.reliefM)) { svg.innerHTML = ""; return; }
-  const W = 290, H = 64, px = 12;
-  const waterE = profile.minE + 0.12 + (rainScenarioMm / 240) * (proposedDrain && !outletBlocked ? 0.35 : 0.85);
-  const wY = Math.max(10, profile.Y(waterE));
-
-  svg.innerHTML = `
-    ${rainScenarioMm > 5 ? `<rect x="${px + 120}" y="${wY.toFixed(1)}" width="${W - px * 2 - 120}" height="${Math.max(0, H - 5 - wY).toFixed(1)}" fill="#38bdf8" opacity="0.55"/>` : ''}
-    <path d="${profile.areaD}" fill="#b59d7e" opacity="0.55"/>
-    <path d="${profile.lineD}" fill="none" stroke="#173e30" stroke-width="2.2"/>
-    <circle cx="${profile.X(0).toFixed(1)}" cy="${profile.Y(profile.pts[0].elev).toFixed(1)}" r="3.5" fill="#173e30"/>
-    <circle cx="${profile.X(1).toFixed(1)}" cy="${profile.Y(profile.pts[profile.pts.length - 1].elev).toFixed(1)}" r="3.5" fill="#173e30"/>
-  `;
-
-  const reliefLbl = containerEl?.querySelector('#transect-relief-lbl');
-  if (reliefLbl) {
-    reliefLbl.textContent = `${t("Relief", "ঢাল")}: ${profile.reliefM.toFixed(1)} m · ${t("Exag", "স্কেল")} ${heightExaggeration.toFixed(1)}×`;
-  }
-}
-
-function dropProbePin(worldX, groundY, worldZ) {
-  if (!scene) return;
-  if (!probePinMesh) {
-    const pinGroup = new THREE.Group();
-    // Head sphere
-    const headGeo = new THREE.SphereGeometry(0.28, 16, 16);
-    const headMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706,
-      roughness: 0.3,
-      metalness: 0.2,
-      emissive: 0xd97706,
-      emissiveIntensity: 0.3,
-    });
-    const headMesh = new THREE.Mesh(headGeo, headMat);
-    headMesh.position.y = 1.0;
-    pinGroup.add(headMesh);
-
-    // Stem / Needle cone
-    const stemGeo = new THREE.ConeGeometry(0.08, 1.0, 12);
-    stemGeo.translate(0, 0.5, 0);
-    const stemMat = new THREE.MeshStandardMaterial({
-      color: 0xfffdf5,
-      roughness: 0.2,
-      metalness: 0.8,
-    });
-    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
-    pinGroup.add(stemMesh);
-
-    probePinMesh = pinGroup;
-    ensureFloatGroup();
-    floatGroup.add(probePinMesh);
-  }
-
-  probePinMesh.position.set(worldX, groundY, worldZ);
-  probePinMesh.visible = true;
-}
-
-function updateProbeCard() {
-  if (!currentData || !containerEl) return;
-  const b = currentBlock.bounds || outlineBounds(currentData.field.outlineM);
-  const heightAt = makeHeightAt(currentData);
-
-  const probe = lookupProbePoint({
-    u: probeUV.u,
-    v: probeUV.v,
-    field: currentData.field,
-    sampleElevationFn: (u, v) => {
-      const x = b.minX + u * b.width;
-      const z = -(b.minY + v * b.height);
-      return heightAt(x, z);
-    },
-    ndviObservation: nearestForMonth(currentData.vegetation || [], currentMonthIdx)?.observation,
-    moistureObservation: nearestForMonth(currentData.moisture || [], currentMonthIdx)?.observation,
-    groundClass: currentData.ground,
-    rainMm: rainScenarioMm,
-    proposedDrain,
-    outletBlocked,
-    s1WaterMask: null,
-  });
-
-  const latlonEl = containerEl.querySelector('#probe-latlon');
-  if (latlonEl) latlonEl.textContent = `${probe.lat.toFixed(4)}°N, ${probe.lon.toFixed(4)}°E`;
-
-  const elevEl = containerEl.querySelector('#probe-elev');
-  if (elevEl) elevEl.textContent = `${num(probe.elevationM, 2)} m`;
-
-  const pondEl = containerEl.querySelector('#probe-pond');
-  if (pondEl) {
-    pondEl.textContent = `${num(probe.pondingCm, 0)} cm`;
-    pondEl.title = probe.pondSource;
-  }
-
-  const ndviEl = containerEl.querySelector('#probe-ndvi');
-  if (ndviEl) ndviEl.textContent = probe.ndvi !== null && probe.ndvi !== undefined ? num(probe.ndvi, 2) : "—";
-
-  // Dispatch custom event for STUDIO5B
-  try {
-    const event = new CustomEvent('studio:probe', {
-      detail: probe,
-      bubbles: true,
-    });
-    containerEl.dispatchEvent(event);
-  } catch (e) {}
 }
 
 /* --------------------------------------------------- STUDIO5M intro animation */
@@ -3948,8 +3809,6 @@ function layoutSurfaceLegend() {
   const summary = card.querySelector('summary');
   summary.tabIndex = size === 'wide' ? 0 : -1;
   summary.setAttribute('aria-disabled', String(size !== 'wide'));
-  const probe = containerEl.querySelector('#probe-card');
-  canvasHostEl.style.setProperty('--studio-probe-height', `${size === 'wide' ? probe?.offsetHeight || 0 : 0}px`);
 }
 
 export function studioOverlayBreakpoint(width, height = Infinity) {
@@ -4020,7 +3879,6 @@ function updateOverlayLayout() {
   canvasHostEl.dataset.chrome = breakpoint === 'wide' ? 'full' : 'compact';
   canvasHostEl.dataset.showCaption = String(breakpoint === 'wide');
   const layers = containerEl.querySelector('.studio-soil-layers');
-  const inspection = containerEl.querySelector('.studio-inspection');
   if (changed) {
     const sheet = containerEl.querySelector('#studio-layers-sheet');
     const overlay = containerEl.querySelector('.studio-overlay-tl');
@@ -4040,21 +3898,7 @@ function updateOverlayLayout() {
       summary.tabIndex = breakpoint === 'wide' ? 0 : -1;
       summary.setAttribute('aria-disabled', String(breakpoint !== 'wide'));
     }
-    for (const id of ['probe', 'transect']) {
-      const card = containerEl.querySelector(`#${id}-card`);
-      if (!card || !inspection) continue;
-      (breakpoint === 'wide' ? canvasHostEl : inspection).appendChild(card);
-      card.hidden = breakpoint !== 'wide' && containerEl.querySelector(`#tab-${id}`)?.getAttribute('aria-selected') !== 'true';
-      if (breakpoint === 'wide') {
-        card.removeAttribute('role');
-        card.removeAttribute('aria-labelledby');
-        card.removeAttribute('tabindex');
-      } else {
-        card.setAttribute('role', 'tabpanel');
-        card.setAttribute('aria-labelledby', `tab-${id}`);
-        card.tabIndex = 0;
-      }
-    }
+
   }
   const hint = containerEl.querySelector('.studio-interaction-hint');
   if (width < 600 && hint) hint.hidden = true;
@@ -4278,6 +4122,36 @@ function bindOverlayEvents() {
   overlayEvents?.abort();
   overlayEvents = new AbortController();
   const options = { signal: overlayEvents.signal };
+  containerEl.addEventListener('toggle', (e) => {
+    const info = e.target;
+    if (!info.matches('.soil-info') || !info.open) return;
+    containerEl.querySelectorAll('.soil-info[open]').forEach((other) => {
+      if (other !== info) other.open = false;
+    });
+    const popover = info.querySelector('div');
+    popover.style.transform = '';
+    popover.style.top = '';
+    const rect = popover.getBoundingClientRect();
+    const shift = Math.max(8 - rect.left, Math.min(0, document.documentElement.clientWidth - 8 - rect.right));
+    popover.style.transform = `translateX(${shift}px)`;
+    if (rect.bottom > window.innerHeight - 8) {
+      popover.style.top = `${Math.max(8 - info.getBoundingClientRect().top, -rect.height - 6)}px`;
+    }
+  }, { ...options, capture: true });
+  document.addEventListener('pointerdown', (e) => {
+    containerEl.querySelectorAll('.soil-info[open]').forEach((info) => {
+      if (!info.contains(e.target)) info.open = false;
+    });
+  }, options);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const info = containerEl.querySelector('.soil-info[open]');
+    if (!info) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    info.open = false;
+    info.querySelector('summary').focus({ preventScroll: true });
+  }, options);
   bindStageOverlays(options);
   window.visualViewport?.addEventListener('resize', onResize, options);
   window.addEventListener('scroll', positionSoilPopover, { ...options, passive: true });
@@ -4356,24 +4230,12 @@ function bindOverlayEvents() {
       if (currentData) {
         buildFieldBlock(currentData, currentCutaway).then(() => {
           buildPlantsAndRoots(currentData, currentMonthIdx);
-          updateProbeCard();
           requestRender();
         });
       }
     }
     const surfaceGoto = e.target.closest('[data-surface-goto]');
     if (surfaceGoto) setSurfaceMode(surfaceGoto.dataset.surfaceGoto);
-    const tab = e.target.closest('[data-inspection-tab]');
-    if (tab) selectInspectionTab(tab);
-  }, options);
-  containerEl.querySelector('.studio-inspection-tabs')?.addEventListener('keydown', (e) => {
-    const tabs = [...e.currentTarget.querySelectorAll('[role="tab"]')];
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-    e.preventDefault();
-    const index = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1
-      : (tabs.indexOf(e.target) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    selectInspectionTab(tabs[index]);
-    tabs[index].focus();
   }, options);
   containerEl.querySelector('.studio-soil-layers')?.addEventListener('toggle', (e) => {
     if (canvasHostEl.dataset.overlaySize === 'wide') wideLayersOpen = e.target.open;
@@ -4383,15 +4245,6 @@ function bindOverlayEvents() {
     if (canvasHostEl.dataset.overlaySize === 'wide') onResize();
     else containerEl.querySelector('.studio-surface-legend').open = true;
   }, options);
-}
-
-function selectInspectionTab(tab) {
-  containerEl.querySelectorAll('[data-inspection-tab]').forEach((el) => {
-    const selected = el === tab;
-    el.setAttribute('aria-selected', String(selected));
-    el.tabIndex = selected ? 0 : -1;
-    containerEl.querySelector(`#${el.dataset.inspectionTab}-card`).hidden = !selected;
-  });
 }
 
 function fallowOverlayChipHtml(data, monthIdx) {
@@ -4699,35 +4552,6 @@ export function studio3dHtml(data, activeMonth = 0, opts = {}) {
             </div>`).join("")}
         </div>
       </details>
-      <div class="studio-inspection">
-        <div class="studio-inspection-tabs" role="tablist" aria-label="${t("Field inspection", "মাঠ পরিদর্শন")}">
-          <button type="button" id="tab-probe" role="tab" aria-selected="true" aria-controls="probe-card" data-inspection-tab="probe">${t("Point probe", "পয়েন্ট প্রোব")}</button>
-          <button type="button" id="tab-transect" role="tab" aria-selected="false" aria-controls="transect-card" tabindex="-1" data-inspection-tab="transect">${t("Cross-section A–A′", "আড়াআড়ি ছেদ A–A′")}</button>
-        </div>
-        <!-- Tap Point Probe Card -->
-        <div class="studio-probe-card" id="probe-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e4d8;padding-bottom:3px;margin-bottom:4px;">
-            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--deep,#173e30);">${t("Point Probe (Click Field)", "পয়েন্ট প্রোব (জমিতে চাপুন)")}</span>
-            <span id="probe-latlon" class="mono" style="font-size:10px;color:var(--text-dim,#536456);">25.8317°N, 89.2355°E</span>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;font-size:11px;" class="mono">
-            <div><span style="font-size:9px;color:var(--text-dim,#536456);display:block;">${t("Elev", "উচ্চতা")}</span><strong id="probe-elev">32.8 m</strong></div>
-            <div><span style="font-size:9px;color:var(--text-dim,#536456);display:block;">${t("Ponding", "জমা পানি")}</span><strong id="probe-pond" style="color:#234f61;">0 cm</strong></div>
-            <div><span style="font-size:9px;color:var(--text-dim,#536456);display:block;">${t("NDVI", "সবুজ")}</span><strong id="probe-ndvi" style="color:#315d42;">0.72</strong></div>
-          </div>
-        </div>
-
-        <!-- Transect SVG cross-section Profile Card -->
-        <div class="studio-transect-card" id="transect-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--deep,#173e30);">${t("Transect Profile · A → A'", "ট্রানসেক্ট প্রোফাইল · A → A'")}</span>
-            <span id="transect-relief-lbl" class="mono" style="font-size:10px;color:var(--text-dim,#536456);">${t("Relief: 2.5 m", "ঢাল: ২.৫ মি")}</span>
-          </div>
-          <svg id="svg-transect" viewBox="0 0 290 68" style="width:100%;height:64px;display:block;"></svg>
-        </div>
-
-      </div>
-
       <!-- Interaction deck below viewport: Slice slider, Rain scenario slider, Relief scale slider + Roots & Bunds toggles -->
       <div class="studio-dock-deck">
         <div class="studio-dock-item">
@@ -5110,8 +4934,6 @@ function bindEvents(container) {
       const rainLbl = containerEl.querySelector("#lbl-rain-mm");
       if (rainLbl) rainLbl.textContent = `${rainScenarioMm} mm`;
       await buildFieldBlock(currentData, currentCutaway);
-      renderTransectSVG();
-      updateProbeCard();
       requestRender();
     };
   }
@@ -5138,7 +4960,6 @@ function bindEvents(container) {
       await buildFieldBlock(currentData, currentCutaway);
       buildPlantsAndRoots(currentData, currentMonthIdx);
       await buildSurroundings(currentData);
-      renderTransectSVG();
       requestRender();
     };
   });
@@ -5215,7 +5036,7 @@ function bindEvents(container) {
   const playBtn = containerEl.querySelector("[data-studio-action='toggle-play']");
   if (playBtn) playBtn.onclick = () => togglePlay();
 
-  // Raycasting for tap / click probe card + drop pin + hover bands
+  // Raycasting for tap / click features + hover bands
   if (canvas) {
     let downPos = { x: 0, y: 0 };
     canvas.addEventListener("pointerdown", (e) => {
@@ -5330,24 +5151,12 @@ function bindEvents(container) {
         soilPinned = true;
         return;
       }
-      if (hits.length > 0) {
-        const pt = hits[0].point;
-        const b = currentBlock.bounds;
-        probeUV = {
-          u: Math.max(0, Math.min(1, (pt.x - b.minX) / Math.max(1e-6, b.width))),
-          v: Math.max(0, Math.min(1, (-pt.z - b.minY) / Math.max(1e-6, b.height))),
-        };
-        // Drop small 3D pin on tapped surface
-        dropProbePin(pt.x, pt.y, pt.z);
-        updateProbeCard();
-        requestRender();
-      }
     });
 
     // STUDIO5T gesture split: decide from the first ~10 px whether a one-finger
     // drag rotates (horizontal) or scrolls the page (vertical, native). These
     // listeners never preventDefault, so the browser keeps scrolling. Taps
-    // still probe via the pointerup handler above; two fingers stay with
+    // still select features via the pointerup handler above; two fingers stay with
     // OrbitControls (pinch zoom + tilt). Mouse is unaffected.
     // The canvas element is reused across rotation switches (no dispose), so
     // bind once — a stacked touchmove would rotate twice per event.
@@ -5414,10 +5223,6 @@ function bindEvents(container) {
 
   bindOverlayEvents();
 
-  // Initial draw of transect and probe
-  renderTransectSVG();
-  updateProbeCard();
-
   // Dismiss intro on any user keydown or control click within container
   containerEl.addEventListener("keydown", () => stopIntroAnimation(true));
   containerEl.addEventListener("click", (e) => {
@@ -5453,7 +5258,6 @@ export function setSoilOverrides(overrides) {
   if (containerEl && currentData) {
     updateSoilDetails(buildCalloutData({ data: currentData, monthIdx: currentMonthIdx, soilOverrides, waterTable: waterTableData || null, smap: smapData || null, grace: graceData || null, t }));
     buildFieldBlock(currentData, currentCutaway).then(() => {
-      updateProbeCard();
       requestRender();
     });
   }
