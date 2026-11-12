@@ -2693,7 +2693,9 @@ export async function mountPlanner3d(host, input) {
   const cropId = input.planner.crop === "rice" ? "aman" : input.planner.crop;
   // Planner owns the crop and spacing; no rotation or calendar selection applies.
   data.months = [{ cropId, stage: "grow",
-    stageFraction: 0.75, canopyHeightM: FAO56_CROP_LIMITS[cropId].heightM }];
+    stageFraction: 0.75,
+    // Custom plans name crops freely ("Aman rice"); their plants come from data.custom, so this is unused there.
+    canopyHeightM: (FAO56_CROP_LIMITS[cropId] ?? FAO56_CROP_LIMITS.aman).heightM }];
   data.planner = { ...input.planner };
   data.net = input.net || null;
   data.custom = input.custom || null;

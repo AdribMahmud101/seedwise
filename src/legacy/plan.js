@@ -608,14 +608,19 @@ function schedulePlan3d() {
       if (!settings) return;
       const { field: planField, polygon: outline } = planFieldInput(fresh);
       await mod.mountPlanner3d(host, {
-        field: planField, polygon: outline, rotationId: fresh.rotation.id, agronomy, soilProfile,
-        ...(fresh.rotation.customPlan ? { custom: { ...fresh.rotation.customPlan, planting: [{ ...settings, sharePct: 100 }] } } : {}),
+        field: planField, polygon: outline, agronomy, soilProfile,
+        // Custom plans have no built-in rotation id ("custom" made buildStudioData throw); the
+        // previewed season's own model/colour/height come from the AI plan, spacing from settings.
+        ...(fresh.rotation.customPlan
+          ? { custom: { ...fresh.rotation.customPlan, planting: [{ ...(fresh.rotation.customPlan.planting?.[fresh.rotation.seasons.findIndex(s => s.key === active3dKey)] || {}), ...settings, sharePct: 100 }] } }
+          : { rotationId: fresh.rotation.id }),
         planner: { crop: settings.crop, row: settings.rowSpacingCm, spacing: settings.withinRowCm, usable: settings.usableAreaPct },
         net: { inputs: fresh.field.netInputs ?? netInputsFor(fresh.field.id),
           edited: fresh.field.netEdited ?? isNetEdited(fresh.field.id) },
       });
     } catch (error) {
       if (version !== planVersion) return;
+      console.warn('Plan 3D unavailable; showing text fallback:', error);
       const wrap = host.closest('.planner3d-stage-wrap');
       if (wrap) wrap.hidden = true;
       host.closest('.panel-body')?.querySelector('.plan-fallback-note')?.removeAttribute('hidden');
