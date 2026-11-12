@@ -146,6 +146,17 @@ function ready(rotationId = 'legume') {
 }
 beforeEach(() => { journey.resetPlan(); state.lang = 'en'; });
 
+test('refinement approval saves a restorable prior version', () => {
+  const saved = journey.savePlan(ready('baseline'), { status: 'ready' });
+  const before = saved.plan.planting[saved.plan.rotation.seasons[0].key].rowSpacingCm;
+  const updated = journey.approveRefinement(saved.id, [{ season: 0, from: 'Rice', to: 'Rice at 25×20 cm', why: 'Suggested spacing' }]);
+  assert.equal(updated.plan.planting[updated.plan.rotation.seasons[0].key].rowSpacingCm, 25);
+  assert.equal(updated.previousVersion.planting[updated.plan.rotation.seasons[0].key].rowSpacingCm, before);
+  const restored = journey.restorePreviousPlan(saved.id);
+  assert.equal(restored.plan.planting[restored.plan.rotation.seasons[0].key].rowSpacingCm, before);
+  assert.equal(journey.getSavedPlan(saved.id).previousVersion, undefined);
+});
+
 test('calendar geometry follows sow→grow→harvest across New Year with gaps and today', () => {
   const seasons = rotation('legume').seasons;
   const potato = seasons.find(s => s.crop === 'potato');

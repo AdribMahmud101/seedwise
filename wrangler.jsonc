@@ -9,5 +9,7 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
-  "routes": [{ "pattern": "seedwise.onefusionlab.systems", "custom_domain": true }, { "pattern": "roponradar.onefusionlab.systems", "custom_domain": true }]
+  "routes": [{ "pattern": "seedwise.onefusionlab.systems", "custom_domain": true }, { "pattern": "roponradar.onefusionlab.systems", "custom_domain": true }],
+  "kv_namespaces": [{ "binding": "DAILY_BRIEF", "id": "9ec249933cd141d99959908f99016e35" }],
+  "triggers": { "crons": ["0 0 * * *"] }
 }
