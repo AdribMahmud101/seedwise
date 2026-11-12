@@ -396,12 +396,10 @@ export function customPlanBanner() {
   const rotation = p.mode === 'rotation';
   const seasonIdx = Math.min(customSeasonIdx, p.planting.length - 1);
   return `<section class="panel adv-plan-banner adv-${cls}" aria-label="${t('Custom plan', 'কাস্টম পরিকল্পনা')}">
-    <div class="adv-plan-head"><span class="adv-mark">${mark}</span><div><span class="eyebrow">${t('Custom plan from Rotation studio', 'ফসলচক্র থেকে কাস্টম পরিকল্পনা')} · ${t(en, bn)}</span><h2>${esc(p.title || '')}</h2></div>
+    <div class="adv-plan-head"><span class="adv-verdict">${mark} ${t(en, bn)}</span><h2>${esc(p.title || '')}</h2>
       <button type="button" class="button small" data-action="custom-plan-clear">${t('Back to standard planting', 'সাধারণ বপনে ফিরুন')}</button></div>
-    ${rotation ? `<p class="note">${t('Season rotation: each crop uses the whole field in its own season — pick a season to see it in 3D.', 'মৌসুমি চক্র: প্রতিটি ফসল নিজের মৌসুমে পুরো জমি নেয় — ৩ডি-তে দেখতে মৌসুম বাছুন।')}</p>` : ''}
-    <div class="adv-plan-crops">${p.planting.map((c, i) => `<${rotation ? `button type="button" data-action="custom-season" data-value="${i}" aria-pressed="${i === seasonIdx}"` : 'div'} class="adv-plan-crop${rotation && i === seasonIdx ? ' on' : ''}"><i style="background:${esc(c.color)}"></i><div><strong>${esc(c.crop)}</strong>
-      <small>${rotation ? t('whole field in its season', 'নিজের মৌসুমে পুরো জমি') : `${c.sharePct}% ${t('of the field', 'জমির')}`} · ${esc(c.model)} · ${c.rowSpacingCm} × ${c.withinRowCm} cm · ~${customCount(area(), usable, rotation ? { ...c, sharePct: 100 } : c).toLocaleString()} ${t('plants', 'চারা')}</small></div></${rotation ? 'button' : 'div'}>`).join('')}</div>
-    <p class="note">${t('3D shows each crop in its share of the land (generic tree / bush / field-crop models; colours and spacing suggested by AI — general guidance, not measurements). Plant counts use your usable area.', '৩ডি-তে প্রতিটি ফসল তার জমির অংশে (সাধারণ গাছ/ঝোপ/মাঠফসলের মডেল; রং ও দূরত্ব এআই প্রস্তাবিত — সাধারণ নির্দেশনা)।')}</p>
+    <div class="adv-plan-crops">${p.planting.map((c, i) => `<${rotation ? `button type="button" data-action="custom-season" data-value="${i}" aria-pressed="${i === seasonIdx}"` : 'span'} class="adv-plan-crop${rotation && i === seasonIdx ? ' on' : ''}"><i style="background:${esc(c.color)}"></i><strong>${esc(c.crop)}</strong><small>${cropMonths(p.calendar, c.crop) ? `${esc(cropMonths(p.calendar, c.crop))} · ` : ''}${c.rowSpacingCm}×${c.withinRowCm}</small></${rotation ? 'button' : 'span'}>`).join('')}</div>
+    <details class="adv-plan-details"><summary>${t('ⓘ Plan details', 'ⓘ পরিকল্পনার তথ্য')}</summary><p class="note">${t('Custom plan from Rotation studio', 'ফসলচক্র থেকে কাস্টম পরিকল্পনা')} · ${t(en, bn)}</p>${rotation ? `<p class="note">${t('Season rotation: each crop uses the whole field in its own season — pick a season to see it in 3D.', 'মৌসুমি চক্র: প্রতিটি ফসল নিজের মৌসুমে পুরো জমি নেয় — ৩ডি-তে দেখতে মৌসুম বাছুন।')}</p>` : ''}<ul>${p.planting.map(c => `<li>${esc(c.crop)} · ${rotation ? t('whole field in its season', 'নিজের মৌসুমে পুরো জমি') : `${c.sharePct}% ${t('of the field', 'জমির')}`} · ${esc(c.model)} · ${c.rowSpacingCm} × ${c.withinRowCm} cm · ~${customCount(area(), usable, rotation ? { ...c, sharePct: 100 } : c).toLocaleString()} ${t('plants', 'চারা')}</li>`).join('')}</ul><p class="note">${t('3D shows each crop in its share of the land (generic tree / bush / field-crop models; colours and spacing suggested by AI — general guidance, not measurements). Plant counts use your usable area.', '৩ডি-তে প্রতিটি ফসল তার জমির অংশে (সাধারণ গাছ/ঝোপ/মাঠফসলের মডেল; রং ও দূরত্ব এআই প্রস্তাবিত — সাধারণ নির্দেশনা)।')}</p></details>
   </section>`;
 }
 
@@ -421,7 +419,7 @@ function recommendedSetupHtml(p) {
   return `<div class="cs-recommend"><button type="button" class="button small" data-action="custom-recommend-toggle" aria-expanded="false" ${changes.length ? '' : 'disabled'}>${changes.length ? `✦ ${t('Use recommended setup', 'প্রস্তাবিত মাপ ব্যবহার করুন')}` : `✓ ${t('Recommended setup in use', 'প্রস্তাবিত মাপ ব্যবহার হচ্ছে')}`}</button>
     ${changes.length ? `<div class="cs-recommend-preview" inert aria-hidden="true"><div class="cs-recommend-inner"><ul>${rows}</ul><div><button type="button" class="button primary small" data-action="custom-recommend-apply">${t('Apply', 'প্রয়োগ করুন')}</button> <button type="button" class="button small" data-action="custom-recommend-cancel">${t('Cancel', 'বাতিল')}</button></div></div></div>` : ''}</div>`;
 }
-export function customSettingsPanel() {
+export function customSettingsPanel(saveAction = '') {
   const p = getCustomPlan();
   if (!p) return '';
   const rotation = p.mode === 'rotation';
@@ -441,7 +439,7 @@ export function customSettingsPanel() {
       ${slider(i, 'row', t('Row spacing', 'সারির দূরত্ব'), c.model === 'tree' ? 200 : 10, c.model === 'tree' ? 1200 : 150, c.model === 'tree' ? 50 : 5, c.rowSpacingCm, ' cm')}
       ${slider(i, 'within', t('Within-row spacing', 'সারিতে দূরত্ব'), c.model === 'tree' ? 200 : 5, c.model === 'tree' ? 1200 : 120, c.model === 'tree' ? 50 : 5, c.withinRowCm, ' cm')}</div>`).join('')}
     <div class="cs-footer"><p class="cs-total">${t('Total plants', 'মোট চারা')}: <strong>~${total.toLocaleString()}</strong> <span class="truth">◌ ${t('Scenario', 'কাল্পনিক')}</span></p>
-    <p class="note">${t('Spacing suggested by AI (general guidance). Usable area comes from your field widths.', 'দূরত্ব এআই প্রস্তাবিত (সাধারণ নির্দেশনা)। চাষযোগ্য জমি আপনার জমির মাপ থেকে।')}</p></div>
+    <p class="note">${t('Spacing suggested by AI (general guidance). Usable area comes from your field widths.', 'দূরত্ব এআই প্রস্তাবিত (সাধারণ নির্দেশনা)। চাষযোগ্য জমি আপনার জমির মাপ থেকে।')}</p></div>${saveAction}
   </form></section>`;
 }
 // Returns true if the input belonged to the custom panel (caller re-renders).

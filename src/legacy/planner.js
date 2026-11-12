@@ -15,7 +15,6 @@ import {
   profile,
   area,
   button,
-  header,
   panel,
   tag,
   truth,
@@ -54,7 +53,7 @@ function plannerSaveCTA() {
   const active = getPlan();
   if (active && !(active.rotation?.customPlan && getSavedPlan(active.id))) return '';
   const source = plannerSaveSource();
-  return `<div class="plan-save">${button(active ? t('Save plan', 'পরিকল্পনা সংরক্ষণ') : t('Save as my plan', 'আমার পরিকল্পনা হিসেবে সংরক্ষণ'), 'plan-save', 'primary')}${source.message ? `<p class="note" role="status"><a href="#${source.route}">${source.message}</a></p>` : ''}</div>`;
+  return `<div class="plan-save plan-save-footer">${button(active ? t('Save plan', 'পরিকল্পনা সংরক্ষণ') : t('Save as my plan', 'আমার পরিকল্পনা হিসেবে সংরক্ষণ'), 'plan-save', 'primary')}${source.message ? `<p class="note" role="status"><a href="#${source.route}">${source.message}</a></p>` : ''}</div>`;
 }
 
 function savePlannerPlan() {
@@ -247,7 +246,7 @@ function usableNote() {
     : `<p class="note plan-usable-note">${t('From your field widths', 'আপনার জমির মাপ থেকে')} · <a href="#field">${t('Edit on My field', 'আমার জমিতে বদলান')}</a></p>`;
 }
 function plannerSettings() {
-  if (getCustomPlan()) return customSettingsPanel();
+  if (getCustomPlan()) return customSettingsPanel(plannerSaveCTA());
   const p = state.planner;
   const plan = seasonPlan();
   const season = activeSeason(plan);
@@ -258,7 +257,7 @@ function plannerSettings() {
     ${numericControl('usable', t('Usable area', 'চাষযোগ্য জমি'), '%')}
     ${usableNote()}
     ${p.crop === 'mustard' ? `<p class="plan-broadcast note">${t('Broadcast sowing · no rows. Seed uses the published 7 kg/ha reference rate.', 'ছিটিয়ে বপন · সারি নেই। প্রকাশিত ৭ কেজি/হেক্টর হার ধরে বীজের হিসাব।')}</p>` : numericControl('row', t('Row spacing', 'সারির দূরত্ব'), 'cm') + numericControl('spacing', t('Within-row spacing', 'গাছের দূরত্ব'), 'cm')}
-    <button type="button" class="plan-reset" data-action="plan-reset">↺ ${t('Reset to recommended', 'প্রস্তাবিত মাপে ফিরুন')}</button><div class="plan-season-confirmation">${seasonConfirmation(plan)}</div></form></div></section>`;
+    <button type="button" class="plan-reset" data-action="plan-reset">↺ ${t('Reset to recommended', 'প্রস্তাবিত মাপে ফিরুন')}</button><div class="plan-season-confirmation">${seasonConfirmation(plan)}</div>${plannerSaveCTA()}</form></div></section>`;
 }
 function resultNumber(key, value, places = 0) {
   return `<span data-plan-number="${key}" data-value="${value}" data-places="${places}">${num(value, places)}</span>`;
@@ -316,18 +315,7 @@ function planner() {
     p[name] = clampPlannerValue(p.crop, name, Number.isFinite(p[name]) ? p[name] : recommendedSettings(p.crop)[name]);
   }
   return (
-    header(
-      t('Planting desk  /  03', 'বপনের নকশা  /  ০৩'),
-      t('Planting planner', 'বপনের পরিকল্পনা'),
-      t(
-        'Turn the field boundary into a row layout and an approximate planting count.',
-        'জমির সীমানা থেকে সারি ও আনুমানিক গাছের সংখ্যা দেখুন।'
-      ),
-      button(t('Guide me', 'আমাকে দেখান'), 'plan-guide') +
-      button(t('Print field plan', 'পরিকল্পনা ছাপুন'), 'print', '', 'print')
-    ) +
-    chips() +
-    plannerSaveCTA() +
+    `<header class="page-head planner-compact-head" title="${t('Planting desk / 03', 'বপনের নকশা / ০৩')}"><div class="planner-head-line"><h1>${t('Planting planner', 'বপনের পরিকল্পনা')}</h1>${chips()}</div><div class="page-head-actions">${button(t('Guide me', 'আমাকে দেখান'), 'plan-guide')}${button(t('Print', 'ছাপুন'), 'print', '', 'print')}</div><p>${t('Turn the field boundary into a row layout and an approximate planting count.', 'জমির সীমানা থেকে সারি ও আনুমানিক গাছের সংখ্যা দেখুন।')}</p></header>` +
     customPlanBanner() +
     `<div id="journey-finish-slot">${journeyFinishCTA()}</div><section id="plan-seasons">${seasonTabs(plan)}</section>
     <div id="plan-season-panel" ${season ? `role="tabpanel" aria-labelledby="plan-season-tab-${plan.rotation.seasons.indexOf(season)}"` : ''} class="planner-workbench"><div class="grid-two planner3d-layout"><section class="panel planner3d-panel"><div class="panel-header"><h2>${t('Field preview', 'জমির পূর্বদৃশ্য')}</h2>${tag(t('Planting model', 'বপনের নকশা'), 'green')}</div>
