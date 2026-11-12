@@ -1,4 +1,4 @@
-import { consumeToastSequence, playToastSequence } from './notify-toast.js';
+import { consumeToastSequence, consumeWelcome, playToastSequence } from './notify-toast.js';
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
 import { getPlan, getReadyPlan, listPlans, openPlan, approveRefinement, restorePreviousPlan } from './journey.js';
 import { requestReplay } from './plan-pipeline.js';
@@ -204,12 +204,25 @@ document.addEventListener('ropon:report-ready', async () => {
   await refreshNotifications();
   const store = readNotificationState();
   playToastSequence(visibleNotifications(store.cache.items || [], store).filter(item => !store.read[item.id]), {
+    persist: true, onDismiss: markToastRead,
     onShow: () => {
       const bell = document.querySelector('.notification-bell');
       bell?.classList.remove('bell-bump'); void bell?.offsetWidth; bell?.classList.add('bell-bump'); // restart the shake per toast
     },
   });
 });
+
+function bumpBell() {
+  const bell = document.querySelector('.notification-bell');
+  bell?.classList.remove('bell-bump'); void bell?.offsetWidth; bell?.classList.add('bell-bump');
+}
+// Dismissing a toast marks that notification read, so the bell count matches what the user has seen.
+function markToastRead(item) {
+  const store = readNotificationState();
+  store.read[item.id] = true;
+  writeNotificationState(store);
+  renderNotifications();
+}
 
 function evidence() {
   modal(
@@ -492,7 +505,13 @@ async function start() {
     const currentRoute = route();
     if (currentRoute.page[0] === 'plan' && currentRoute.param) openPlan(currentRoute.param);
     render();
-    refreshNotifications();
+    // First visit this session: show the real unread notifications as persistent stacked toasts.
+    refreshNotifications().then(() => {
+      if (!consumeWelcome()) return;
+      const store = readNotificationState();
+      playToastSequence(visibleNotifications(store.cache.items || [], store).filter(item => !store.read[item.id]), {
+        persist: true, onDismiss: markToastRead, onShow: bumpBell });
+    });
   } catch (error) {
     console.error(error);
     document.querySelector("#app").innerHTML = stateError(
