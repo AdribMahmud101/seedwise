@@ -20,7 +20,7 @@ test('no plan hides bar and handoffs; only explicit start choices appear', () =>
   assert.equal(bar.journeyFieldCTA(), '');
   assert.equal(bar.journeyRotationCTA('legume'), '');
   assert.equal(bar.journeyFinishCTA(), '');
-  assert.match(bar.journeyStart(), /Plan my season/);
+  assert.doesNotMatch(bar.journeyStart(), /Plan my season/); // Guide me covers it
   assert.match(bar.journeyStart(), /Watch Rahim&#39;s journey|Watch Rahim's journey/);
 });
 

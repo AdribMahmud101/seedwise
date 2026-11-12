@@ -4398,8 +4398,8 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
   .main[data-page="field"] .field-compact-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin-bottom: 8px; }
   .main[data-page="field"] .page-head { display: contents; }
   .main[data-page="field"] .page-head > div:first-child { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .main[data-page="field"] .page-head .eyebrow { margin: 0; font-size: 10px; white-space: nowrap; }
-  .main[data-page="field"] .page-head p { margin: 0; max-width: 300px; font-size: 11px; white-space: nowrap; }
+  .main[data-page="field"] .page-head .eyebrow { margin: 0; font-size: 11.5px; white-space: nowrap; }
+  .main[data-page="field"] .page-head p { margin: 0; max-width: none; font-size: 13px; white-space: nowrap; }
   .main[data-page="field"] .page-head h1 { margin: 0; font-size: 25px; white-space: nowrap; }
   .main[data-page="field"] .page-head-actions { grid-column: 2; grid-row: 2; gap: 6px; }
   .main[data-page="field"] .page-head-actions .button { min-height: 36px; padding: 6px 9px; font-size: 12px; }
@@ -4411,18 +4411,18 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
   .main[data-page="field"] .field-overview .panel-header { min-height: 42px; padding: 8px 12px; }
   .main[data-page="field"] .field-overview .panel-header h2 { font-size: 16px; }
   .main[data-page="field"] .map-switcher { flex: none; gap: 4px; padding: 5px 8px; }
-  .main[data-page="field"] .map-segmented .button { min-height: 34px; padding: 5px 8px; font-size: 11px; }
+  .main[data-page="field"] .map-segmented .button { min-height: 34px; padding: 5px 8px; font-size: 12.5px; }
   .main[data-page="field"] .map-subcontrols { gap: 5px; }
-  .main[data-page="field"] .map-subcontrols .button { min-height: 32px; padding: 4px 7px; font-size: 11px; }
+  .main[data-page="field"] .map-subcontrols .button { min-height: 32px; padding: 4px 7px; font-size: 12.5px; }
   .main[data-page="field"] .map-timeline { flex: none; padding: 4px 8px; }
   .main[data-page="field"] .map-timeline-dates { gap: 3px; }
-  .main[data-page="field"] .map-timeline-dates .button { min-height: 28px; padding: 3px 6px; font-size: 10px; }
+  .main[data-page="field"] .map-timeline-dates .button { min-height: 28px; padding: 3px 6px; font-size: 11.5px; }
   .main[data-page="field"] .map-shell { flex: 1; min-height: 0; }
   .main[data-page="field"] .map-shell .field-map { height: 100%; min-height: 0; }
-  .main[data-page="field"] .map-legend-bar { flex: none; padding: 4px 8px; font-size: 10px; }
+  .main[data-page="field"] .map-legend-bar { flex: none; padding: 4px 8px; font-size: 11.5px; }
   .main[data-page="field"] .map-actions { flex: none; margin: 0; padding: 4px 8px; }
   .main[data-page="field"] .map-controls { gap: 4px; }
-  .main[data-page="field"] .map-controls .button { min-height: 32px; padding: 4px 7px; font-size: 11px; }
+  .main[data-page="field"] .map-controls .button { min-height: 32px; padding: 4px 7px; font-size: 12.5px; }
   .main[data-page="field"] .field-overview > .panel:last-child { display: flex; flex-direction: column; }
   .main[data-page="field"] .field-card { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px 0; }
   .main[data-page="field"] .field-card h2 { margin: 4px 0; font-size: 24px; }
@@ -4439,10 +4439,10 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
   .main[data-page="field"] .journey-start { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; }
   .main[data-page="field"] .journey-start > div:first-child { min-width: 0; gap: 9px; }
   .main[data-page="field"] .journey-start .planty-mascot { width: 34px; height: 38px; }
-  .main[data-page="field"] .journey-start h2 { margin: 0; font-size: 15px; white-space: nowrap; }
-  .main[data-page="field"] .journey-start p { display: block; font-size: 10px; white-space: nowrap; }
+  .main[data-page="field"] .journey-start h2 { margin: 0; font-size: 17px; white-space: nowrap; }
+  .main[data-page="field"] .journey-start p { display: block; font-size: 13px; white-space: nowrap; }
   .main[data-page="field"] .journey-start-actions { flex: none; gap: 6px; margin: 0; flex-wrap: nowrap; }
-  .main[data-page="field"] .journey-start-actions .button { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+  .main[data-page="field"] .journey-start-actions .button { min-height: 36px; padding: 6px 9px; font-size: 13.5px; }
 }
 
 .field-recommend .button.primary { isolation: isolate; color: #fffef2; background: #284f38; border-color: #284f38; box-shadow: 0 0 18px #72a84155; }
