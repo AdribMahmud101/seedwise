@@ -783,3 +783,9 @@ li.done .rr-check-dot {
     display: none;
   }
 }
+/* Readiness rows are tappable buttons: the li keeps the look, the button fills it. */
+.rr-ready-body li { padding: 0; }
+.rr-check-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .2s ease; }
+.rr-check-btn:hover { background: #f1efe4; }
+.rr-ready-body li.done .rr-check-btn:hover { background: #dfe6d4; }
+.rr-check-btn:focus-visible { outline: 2px solid #2b4a39; outline-offset: 2px; }
