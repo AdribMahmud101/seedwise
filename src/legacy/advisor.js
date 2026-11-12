@@ -432,8 +432,8 @@ export function customSettingsPanel() {
       <small>${rotation ? t('whole field in its season', 'নিজের মৌসুমে পুরো জমি') : `${c.sharePct}% ${t('of the field', 'জমির')}`} · ~${customCount(area(), usable, rotation ? { ...c, sharePct: 100 } : c).toLocaleString()} ${t('plants', 'চারা')}</small></div>
       ${slider(i, 'row', t('Row spacing', 'সারির দূরত্ব'), c.model === 'tree' ? 200 : 10, c.model === 'tree' ? 1200 : 150, c.model === 'tree' ? 50 : 5, c.rowSpacingCm, ' cm')}
       ${slider(i, 'within', t('Within-row spacing', 'সারিতে দূরত্ব'), c.model === 'tree' ? 200 : 5, c.model === 'tree' ? 1200 : 120, c.model === 'tree' ? 50 : 5, c.withinRowCm, ' cm')}</div>`).join('')}
-    <p class="cs-total">${t('Total plants', 'মোট চারা')}: <strong>~${total.toLocaleString()}</strong> <span class="truth">◌ ${t('Scenario', 'কাল্পনিক')}</span></p>
-    <p class="note">${t('Spacing suggested by AI (general guidance). Usable area comes from your field widths.', 'দূরত্ব এআই প্রস্তাবিত (সাধারণ নির্দেশনা)। চাষযোগ্য জমি আপনার জমির মাপ থেকে।')}</p>
+    <div class="cs-footer"><p class="cs-total">${t('Total plants', 'মোট চারা')}: <strong>~${total.toLocaleString()}</strong> <span class="truth">◌ ${t('Scenario', 'কাল্পনিক')}</span></p>
+    <p class="note">${t('Spacing suggested by AI (general guidance). Usable area comes from your field widths.', 'দূরত্ব এআই প্রস্তাবিত (সাধারণ নির্দেশনা)। চাষযোগ্য জমি আপনার জমির মাপ থেকে।')}</p></div>
   </form></section>`;
 }
 // Returns true if the input belonged to the custom panel (caller re-renders).
