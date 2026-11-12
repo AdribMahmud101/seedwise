@@ -63,7 +63,7 @@ export function mountPlanty(getContext) {
     getMessages(id); attachedEntry=entry;
     modal.querySelector('.planty-attach').innerHTML=summary&&attached?`<span>${local('Attached:', 'যুক্ত:')} ${esc(summary.name)}</span><button type="button" data-detach aria-label="${local('Detach plan','পরিকল্পনা বাদ দিন')}">×</button>`:'';
     modal.querySelector('.planty-page-context').textContent=[ctx.page||'',ctx.fieldName||ctx.fieldId||''].filter(Boolean).join(' · ');
-    modal.querySelector('.planty-messages').innerHTML=messages.map(msg).join('');
+    const list=modal.querySelector('.planty-messages');list.innerHTML=messages.map(msg).join('');list.scrollTop=list.scrollHeight; // keep the newest reply in view
     modal.querySelectorAll('[role="tab"]').forEach(el=>{const selected=el.dataset.tab===tab;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;});
     modal.querySelectorAll('.planty-view').forEach(el=>el.hidden=el.id!==`planty-${tab}`);
     const chip=modal.querySelector('.planty-diagnosis-chip');chip.hidden=!diagnosis;chip.innerHTML=diagnosis?`${local('Clinic attached:','যুক্ত রোগ:')} ${esc(t(diagnosis.name.en,diagnosis.name.bn))} <button type="button" data-detach-diagnosis aria-label="${local('Remove diagnosis','রোগের তথ্য বাদ দিন')}">×</button>`:'';

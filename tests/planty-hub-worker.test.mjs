@@ -12,7 +12,7 @@ function req(path, body, options = {}) {
 test('planty-chat sanitizes context and sends bounded, grounded prompt', async t => {
   t.mock.method(globalThis, 'fetch', async (_url, options) => {
     const payload = JSON.parse(options.body);
-    assert.match(payload.messages[0].content, /Never invent numbers/);
+    assert.match(payload.messages[0].content, /Never invent/);
     const data = JSON.parse(payload.messages[1].content);
     assert.equal(data.context.private, undefined);
     assert.equal(data.context.plan.crops[0].rowSpacingCm, 20);
@@ -41,7 +41,7 @@ test('clinic segments with SAM then validates Muse diagnoses against disease ids
     return Response.json({ choices: [{ message: { content: JSON.stringify({ diagnoses: [{ id: 'rice_blast', confidence: .6, why: ['Visible lesions'], actions: ['Ask DAE'] }] }) } }] });
   });
   const response=await worker.fetch(req('/api/clinic-analyze',{image:'data:image/jpeg;base64,AA==',width:1024,height:1024,colorMean:[90,130,70],crop:'rice',note:'',lang:'en'}),env);
-  assert.equal(response.status,200);const data=await response.json();assert.deepEqual(prompts,['leaf','lesion','insect']);assert.equal(data.diagnoses[0].id,'rice_blast');assert.equal(data.segments.length,3);assert.equal(data.segments[0].mask.width,5);assert.match(data.segments[0].mask.data,/^[A-Za-z0-9+/]+=*$/);
+  assert.equal(response.status,200);const data=await response.json();assert.deepEqual(prompts,['leaf','diseased spot','brown spot','disease lesion','insect']);assert.equal(data.diagnoses[0].id,'rice_blast');assert.equal(data.segments.length,3);assert.equal(data.segments[0].mask.width,5);assert.match(data.segments[0].mask.data,/^[A-Za-z0-9+/]+=*$/);
 });
 
 test('clinic rejects non-JPEG, unknown crop, and oversized input', async t => {

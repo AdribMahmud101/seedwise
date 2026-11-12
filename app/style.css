@@ -4661,3 +4661,7 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .planty-tabs button:focus-visible,.planty-close:focus-visible,.planty-launch:focus-visible,.planty-form button:focus-visible { outline:3px solid #8fb467;outline-offset:3px; }
 .clinic-mask-toggle { display:flex;justify-content:center;gap:6px;margin:12px 0 0; }.clinic-mask-toggle button { min-height:36px;padding:7px 13px;border:1px solid #d1ddca;border-radius:20px;background:#fff;color:#526653;font-size:12px;cursor:pointer; }.clinic-mask-toggle button[aria-pressed="true"] { border-color:#4d8558;background:#e7efdc;color:#285538; }.clinic-sources { display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;font-size:12px; }
 @media(max-width:700px) { .workspace > .planty-launch { right:16px;bottom:max(16px,env(safe-area-inset-bottom));min-height:54px; } }
+/* Planty chat: only the message list scrolls; attach chip, quick replies and the input stay pinned in the window. */
+#planty-chat.planty-view:not([hidden]) { display: flex; flex-direction: column; overflow: hidden; }
+#planty-chat .planty-chat-meta, #planty-chat .planty-quick, #planty-chat .planty-form, #planty-chat .planty-diagnosis-chip { flex: none; }
+#planty-chat .planty-messages { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth; }
