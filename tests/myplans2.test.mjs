@@ -257,9 +257,10 @@ test('Ready opens read-only without coach; Edit explicitly resumes the same plan
   assert.match(html, /Edit this plan/);
   assert.match(html, /Plan ready ✓/);
   assert.doesNotMatch(html, /plan-edit-season|Edit field|Edit rotation/);
-  assert.match(html, /data-check="[^"]+" disabled/);
+  assert.doesNotMatch(html, /data-check="[^"]+" disabled/); // ticks work on saved plans
   planPage.planChange({ matches: selector => selector === '[data-check]', dataset: { check: 'well-reading' }, checked: true });
-  assert.deepEqual(journey.getSavedPlan(ready.id).plan, snapshot);
+  assert.deepEqual(journey.getSavedPlan(ready.id).plan, { ...snapshot, checklist: { 'well-reading': true } });
+  assert.equal(journey.getSavedPlan(ready.id).status, 'ready'); // ticking never reopens the plan for editing
 
   const host = { innerHTML: 'old coach', className: 'coach-host' };
   globalThis.document = { querySelector: () => null };

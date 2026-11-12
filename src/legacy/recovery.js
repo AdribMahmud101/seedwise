@@ -120,17 +120,19 @@ function pathSteps(a) {
 }
 function readinessChecks(a) {
   const list = [
-    [a.ground === "workable", ["Ground stable and moist", "জমি স্থির ও আর্দ্র"]],
-    [a.standing === "free", ["Plot free for a new crop", "নতুন ফসলের জন্য জমি খালি"]],
+    [a.ground === "workable", ["Ground stable and moist", "জমি স্থির ও আর্দ্র"], "ground"],
+    [a.standing === "free", ["Plot free for a new crop", "নতুন ফসলের জন্য জমি খালি"], "standing"],
     [
       ["limited", "dependable"].includes(a.water),
       ["Water covers critical stages", "জরুরি সময়ে পানির ব্যবস্থা"],
+      "water",
     ],
   ];
   if (hazard() !== "drought")
     list.push([
       ["clear", "reviewed"].includes(a.exposure),
       ["Contamination reviewed", "দূষণ যাচাই হয়েছে"],
+      "exposure",
     ]);
   return list;
 }
@@ -143,8 +145,8 @@ function readiness(a) {
     off = (C * (1 - done / total)).toFixed(2);
   return `<section class="rr-ready" aria-label="${esc(t("Field readiness", "জমির প্রস্তুতি"))}"><div class="rr-ready-ring"><svg viewBox="0 0 80 80" role="img" aria-label="${num(pct)}%"><circle cx="40" cy="40" r="34" class="rr-ring-bg"/><circle cx="40" cy="40" r="34" class="rr-ring-fg" stroke-dasharray="${C}" stroke-dashoffset="${off}"/></svg><div><b class="mono">${num(pct)}%</b><span>${t("Field readiness", "জমির প্রস্তুতি")}</span></div></div><div class="rr-ready-body"><p class="note">${t(`${done} of ${total} checks done`, `${num(total)}টির মধ্যে ${num(done)}টি সম্পন্ন`)} · ${t("Tick each check once it is done. Do this after the hazard has passed.", "প্রতিটি পরীক্ষা শেষ হলে টিক দিন। বিপদ কেটে যাওয়ার পর এটি করুন।")}</p><ul>${list
     .map(
-      ([ok, label]) =>
-        `<li class="${ok ? "done" : ""}"><span class="rr-check-dot">${ok ? icon("check", 13) : ""}</span>${esc(word(label))}</li>`,
+      ([ok, label, field]) =>
+        `<li class="${ok ? "done" : ""}"><button type="button" class="rr-check-btn" data-action="rr-tick" data-value="${field}" aria-pressed="${ok}"><span class="rr-check-dot">${ok ? icon("check", 13) : ""}</span>${esc(word(label))}</button></li>`,
     )
     .join("")}</ul>${button(t("Continue to replanting", "রোপণ পরিকল্পনায় যান"), "rr-calendar", done === total ? "primary" : "")}</div></section>`;
 }
@@ -521,6 +523,18 @@ function recoveryAction(action, value) {
   if (action === "rr-phase") {
     const a = draft();
     if (phases.some((p) => p[0] === value)) a.phase = value;
+    state.recoveryDrafts = { ...state.recoveryDrafts, [key()]: a };
+    persist();
+    repaint();
+    return;
+  }
+  if (action === "rr-tick") {
+    // A tick sets the matching "Check this plot" answer (untick resets it to not checked).
+    const okValue = { ground: "workable", standing: "free", water: "limited", exposure: "reviewed" }[value];
+    if (!okValue) return;
+    const a = draft();
+    const ok = readinessChecks(a).find((c) => c[2] === value)?.[0];
+    a[value] = ok ? "unknown" : okValue;
     state.recoveryDrafts = { ...state.recoveryDrafts, [key()]: a };
     persist();
     repaint();

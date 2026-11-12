@@ -6,7 +6,7 @@ import {
 } from './ui.js';
 import { monthlyRotationWater, CROP_KC } from './engine.js';
 import { outlookPlanHint, outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
-import { getPlan, getReadyPlan, editReadyPlan, importPlanJSON, markPlanGenerated, stepStatus } from './journey.js';
+import { getPlan, getReadyPlan, editReadyPlan, importPlanJSON, markPlanGenerated, stepStatus, savePlan } from './journey.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { setPlannerSeason } from './planner.js';
@@ -462,7 +462,7 @@ function numbersCard(plan) {
 function checklistCard(plan) {
   const done = plan.checklist ?? {};
   const items = deriveChecklist(plan, outlookPlanHint(plan.field?.id, outlookPack)).map(item =>
-    `<li><label><input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}${getPlan() ? '' : ' disabled'}><span>${esc(t(item.en, item.bn))}</span></label></li>`).join('');
+    `<li><label><input type="checkbox" data-check="${esc(item.id)}"${done[item.id] ? ' checked' : ''}${displayPlan() ? '' : ' disabled'}><span>${esc(t(item.en, item.bn))}</span></label></li>`).join('');
   return `<section class="panel"><div class="panel-header"><h2>${t('What to do, step by step', 'ধাপে ধাপে কী করবেন')}</h2></div>
     <div class="panel-body"><ul class="plan-check" id="plan-checklist">${items}</ul></div></section>`;
 }
@@ -839,10 +839,14 @@ export function planChange(element) {
   }
   if (element?.matches?.('[data-check]')) {
     const current = getPlan();
-    if (!current) return true;
-    const checklist = { ...(current.checklist ?? {}), [element.dataset.check]: element.checked };
+    const ready = current ? null : getReadyPlan();
+    const plan = current ?? ready?.plan;
+    if (!plan) return true;
+    const checklist = { ...(plan.checklist ?? {}), [element.dataset.check]: element.checked };
     try {
-      importPlanJSON(JSON.stringify({ ...current, checklist }));
+      // Saved (ready) plans keep their ticks in My plans; an in-progress journey keeps them in the draft.
+      if (ready) savePlan({ ...plan, checklist }, { status: 'ready' });
+      else importPlanJSON(JSON.stringify({ ...plan, checklist }));
     } catch (error) {
       console.warn('Checklist could not be saved', error);
     }
