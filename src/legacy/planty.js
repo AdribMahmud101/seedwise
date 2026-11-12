@@ -62,7 +62,7 @@ export function mountPlanty(getContext) {
   function refresh() {
     const ctx=context(), entry=ctx.plan || null, summary=entry&&summarizePlan(entry), id=summary?.id || '';
     getMessages(id); attachedEntry=entry;
-    modal.querySelector('.planty-attach').innerHTML=summary&&attached?`<span>${local('Attached:', 'যুক্ত:')} ${esc(summary.name)}</span><button type="button" data-detach aria-label="${local('Detach plan','পরিকল্পনা বাদ দিন')}">×</button>`:'';
+    modal.querySelector('.planty-attach').innerHTML=summary?`<span title="${esc(summary.name)}"><i aria-hidden="true">✓</i>${local('Your plan is attached','আপনার পরিকল্পনা যুক্ত আছে')}</span>`:''; // always attached for users with a plan
     modal.querySelector('.planty-page-context').textContent=[ctx.page||'',ctx.fieldName||ctx.fieldId||''].filter(Boolean).join(' · ');
     const list=modal.querySelector('.planty-messages');list.innerHTML=messages.map(msg).join('');list.scrollTop=list.scrollHeight; // keep the newest reply in view
     modal.querySelectorAll('[role="tab"]').forEach(el=>{const selected=el.dataset.tab===tab;el.setAttribute('aria-selected',String(selected));el.tabIndex=selected?0:-1;});
@@ -76,7 +76,6 @@ export function mountPlanty(getContext) {
   modal.querySelector('.planty-tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;refresh();}};
   modal.querySelector('.planty-tabs').onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const tabs=[...modal.querySelectorAll('[role="tab"]')];const index=tabs.indexOf(e.target);const next=e.key==='Home'?0:e.key==='End'?1:1-index;e.preventDefault();tab=tabs[next].dataset.tab;refresh();tabs[next].focus();};
   modal.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();setOpen(false);}if(e.key==='Tab'){const els=[...panel.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href]')].filter(x=>!x.closest('[hidden]'));if(e.shiftKey&&document.activeElement===els[0]){e.preventDefault();els.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===els.at(-1)){e.preventDefault();els[0].focus();}}};
-  modal.querySelector('.planty-attach').onclick=e=>{if(e.target.closest('[data-detach]')){attached=false;refresh();}};
   modal.querySelector('.planty-diagnosis-chip').onclick=e=>{if(e.target.closest('[data-detach-diagnosis]')){diagnosis=null;refresh();}};
   modal.querySelector('.planty-quick').onclick=e=>{const b=e.target.closest('[data-quick-en]');if(b){input.value=t(b.dataset.quickEn,b.dataset.quickBn);form.requestSubmit();}};
   modal.querySelector('.planty-messages').onclick=e=>{if(e.target.closest('[data-apply-suggestion]')){const data=messages.at(-1)?.suggestion;window.dispatchEvent(new CustomEvent('planty:apply-suggestion',{detail:{suggestion:data,plan:attachedEntry}}));}if(e.target.closest('[data-dismiss-suggestion]')){messages.at(-1).suggestion=null;refresh();}};

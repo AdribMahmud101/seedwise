@@ -4692,3 +4692,5 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .planty-md code { padding: 1px 6px; border-radius: 6px; background: #e3eadb; font-size: .92em; }
 .planty-md a { color: #2f6946; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .planty-md blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #a9c66e; background: #f4f7ee; border-radius: 0 8px 8px 0; color: #4b564d; }
+.planty-attach span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.planty-attach span i { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #2f6946; color: #fff; font-size: 10px; font-style: normal; }
