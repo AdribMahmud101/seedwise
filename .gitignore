@@ -5,3 +5,7 @@ out/
 *.log
 .env*
 data-raw/
+
+# local scratch copies from QA checks
+.mob3d-check/
+.planui-validation-*/
