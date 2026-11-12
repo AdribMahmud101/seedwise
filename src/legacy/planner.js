@@ -579,7 +579,27 @@ function applyRecommendedSetup() {
   requestAnimationFrame(tick);
 }
 
+// The first grid row fills the screen below whatever sits above it (plan-ready strip, custom-plan banner…),
+// so the settings panel — and its sticky Save button — always ends inside the viewport.
+let fitObserver = null;
+function fitPlannerRow() {
+  const grid = document.querySelector('[data-page="planner"] .planner3d-layout');
+  if (grid) grid.style.setProperty('--planner-top', `${Math.round(grid.getBoundingClientRect().top + window.scrollY)}px`);
+  // Left edge of the content area (sidebar width varies) for the pinned Save bar on narrow screens.
+  if (grid) grid.style.setProperty('--planner-left', `${Math.round(document.querySelector('.main')?.getBoundingClientRect().left || 0)}px`);
+}
+function watchPlannerFit() {
+  fitObserver?.disconnect();
+  fitPlannerRow();
+  window.addEventListener('resize', fitPlannerRow);
+  const main = document.querySelector('.main');
+  if (main && typeof ResizeObserver !== 'undefined') { fitObserver = new ResizeObserver(fitPlannerRow); fitObserver.observe(main); }
+}
+
 function disposePlanner() {
+  fitObserver?.disconnect();
+  fitObserver = null;
+  window.removeEventListener('resize', fitPlannerRow);
   disposePlanty?.();
   disposePlanty = null;
   cancelAnimationFrame(resultFrame);
@@ -605,6 +625,7 @@ function mountPlanner() {
     event.preventDefault();
     plannerAction('plan-season', tabs[next].dataset.value);
   };
+  watchPlannerFit();
   const cv = document.querySelector('#plant-model');
   if (!cv) return;
   plannerHost = cv.parentElement;

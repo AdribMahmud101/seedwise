@@ -4002,7 +4002,7 @@ dialog .modal-body {
   [data-page="planner"] .planner-workbench { display: block; }
   [data-page="planner"] .planner3d-layout {
     grid-template-columns: minmax(0, 1.2fr) minmax(340px, .8fr);
-    grid-template-rows: minmax(460px, calc(100dvh - 190px)) auto auto auto;
+    grid-template-rows: minmax(300px, calc(100dvh - var(--planner-top, 190px) - 16px)) auto auto auto;
     gap: 12px;
     align-items: stretch;
   }
@@ -4575,3 +4575,10 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .plan-stage .plan3d-whole { flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 600; color: #2b4a39; }
 .plan-stage .plan3d-toolbar .planner3d-view-toggle { margin-left: auto; }
 .plan-stage .plan3d-whole-note { flex-basis: 100%; order: 3; font-size: 12px; color: #5f6f62; }
+/* Below the 2-column planner layout the settings sit far down the page, so Save is pinned to the screen bottom. */
+@media (max-width: 1099px) {
+  .main[data-page="planner"] .plan-save-footer { position: fixed; left: var(--planner-left, 0px); right: 0; bottom: 0; z-index: 40; margin: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(36, 57, 44, .12); }
+  .main[data-page="planner"] .plan-save-footer .note { margin: 4px 0 0; }
+  .main[data-page="planner"] { padding-bottom: 96px; }
+  body:has(.main[data-page="planner"] .plan-save-footer) .planty-launch { bottom: 84px; }
+}
