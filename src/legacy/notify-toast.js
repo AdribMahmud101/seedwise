@@ -38,6 +38,11 @@ export function stackLayout(heights, expanded) {
   });
 }
 
+// Refine toasts preview the first proposed change, e.g. "Aman rice → BRRI dhan52".
+function refineChange(item) {
+  const c = item.type === 'refine' && item.changes?.[0];
+  return c ? `<p class="sw-toast-change"><span>${esc(c.current || c.from)}</span><b aria-hidden="true">→</b><span>${esc(c.suggested || c.to)}</span></p>${c.why ? `<p>${esc(c.why)}</p>` : ''}` : '';
+}
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const lang = () => (document.documentElement.lang === 'bn' ? 1 : 0);
 
@@ -87,8 +92,8 @@ export function playToastSequence(items, { onShow, onDismiss, persist = false } 
     el.dataset.toastId = item.id;
     el.setAttribute('role', 'status');
     el.innerHTML = `<span class="sw-toast-icon" aria-hidden="true">${ICON[item.type] || '•'}</span>
-      <div class="sw-toast-copy"><small>${esc((LABEL[item.type] || ['SeedWise', 'SeedWise'])[lang()])}</small><strong>${esc(item.title)}</strong>${item.body ? `<p>${esc(item.body)}</p>` : ''}
-      ${item.href ? `<a href="#${esc(item.href)}">${esc(item.cta || 'Open')} →</a>` : ''}</div>
+      <div class="sw-toast-copy"><small>${esc((LABEL[item.type] || ['SeedWise', 'SeedWise'])[lang()])}</small><strong>${esc(item.title)}</strong>${refineChange(item) || (item.body ? `<p>${esc(item.body)}</p>` : '')}
+      ${item.type === 'refine' ? `<button type="button" class="sw-toast-action" data-open-notification="${esc(item.id)}">${lang() ? 'দেখে অনুমোদন দিন' : 'Review & approve'} →</button>` : item.href ? `<a href="#${esc(item.href)}">${esc(item.cta || 'Open')} →</a>` : ''}</div>
       <button type="button" class="sw-toast-close" aria-label="${lang() ? 'বন্ধ করুন' : 'Dismiss'}">×</button>${persist ? '' : '<i class="sw-toast-timer" aria-hidden="true"></i>'}`;
     const close = () => {
       if (el.classList.contains('out')) return;
@@ -96,7 +101,7 @@ export function playToastSequence(items, { onShow, onDismiss, persist = false } 
       setTimeout(() => { el.remove(); layout(stack); }, 320);
     };
     el.querySelector('.sw-toast-close').onclick = close;
-    el.querySelector('a')?.addEventListener('click', close);
+    el.querySelector('a, .sw-toast-action')?.addEventListener('click', close);
     stack.append(el);
     layout(stack);
     onShow?.(item);

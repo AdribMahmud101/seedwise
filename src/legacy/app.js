@@ -302,6 +302,15 @@ initNasaBadges();
 document.addEventListener("click", (event) => {
   const el = event.target.closest("button,a");
   if (!el) return;
+  if (el.dataset.openNotification) {
+    // From a toast: open the bell panel on that suggestion so the user can review and approve it.
+    const host = document.querySelector('.notification-host');
+    if (host && !host.classList.contains('open')) { host.classList.add('open'); document.querySelector('.notification-bell')?.setAttribute('aria-expanded', 'true'); }
+    renderNotifications();
+    const target = document.querySelector(`.notification-panel [data-id="${CSS.escape(el.dataset.openNotification)}"]`)?.closest('li, .notification-item');
+    target?.classList.add('notification-focus'); target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return;
+  }
   if (el.classList.contains('notification-bell')) {
     const host = document.querySelector('.notification-host');
     if (host.classList.contains('open')) { closeNotifications(); return; }
@@ -492,7 +501,8 @@ function closeNotifications() {
 }
 document.addEventListener('click', event => {
   const host = document.querySelector('.notification-host.open');
-  if (host && event.target.isConnected && !host.contains(event.target)) closeNotifications();
+  // Toast "Review & approve" opens the panel itself, so clicks from the toast stack never count as outside clicks.
+  if (host && event.target.isConnected && !host.contains(event.target) && !event.target.closest('.sw-toast-stack')) closeNotifications();
 });
 window.addEventListener("hashchange", () => {
   const currentRoute = route();
