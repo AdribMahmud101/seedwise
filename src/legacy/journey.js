@@ -69,11 +69,14 @@ function validateRotation(rotation) {
   if (custom) {
     const value = rotation.customPlan;
     requireValid(object(value) && text(value.fieldId) && text(value.mode) &&
-      ['recommended', 'possible_with_conditions'].includes(value.verdict) &&
+      ['recommended', 'possible_with_conditions', 'not_suitable'].includes(value.verdict) &&
       Array.isArray(value.planting) && value.planting.length > 0 &&
       Array.isArray(value.calendar) && value.calendar.length === 12 &&
       new Set(value.calendar.map(m => m.month)).size === 12 && value.calendar.every(m =>
         Number.isInteger(m.month) && m.month >= 1 && m.month <= 12 && (m.crop === null || text(m.crop))));
+    if (value.savedPlanId !== undefined) requireValid(text(value.savedPlanId));
+    if (value.recheck !== undefined) requireValid(object(value.recheck) && date(value.recheck.checkedAt) &&
+      ['recommended', 'possible_with_conditions', 'not_suitable'].includes(value.recheck.previousVerdict));
     requireValid(value.planting.every(item => object(item) && text(item.crop) && text(item.model) &&
       positive(item.rowSpacingCm) && item.rowSpacingCm <= 1500 && positive(item.withinRowCm) && item.withinRowCm <= 1500 &&
       Number.isFinite(item.sharePct) && item.sharePct >= 0 && item.sharePct <= 100));
@@ -352,13 +355,13 @@ export function getReadyPlan() {
   return entry?.status === 'ready' ? entry : null;
 }
 
-function notify() {
+function notify(snapshot = current) {
   for (const listener of listeners) {
     // Observers must not prevent other subscribers or page persistence from running.
-    try { listener(copy(current)); } catch (error) { console.error('Season plan subscriber failed', error); }
+    try { listener(copy(snapshot)); } catch (error) { console.error('Season plan subscriber failed', error); }
   }
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-    window.dispatchEvent(new CustomEvent('ropon:plan', { detail: copy(current) }));
+    window.dispatchEvent(new CustomEvent('ropon:plan', { detail: copy(snapshot) }));
   }
 }
 
@@ -514,10 +517,24 @@ export function getSavedPlan(id) {
 
 export function savePlan(planToSave, { status = 'draft', name } = {}) {
   if (!planToSave?.field || planToSave.mode === 'demo') return null;
-  const validated = validatePlan(planToSave);
+  const validated = validatePlan(copy(planToSave));
+  const custom = validated.rotation?.customPlan;
+  if (custom) {
+    custom.savedPlanId = validated.id;
+    custom.planting = validated.rotation.seasons.map((season, i) => {
+      const settings = validated.planting[season.key];
+      return { ...custom.planting[i], crop: settings.crop, rowSpacingCm: settings.rowSpacingCm,
+        withinRowCm: settings.withinRowCm, sharePct: settings.sharePct };
+    });
+  }
   const now = new Date().toISOString();
   const list = listPlans();
   const index = list.findIndex(item => item.id === validated.id);
+  if (custom && index >= 0 && !same(customPlanInputs(validated), customPlanInputs(list[index].plan))) {
+    status = 'draft';
+    custom.needsRecheck = true;
+  }
+  if (custom && (custom.needsRecheck || custom.verdict === 'not_suitable')) status = 'draft';
   const entryName = name?.trim() || (index >= 0 ? list[index].name : defaultPlanName(validated));
   const entry = {
     id: validated.id,
@@ -546,9 +563,17 @@ export function savePlan(planToSave, { status = 'draft', name } = {}) {
 export function openPlan(id) {
   const entry = getSavedPlan(id);
   if (!entry) return null;
+  if (entry.plan.rotation?.customPlan) {
+    globalThis.localStorage?.setItem('ropon_custom_plan_v1', JSON.stringify({
+      ...entry.plan.rotation.customPlan, savedPlanId: entry.id,
+    }));
+  } else {
+    globalThis.localStorage?.removeItem('ropon_custom_plan_v1');
+  }
   if (entry.status === 'ready') {
     globalThis.sessionStorage?.setItem(READY_PLAN_KEY, entry.id);
     resetPlan();
+    notify(entry.plan);
     return copy(entry.plan);
   }
   globalThis.sessionStorage?.removeItem(READY_PLAN_KEY);
@@ -569,7 +594,7 @@ export function renamePlan(id, newName) {
   if (index < 0) return null;
   list[index].name = newName.trim();
   list[index].updatedAt = new Date().toISOString();
-  writeSavedListRaw(list);
+  if (!writeSavedListRaw(list)) throw new Error('Could not rename plan');
   return list[index];
 }
 
@@ -582,6 +607,7 @@ export function duplicatePlan(id) {
   duplicatedPlanSnapshot.id = newId;
   duplicatedPlanSnapshot.createdAt = now;
   duplicatedPlanSnapshot.updatedAt = now;
+  if (duplicatedPlanSnapshot.rotation?.customPlan) duplicatedPlanSnapshot.rotation.customPlan.savedPlanId = newId;
   const dupEntry = {
     id: newId,
     name: `${entry.name} (Copy)`,
@@ -594,19 +620,64 @@ export function duplicatePlan(id) {
   if (!valid) return null;
   const list = listPlans();
   list.unshift(valid);
-  writeSavedListRaw(list);
+  if (!writeSavedListRaw(list)) throw new Error('Could not duplicate plan');
   return valid;
 }
 
 export function deletePlan(id) {
   const list = listPlans();
   const filtered = list.filter(item => item.id !== id);
-  writeSavedListRaw(filtered);
+  if (!writeSavedListRaw(filtered)) throw new Error('Could not delete plan');
   const active = getPlan();
   if (active?.id === id) {
     resetPlan();
   }
+  if (globalThis.sessionStorage?.getItem(READY_PLAN_KEY) === id) globalThis.sessionStorage.removeItem(READY_PLAN_KEY);
+  try {
+    const custom = JSON.parse(globalThis.localStorage?.getItem('ropon_custom_plan_v1') || 'null');
+    if (custom?.savedPlanId === id) globalThis.localStorage.removeItem('ropon_custom_plan_v1');
+  } catch { /* A corrupt handoff must not block deletion. */ }
   return true;
+}
+
+function customPlanInputs(plan) {
+  const custom = plan.rotation?.customPlan;
+  return { field: plan.field && { id: plan.field.id, outlineHash: plan.field.outlineHash,
+    constraints: plan.field.constraints, netInputs: plan.field.netInputs },
+  mode: custom?.mode, calendar: custom?.calendar, seasons: plan.rotation?.seasons,
+  planting: Object.values(plan.planting).map(s => [s.crop, s.rowSpacingCm, s.withinRowCm, s.sharePct, s.usableAreaPct]) };
+}
+
+export async function recheckPlan(id, context, { lang = 'en', category } = {}) {
+  const entry = getSavedPlan(id);
+  const custom = entry?.plan.rotation?.customPlan;
+  if (!custom) return null;
+  if (globalThis.navigator?.onLine === false) throw new Error('offline');
+  const response = await fetch('/api/rotation-advisor', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(40000),
+    body: JSON.stringify({ lang, category, mode: custom.mode,
+      crops: Object.values(entry.plan.planting).map(s => s.crop), notes: '', context }),
+  });
+  const result = await response.json();
+  if (!response.ok || result?.error || !['recommended', 'possible_with_conditions', 'not_suitable'].includes(result?.verdict) ||
+      !text(result.summary)) throw new Error('Invalid Planty response');
+  const latest = getSavedPlan(id);
+  if (!latest || !same(customPlanInputs(latest.plan), customPlanInputs(entry.plan)) ||
+      !same(latest.plan.rotation.customPlan.recheck, custom.recheck) ||
+      (current?.id === id && !same(customPlanInputs(current), customPlanInputs(entry.plan)))) {
+    throw new Error('Plan changed during re-check');
+  }
+  const checkedAt = new Date().toISOString();
+  Object.assign(latest.plan.rotation.customPlan, { verdict: result.verdict, summary: result.summary,
+    needsRecheck: false, recheck: { checkedAt, previousVerdict: custom.verdict } });
+  latest.plan.updatedAt = checkedAt;
+  const saved = savePlan(latest.plan, { status: result.verdict === 'not_suitable' ? 'draft' : 'ready' });
+  if (current?.id === id) save(copy(saved.plan));
+  try {
+    const handoff = JSON.parse(globalThis.localStorage?.getItem('ropon_custom_plan_v1') || 'null');
+    if (handoff?.savedPlanId === id) globalThis.localStorage.setItem('ropon_custom_plan_v1', JSON.stringify(saved.plan.rotation.customPlan));
+  } catch (error) { console.warn('Re-checked planner handoff could not be refreshed', error); }
+  return saved;
 }
 
 export function allSeasonsReviewed(plan) {

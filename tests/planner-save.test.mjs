@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import * as journey from '../src/legacy/journey.js';
 import { planner, plannerAction, plannerInput } from '../src/legacy/planner.js';
-import { plans } from '../src/legacy/plans.js';
+import { plans, plansAction, disposePlans } from '../src/legacy/plans.js';
+import { customPlanFor3d, advisorAction } from '../src/legacy/advisor.js';
 import { plan as planPage, planAction, buildExportHTML } from '../src/legacy/plan.js';
 import { state, loadData, basePolygon, defaultProfile } from '../src/legacy/ui.js';
 import { recommendedSettings } from '../src/legacy/planner-controls.js';
@@ -29,6 +30,7 @@ const custom = () => ({
 });
 
 beforeEach(async t => {
+  disposePlans();
   storage.clear();
   Object.defineProperty(globalThis, 'localStorage', { value: memory(''), configurable: true });
   globalThis.sessionStorage = memory('session:');
@@ -40,6 +42,255 @@ beforeEach(async t => {
   Object.assign(state, { lang: 'en', fieldId: site.id, plans: [], boundaries: {}, profiles: {}, netInputs: {},
     planner: { ...recommendedSettings('rice'), row: 30, spacing: 15, usable: 73, usableSource: 'override' } });
   await loadData();
+});
+
+function saveCustomPlan() {
+  localStorage.setItem('ropon_custom_plan_v1', JSON.stringify(custom()));
+  planner();
+  plannerAction('plan-save');
+  return journey.listPlans()[0];
+}
+
+test('repeated planner saves update the same custom plan and retain its renamed title', () => {
+  const first = saveCustomPlan();
+  journey.renamePlan(first.id, 'My maize');
+  planner();
+  plannerAction('plan-save');
+  assert.equal(journey.listPlans().length, 1);
+  assert.equal(journey.listPlans()[0].id, first.id);
+  assert.equal(journey.listPlans()[0].name, 'My maize');
+});
+
+test('Open restores the saved field, calendar, spacing, split and custom 3D; edits save as draft', () => {
+  const first = saveCustomPlan();
+  localStorage.removeItem('ropon_custom_plan_v1');
+  state.fieldId = earth.fields[1].id;
+  plansAction('open', first.id);
+  assert.equal(location.hash.replace('#', ''), 'planner');
+  planner();
+  assert.equal(state.fieldId, site.id);
+  assert.deepEqual(customPlanFor3d().calendar, custom().calendar);
+  assert.deepEqual(customPlanFor3d().planting.map(p => [p.crop, p.rowSpacingCm, p.withinRowCm, p.sharePct]),
+    [['Maize', 75, 25, 60], ['Mango', 600, 500, 40]]);
+  plansAction('edit', first.id);
+  planner();
+  plannerInput({ name: 'custom-row', value: '100', dataset: { idx: '0' } });
+  plannerInput({ name: 'custom-split', value: '70', dataset: {} });
+  assert.match(planner(), /data-action="plan-save"/);
+  plannerAction('plan-save');
+  const [edited] = journey.listPlans();
+  assert.equal(journey.listPlans().length, 1);
+  assert.equal(edited.id, first.id);
+  assert.equal(edited.status, 'draft');
+  assert.equal(edited.plan.planting['custom-0'].rowSpacingCm, 100);
+  assert.equal(edited.plan.planting['custom-0'].sharePct, 70);
+  assert.equal(edited.plan.rotation.customPlan.planting[0].sharePct, 70);
+});
+
+test('custom duplicate edits remain independent; delete requires inline confirmation and supports cancel', () => {
+  const first = saveCustomPlan();
+  journey.renamePlan(first.id, 'Original');
+  const duplicate = journey.duplicatePlan(first.id);
+  assert.notEqual(duplicate.id, first.id);
+  assert.equal(duplicate.name, 'Original (Copy)');
+  plansAction('delete', first.id);
+  assert.equal(journey.listPlans().length, 2);
+  assert.match(plans(), /data-plans-action="delete-confirm"/);
+  plansAction('delete-cancel', first.id);
+  assert.doesNotMatch(plans(), /data-plans-action="delete-confirm"/);
+  plansAction('delete', first.id);
+  plansAction('delete-confirm', first.id);
+  assert.equal(journey.getSavedPlan(first.id), null);
+  assert.equal(journey.getSavedPlan(duplicate.id).name, 'Original (Copy)');
+});
+
+test('Re-check stores the real response and prior verdict using the saved crops and current field context', async t => {
+  const first = saveCustomPlan();
+  state.profiles[site.id] = { ...defaultProfile(), irrigation: 'none', budget: 'low' };
+  state.fieldId = earth.fields[1].id;
+  let request;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url, '/api/rotation-advisor');
+    request = JSON.parse(options.body);
+    return Response.json({ verdict: 'not_suitable', summary: 'Water supply is insufficient.', calendar: [], planting: [] });
+  });
+  await plansAction('recheck', first.id);
+  const saved = journey.getSavedPlan(first.id);
+  assert.deepEqual(request.crops, ['Maize', 'Mango']);
+  assert.equal(request.context.fieldId, site.id);
+  assert.equal(request.context.irrigation, 'none');
+  assert.equal(saved.plan.rotation.customPlan.verdict, 'not_suitable');
+  assert.equal(saved.plan.rotation.customPlan.summary, 'Water supply is insufficient.');
+  assert.equal(saved.plan.rotation.customPlan.recheck.previousVerdict, 'possible_with_conditions');
+  assert.ok(Number.isFinite(Date.parse(saved.plan.rotation.customPlan.recheck.checkedAt)));
+  assert.deepEqual(saved.plan.rotation.customPlan.calendar, custom().calendar);
+  assert.match(plans(), /Re-checked .*Not suitable/);
+  assert.match(plans(), /Possible with conditions.*Not suitable/);
+  assert.match(plans(), /Water supply is insufficient/);
+});
+
+test('offline and malformed re-checks preserve the previous saved verdict and show a clear message', async t => {
+  const first = saveCustomPlan();
+  t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('Failed to fetch'); });
+  await plansAction('recheck', first.id);
+  assert.deepEqual(journey.getSavedPlan(first.id), first);
+  assert.match(plans(), /previous verdict.*kept|Previous verdict.*kept/);
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ verdict: 'invented', summary: 'Invalid' }));
+  await plansAction('recheck', first.id);
+  assert.deepEqual(journey.getSavedPlan(first.id), first);
+});
+
+test('saving after a re-check retains its latest verdict and date', async t => {
+  const first = saveCustomPlan();
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ verdict: 'recommended', summary: 'Suitable with current irrigation.' }));
+  await plansAction('recheck', first.id);
+  const checked = journey.getSavedPlan(first.id).plan.rotation.customPlan;
+  planner();
+  plannerAction('plan-save');
+  const saved = journey.getSavedPlan(first.id).plan.rotation.customPlan;
+  assert.equal(saved.verdict, 'recommended');
+  assert.equal(saved.summary, checked.summary);
+  assert.deepEqual(saved.recheck, checked.recheck);
+});
+
+test('a failed handoff refresh cannot overwrite a re-checked verdict on the next save', async t => {
+  const first = saveCustomPlan();
+  const setItem = localStorage.setItem;
+  const failure = t.mock.method(localStorage, 'setItem', (key, value) => {
+    if (key === 'ropon_custom_plan_v1') throw new Error('Storage full');
+    setItem(key, value);
+  });
+  t.mock.method(console, 'warn', () => {});
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ verdict: 'recommended', summary: 'Updated verdict.' }));
+  await plansAction('recheck', first.id);
+  assert.equal(journey.getSavedPlan(first.id).plan.rotation.customPlan.verdict, 'recommended');
+  failure.mock.restore();
+  planner();
+  plannerAction('plan-save');
+  assert.equal(journey.getSavedPlan(first.id).plan.rotation.customPlan.verdict, 'recommended');
+  assert.equal(journey.getSavedPlan(first.id).plan.rotation.customPlan.summary, 'Updated verdict.');
+});
+
+test('legacy PLANANY custom handoffs without saved IDs update their matching saved entry', () => {
+  const first = saveCustomPlan();
+  const legacy = structuredClone(first);
+  delete legacy.plan.rotation.customPlan.savedPlanId;
+  localStorage.setItem('ropon_saved_plans_v1', JSON.stringify([legacy]));
+  localStorage.setItem('ropon_custom_plan_v1', JSON.stringify(custom()));
+  planner();
+  plannerAction('plan-save');
+  assert.equal(journey.listPlans().length, 1);
+  assert.equal(journey.listPlans()[0].id, first.id);
+});
+
+test('duplicate edits save only the copy; storage failure never reports successful CRUD', t => {
+  const first = saveCustomPlan();
+  const duplicate = journey.duplicatePlan(first.id);
+  plansAction('edit', duplicate.id);
+  planner();
+  plannerInput({ name: 'custom-row', value: '110', dataset: { idx: '0' } });
+  plannerAction('plan-save');
+  assert.equal(journey.getSavedPlan(duplicate.id).plan.planting['custom-0'].rowSpacingCm, 110);
+  assert.deepEqual(journey.getSavedPlan(first.id), first);
+  t.mock.method(localStorage, 'setItem', () => { throw new Error('Storage full'); });
+  t.mock.method(console, 'warn', () => {});
+  assert.throws(() => journey.renamePlan(first.id, 'Lost name'), /Could not rename/);
+  assert.throws(() => journey.duplicatePlan(first.id), /Could not duplicate/);
+  assert.throws(() => journey.deletePlan(first.id), /Could not delete/);
+  assert.deepEqual(journey.getSavedPlan(first.id), first);
+});
+
+test('edits and deletion during re-check never overwrite or resurrect a saved plan', async t => {
+  const first = saveCustomPlan();
+  let finish;
+  t.mock.method(globalThis, 'fetch', () => new Promise(resolve => { finish = resolve; }));
+  const pending = plansAction('recheck', first.id);
+  plansAction('edit', first.id);
+  planner();
+  plannerInput({ name: 'custom-row', value: '100', dataset: { idx: '0' } });
+  plannerAction('plan-save');
+  const edited = journey.getSavedPlan(first.id);
+  finish(Response.json({ verdict: 'recommended', summary: 'Stale response.' }));
+  await pending;
+  assert.deepEqual(journey.getSavedPlan(first.id), edited);
+  assert.match(plans(), /Plan changed during re-check/);
+  const deleting = plansAction('recheck', first.id);
+  journey.deletePlan(first.id);
+  finish(Response.json({ verdict: 'recommended', summary: 'Deleted plan.' }));
+  await deleting;
+  assert.equal(journey.getSavedPlan(first.id), null);
+});
+
+test('Finish cannot promote an edited custom draft or unsuitable verdict without a successful re-check', async t => {
+  const first = saveCustomPlan();
+  plansAction('edit', first.id);
+  planner();
+  plannerInput({ name: 'custom-row', value: '100', dataset: { idx: '0' } });
+  plannerAction('plan-save');
+  const edited = journey.getSavedPlan(first.id);
+  assert.equal(journey.savePlan(edited.plan, { status: 'ready' }).status, 'draft');
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ verdict: 'not_suitable', summary: 'Unsuitable for this field.' }));
+  await plansAction('recheck', first.id);
+  assert.equal(journey.savePlan(journey.getSavedPlan(first.id).plan, { status: 'ready' }).status, 'draft');
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ verdict: 'recommended', summary: 'Suitable for this field.' }));
+  await plansAction('recheck', first.id);
+  assert.equal(journey.getSavedPlan(first.id).status, 'ready');
+  assert.equal(journey.getSavedPlan(first.id).plan.rotation.customPlan.needsRecheck, false);
+});
+
+test('changing custom crops through the decision helper saves the same plan with the new calendar and model', async t => {
+  const first = saveCustomPlan();
+  plansAction('edit', first.id);
+  planner();
+  const replacement = { ...custom(), title: 'Potato and mango',
+    planting: [{ ...custom().planting[0], crop: 'Potato', model: 'potato', rowSpacingCm: 60 }, custom().planting[1]],
+    calendar: custom().calendar.map(m => ({ ...m, crop: m.crop.replace('Maize', 'Potato') })) };
+  t.mock.method(globalThis, 'fetch', async () => Response.json(replacement));
+  window.matchMedia = () => ({ matches: true });
+  document.dispatchEvent = () => {};
+  await advisorAction('adv-crop', 'Potato');
+  await advisorAction('adv-check');
+  await advisorAction('adv-use');
+  planner();
+  plannerAction('plan-save');
+  const [saved] = journey.listPlans();
+  assert.equal(journey.listPlans().length, 1);
+  assert.equal(saved.id, first.id);
+  assert.equal(saved.status, 'draft');
+  assert.equal(saved.plan.rotation.seasons[0].crop, 'Potato');
+  assert.equal(saved.plan.planting['custom-0'].crop, 'Potato');
+  assert.equal(saved.plan.rotation.customPlan.planting[0].model, 'potato');
+  assert.deepEqual(saved.plan.rotation.customPlan.calendar, replacement.calendar);
+});
+
+test('repeated standard PLANANY saves also update their saved identity', () => {
+  state.plans = [{ fieldId: site.id, rotation: 'legume' }];
+  planner();
+  plannerAction('plan-save');
+  const first = journey.listPlans()[0];
+  plannerAction('plan-save');
+  assert.equal(journey.listPlans().length, 1);
+  assert.equal(journey.listPlans()[0].id, first.id);
+});
+
+test('Re-check uses current context after saved boundary and profile overrides were reset', async t => {
+  const defaultArea = journey.fieldSnapshot(site, basePolygon(site), defaultProfile()).areaHa;
+  state.boundaries[site.id] = basePolygon(site).map(([lat, lon]) => [site.lat + (lat - site.lat) * 2, site.lon + (lon - site.lon) * 2]);
+  state.profiles[site.id] = { ...defaultProfile(), irrigation: 'none' };
+  const first = saveCustomPlan();
+  assert.ok(first.plan.field.areaHa > defaultArea * 3);
+  delete state.boundaries[site.id];
+  delete state.profiles[site.id];
+  let sentArea;
+  let sentIrrigation;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    sentArea = JSON.parse(options.body).context.areaHa;
+    sentIrrigation = JSON.parse(options.body).context.irrigation;
+    return Response.json({ verdict: 'recommended', summary: 'Checked against the current field.' });
+  });
+  await plansAction('recheck', first.id);
+  assert.equal(sentArea, defaultArea);
+  assert.equal(sentIrrigation, undefined);
 });
 
 test('saved field and custom plan build a valid Ready plan without an active journey', async () => {

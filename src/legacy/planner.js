@@ -32,7 +32,7 @@ import { cultivableUsablePct } from './netarea.js';
 import { netAreaFor, netInputsFor, isNetEdited } from './fields.js';
 import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
-import { getPlan, getReadyPlan, setPlanting, startPlan, fieldSnapshot, rotationSnapshot, transitionPlan, savePlan, defaultPlanName, resetPlan } from './journey.js';
+import { getPlan, getReadyPlan, getSavedPlan, listPlans, setPlanting, startPlan, fieldSnapshot, rotationSnapshot, transitionPlan, savePlan, resetPlan } from './journey.js';
 import { journeyFinishCTA } from './journey-bar.js';
 
 function plannerSaveSource() {
@@ -51,17 +51,28 @@ function plannerSaveSource() {
 }
 
 function plannerSaveCTA() {
-  if (getPlan()) return '';
+  const active = getPlan();
+  if (active && !(active.rotation?.customPlan && getSavedPlan(active.id))) return '';
   const source = plannerSaveSource();
-  return `<div class="plan-save">${button(t('Save as my plan', 'আমার পরিকল্পনা হিসেবে সংরক্ষণ'), 'plan-save', 'primary')}${source.message ? `<p class="note" role="status"><a href="#${source.route}">${source.message}</a></p>` : ''}</div>`;
+  return `<div class="plan-save">${button(active ? t('Save plan', 'পরিকল্পনা সংরক্ষণ') : t('Save as my plan', 'আমার পরিকল্পনা হিসেবে সংরক্ষণ'), 'plan-save', 'primary')}${source.message ? `<p class="note" role="status"><a href="#${source.route}">${source.message}</a></p>` : ''}</div>`;
 }
 
 function savePlannerPlan() {
-  if (getPlan()) return;
+  const active = getPlan();
+  if (active && !(active.rotation?.customPlan && getSavedPlan(active.id))) return;
   const source = plannerSaveSource();
   if (source.message) { toast(source.message); return; }
   try {
-    let plan = startPlan();
+    const customSource = source.rotation.customPlan;
+    // Older PLANANY handoffs have no saved ID; match their original crop layout once.
+    const layout = p => JSON.stringify([p.fieldId, p.mode, p.calendar,
+      p.planting.map(s => [s.crop, s.rowSpacingCm, s.withinRowCm, s.sharePct])]);
+    const standardSaved = !customSource && (getSavedPlan(state.planner.savedPlanId) || getReadyPlan());
+    const existing = customSource ? (getSavedPlan(active?.id || customSource.savedPlanId) ||
+      (!customSource.savedPlanId && listPlans().find(entry => entry.plan.rotation?.customPlan &&
+        layout(entry.plan.rotation.customPlan) === layout(customSource)))) :
+      (standardSaved?.plan.field.id === source.field.id && standardSaved.plan.rotation?.id === source.rotation.id ? standardSaved : null);
+    let plan = active || existing?.plan || startPlan();
     plan = transitionPlan(plan, { type: 'field', value: source.field });
     plan = transitionPlan(plan, { type: 'rotation', value: source.rotation });
     const custom = !!source.rotation.customPlan;
@@ -69,6 +80,7 @@ function savePlannerPlan() {
       source.rotation.seasons.find(season => season.crop !== 'fallow');
     for (const season of source.rotation.seasons.filter(season => season.crop !== 'fallow')) {
       const value = { usableAreaPct: state.planner.usable, usableSource: state.planner.usableSource ?? 'field' };
+      if (custom) Object.assign(value, customSource.planting[source.rotation.seasons.indexOf(season)]);
       if (!custom && season === currentSeason) Object.assign(value, {
         crop: state.planner.crop, rowSpacingCm: state.planner.row, withinRowCm: state.planner.spacing, custom: true,
       });
@@ -76,11 +88,22 @@ function savePlannerPlan() {
     }
     plan = transitionPlan(plan, { type: 'confirmPlanting' });
     plan = transitionPlan(plan, { type: 'generated', value: {} });
-    savePlan(plan, { status: 'ready', name: defaultPlanName(plan) });
+    if (custom) {
+      plan.rotation.customPlan = structuredClone(customSource);
+      const checked = existing?.plan.rotation.customPlan;
+      if (checked?.recheck) Object.assign(plan.rotation.customPlan, {
+        verdict: checked.verdict, summary: checked.summary, recheck: checked.recheck, needsRecheck: checked.needsRecheck,
+      });
+    }
+    const saved = savePlan(plan, { status: existing?.status || 'ready' });
+    if (custom) localStorage.setItem('ropon_custom_plan_v1', JSON.stringify(saved.plan.rotation.customPlan));
+    if (active) resetPlan();
+    state.planner.savedPlanId = saved.id;
+    persist();
     sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
     location.hash = '#plans';
   } catch (error) {
-    resetPlan();
+    if (!active) resetPlan();
     console.warn('Planner plan could not be saved', error);
     toast(t('Plan could not be saved. Please try again.', 'পরিকল্পনা সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'));
   }
