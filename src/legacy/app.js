@@ -26,6 +26,8 @@ import {
   seasonView,
   mountMap,
   disposeMap,
+  mountSeasonCharts,
+  disposeSeasonCharts,
   setField,
   fieldAction,
   fieldInput,
@@ -88,6 +90,7 @@ function evidence() {
 }
 function render() {
   const current = page();
+  disposeSeasonCharts();
   disposeMap();
   const title = t(current[1], current[2]);
   document.documentElement.lang = state.lang;
@@ -107,6 +110,7 @@ function render() {
  <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
  <div id="journey-bar-slot">${journeyBar(current[0])}</div>
  <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
+  if (current[0] === "seasons") mountSeasonCharts();
   mountJourney(current[0], navigate, () => pages.some(([id]) => id === "plan"));
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();
