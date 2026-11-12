@@ -4006,6 +4006,7 @@ dialog .modal-body {
   [data-page="planner"] .planner3d-toolbar { flex-wrap: nowrap; gap: 6px; padding: 5px 8px; }
   [data-page="planner"] .planner3d-toolbar { flex-wrap: nowrap; }
   [data-page="planner"] .planner3d-toolbar .cs-season-toggle { flex: 1 1 0; min-width: 0; flex-wrap: wrap; gap: 6px; padding: 0; border: 0; background: transparent; white-space: nowrap; }
+  [data-page="planner"] .planner3d-toolbar .cs-season-toggle > span { display: none; } /* group has aria-label; frees room so buttons stay on one row */
   [data-page="planner"] .planner3d-toolbar .cs-season-toggle button { flex: none; min-height: 34px; padding: 3px 8px; font-size: 11px; }
   [data-page="planner"] .planner3d-toolbar .cs-wy-note { flex: 0 0 150px; font-size: 10px; white-space: normal; }
   [data-page="planner"] .planner3d-view-toggle { flex: none; flex-wrap: nowrap; gap: 2px; padding: 2px; }
