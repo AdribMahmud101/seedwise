@@ -1,3 +1,5 @@
+import { decodeMaskToRaster, parseImageStream, recordsOfKind } from '@meta-sam/parser';
+
 const MAX_BODY_BYTES = 8192;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 // shortcut: limits reset per isolate and are not shared; use a shared limiter if abuse outgrows this best-effort guard.
@@ -139,7 +141,7 @@ function json(body, status = 200, headers = {}) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 }
 
-async function readBody(request) {
+async function readBody(request, maxBytes = MAX_BODY_BYTES) {
   const reader = request.body?.getReader();
   if (!reader) return '';
   const decoder = new TextDecoder();
@@ -148,12 +150,117 @@ async function readBody(request) {
     const { done, value } = await reader.read();
     if (done) return text + decoder.decode();
     size += value.byteLength;
-    if (size > MAX_BODY_BYTES) {
+    if (size > maxBytes) {
       await reader.cancel();
       return null;
     }
     text += decoder.decode(value, { stream: true });
   }
+}
+
+const CHAT_BODY_BYTES = 24 * 1024;
+const CLINIC_BODY_BYTES = 2800000;
+const DISEASE_CROPS = new Set(['rice','potato','wheat','maize','mustard','lentil','mungbean','jute','tomato','chilli','mango','banana']);
+const chatText = (value, max = 240) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+function sanitizeChat(body) {
+  if (!body || typeof body.question !== 'string' || !body.question.trim() || body.question.length > 600 ||
+      !['en','bn','banglish'].includes(body.lang) || !['en','bn'].includes(body.appLang) || !body.context || typeof body.context !== 'object' || Array.isArray(body.context)) return null;
+  const ctx = body.context;
+  const context = { page: chatText(ctx.page, 60), fieldName: chatText(ctx.fieldName, 100), fieldId: chatText(ctx.fieldId, 100),
+    crop: chatText(ctx.crop, 30), outlook: chatText(ctx.outlook, 200), flood: chatText(ctx.flood, 200),
+    areaHa: cleanNumber(ctx.areaHa, { max:100000 }), rowSpacingCm: cleanNumber(ctx.rowSpacingCm, { max:1000 }),
+    withinRowCm: cleanNumber(ctx.withinRowCm, { max:1000 }), usableAreaPct: cleanNumber(ctx.usableAreaPct, { max:100 }),
+    month: cleanNumber(ctx.month, { min:1, max:12, integer:true }) };
+  if (ctx.plan && typeof ctx.plan === 'object' && !Array.isArray(ctx.plan)) {
+    context.plan = { id: chatText(ctx.plan.id, 120), name: chatText(ctx.plan.name, 100), custom: ctx.plan.custom === true, field: chatText(ctx.plan.field, 100),
+      crops: (Array.isArray(ctx.plan.crops) ? ctx.plan.crops : []).slice(0, 12).map(s => ({ crop: chatText(s?.crop, 20), sowMonth: cleanNumber(s?.sowMonth, { min: 1, max: 12, integer: true }), harvestMonth: cleanNumber(s?.harvestMonth, { min: 1, max: 12, integer: true }), rowSpacingCm: cleanNumber(s?.rowSpacingCm, { max: 1000 }), withinRowCm: cleanNumber(s?.withinRowCm, { max: 1000 }) })), checklist: ctx.plan.checklist && typeof ctx.plan.checklist === 'object' ? Object.fromEntries(Object.entries(ctx.plan.checklist).slice(0, 6).map(([k,v]) => [chatText(k,30), chatText(v,30)])) : {}, verdict: chatText(ctx.plan.verdict, 80) };
+  }
+  if (ctx.diagnosis && typeof ctx.diagnosis === 'object') context.diagnosis = { id: chatText(ctx.diagnosis.id, 80), name: { en: chatText(ctx.diagnosis.name?.en, 100), bn: chatText(ctx.diagnosis.name?.bn, 100) }, confidence: cleanNumber(ctx.diagnosis.confidence, { max: 1 }) };
+  const history = (Array.isArray(body.history) ? body.history : []).slice(-8).flatMap(m => ['user','assistant'].includes(m?.role) && typeof m.text === 'string' ? [{ role: m.role, content: m.text.slice(0, 600) }] : []);
+  return { question: body.question.trim(), lang: body.lang, appLang: body.appLang, context, history };
+}
+function validChatSuggestion(raw, plan, knownSources) {
+  if (!raw || !plan || !Array.isArray(raw.changes) || !raw.changes.length || !Array.isArray(raw.newPlanting) || !Number.isFinite(raw.confidence)) return null;
+  const changes = raw.changes.slice(0, 12).flatMap(c => {
+    const to=typeof c?.to==='string'?c.to.slice(0,80):'';
+    const actionable=plan.custom?!!raw.newPlanting[c?.season]?.crop:/\b(?:aman|boro|rice|mustard|potato|mungbean)\b/i.test(to)||/\d+\s*[x×]\s*\d+/i.test(to);
+    return Number.isInteger(c?.season) && c.season >= 0 && c.season < (plan.crops?.length || 0) && typeof c.from === 'string' && to && typeof c.why === 'string' && actionable ? [{ season:c.season, from:c.from.slice(0,80), to, why:c.why.slice(0,240) }] : [];
+  });
+  if (!changes.length) return null;
+  const newPlanting = normalisePlanting(raw.newPlanting).filter(p => plan.custom || ['rice','aman','boro','mustard','potato','mungbean'].includes(p.crop)).map(p => ({ crop:p.crop, model:p.model, rowSpacingCm:p.rowSpacingCm, withinRowCm:p.withinRowCm, sharePct:p.sharePct }));
+  return { changes, newPlanting, evidence: cleanList(raw.evidence, 6, 80).filter(id => knownSources.has(id)), confidence: Math.max(0,Math.min(1,raw.confidence)) };
+}
+async function plantyChat(request, env, url) {
+  if (request.method !== 'POST') return json({ error:'method_not_allowed' },405,{Allow:'POST'});
+  const origin=request.headers.get('Origin');
+  if ((origin && origin!==url.origin) || ['cross-site','same-site'].includes(request.headers.get('Sec-Fetch-Site'))) return json({error:'forbidden'},403);
+  if (Number(request.headers.get('Content-Length'))>CHAT_BODY_BYTES || request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json') return json({error:'invalid_request'},400);
+  let req; try { const raw=await readBody(request,CHAT_BODY_BYTES); if(raw===null)return json({error:'payload_too_large'},413); req=sanitizeChat(JSON.parse(raw)); } catch { req=null; }
+  if(!req)return json({error:'invalid_request'},400);
+  const ip=request.headers.get('CF-Connecting-IP')||'unknown', now=Date.now();
+  for(const [key,value] of requestsByIp)if(value.expires<=now)requestsByIp.delete(key);
+  const rate=requestsByIp.get(ip)||{count:0,expires:now+RATE_WINDOW_MS}; if(rate.count>=20)return json({error:'rate_limited'},429);rate.count++;requestsByIp.set(ip,rate);
+  if(!env.MUSE_API_KEY)return json({error:'not_configured'},503);
+  const [research,tolerant]=await Promise.all([loadAgronomy(env,url.origin),loadTolerant(env,url.origin)]);
+  const knowledge={agronomy:research,tolerantVarieties:tolerant};
+  const language=req.lang==='banglish'?'Banglish (Bengali in Latin letters)':req.lang==='bn'?'simple Bengali':'English';
+  const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),30000);
+  try{
+    const response=await fetch('https://api.meta.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.MUSE_API_KEY}`},signal:controller.signal,
+      body:JSON.stringify({model:env.PLANTY_CHAT_MODEL||env.PLANTY_MODEL||'muse-ember-1.0',max_tokens:1200,temperature:.25,messages:[
+        {role:'system',content:`You are Planty, a kind, brief farming helper for Rangpur, Bangladesh. Answer in ${language}. Use only supplied agronomy, tolerant-variety, field, plan, and diagnosis facts for specific claims. Never invent numbers, prices or chemical doses. Cite known source ids only. If suggesting a plan change, return a JSON object with answer and suggestion: {"answer":"...","suggestion":{"changes":[{"season":0,"from":"...","to":"...","why":"..."}],"newPlanting":[{"crop":"...","model":"tree|shrub|herb|grass|vine|rice|potato|mustard|mungbean|wheat|maize","rowSpacingCm":40,"withinRowCm":30,"sharePct":100}],"evidence":["source-id"],"confidence":0.5}}. Otherwise suggestion must be null. Do not suggest changes without attached plan. If unsupported, say so and refer to DAE 16123.`},
+        {role:'user',content:JSON.stringify({knowledge,context:req.context,history:req.history,question:req.question}).slice(0,22000)}]})});
+    if(!response.ok)return json({error:'unavailable'},503);const data=await response.json();const parsed=parseModelJson(data?.choices?.[0]?.message?.content||'');
+    const answer=typeof parsed?.answer==='string'?parsed.answer.trim().slice(0,1800):'';if(!answer)return json({error:'unavailable'},503);
+    const ids=new Set([...(research?.sources||[]).map(s=>s.id),...(tolerant?.varieties||[]).flatMap(v=>v.evidence||[])]);
+    const suggestion=validChatSuggestion(parsed.suggestion,req.context.plan,ids);
+    return json({answer,suggestion});
+  }catch{return json({error:'unavailable'},503)}finally{clearTimeout(timeout)}
+}
+function responseText(data) { return data?.output?.flatMap(x=>x.content||[]).find(x=>typeof x.text==='string')?.text || data?.output_text || ''; }
+async function* samEvents(text) {
+  yield { type:'response.output_text.delta', item_id:'m', output_index:0, content_index:0, delta:text };
+  yield { type:'response.output_text.done', item_id:'m', output_index:0, content_index:0, text };
+  yield { type:'response.completed' };
+}
+function rasterBase64(raster) {
+  let binary='';
+  for(let i=0;i<raster.length;i+=0x8000)binary+=String.fromCharCode(...raster.subarray(i,i+0x8000));
+  return btoa(binary);
+}
+async function parseSamSegments(text, kind, imageWidth, imageHeight) {
+  const result=await parseImageStream(samEvents(text)).finalResult;
+  const masks=recordsOfKind(result.records,'mask'),out=[];
+  for(const box of recordsOfKind(result.records,'box')){
+    const record=masks.find(mask=>mask.objectId===box.objectId);if(!record)continue;
+    const raster=decodeMaskToRaster(record.mask),area=raster.reduce((sum,bit)=>sum+bit,0)*(box.right-box.left)*(box.bottom-box.top)/(record.mask.width*record.mask.height);
+    out.push({kind,box:[box.left/imageWidth,box.top/imageHeight,(box.right-box.left)/imageWidth,(box.bottom-box.top)/imageHeight],areaPx:area,areaPct:area/(imageWidth*imageHeight)*100,
+      mask:{width:record.mask.width,height:record.mask.height,data:rasterBase64(raster)}});
+  }
+  return out;
+}
+async function clinicAnalyze(request,env,url){
+  if(request.method!=='POST')return json({error:'method_not_allowed'},405,{Allow:'POST'});
+  const origin=request.headers.get('Origin');if((origin&&origin!==url.origin)||['cross-site','same-site'].includes(request.headers.get('Sec-Fetch-Site')))return json({error:'forbidden'},403);
+  if(Number(request.headers.get('Content-Length'))>CLINIC_BODY_BYTES||request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()!=='application/json')return json({error:'payload_too_large'},413);
+  let body;try{const raw=await readBody(request,CLINIC_BODY_BYTES);if(raw===null)return json({error:'payload_too_large'},413);body=JSON.parse(raw)}catch{return json({error:'invalid_request'},400)}
+  const match=typeof body?.image==='string'&&body.image.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);if(!match||match[1].length>2700000||!Number.isInteger(body.width)||!Number.isInteger(body.height)||body.width<1||body.height<1||body.width>1024||body.height>1024||!Array.isArray(body.colorMean)||body.colorMean.length!==3||!body.colorMean.every(n=>Number.isFinite(n)&&n>=0&&n<=255)||!DISEASE_CROPS.has(body.crop)&&body.crop!=='auto'||!['en','bn'].includes(body.lang))return json({error:'invalid_request'},400);
+  const now=Date.now(),ip=request.headers.get('CF-Connecting-IP')||'unknown';for(const [key,value]of requestsByIp)if(value.expires<=now)requestsByIp.delete(key);const rate=requestsByIp.get(ip)||{count:0,expires:now+RATE_WINDOW_MS};if(rate.count>=20)return json({error:'rate_limited'},429);rate.count++;requestsByIp.set(ip,rate);
+  if(!env.MUSE_API_KEY)return json({error:'not_configured'},503);
+  const image=body.image;
+  const call=async(model,payload,ms=45000)=>{const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{const r=await fetch('https://api.meta.ai/v1/responses',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.MUSE_API_KEY}`},signal:c.signal,body:JSON.stringify({model,...payload})});if(!r.ok)throw Error('upstream');return await r.json()}finally{clearTimeout(timer)}};
+  try{
+    const concepts=['leaf','lesion','insect'];const segs=await Promise.all(concepts.map(async concept=>{const data=await call('sam-3.1',{input:[{type:'message',role:'user',content:[{type:'input_text',text:concept},{type:'input_image',image_url:image}]}],stream:false,metadata:{include_confidence:'true',mask_encoding:'one_bit'}});return parseSamSegments(responseText(data),concept==='leaf'?'leaf':concept==='insect'?'insect':'lesion',body.width,body.height);}));
+    const segments=segs.flat().slice(0,40);if(!segments.length)return json({error:'unavailable'},503);
+    const pack=await env.ASSETS.fetch(new Request(`${url.origin}/data/crop-diseases.json`));if(!pack.ok)return json({error:'unavailable'},503);const kb=await pack.json();
+    const ids=new Set();const validKb=kb?.schemaVersion===1&&Array.isArray(kb.diseases)&&kb.diseases.length>0&&kb.diseases.every(d=>typeof d?.id==='string'&&!ids.has(d.id)&&DISEASE_CROPS.has(d.crop)&&typeof d.cause==='string'&&d.names&&typeof d.names.en==='string'&&typeof d.names.bn==='string'&&['symptoms','lookAlikes','triggers','management','sources'].every(k=>Array.isArray(d[k])&&d[k].length>0)&&d.sources.every(s=>typeof s.id==='string'&&typeof s.title==='string'&&/^https:\/\//.test(s.url))&&(ids.add(d.id),true));
+    if(!validKb)return json({error:'unavailable'},503);const crops=body.crop==='auto'?DISEASE_CROPS: new Set([body.crop]);const diseases=kb.diseases.filter(d=>crops.has(d.crop));
+    const lesionAreaPct=Math.min(100,segments.filter(s=>s.kind==='lesion').reduce((n,s)=>n+s.areaPx,0)/(body.width*body.height)*100);
+    const visionController=new AbortController(),visionTimer=setTimeout(()=>visionController.abort(),45000);let vision;
+    try{vision=await fetch('https://api.meta.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${env.MUSE_API_KEY}`},signal:visionController.signal,body:JSON.stringify({model:env.MUSE_VISION_MODEL||'muse-spark-1.3',max_tokens:1600,temperature:.1,messages:[{role:'system',content:`You are a cautious crop disease triage assistant for Rangpur, Bangladesh. Use only the disease knowledge base ids. Return JSON only: {"diagnoses":[{"id":"known id","confidence":0.4,"why":["visible evidence"],"actions":["IPM action"]}]}. Return up to 3 diagnoses, or an empty list if image unclear. Confidence is a visual match estimate, not clinical certainty. Never recommend chemical dose. Write why/actions in ${body.lang==='bn'?'simple Bengali':'plain English'}.`},{role:'user',content:[{type:'text',text:JSON.stringify({crop:body.crop,note:chatText(body.note,300),segmentation:{lesionAreaPct,lesionCount:segments.filter(s=>s.kind==='lesion').length,leafCount:segments.filter(s=>s.kind==='leaf').length,meanRgb:body.colorMean},knowledge:diseases})},{type:'image_url',image_url:{url:image}}]}]})});}finally{clearTimeout(visionTimer)}
+    if(!vision.ok)return json({error:'unavailable'},503);const answer=parseModelJson((await vision.json())?.choices?.[0]?.message?.content||'');const diagnoses=(Array.isArray(answer?.diagnoses)?answer.diagnoses:[]).slice(0,3).flatMap(d=>{const known=diseases.find(x=>x.id===d?.id);if(!known||!Number.isFinite(d.confidence)||d.confidence<0||d.confidence>1)return[];const actions=Array.isArray(d.actions)?d.actions.filter(x=>typeof x==='string').slice(0,5).map(x=>x.slice(0,240)):[];if(actions.some(x=>/\d|\b(?:ml|mg|g|kg|litre|liter|dose|spray)\b/i.test(x)))return[];return[{id:known.id,name:known.names,confidence:d.confidence,why:Array.isArray(d.why)?d.why.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],actions,sources:known.sources}];});
+    return json({diagnoses,segments,lesionAreaPct,knownDiseaseIds:diseases.map(d=>d.id)});
+  }catch{return json({error:'unavailable'},503)}
 }
 
 
@@ -506,6 +613,8 @@ export default {
       const result = await dailyBrief(url.searchParams.get('field'), env);
       return result ? json(result) : json({ error: 'unavailable' }, 503);
     }
+    if (url.pathname === '/api/planty-chat') return plantyChat(request, env, url);
+    if (url.pathname === '/api/clinic-analyze') return clinicAnalyze(request, env, url);
     if (url.pathname === '/api/rotation-advisor') return rotationAdvisor(request, env, url);
     if (url.pathname !== '/api/planty' && url.pathname !== '/api/plan-summary') return json({ error: 'not_found' }, 404);
     const planSummary = url.pathname === '/api/plan-summary';

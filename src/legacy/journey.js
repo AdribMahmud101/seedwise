@@ -576,7 +576,7 @@ export function approveRefinement(id, changes, newPlanting = []) {
     const settings = season && plan.planting[season.key];
     if (!settings) continue;
     const text = `${change.to || ''}`.toLowerCase();
-    const crop = ['boro', 'aman', 'mustard', 'potato', 'mungbean'].find(name => text.includes(name));
+    const crop = ['boro', 'aman', 'rice', 'mustard', 'potato', 'mungbean'].find(name => text.includes(name));
     const proposal = newPlanting[change.season];
     if (plan.rotation.customPlan && proposal?.crop) {
       const custom = plan.rotation.customPlan, previous = custom.planting[change.season];

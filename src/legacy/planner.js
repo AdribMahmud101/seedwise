@@ -30,7 +30,7 @@ import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { recommendedSettings, controlLimits, clampPlannerValue, syncPlannerControl, plantyContext, resolvePlannerUsable } from './planner-controls.js';
 import { cultivableUsablePct } from './netarea.js';
 import { netAreaFor, netInputsFor, isNetEdited } from './fields.js';
-import { plantyPanel, mountPlanty, refreshPlantySuggestions } from './planty.js';
+import { refreshPlantySuggestions } from './planty.js';
 import { guide } from './planty-guide.js';
 import { getPlan, getReadyPlan, getSavedPlan, listPlans, setPlanting, startPlan, fieldSnapshot, rotationSnapshot, transitionPlan, savePlan, resetPlan } from './journey.js';
 import { journeyFinishCTA } from './journey-bar.js';
@@ -326,7 +326,7 @@ function planner() {
  <div class="planner3d-stage-canvas-host" tabindex="0" role="region" aria-label="${t('Field model. Drag or use arrow keys to rotate; scroll, pinch or use zoom buttons to zoom.', 'জমির মডেল। ঘোরাতে টানুন বা তীরচিহ্নের কী ব্যবহার করুন; জুম করতে স্ক্রল, দুই আঙুল বা জুম বোতাম ব্যবহার করুন।')}"><canvas id="plant-model" class="planner-canvas" aria-label="${t('Schematic of planting rows within the field boundary', 'জমির সীমানায় সারির নমুনা নকশা')}"></canvas></div>
  <div class="planner3d-footer"><span class="planner3d-crop-chip">${t('Illustrative · rows drawn at readable scale', 'কাল্পনিক · বোঝার সুবিধায় সারি বড় করে দেখানো')}</span><span class="note planner3d-fallback-note">${t('2D fallback · flat ground · drag to rotate', '২ডি বিকল্প · সমতল জমি · ঘোরাতে টানুন')}</span></div></div></section>
  <section class="panel plan-live" aria-label="${t('Live planting results', 'বপনের সরাসরি হিসাব')}"><div id="plan-estimate" role="status" aria-live="polite" aria-atomic="true">${plannerResult()}</div></section>
- ${plannerSettings()}</div>${plantyPanel(p)}</div>
+ ${plannerSettings()}</div></div>
  <div id="planner-finish-slot"></div><div class="section-space">${panel(t('Read the estimate', 'হিসাব বুঝুন'), `<p class="note">${t('Usable area reserves room for paths, drains or a tree border. Row crops use usable square metres divided by row × plant spacing. Broadcast mustard uses BARI Shorisha-14’s reference seed rate. The model draws representative plants. Rice is counted in hills.', 'আইল, নালা ও গাছের জন্য জমি বাদ দিয়ে চাষযোগ্য অংশ ঠিক করুন। সারির ফসলে চাষযোগ্য বর্গমিটারকে দুই দূরত্বের গুণফল দিয়ে ভাগ করা হয়। ছিটানো সরিষায় বারি সরিষা-১৪ এর বীজের হার ধরা হয়। ধানের হিসাব গোছায়।')}</p>`)}</div>`
   );
 }
@@ -498,7 +498,6 @@ let soilProfilePromise = null;
 let plannerTimer = null;
 let plannerHost = null;
 let plannerVersion = 0;
-let disposePlanty = null;
 let resultFrame = null;
 
 function hasPlannerWebGL() { return webglAvailable(); }
@@ -600,8 +599,6 @@ function disposePlanner() {
   fitObserver?.disconnect();
   fitObserver = null;
   window.removeEventListener('resize', fitPlannerRow);
-  disposePlanty?.();
-  disposePlanty = null;
   cancelAnimationFrame(resultFrame);
   ++plannerVersion;
   clearTimeout(plannerTimer);
@@ -610,11 +607,13 @@ function disposePlanner() {
   planner3dModule?.disposePlanner3d();
 }
 
-function mountPlanner() {
-  disposePlanty?.();
-  disposePlanty = mountPlanty(() => plantyContext(field().id, state.planner, estimate(), state.lang, { fieldName: fieldName(), month: state.month + 1,
+export function getPlannerPlantyContext() {
+  return plantyContext(field().id, state.planner, estimate(), state.lang, { fieldName: fieldName(), month: state.month + 1,
     outlook: outlookSummaryLine(field().id, outlookPack, state.lang),
-    flood: floodSummaryLine(field().id, floodFields, state.lang) }));
+    flood: floodSummaryLine(field().id, floodFields, state.lang) });
+}
+
+function mountPlanner() {
   document.querySelector('#plant-controls').onsubmit = event => event.preventDefault();
   document.querySelector('#plan-seasons').onkeydown = event => {
     if (event.target.getAttribute('role') !== 'tab' || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;

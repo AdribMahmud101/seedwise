@@ -1,7 +1,9 @@
 import { journeyBar, journeyStart, journeyReview, journeyFieldCTA, mountJourney, journeyAction } from './journey-bar.js';
-import { getPlan, listPlans, openPlan, approveRefinement, restorePreviousPlan } from './journey.js';
+import { getPlan, getReadyPlan, listPlans, openPlan, approveRefinement, restorePreviousPlan } from './journey.js';
 import { requestReplay } from './plan-pipeline.js';
 import { parseRoute } from './routes.js';
+import { plantyPanel, mountPlanty } from './planty.js';
+import { getPlannerPlantyContext } from './planner.js';
 import { notificationId, mergeNotifications, unreadCount, readNotificationState, writeNotificationState, visibleNotifications } from './notifications.js';
 import { runShowMe } from './journey-story.js';
 import { plan, mountPlan, disposePlan, planAction, planChange } from './plan.js';
@@ -80,7 +82,6 @@ const pages = [
   ["planner", "Planting planner", "বপনের পরিকল্পনা", planner],
   ["plans", "My plans", "আমার পরিকল্পনা", plans],
   ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
-  ["clinic", "Crop clinic", "ফসলের চিকিৎসাঘর", clinic],
   ["water", "Water & resilience", "পানি ও সহনশীলতা", water],
   ["recovery", "Disaster recovery", "দুর্যোগের পর করণীয়", recovery],
   ["plan", "Your plan", "আপনার পরিকল্পনা", plan],
@@ -88,6 +89,7 @@ const pages = [
 ];
 function route() {
   const parsed = parseRoute(location.hash);
+  if (parsed.page === 'clinic') return { ...parsed, page: pages[0] };
   return { ...parsed, page: pages.find(p => p[0] === parsed.page) || pages[0] };
 }
 function page() {
@@ -115,6 +117,17 @@ function offerUndo(id) {
   document.body.append(button);
   setTimeout(() => button.remove(), 10000);
 }
+document.addEventListener('planty:apply-suggestion', event => {
+  const { suggestion, plan: attached } = event.detail || {};
+  const saved = listPlans().find(item => item.id === attached?.id);
+  try {
+    if (saved && suggestion && approveRefinement(saved.id, suggestion.changes, suggestion.newPlanting)) {
+      requestReplay();
+      offerUndo(saved.id);
+      location.hash = `plan/${encodeURIComponent(saved.id)}?refresh=${Date.now()}`;
+    }
+  } catch { /* invalid suggestions stay unapproved */ }
+});
 function renderNotifications() {
   const button = document.querySelector('.notification-bell');
   if (!button) return;
@@ -182,7 +195,10 @@ function evidence() {
     `<p class="note">${t("Weather values are frozen to 2024. Each prepared field has a dated image and a boundary traced from the satellite photo. The rotation scores combine these data with stated planning assumptions.", "আবহাওয়ার তথ্য ২০২৪ সালের। প্রতিটি স্থানে তারিখসহ ছবি ও ছবি দেখে আঁকা সীমানা আছে। এই তথ্যের সঙ্গে স্পষ্ট অনুমান মিলিয়ে ফসলচক্রের স্কোর হয়।")}</p>${[...earth.sources, ...agronomy.sources].map((s, i) => `<div class="source-row"><span class="source-no">${String(i + 1).padStart(2, "0")}</span><div><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name || s.title)} ↗</a><p>${esc(s.spatialSupport || s.method || s.locator || s.role || "")}</p></div></div>`).join("")}`,
   );
 }
+let disposePlantyHub = null;
 function render() {
+  disposePlantyHub?.();
+  disposePlantyHub = null;
   const current = page();
   disposeSeasonCharts();
   disposeMap();
@@ -203,12 +219,18 @@ function render() {
  <div class="side-bottom"><div class="region-mark"><i class="status-dot"></i><strong>${t("Rangpur field lab", "রংপুর মাঠ গবেষণা")}</strong></div><p>${t("Bangladesh · Three prepared sites", "বাংলাদেশ · তিনটি প্রস্তুত স্থান")}</p><div class="sidebar-foot"><span>24°–27° N</span><span>FIELD EDITION 01</span></div></div></aside><button class="nav-shade" data-action="menu" aria-label="${t("Close navigation", "মেনু বন্ধ করুন")}"></button>
  <div class="workspace"><div class="topbar"><div class="crumb"><button class="mobile-menu" data-action="menu" aria-expanded="false" aria-label="${t("Open navigation", "মেনু খুলুন")}">${icon("menu")}</button><span class="crumb-region">${t("Rangpur", "রংপুর")} &nbsp; / &nbsp;</span><b>${esc(title)}</b></div><div class="top-actions"><span class="snapshot">${t("HISTORICAL DATA  /  2024", "ঐতিহাসিক তথ্য  /  ২০২৪")}</span><div class="notification-host"><button class="notification-bell" aria-expanded="false">${bellIcon}<span class="notification-badge" hidden></span></button></div><div class="lang-toggle" aria-label="Language"><button data-lang="en" class="${state.lang === "en" ? "on" : ""}">EN</button><button data-lang="bn" class="${state.lang === "bn" ? "on" : ""}">বাংলা</button></div><span class="avatar" aria-label="Rangpur field lab">RG</span></div></div>
  <div id="journey-bar-slot">${journeyBar(current[0])}</div>
- <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main></div>`;
+ <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main>${plantyPanel()}</div>`;
   if (current[0] === "seasons") mountSeasonCharts();
   mountJourney(current[0], navigate, () => pages.some(([id]) => id === "plan"));
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();
   else disposePlanner();
+  disposePlantyHub = mountPlanty(() => {
+    const selected = getPlan() || getReadyPlan() || listPlans().find(item => item.status === 'ready') || null;
+    const base = current[0] === 'planner' ? getPlannerPlantyContext() : { lang: state.lang, fieldId: state.fieldId, fieldName: fieldName(), month: state.month + 1 };
+    return { ...base, lang: state.lang, page: current[1], fieldName: fieldName(),
+      outlook: outlookSummaryLine(state.fieldId, outlook, state.lang), flood: floodSummaryLine(state.fieldId, floodFields, state.lang), plan: selected };
+  });
   if (current[0] === "plans") mountPlans();
   else disposePlans();
   if (current[0] === "plan") mountPlan();
