@@ -512,3 +512,12 @@ body:has(.planty-guide:not(.planty-guide--hint)) .coach-host {
     overscroll-behavior: contain;
   }
 }
+/* Guide panel never runs off-screen: header + actions stay visible, only the steps scroll. */
+.coach-host--docked { overflow: visible; display: flex; }
+.coach-host--docked .coach-card { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); width: 100%; }
+.coach-host--docked .coach-header, .coach-host--docked .coach-actions { flex: none; }
+.coach-host--docked .coach-checklist { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.coach-host--docked .coach-actions { position: relative; padding-top: 10px; border-top: 1px solid rgba(36, 57, 44, .1); }
+.coach-hide-btn { display: inline-flex; align-items: center; gap: 4px; width: auto !important; min-width: 0; height: 32px !important; padding: 0 10px !important; border-radius: 999px !important; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.coach-hide-btn span { font-size: 16px; line-height: 1; }
+.coach-card img, .coach-card video, .coach-card .howto-stage, .coach-card [class*="howto-frame"], .coach-card [class*="howto-clip"] { max-height: 180px; object-fit: cover; }

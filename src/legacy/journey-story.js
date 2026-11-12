@@ -358,7 +358,7 @@ export function renderCoach(container) {
             <p class="coach-instruction">${t(info.instructionEn, info.instructionBn)}</p>
           </div>
         </div>
-        <button type="button" class="coach-hide-btn" data-coach="hide" title="${t('Hide coach', 'লুকান')}" aria-label="${t('Hide coach', 'লুকান')}">✕</button>
+        <button type="button" class="coach-hide-btn" data-coach="hide" title="${t('Hide guide (Planty stays in the corner)', 'গাইড লুকান (Planty কোণে থাকবে)')}" aria-label="${t('Hide guide', 'গাইড লুকান')}"><span aria-hidden="true">–</span>${t('Hide', 'লুকান')}</button>
       </div>
 
       <ul class="coach-checklist${isHowtoPage ? ' coach-checklist--howto' : ''}">
