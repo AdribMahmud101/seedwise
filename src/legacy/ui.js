@@ -434,6 +434,7 @@ function cropName(id) {
   return c ? t(c.label, c.bn) : id;
 }
 const paths = {
+  calendar: "M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h3 M8 17h3 M14 14h2",
   plans: "M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z M9 7h6 M9 11h6 M9 15h4",
   recovery: "M12 2 3 6v6c0 5 5 8 9 10 4-2 9-5 9-10V6Z M7 12l3 3 7-7",
   field: "M3 16 7 6l7-3 7 5-3 11-10 2Z M7 6l6 5 8-3 M13 11l-3 9",

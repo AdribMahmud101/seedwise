@@ -5,7 +5,7 @@ import { requestReplay } from './plan-pipeline.js';
 import { parseRoute } from './routes.js';
 import { plantyPanel, mountPlanty } from './planty.js';
 import { getPlannerPlantyContext } from './planner.js';
-import { notificationId, mergeNotifications, unreadCount, readNotificationState, writeNotificationState, visibleNotifications } from './notifications.js';
+import { notificationId, taskReminderId, mergeNotifications, unreadCount, readNotificationState, writeNotificationState, visibleNotifications } from './notifications.js';
 import { runShowMe } from './journey-story.js';
 import { plan, mountPlan, disposePlan, planAction, planChange } from './plan.js';
 import { plans, mountPlans, disposePlans, plansAction } from './plans.js';
@@ -76,12 +76,14 @@ import {
 } from "./research.js";
 import { deriveChecklist } from './plan.js';
 import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
+import { calendar, mountCalendar, disposeCalendar } from './calendar.js';
 
 const pages = [
   ["field", "My field", "আমার জমি", home],
   ["rotations", "Rotation studio", "ফসলচক্র বাছাই", rotations],
   ["planner", "Planting planner", "বপনের পরিকল্পনা", planner],
   ["plans", "My plans", "আমার পরিকল্পনা", plans],
+  ["calendar", "Calendar", "ক্যালেন্ডার", calendar],
   ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
   ["water", "Water & resilience", "পানি ও সহনশীলতা", water],
   ["recovery", "Disaster recovery", "দুর্যোগের পর করণীয়", recovery],
@@ -142,16 +144,9 @@ function renderNotifications() {
   const pop = host?.querySelector('.notification-pop');
   if (pop) pop.innerHTML = host.classList.contains('open') ? panelHtml(store.cache.items || [], store) : '';
 }
-function relativeTask(plan, today = new Date()) {
-  return deriveChecklist(plan, null).filter(item => !plan.checklist?.[item.id]).map(item => {
-    const season = plan.rotation.seasons.find(s => item.id === `sow-${s.key}`);
-    const target = season ? new Date(today.getFullYear(), season.sowMonth - 1, 1) : today;
-    const days = Math.ceil((target - today) / 86400000);
-    return { item, season, days };
-  }).sort((a, b) => (a.days < 0 ? 1000 + Math.abs(a.days) : a.days) - (b.days < 0 ? 1000 + Math.abs(b.days) : b.days))[0];
-}
 async function refreshNotifications() {
   const store = readNotificationState(), date = new Date().toISOString().slice(0, 10);
+  const knownTaskIds = new Set((store.cache.items || []).filter(item => item.type === 'task').map(item => item.id));
   const entries = listPlans(), incoming = [], field = state.fieldId, name = fieldName(); // fieldName takes a field object (defaults to the current field), not an id
   try {
     const response = await fetch(`/api/daily-brief?field=${encodeURIComponent(field)}`);
@@ -160,11 +155,22 @@ async function refreshNotifications() {
       incoming.push({ id: notificationId('disaster', brief.date, field), type: 'disaster', createdAt: `${brief.date}T00:00:00Z`, title: t(`Today's disaster outlook for ${name}: ${brief.headline}`, `আজ ${name}-এর দুর্যোগ পূর্বাভাস: ${brief.headline}`), body: brief.fallback ? t('Using prepared outlook and flood data.', 'প্রস্তুত আউটলুক ও বন্যার তথ্য দেখানো হচ্ছে।') : t('Daily model update is ready.', 'দৈনিক মডেল হালনাগাদ প্রস্তুত।'), cta: t('See analytics', 'বিশ্লেষণ দেখুন'), href: entries.length ? `plan/${encodeURIComponent(entries[0].id)}` : 'recovery' });
     }
   } catch { /* no fabricated alert */ }
-  const next = entries.map(entry => ({ entry, task: relativeTask(entry.plan) })).filter(x => x.task).sort((a, b) => a.task.days - b.task.days)[0];
-  if (next) {
-    const { entry, task } = next, due = task.days < 0 ? t('overdue', 'বাকি') : task.days === 0 ? t('today', 'আজ') : t(`in ${task.days} days`, `${task.days} দিনে`);
-    incoming.push({ id: notificationId('task', date, entry.id), type: 'task', createdAt: `${date}T00:00:00Z`, title: t('Next task in your plan', 'আপনার পরিকল্পনার পরের কাজ'), body: `${t(task.item.en, task.item.bn)} (${due})`, cta: t('Open plan', 'পরিকল্পনা খুলুন'), href: `plan/${encodeURIComponent(entry.id)}?section=plan-checklist` });
-  } else if (!entries.length) incoming.push({ id: notificationId('task', date), type: 'task', createdAt: `${date}T00:00:00Z`, title: t('Make your first plan', 'প্রথম পরিকল্পনা করুন'), body: t('Planty can help shape a plan for your field.', 'প্ল্যান্টি আপনার জমির পরিকল্পনায় সাহায্য করবে।'), cta: t('Open field', 'জমি দেখুন'), href: 'field' });
+  const dueTasks = entries.flatMap(entry => deriveChecklist(entry.plan, null).filter(item => !entry.plan.checklist?.[item.id] && item.id.startsWith('sow-')).map(item => {
+    const season = entry.plan.rotation.seasons.find(s => item.id === `sow-${s.key}`);
+    if (!season.sowDate) return null;
+    const sowDate = season.sowDate;
+    const target = new Date(`${new Date().getFullYear()}-${sowDate.slice(5,10)}T00:00:00`);
+    const days = Math.ceil((target - new Date(`${date}T00:00:00`)) / 86400000);
+    return { entry, item, days };
+  })).filter(task => task && task.days <= 7).sort((a,b)=>a.days-b.days);
+  const nextPlanTask = entries.map(entry => ({ entry, item: deriveChecklist(entry.plan, null).find(item => item.id.startsWith('sow-') && !entry.plan.checklist?.[item.id]) }))
+    .find(({entry,item}) => item && !entry.plan.rotation.seasons.find(season => item.id === `sow-${season.key}`)?.sowDate && !dueTasks.some(task => task.entry.id === entry.id && task.item.id === item.id));
+  if (nextPlanTask) incoming.push({ id: notificationId('task', date, nextPlanTask.entry.id), type: 'task', createdAt: `${date}T00:00:00Z`, title: t('Next task in your plan', 'আপনার পরিকল্পনার পরের কাজ'), body: t(nextPlanTask.item.en,nextPlanTask.item.bn), cta: t('Open plan', 'পরিকল্পনা খুলুন'), href: `plan/${encodeURIComponent(nextPlanTask.entry.id)}?section=plan-checklist` });
+  dueTasks.forEach(({entry,item,days}, index) => {
+    const due = days < 0 ? t('overdue', 'বাকি') : days === 0 ? t('today', 'আজ') : t(`in ${days} days`, `${days} দিনে`);
+    incoming.push({ id: taskReminderId(date, entry.id, item.id), type: 'task', createdAt: `${date}T00:00:00Z`, title: index === 0 ? t('Next task in your plan', 'আপনার পরিকল্পনার পরের কাজ') : t('Task due soon', 'শিগগির কাজ'), body: `${t(item.en,item.bn)} (${due})`, cta: t('Open plan', 'পরিকল্পনা খুলুন'), href: `plan/${encodeURIComponent(entry.id)}?section=plan-checklist` });
+  });
+  if (!entries.length) incoming.push({ id: notificationId('task', date), type: 'task', createdAt: `${date}T00:00:00Z`, title: t('Make your first plan', 'প্রথম পরিকল্পনা করুন'), body: t('Planty can help shape a plan for your field.', 'প্ল্যান্টি আপনার জমির পরিকল্পনায় সাহায্য করবে।'), cta: t('Open field', 'জমি দেখুন'), href: 'field' });
   for (const entry of entries) {
     const cacheKey = `refine:${date}:${entry.id}`;
     if (Date.parse(store.cache[`refineDismissed:${entry.id}`] || '') > Date.now()) continue;
@@ -197,6 +203,8 @@ async function refreshNotifications() {
   store.cache.items = mergeNotifications(kept, incoming);
   writeNotificationState(store);
   renderNotifications();
+  const newTasks = incoming.filter(item => item.type === 'task' && item.id.includes(':') && !knownTaskIds.has(item.id) && !store.read[item.id]);
+  if (newTasks.length) playToastSequence(newTasks, { persist: true, onDismiss: markToastRead, onShow: bumpBell });
 }
 // After the user completes a plan, play the real notifications as a timed toast sequence (judges see it once).
 document.addEventListener('ropon:report-ready', async () => {
@@ -262,6 +270,8 @@ function render() {
  <div id="journey-bar-slot">${journeyBar(current[0])}</div>
  <main class="main" id="main-content" tabindex="-1" data-page="${current[0]}">${current[0] === "field" ? `<div id="journey-start-slot">${journeyStart()}</div><div id="journey-field-slot">${journeyFieldCTA()}</div>` : ""}<div id="journey-review-slot">${journeyReview(current[0])}</div>${current[3]()}<footer class="workspace-foot"><span>SEEDWISE &nbsp; / &nbsp; ${esc(fieldName())}</span><span>${t("NASA EARTH OBSERVATIONS · BANGLADESH FIELD RESEARCH", "নাসার পৃথিবী পর্যবেক্ষণ · বাংলাদেশের মাঠ গবেষণা")}</span></footer></main>${plantyPanel()}</div>`;
   if (current[0] === "seasons") mountSeasonCharts();
+  if (current[0] === "calendar") mountCalendar();
+  else disposeCalendar();
   mountJourney(current[0], navigate, () => pages.some(([id]) => id === "plan"));
   if (current[0] === "field") mountMap();
   if (current[0] === "planner") mountPlanner();
@@ -269,7 +279,7 @@ function render() {
   disposePlantyHub = mountPlanty(() => {
     const selected = getPlan() || getReadyPlan() || listPlans().find(item => item.status === 'ready') || null;
     const base = current[0] === 'planner' ? getPlannerPlantyContext() : { lang: state.lang, fieldId: state.fieldId, fieldName: fieldName(), month: state.month + 1 };
-    return { ...base, lang: state.lang, page: current[1], fieldName: fieldName(),
+    return { ...base, ...(current[0] === 'calendar' ? calendarPlantyContext : {}), lang: state.lang, page: current[1], fieldName: fieldName(),
       outlook: outlookSummaryLine(state.fieldId, outlook, state.lang), flood: floodSummaryLine(state.fieldId, floodFields, state.lang), plan: selected };
   });
   if (current[0] === "plans") mountPlans();
@@ -412,6 +422,15 @@ document.addEventListener("click", (event) => {
   waterAction(action, value);
   recoveryAction(action, value);
   researchAction(action, value);
+});
+let calendarPlantyContext = {};
+window.addEventListener('calendar:ask', event => {
+  calendarPlantyContext = { weekTasks: event.detail?.tasks?.map(task => task.title) || [], riskLines: event.detail?.risk ? [event.detail.risk] : [] };
+  document.querySelector('.planty-launch')?.click();
+});
+window.addEventListener('calendar:shifted', event => {
+  offerUndo(event.detail?.id);
+  requestReplay();
 });
 document.addEventListener("input", (event) => {
   const el = event.target;

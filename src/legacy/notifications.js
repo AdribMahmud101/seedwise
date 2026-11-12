@@ -4,6 +4,10 @@ export function notificationId(type, date, planId = '') {
   return `${type}:${date}:${planId || 'all'}`;
 }
 
+export function taskReminderId(date, planId, taskId) {
+  return notificationId('task', date, `${planId}:${taskId}`);
+}
+
 export function mergeNotifications(existing = [], incoming = []) {
   const byId = new Map(existing.map(item => [item.id, item]));
   for (const item of incoming) byId.set(item.id, { ...byId.get(item.id), ...item });
