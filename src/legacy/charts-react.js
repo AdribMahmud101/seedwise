@@ -37,7 +37,7 @@ export function mountBarChart(el, { data, selected }) {
       h(Tooltip, { key: "tip", content: (props) => h(ChartTooltip, { ...props, unit: "mm" }), cursor: { fill: "#edf1e9" } }),
       h(Bar, { key: "bar", dataKey: "total", name: "GPM IMERG", maxBarSize: 44, radius: [3, 3, 0, 0] }, [
         ...data.map((row) => h(Cell, { key: row.year, fill: row.year === selected ? "#244f3d" : "#9eafa3" })),
-        h(LabelList, { key: "labels", dataKey: "total", position: "top", formatter: (v) => v >= 1000 ? `${(v / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k` : Number(v).toLocaleString(), style: { fontSize: 11, fill: "#34483b" } }),
+        h(LabelList, { key: "labels", dataKey: "total", position: "top", formatter: (v) => Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 }), style: { fontSize: 11, fill: "#34483b" } }),
       ]),
     ]),
   ));
