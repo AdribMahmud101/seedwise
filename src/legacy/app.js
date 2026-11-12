@@ -137,7 +137,7 @@ function relativeTask(plan, today = new Date()) {
 }
 async function refreshNotifications() {
   const store = readNotificationState(), date = new Date().toISOString().slice(0, 10);
-  const entries = listPlans(), incoming = [], field = state.fieldId, name = fieldName(field);
+  const entries = listPlans(), incoming = [], field = state.fieldId, name = fieldName(); // fieldName takes a field object (defaults to the current field), not an id
   try {
     const response = await fetch(`/api/daily-brief?field=${encodeURIComponent(field)}`);
     if (response.ok) {
@@ -170,7 +170,9 @@ async function refreshNotifications() {
       store.cache[cacheKey] = item; incoming.push(item);
     } catch { /* offline/API failure means no item */ }
   }
-  store.cache.items = mergeNotifications(store.cache.items || [], incoming);
+  // Task items are recomputed every refresh: drop stale ones (e.g. "Make your first plan" once a plan exists).
+  const kept = (store.cache.items || []).filter(item => item.type !== 'task' || incoming.some(n => n.id === item.id));
+  store.cache.items = mergeNotifications(kept, incoming);
   writeNotificationState(store);
   renderNotifications();
 }
