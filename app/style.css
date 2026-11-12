@@ -4446,8 +4446,8 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 }
 
 .field-recommend .button.primary { isolation: isolate; color: #fffef2; background: #284f38; border-color: #284f38; box-shadow: 0 0 18px #72a84155; }
-.field-recommend .button.primary::before { content: ""; position: absolute; inset: -3px; z-index: -1; border-radius: inherit; background: conic-gradient(from var(--field-cta-angle, 0deg), #315c3d, #b7d84b, #315c3d); animation: field-cta-border 3s linear infinite; }
-.field-recommend .button.primary::after { inset: 0; border-radius: inherit; background: linear-gradient(105deg, transparent 30%, #ffffff70 48%, transparent 66%); transform: translateX(-130%); animation: field-cta-shimmer 4s ease-in-out infinite; }
+.field-recommend .button.primary::before { content: ""; position: absolute; inset: -3px; z-index: -1; border-radius: inherit; background: conic-gradient(from var(--field-cta-angle, 0deg), #315c3d, #4f7f43 25%, #9cc451 50%, #4f7f43 75%, #315c3d); animation: field-cta-border 7s linear infinite; }
+.field-recommend .button.primary::after { inset: 0; border-radius: inherit; background: linear-gradient(105deg, transparent 35%, #ffffff38 50%, transparent 65%) no-repeat; background-size: 250% 100%; background-position: 160% 0; box-shadow: none; animation: field-cta-shimmer 6s cubic-bezier(.45,0,.25,1) infinite; }
 .field-recommend .button.primary svg { animation: field-recommend-arrow 2.4s ease-in-out infinite; }
 .field-recommend .button.primary:hover,
 .field-recommend .button.primary:focus-visible { animation-play-state: paused; }
@@ -4458,7 +4458,7 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .field-recommend .button.primary:hover svg,
 .field-recommend .button.primary:focus-visible svg { animation-play-state: paused; }
 @keyframes field-cta-border { to { --field-cta-angle: 360deg; } }
-@keyframes field-cta-shimmer { 0%, 65%, 100% { transform: translateX(-130%); } 82% { transform: translateX(130%); } }
+@keyframes field-cta-shimmer { 0%, 55% { background-position: 160% 0; } 90%, 100% { background-position: -60% 0; } }
 @property --field-cta-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @media (prefers-reduced-motion: reduce) {
   .field-recommend .button.primary,
