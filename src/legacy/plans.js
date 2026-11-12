@@ -3,9 +3,10 @@ import {
   header, button, toast, repaint, download, promptModal,
 } from './ui.js';
 import {
-  listPlans, getSavedPlan, savePlan, openPlan, renamePlan,
-  duplicatePlan, deletePlan, migrateActivePlanOnce,
+  listPlans, getSavedPlan, openPlan, editReadyPlan, renamePlan,
+  duplicatePlan, deletePlan, migrateActivePlanOnce, recheckPlan,
 } from './journey.js';
+import { fieldContext, cropCategory } from './advisor.js';
 import { plantyMascot } from './planty.js';
 import { guide } from './planty-guide.js';
 import { buildExportHTML, cropGlyph, cropLabel } from './plan.js';
@@ -16,6 +17,14 @@ const CROP_BAR = {
   aman: '#35702b', rice: '#35702b', boro: '#2b5f70',
   mustard: '#6b7a2b', potato: '#33571f', mungbean: '#3d702f', fallow: '#b8ab93',
 };
+let deletingId = null;
+const rechecking = new Set();
+const recheckErrors = new Map();
+const verdictLabel = verdict => ({
+  recommended: t('Recommended', 'উপযুক্ত'),
+  possible_with_conditions: t('Possible with conditions', 'শর্তসাপেক্ষে সম্ভব'),
+  not_suitable: t('Not suitable here', 'এখানে উপযুক্ত নয়'),
+})[verdict] || t('Unknown', 'অজানা');
 
 function planMonths(season) {
   const months = [];
@@ -85,6 +94,8 @@ export function plans() {
     const isHighlighted = highlightedId === entry.id;
     const dateStr = (entry.updatedAt || '').slice(0, 10);
     const seasons = p.rotation?.seasons ?? [];
+    const custom = p.rotation?.customPlan;
+    const recheck = custom?.recheck;
     const names = state.lang === 'bn' ? MONTH_BN : MONTH_EN;
     const chips = seasons.map(season =>
       `<span class="plan-chip plan-chip--compact plan-crop-${esc(season.crop)}">${cropGlyph(season.crop)}<span><b>${esc(state.lang === 'bn' ? season.cropBn : cropLabel(season.crop, state.lang))}</b><small>${esc(names[season.sowMonth - 1])}–${esc(names[season.harvestMonth - 1])}${p.rotation.customPlan ? ` · ${num(p.planting[season.key].rowSpacingCm)} × ${num(p.planting[season.key].withinRowCm)} cm` : ''}</small></span></span>`).join('');
@@ -107,15 +118,20 @@ export function plans() {
         <div class="plan-card-calendar">
           ${miniSeasonCalendarSVG(seasons, { lang: state.lang, uid: `cal-${entry.id}` })}
         </div>
+        ${recheck ? `<div role="status"><p>${t('Re-checked', 'আবার যাচাই')} ${esc(recheck.checkedAt.slice(0, 10))} · ${esc(verdictLabel(custom.verdict))}</p><p class="note">${recheck.previousVerdict === custom.verdict ? t('Verdict unchanged', 'সিদ্ধান্ত অপরিবর্তিত') : `${t('Verdict changed', 'সিদ্ধান্ত পরিবর্তিত')}: ${esc(verdictLabel(recheck.previousVerdict))} → ${esc(verdictLabel(custom.verdict))}`}</p>${custom.summary ? `<p>${esc(custom.summary)}</p>` : ''}</div>` : ''}
+        ${custom?.needsRecheck ? `<p class="note">${t('Plan changed. Re-check with Planty before using the previous verdict.', 'পরিকল্পনা বদলেছে। আগের সিদ্ধান্ত ব্যবহারের আগে Planty দিয়ে আবার যাচাই করুন।')}</p>` : ''}
+        ${recheckErrors.has(entry.id) ? `<p role="alert">${esc(recheckErrors.get(entry.id))}</p>` : ''}
         <div class="plan-card-actions">
           <button type="button" class="button primary plan-open-btn ${isHighlighted ? 'journey-cta-pulse' : ''}" data-plans-action="open" data-plan-id="${esc(entry.id)}">
             ${isReady ? t('Open plan →', 'পরিকল্পনা দেখুন →') : t('Resume draft →', 'খসড়া চালু করুন →')}
           </button>
+          ${custom ? `<button type="button" class="button ghost" data-plans-action="edit" data-plan-id="${esc(entry.id)}">${t('Edit', 'সম্পাদনা')}</button><button type="button" class="button ghost" data-plans-action="recheck" data-plan-id="${esc(entry.id)}" ${rechecking.has(entry.id) ? 'disabled aria-busy="true"' : ''}>${rechecking.has(entry.id) ? t('Re-checking…', 'যাচাই চলছে…') : t('Re-check with Planty', 'Planty দিয়ে আবার যাচাই')}</button>` : ''}
           <button type="button" class="button ghost" data-plans-action="rename" data-plan-id="${esc(entry.id)}" title="${t('Rename', 'নাম বদলান')}">${t('Rename', 'নাম বদলান')}</button>
           <button type="button" class="button ghost" data-plans-action="duplicate" data-plan-id="${esc(entry.id)}" title="${t('Duplicate', 'অনুলিপি')}">${t('Duplicate', 'অনুলিপি')}</button>
           <button type="button" class="button ghost" data-plans-action="download" data-plan-id="${esc(entry.id)}" title="${t('Download', 'ডাউনলোড')}">${t('Download', 'ডাউনলোড')}</button>
           <button type="button" class="button ghost plan-delete-btn" data-plans-action="delete" data-plan-id="${esc(entry.id)}" style="color:#b0452b;" title="${t('Delete', 'মুছুন')}">${t('Delete', 'মুছুন')}</button>
         </div>
+        ${deletingId === entry.id ? `<div role="group" aria-label="${t('Confirm deletion', 'মুছে ফেলা নিশ্চিত করুন')}"><p>${t('Delete this plan?', 'এই পরিকল্পনা মুছবেন?')} ${esc(entry.name)}</p><button type="button" class="button" data-plans-action="delete-confirm" data-plan-id="${esc(entry.id)}">${t('Delete plan', 'পরিকল্পনা মুছুন')}</button> <button type="button" class="button ghost" data-plans-action="delete-cancel" data-plan-id="${esc(entry.id)}">${t('Cancel', 'বাতিল')}</button></div>` : ''}
       </article>
     `;
   }).join('');
@@ -138,14 +154,27 @@ export function mountPlans() {
   }
 }
 
-export function disposePlans() {}
+export function disposePlans() { deletingId = null; recheckErrors.clear(); }
 
 export function plansAction(action, value) {
-  if (action === 'open') {
+  try { return handlePlansAction(action, value); }
+  catch (error) {
+    console.warn('Plan action failed', error);
+    toast(t('Plan could not be saved. Please try again.', 'পরিকল্পনা সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'));
+  }
+}
+
+function handlePlansAction(action, value) {
+  if (action === 'open' || action === 'edit') {
     const entry = getSavedPlan(value);
     if (!entry) return;
     openPlan(value);
-    if (entry.status === 'ready') {
+    if (entry.plan.rotation?.customPlan) {
+      if (action === 'edit' && entry.status === 'ready') editReadyPlan();
+      const settings = Object.values(entry.plan.planting)[0];
+      Object.assign(state.planner, { usable: settings.usableAreaPct, usableSource: settings.usableSource });
+      location.hash = 'planner';
+    } else if (entry.status === 'ready') {
       location.hash = 'plan';
     } else {
       // Draft: resume at its next step
@@ -163,8 +192,10 @@ export function plansAction(action, value) {
       entry.name,
       (newName) => {
         if (newName && newName.trim()) {
-          renamePlan(value, newName.trim());
-          toast(t('Plan renamed', 'পরিকল্পনার নাম পরিবর্তিত হয়েছে'));
+          try {
+            renamePlan(value, newName.trim());
+            toast(t('Plan renamed', 'পরিকল্পনার নাম পরিবর্তিত হয়েছে'));
+          } catch { toast(t('Plan could not be renamed. Please try again.', 'নাম পরিবর্তন হয়নি। আবার চেষ্টা করুন।')); }
           repaint();
         }
       }
@@ -191,11 +222,37 @@ export function plansAction(action, value) {
   } else if (action === 'delete') {
     const entry = getSavedPlan(value);
     if (!entry) return;
-    const confirmed = confirm(t(`Are you sure you want to delete "${entry.name}"?`, `আপনি কি নিশ্চিত যে "${entry.name}" মুছে ফেলতে চান?`));
-    if (confirmed) {
+    deletingId = value;
+    repaint();
+  } else if (action === 'delete-cancel') {
+    deletingId = null;
+    repaint();
+  } else if (action === 'delete-confirm' && deletingId === value) {
       deletePlan(value);
+      deletingId = null;
       toast(t('Plan deleted', 'পরিকল্পনা মুছে ফেলা হয়েছে'));
       repaint();
-    }
+  } else if (action === 'recheck') {
+    return recheckSavedPlan(value);
+  }
+}
+
+async function recheckSavedPlan(id) {
+  const entry = getSavedPlan(id);
+  if (!entry?.plan.rotation?.customPlan || rechecking.has(id)) return;
+  rechecking.add(id);
+  recheckErrors.delete(id);
+  repaint();
+  try {
+    await recheckPlan(id, fieldContext(entry.plan.field.id, entry.plan.field), {
+      lang: state.lang, category: cropCategory(Object.values(entry.plan.planting).map(s => s.crop)),
+    });
+  } catch (error) {
+    recheckErrors.set(id, error.message === 'Plan changed during re-check'
+      ? t('Plan changed during re-check. Please check it again. The previous verdict was kept.', 'যাচাই চলাকালে পরিকল্পনা বদলেছে। আবার যাচাই করুন। আগের সিদ্ধান্ত রাখা হয়েছে।')
+      : t('Planty could not re-check. Check your internet connection and try again. The previous verdict was kept.', 'Planty আবার যাচাই করতে পারেনি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন। আগের সিদ্ধান্ত রাখা হয়েছে।'));
+  } finally {
+    rechecking.delete(id);
+    repaint();
   }
 }

@@ -1,6 +1,8 @@
 // "Plan your own crops" — AI decision helper card for the Rotation studio.
 // Calls /api/rotation-advisor (worker); the verdict is shown exactly as returned (no invented numbers).
-import { t, esc, field, area, state, outlook as outlookPack, floodFields, nasaBadge, agronomy } from './ui.js';
+import { t, esc, field, area, state, allFields, basePolygon, outlook as outlookPack, floodFields, nasaBadge, agronomy } from './ui.js';
+import { areaHa } from './engine.js';
+import { getPlan, getSavedPlan, confirmRotation, rotationSnapshot } from './journey.js';
 import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { plantyMascot } from './planty.js';
 import { recommendedSetupChanges } from './recommended-setup.js';
@@ -59,10 +61,12 @@ export function advisorRequest(context) {
   return { lang: state.lang === 'bn' ? 'bn' : 'en', mode, category, crops: ui.crops.slice(0, 2), notes: ui.notes.slice(0, 300), context };
 }
 
-function fieldContext() {
-  const f = field() || {};
-  const prof = { ...(state.profiles?.[state.fieldId] || {}) };
-  const ctx = { fieldId: f.id, fieldName: f.name, areaHa: Number(area()) || undefined, irrigation: prof.irrigation, budget: prof.budget };
+export function fieldContext(fieldId = state.fieldId, snapshot = null) {
+  const live = allFields().find(item => item.id === fieldId);
+  const f = live || snapshot || {};
+  const prof = state.profiles?.[fieldId] || (!live && snapshot?.constraints) || {};
+  const outline = state.boundaries?.[fieldId] || (live ? basePolygon(live) : snapshot?.outline);
+  const ctx = { fieldId: f.id, fieldName: f.name, areaHa: outline ? areaHa(outline) : undefined, irrigation: prof.irrigation, budget: prof.budget };
   try { ctx.outlook = outlookSummaryLine(f.id, outlookPack, 'en') || undefined; } catch { /* optional */ }
   try { ctx.flood = floodSummaryLine(f.id, floodFields, 'en') || undefined; } catch { /* optional */ }
   return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v !== undefined && v !== null && v !== ''));
@@ -369,9 +373,13 @@ function useInPlanner() {
   if (!r?.planting?.length || r.verdict === 'not_suitable') return;
   // Mode follows the auto-detected category (two crops together = mixed land split; one crop = whole field).
   const plan = { fieldId: state.fieldId, title: r.title, verdict: r.verdict, mode: ui.planMode || advisorRequest({}).mode, planting: r.planting.map((c) => ({ ...c, originalSpacingCm: [c.rowSpacingCm, c.withinRowCm] })), calendar: r.calendar, savedAt: new Date().toISOString() };
+  const active = getPlan();
+  const savedId = active?.rotation?.customPlan ? active.id : getCustomPlan()?.savedPlanId;
+  if (getSavedPlan(savedId)?.plan.field.id === state.fieldId) plan.savedPlanId = savedId;
   if (plan.mode !== 'rotation' && plan.planting.length === 2) plan.originalSharePct = plan.planting[0].sharePct;
   { const cs = distinctHexes(plan.planting.map((c) => c.color)); plan.planting = plan.planting.map((c, i) => ({ ...c, color: cs[i] })); } // every mode: chips/dots easy to scan
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(plan)); } catch { /* ignore */ }
+  if (active?.rotation?.customPlan && active.field.id === state.fieldId) confirmRotation(rotationSnapshot(plan, state.weights, agronomy));
   location.hash = '#planner';
 }
 // Pure: estimated plant count for one crop's share of the usable area.
