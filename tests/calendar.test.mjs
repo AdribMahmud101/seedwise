@@ -69,3 +69,12 @@ test('task reminder ids stay deterministic per plan task and day', () => {
   assert.equal(taskReminderId('2026-11-12', 'plan-a', 'sow-winter'), 'task:2026-11-12:plan-a:sow-winter');
   assert.notEqual(taskReminderId('2026-11-12', 'plan-a', 'sow-winter'), taskReminderId('2026-11-12', 'plan-a', 'soil-potato'));
 });
+
+import { matchCrop } from '../src/legacy/calendar.js';
+test('calendar matches plan crop names to agronomy ids', () => {
+  const list = [{ id: 'aman' }, { id: 'boro' }, { id: 'potato' }];
+  assert.equal(matchCrop(list, 'Aman rice')?.id, 'aman');
+  assert.equal(matchCrop(list, 'Boro rice')?.id, 'boro');
+  assert.equal(matchCrop(list, 'potato')?.id, 'potato');
+  assert.equal(matchCrop(list, 'Mango'), null);
+});

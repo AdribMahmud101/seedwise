@@ -11,6 +11,12 @@ const dateKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padSt
 const addDays = (date, days) => new Date(date.getFullYear(), date.getMonth(), date.getDate()+days);
 function riskMonth(){const signal=riskOn&&brief&&riskStatus(brief).signals.find(item=>item.id==='dry'||item.id==='rain');if(!signal?.month)return 0;const value=String(signal.month),iso=Number(value.slice(-2));return iso>=1&&iso<=12?iso:MONTHS.findIndex(month=>month.slice(0,3).toLowerCase()===value.slice(0,3).toLowerCase())+1}
 
+// Plans name crops freely ("Aman rice", "Boro rice"); agronomy uses ids ("aman"). Match by id, then by whole word in the name.
+export function matchCrop(list, ...names) {
+  const wanted = names.filter(Boolean).map(n => String(n).toLowerCase());
+  return list.find(c => wanted.includes(c.id)) || list.find(c => wanted.some(n => new RegExp(`\\b${c.id}\\b`).test(n))) || null;
+}
+
 export function calendarTasks(plan, year = cursor.getFullYear()) {
   if (!plan?.rotation?.seasons) return [];
   return plan.rotation.seasons.filter(s => s.crop !== 'fallow').map(season => {
@@ -23,7 +29,7 @@ export function calendarTasks(plan, year = cursor.getFullYear()) {
 
 export function deriveSeasonBands(plan, year, agronomyData = crops()) {
   return (plan?.rotation?.seasons || []).filter(season => season.crop !== 'fallow').flatMap(season => {
-    const crop = agronomyData.find(item => item.id === season.crop || item.id === plan.planting?.[season.key]?.crop);
+    const crop = matchCrop(agronomyData, season.crop, plan.planting?.[season.key]?.crop);
     const hasDuration = Array.isArray(crop?.durationDays) && crop.durationDays.length === 2;
     const years = season.sowDate ? [year] : [year - 1, year];
     return years.flatMap(sowYear => {
@@ -47,7 +53,7 @@ export function deriveSeasonBands(plan, year, agronomyData = crops()) {
 function cropColor(plan, season) {
   const palette = { aman:'#6f9c55', boro:'#4386a8', rice:'#4386a8', mustard:'#d3a332', potato:'#a87545', mungbean:'#62a982' };
   const custom = plan.rotation?.customPlan?.planting?.find(item => item.crop?.toLowerCase() === season.crop?.toLowerCase());
-  return plan.planting?.[season.key]?.color || custom?.color || palette[season.crop] || '#798c60';
+  return plan.planting?.[season.key]?.color || custom?.color || palette[matchCrop(crops(), season.crop)?.id] || palette[season.crop] || '#798c60';
 }
 
 export function validateSowDate(plan, seasonKey, value, agronomyData = crops()) {
@@ -58,7 +64,7 @@ export function validateSowDate(plan, seasonKey, value, agronomyData = crops()) 
   const month = date.getMonth() + 1;
   const monthDistance = Math.min((month - season.sowMonth + 12) % 12, (season.sowMonth - month + 12) % 12);
   if (monthDistance > 1) throw new RangeError('Sow date is more than one month outside the planned sowing month');
-  const crop = agronomyData.find(item => item.id === season.crop || item.id === plan.planting?.[seasonKey]?.crop);
+  const crop = matchCrop(agronomyData, season.crop, plan.planting?.[seasonKey]?.crop);
   const maxDays = Number(crop?.durationDays?.[1]);
   const harvest = Number.isFinite(maxDays) ? addDays(date, maxDays) : new Date(date.getFullYear() + (season.harvestMonth < date.getMonth() + 1 ? 1 : 0), season.harvestMonth, 0);
   const next = seasons.slice(index + 1).find(item => item.crop !== 'fallow') || seasons.slice(0, index).find(item => item.crop !== 'fallow');
@@ -87,7 +93,7 @@ export function shiftSowDate(plan, seasonKey, value, agronomyData = crops()) {
   const date = new Date(`${value}T00:00:00`);
   const season = plan?.rotation?.seasons?.find(item => item.key === seasonKey);
   if (!season) throw new RangeError('Unknown season');
-  const crop = agronomyData.find(item => item.id === season.crop || item.id === plan.planting?.[seasonKey]?.crop);
+  const crop = matchCrop(agronomyData, season.crop, plan.planting?.[seasonKey]?.crop);
   const next = structuredClone(plan);
   const target = next.rotation.seasons.find(item => item.key === seasonKey);
   const duration=Math.max(1, Math.ceil((Number(crop?.durationDays?.[1]) || ((season.harvestMonth-season.sowMonth+12)%12+1)*30)/30));
@@ -146,7 +152,7 @@ function drawer(plan) {
   if(!selectedDay&&!selectedTaskId)return '';
   const tasks=selectedTaskId?calendarTasks(plan,cursor.getFullYear()).filter(item=>item.id===selectedTaskId):eventsFor(plan,new Date(`${selectedDay}T00:00:00`),new Date(`${selectedDay}T23:59:59`));
   const task=tasks[0], season=task?.season;
-  const crop=crops().find(item=>item.id===season?.crop||item.id===task?.planting.crop);
+  const crop=matchCrop(crops(), season?.crop, task?.planting?.crop);
   const sources=(agronomy?.sources||[]).filter(source=>crop?.sourceIds?.includes(source.id));
   const band=season?deriveSeasonBands(plan,Number(selectedDay?.slice(0,4)||cursor.getFullYear())).find(item=>item.date===(selectedDay||item.start)&&item.season.key===season.key):null;
   const dayNumber=band&&season?Math.max(1,Math.floor((new Date(`${selectedDay||band.date}T00:00:00`)-new Date(`${band.start}T00:00:00`))/86400000)+1):null;
