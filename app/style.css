@@ -4284,7 +4284,7 @@ button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-hei
 .main[data-page="planner"] .planner-compact-head .page-head-actions { gap: 6px; }
 .main[data-page="planner"] .planner-compact-head .page-head-actions .button { min-height: 36px; padding: 6px 10px; }
 .main[data-page="planner"] .planner-compact-head > p { flex-basis: 100%; margin: 0; font-size: 12px; }
-.main[data-page="planner"] .adv-plan-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 10px; padding: 10px 16px; border-left-width: 4px; }
+.main[data-page="planner"] .adv-plan-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin: 14px 0 14px; padding: 10px 16px; border-left-width: 4px; }
 .main[data-page="planner"] .adv-plan-head { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; gap: 12px; }
 .main[data-page="planner"] .adv-verdict { flex: none; border-radius: 999px; padding: 3px 8px; background: var(--adv); color: white; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .main[data-page="planner"] .adv-plan-head h2 { margin: 0; font-size: 14px; line-height: 1.25; }
