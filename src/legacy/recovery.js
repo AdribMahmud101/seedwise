@@ -272,8 +272,8 @@ function nextCta(a) {
     );
   if (a.phase === "inspect")
     return goButton(
-      t("Log a field observation", "মাঠের তথ্য লিখুন"),
-      "research",
+      t("Check crop damage in Crop clinic", "ফসল ক্লিনিকে ক্ষতি দেখুন"),
+      "clinic",
       "primary",
     );
   const rel = relevantContact();
