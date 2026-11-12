@@ -1,0 +1,84 @@
+/* PLANGEN: generative plan-report pipeline. Mobile first (412px), then wide. */
+.plg { overflow: hidden; }
+.plg-head { display: flex; gap: 12px; align-items: center; }
+.plg-head > div { flex: 1; min-width: 0; }
+.plg-head h2 { margin: 2px 0 0; font-size: 19px; }
+.plg-planty .planty-mascot { width: 52px; height: 52px; }
+.plg[data-done="1"] .plg-planty .planty-mascot { animation: none; }
+.plg-head .plg-planty .planty-mascot { animation: plg-bob 2.2s ease-in-out infinite; }
+@keyframes plg-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.plg-skip { flex: none; }
+
+.plg-steps { list-style: none; margin: 14px 0 0; padding: 0; position: relative; }
+.plg-steps::before { content: ""; position: absolute; left: 11px; top: 14px; bottom: 14px; width: 2px; background: var(--line); border-radius: 2px; }
+.plg-step { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; position: relative; }
+.plg-step[hidden] { display: none; }
+.plg-mark { flex: none; width: 24px; height: 24px; margin-top: 1px; position: relative; z-index: 1; display: grid; place-items: center; background: var(--surface); border-radius: 50%; }
+.plg-dotbox { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); }
+.plg-step[data-state="busy"] .plg-dotbox { border-color: var(--blue); border-top-color: transparent; animation: plg-spin .8s linear infinite; }
+.plg-step[data-state="done"] .plg-dotbox { border-color: #2f7a3d; background: #2f7a3d; position: relative; }
+.plg-step[data-state="done"] .plg-dotbox::after { content: ""; position: absolute; left: 2.5px; top: 0.5px; width: 3px; height: 6px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(42deg); }
+@keyframes plg-spin { to { transform: rotate(360deg); } }
+
+.plg-art { flex: none; width: 34px; height: 34px; display: grid; place-items: center; color: var(--green); background: #eef3e4; border: 1px solid var(--line); border-radius: 10px; }
+.plg-step[data-state="idle"] .plg-art { opacity: .45; }
+.plg-step[data-state="done"] .plg-art { color: #2f7a3d; }
+.plg-art-svg { display: block; }
+.plg-step[data-state="busy"] .plg-orbit { transform-origin: 15px 15px; animation: plg-spin 2.4s linear infinite; }
+.plg-step[data-state="busy"] .plg-sweep { transform-origin: 15px 15px; animation: plg-spin 1.6s linear infinite; }
+.plg-step[data-state="busy"] .plg-blip { animation: plg-blink 1.2s ease-in-out infinite; }
+@keyframes plg-blink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+.plg-step[data-state="busy"] .plg-ripple { transform-origin: 15px 17px; animation: plg-grow 1.8s ease-out infinite; }
+.plg-step[data-state="busy"] .plg-ripple.r2 { animation-delay: .9s; }
+@keyframes plg-grow { 0% { transform: scale(.55); opacity: .9; } 100% { transform: scale(1.15); opacity: 0; } }
+.plg-step[data-state="busy"] .plg-leaf { transform-origin: 15px 20px; animation: plg-sway 2s ease-in-out infinite; }
+.plg-step[data-state="busy"] .plg-leaf.r { animation-delay: .5s; }
+@keyframes plg-sway { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(7deg); } }
+.plg-step[data-state="busy"] .plg-dot { animation: plg-blink 1.1s ease-in-out infinite; }
+.plg-step[data-state="busy"] .plg-dot.d2 { animation-delay: .2s; }
+.plg-step[data-state="busy"] .plg-dot.d3 { animation-delay: .4s; }
+.plg-step[data-state="busy"] .plg-sun { transform-origin: 12px 12px; animation: plg-spin 6s linear infinite; }
+
+.plg-body { flex: 1; min-width: 0; }
+.plg-title { font-weight: 650; font-size: 14.5px; }
+.plg-step[data-state="idle"] .plg-title { color: var(--muted); font-weight: 500; }
+.plg-status { font-size: 13.5px; color: var(--muted); margin-top: 2px; }
+.plg-step[data-state="done"] .plg-status { color: var(--ink); }
+.plg-result code { font-family: ui-monospace, monospace; font-size: 12px; background: #eef3e4; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin: 1px 2px 1px 0; display: inline-block; }
+.plg-link { display: inline-block; margin-top: 4px; font-size: 13px; }
+.plg-list { margin: 4px 0 2px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.plg-list li { font-size: 13.5px; }
+.plg-evidence { font-size: 11.5px; background: #eef3e4; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+
+.plg-skeleton span { display: block; height: 12px; border-radius: 6px; margin: 5px 0; max-width: 280px; background: linear-gradient(90deg, #e3e8da 25%, #f4f7ee 50%, #e3e8da 75%); background-size: 200% 100%; animation: plg-shimmer 1.3s ease-in-out infinite; }
+.plg-skeleton .short { width: 55%; }
+@keyframes plg-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.plg-spin { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--blue); border-top-color: transparent; border-radius: 50%; animation: plg-spin .8s linear infinite; vertical-align: -2px; }
+.plg-elapsed { font-variant-numeric: tabular-nums; color: var(--muted); }
+.plg-progress { display: block; height: 5px; border-radius: 3px; background: #e3e8da; overflow: hidden; margin-top: 6px; max-width: 320px; }
+.plg-progress i { display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--blue); animation: plg-slide 1.4s ease-in-out infinite; }
+@keyframes plg-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(280%); } }
+
+/* Report reveal: skeleton blocks fade into real sections. */
+.plg-hidden { display: none; }
+.plg-report.plg-reveal > section { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .5s ease; }
+.plg-report.plg-reveal > section.on { opacity: 1; transform: none; }
+.plg-word { opacity: 0; transition: opacity .18s ease; }
+.plg-word.on { opacity: 1; }
+
+@media (min-width: 900px) {
+  .plg-head h2 { font-size: 22px; }
+  .plg-planty .planty-mascot { width: 64px; height: 64px; }
+  .plg-steps { max-width: 640px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plg-head .plg-planty .planty-mascot, .plg-step[data-state="busy"] .plg-dotbox,
+  .plg-step[data-state="busy"] .plg-orbit, .plg-step[data-state="busy"] .plg-sweep,
+  .plg-step[data-state="busy"] .plg-blip, .plg-step[data-state="busy"] .plg-ripple,
+  .plg-step[data-state="busy"] .plg-leaf, .plg-step[data-state="busy"] .plg-dot,
+  .plg-step[data-state="busy"] .plg-sun, .plg-spin, .plg-progress i { animation: none; }
+  .plg-skeleton span { animation: none; }
+  .plg-report.plg-reveal > section { opacity: 1; transform: none; transition: none; }
+  .plg-word { opacity: 1; transition: none; }
+}

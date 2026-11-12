@@ -1,7 +1,7 @@
 import {
   state, earth, agronomy, allFields, polygon, t, esc, num,
   nasaBadge, truth, header, panel, tag, button, toast, repaint, download,
-  outlook as outlookPack, floodFields,
+  outlook as outlookPack, floodFields, smap as smapPack, graceGroundwater as gracePack,
 } from './ui.js';
 import { monthlyRotationWater, CROP_KC } from './engine.js';
 import { outlookPlanHint, outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
@@ -11,6 +11,9 @@ import { guide } from './planty-guide.js';
 import { setPlannerSeason } from './planner.js';
 import { netInputsFor, isNetEdited } from './fields.js';
 import { recommendedSettings } from './planner-controls.js';
+import {
+  pipelineShell, pipelineRunner, shouldPlayPipeline, markPipelineSeen, requestReplay,
+} from './plan-pipeline.js';
 
 const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_BN = ['জানু', 'ফেব্রু', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে'];
@@ -510,13 +513,19 @@ export function plan() {
   if (!current?.field || !current?.rotation) return emptyPlan();
   const planted = current.rotation.seasons.filter(season => season.crop !== 'fallow');
   if (!planted.some(season => season.key === active3dKey)) active3dKey = planted[0]?.key ?? null;
-  const backLink = `<div class="plan-back-bar"><a class="button ghost plan-back-link" href="#plans">← ${t('My plans', 'আমার পরিকল্পনা')}</a>${!getPlan() ? `<button type="button" class="button primary" data-action="plan-edit">${t('Edit this plan', 'এই পরিকল্পনা বদলান')}</button>` : ''}</div>`;
-  return `<div class="plan-page">${backLink}` + header(
+  const backLink = `<div class="plan-back-bar"><a class="button ghost plan-back-link" href="#plans">← ${t('My plans', 'আমার পরিকল্পনা')}</a><button type="button" class="button ghost" data-action="plan-regenerate">↻ ${t('Regenerate report', 'প্রতিবেদন আবার বানান')}</button>${!getPlan() ? `<button type="button" class="button primary" data-action="plan-edit">${t('Edit this plan', 'এই পরিকল্পনা বদলান')}</button>` : ''}</div>`;
+  const report = heroCard(current) + calendarCard(current) + field3dCard(current, active3dKey) +
+    numbersCard(current) + checklistCard(current) + summaryCard() + (getPlan() ? editCard(current) : '') + exportCard();
+  // First open of a plan plays the generative Planty pipeline; later opens show the report directly.
+  const play = shouldPlayPipeline(current);
+  const head = header(
     t('Your plan  /  04', 'আপনার পরিকল্পনা  /  ০৪'),
     t('Your plan', 'আপনার পরিকল্পনা'),
     t('Your finished season plan — numbers, steps, and file.', 'আপনার চূড়ান্ত পরিকল্পনা — সংখ্যা, ধাপ ও ফাইল।'),
-  ) + heroCard(current) + calendarCard(current) + field3dCard(current, active3dKey) +
-    numbersCard(current) + checklistCard(current) + summaryCard() + (getPlan() ? editCard(current) : '') + exportCard() + `</div>`;
+  );
+  if (!play) return `<div class="plan-page">${backLink}` + head + report + `</div>`;
+  return `<div class="plan-page">${backLink}` + head + pipelineShell(current, state.lang) +
+    `<div class="plg-report plg-hidden plg-reveal">${report}</div></div>`;
 }
 
 export async function fetchPlanSummary(plan, lang) {
@@ -625,6 +634,8 @@ function schedulePlan3d() {
 export function disposePlan() {
   ++planVersion;
   ++summaryRequest;
+  ++pipelineToken;
+  activeRunner = null;
   clearTimeout(planTimer);
   planTimer = null;
   planHost = null;
@@ -648,17 +659,11 @@ function maybeCelebrate(current) {
   }, 3100);
 }
 
-export function mountPlan() {
-  const current = displayPlan();
-  if (!current?.field || !current?.rotation) return;
-  try {
-    const statuses = stepStatus();
-    if (getPlan() && statuses.plan !== 'done' && statuses.field === 'done' && statuses.rotation === 'done' && statuses.planting === 'done') {
-      markPlanGenerated({});
-    }
-  } catch (error) {
-    console.warn('Plan could not be marked ready', error);
-  }
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+let activeRunner = null;
+let pipelineToken = 0;
+
+function mountPlanBody(current) {
   tweenCounts(document.querySelector('.plan-page') ?? document);
   const host = document.querySelector('#plan-model')?.parentElement;
   if (host) {
@@ -677,8 +682,116 @@ export function mountPlan() {
   if (getPlan()) maybeCelebrate(current);
 }
 
+// AI summary streams word by word after the pipeline; instant when reduced motion.
+function streamSummary(body, text, request) {
+  if (reducedMotion()) {
+    body.innerHTML = `<p>${esc(text)}</p>`;
+    return;
+  }
+  const words = text.split(/\s+/).filter(Boolean);
+  body.innerHTML = `<p>${words.map(word => `<span class="plg-word">${esc(word)}</span>`).join(' ')}</p>`;
+  const nodes = [...body.querySelectorAll('.plg-word')];
+  let i = 0;
+  const step = () => {
+    if (request !== summaryRequest || !body.isConnected) return;
+    nodes.slice(i, i + 4).forEach(node => node.classList.add('on'));
+    i += 4;
+    if (i < nodes.length) setTimeout(step, 45);
+  };
+  step();
+}
+
+function revealReport() {
+  const report = document.querySelector('.plg-report');
+  if (!report) return;
+  report.classList.remove('plg-hidden');
+  const sections = [...report.children];
+  if (reducedMotion()) {
+    sections.forEach(section => section.classList.add('on'));
+    return;
+  }
+  sections.forEach((section, i) => setTimeout(() => {
+    if (section.isConnected) {
+      section.classList.add('on');
+      if (i === sections.length - 1) section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 200 * i));
+}
+
+function finishPipeline(pipeline, current, summaryPromise) {
+  pipeline.dataset.done = '1';
+  pipeline.querySelector('.plg-skip')?.remove();
+  const heading = pipeline.querySelector('.plg-head h2');
+  if (heading) heading.textContent = t('Report ready ✓', 'প্রতিবেদন তৈরি ✓');
+  const mascot = pipeline.querySelector('.plg-planty');
+  if (mascot) mascot.innerHTML = plantyMascot('happy');
+  revealReport();
+  tweenCounts(document.querySelector('.plan-page') ?? document);
+  const host = document.querySelector('#plan-model')?.parentElement;
+  if (host) {
+    planHost = host;
+    schedulePlan3d();
+  }
+  const body = document.querySelector('#plan-summary-body');
+  if (body) {
+    const request = ++summaryRequest;
+    const fresh = displayPlan();
+    summaryPromise.then(
+      summary => { if (request === summaryRequest && body.isConnected) streamSummary(body, summary, request); },
+      () => { if (request === summaryRequest && body.isConnected) body.innerHTML = `<p>${esc(fallbackSummary(fresh, state.lang))}</p><p class="note">${esc(t('Offline note — AI unavailable', 'অফলাইন নোট — এআই নেই'))}</p>`; },
+    );
+  }
+  if (getPlan()) maybeCelebrate(current);
+}
+
+function mountPipeline(current) {
+  const pipeline = document.querySelector('#plan-pipeline');
+  if (!pipeline) return false;
+  markPipelineSeen(current.id);
+  if (reducedMotion()) {
+    // No animation: show the report directly.
+    pipeline.remove();
+    const report = document.querySelector('.plg-report');
+    report?.classList.remove('plg-hidden');
+    report?.querySelectorAll(':scope > section').forEach(section => section.classList.add('on'));
+    return false;
+  }
+  const token = ++pipelineToken;
+  const summaryPromise = fetchPlanSummary(displayPlan(), state.lang);
+  const packs = {
+    monthly: planMonthly(current), outlook: outlookPack, flood: floodFields,
+    smap: smapPack, grace: gracePack, earth,
+  };
+  activeRunner = pipelineRunner(current, packs, state.lang);
+  activeRunner.run(() => {
+    activeRunner = null;
+    if (token === pipelineToken && pipeline.isConnected) finishPipeline(pipeline, current, summaryPromise);
+  });
+  return true;
+}
+
+export function mountPlan() {
+  const current = displayPlan();
+  if (!current?.field || !current?.rotation) return;
+  try {
+    const statuses = stepStatus();
+    if (getPlan() && statuses.plan !== 'done' && statuses.field === 'done' && statuses.rotation === 'done' && statuses.planting === 'done') {
+      markPlanGenerated({});
+    }
+  } catch (error) {
+    console.warn('Plan could not be marked ready', error);
+  }
+  if (mountPipeline(current)) return;
+  mountPlanBody(current);
+}
+
 export function planAction(action, value) {
-  if (action === 'plan-edit') {
+  if (action === 'plan-pipeline-skip') {
+    activeRunner?.skip();
+  } else if (action === 'plan-regenerate') {
+    requestReplay();
+    repaint();
+  } else if (action === 'plan-edit') {
     if (editReadyPlan()) location.hash = 'planner';
   } else if (action === 'plan-season3d') {
     const current = displayPlan();
