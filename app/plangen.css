@@ -61,7 +61,7 @@
 
 /* Report reveal: skeleton blocks fade into real sections. */
 .plg-hidden { display: none; }
-.plg-report.plg-reveal > section { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .5s ease; }
+.plg-report.plg-reveal > section { opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease; }
 .plg-report.plg-reveal > section.on { opacity: 1; transform: none; }
 .plg-word { opacity: 0; transition: opacity .18s ease; }
 .plg-word.on { opacity: 1; }
