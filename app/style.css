@@ -4227,6 +4227,59 @@ label.plan-import { cursor: pointer; }
 button.adv-plan-crop { font: inherit; text-align: left; cursor: pointer; min-height: 44px; }
 .adv-plan-crop.on { border-color: #24392c; box-shadow: 0 0 0 2px #24392c inset; }
 
+/* Compact planner first screen and pinned save action. */
+.main[data-page="planner"] .planner-compact-head { align-items: center; gap: 8px 16px; margin: 0 0 8px; flex-wrap: wrap; }
+.main[data-page="planner"] .planner-head-line { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.main[data-page="planner"] .planner-compact-head h1 { flex: none; margin: 0; font-size: 20px; line-height: 1.2; }
+.main[data-page="planner"] .planner-head-line .field-selector { min-width: 0; margin: 0; gap: 5px; }
+.main[data-page="planner"] .planner-head-line .field-chip { min-height: 34px; padding: 5px 9px; font-size: 12px; }
+.main[data-page="planner"] .planner-head-line .chip-delete-btn { min-height: 34px; min-width: 34px; }
+.main[data-page="planner"] .planner-compact-head .page-head-actions { gap: 6px; }
+.main[data-page="planner"] .planner-compact-head .page-head-actions .button { min-height: 36px; padding: 6px 10px; }
+.main[data-page="planner"] .planner-compact-head > p { flex-basis: 100%; margin: 0; font-size: 12px; }
+.main[data-page="planner"] .adv-plan-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; margin: 0 0 8px; padding: 6px 10px; border-left-width: 4px; }
+.main[data-page="planner"] .adv-plan-head { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; gap: 8px; }
+.main[data-page="planner"] .adv-verdict { flex: none; border-radius: 999px; padding: 3px 8px; background: var(--adv); color: white; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.main[data-page="planner"] .adv-plan-head h2 { margin: 0; font-size: 14px; line-height: 1.25; }
+.main[data-page="planner"] .adv-plan-head > .button { margin-left: auto; flex: none; min-height: 28px; height: 28px; padding: 2px 8px; }
+.main[data-page="planner"] .adv-plan-crops { flex: 0 1 auto; gap: 5px; margin: 0; }
+.main[data-page="planner"] .adv-plan-crop { gap: 5px; min-height: 30px; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.main[data-page="planner"] button.adv-plan-crop { min-height: 28px; }
+.main[data-page="planner"] .adv-plan-crop i { width: 8px; height: 8px; }
+.main[data-page="planner"] .adv-plan-crop strong, .main[data-page="planner"] .adv-plan-crop small { display: inline; font-size: 11px; }
+.main[data-page="planner"] .adv-plan-details { flex: 0 0 auto; font-size: 11px; }
+.main[data-page="planner"] .adv-plan-details[open] { flex-basis: 100%; }
+.main[data-page="planner"] .adv-plan-details summary { cursor: pointer; color: var(--muted); }
+.main[data-page="planner"] .adv-plan-details ul { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 5px 0; padding-left: 18px; }
+.main[data-page="planner"] .adv-plan-details p { margin: 5px 0 0; }
+.main[data-page="planner"] .plan-save-footer { position: sticky; bottom: 0; z-index: 2; margin-top: auto; padding: 8px 0 0; background: var(--surface); border-top: 1px solid var(--line); }
+.main[data-page="planner"] .plan-save-footer .button { width: 100%; }
+@media (min-width: 1024px) {
+  .main[data-page="planner"] { padding-top: 6px; }
+  .main[data-page="planner"] .planner-compact-head { margin-bottom: 0; }
+  .main[data-page="planner"] .planner-compact-head > p { display: none; }
+  .main[data-page="planner"] .planner-head-line .field-chip { min-height: 30px; }
+  .main[data-page="planner"] .planner-compact-head .page-head-actions .button { min-height: 32px; }
+  .main[data-page="planner"] #plant-controls { display: flex; flex: 1; flex-direction: column; min-height: 100%; }
+  .main[data-page="planner"] #plan-seasons:empty { display: none; }
+  .main[data-page="planner"] .planner3d-panel > .panel-header:not(#studio-3d-host *) { min-height: 30px; padding: 2px 10px; }
+  .main[data-page="planner"] .planner3d-panel > .panel-header h2:not(#studio-3d-host *) { font-size: 14px; }
+  .main[data-page="planner"] .planner3d-toolbar { padding: 2px 6px; }
+}
+@media (min-width: 1100px) {
+  .main[data-page="planner"] .planner3d-toolbar .cs-wy-note { display: none; }
+}
+@media (max-width: 700px) {
+  .main[data-page="planner"] .planner-compact-head { align-items: stretch; gap: 6px; }
+  .main[data-page="planner"] .planner-head-line { flex-wrap: wrap; gap: 6px; }
+  .main[data-page="planner"] .planner-head-line .field-selector { flex-basis: 100%; }
+  .main[data-page="planner"] .planner-compact-head .page-head-actions { width: auto; }
+  .main[data-page="planner"] .planner-compact-head .page-head-actions .button { width: auto; }
+  .main[data-page="planner"] .adv-plan-head { flex-wrap: wrap; }
+  .main[data-page="planner"] .adv-plan-crops { flex-basis: 100%; flex-wrap: wrap; }
+  .main[data-page="planner"] .adv-plan-head .button { margin-left: auto; }
+}
+
 /* Custom plan settings panel */
 .cs-panel .cs-change { margin-left: 6px; font-weight: 600; }
 .cs-recommend { margin: 0 0 12px; }
