@@ -2762,9 +2762,15 @@ function studioFreeRegion() {
     .map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0);
   const bottom = Math.min(h - 16, ...cards.map((r) => r.top - rect.top - 16));
   const top = Math.max(overlayBottom, controlsBottom) + 16;
-  return { region: {
-    left: 16 / w, right: (w - 16) / w, top: top / h, bottom: Math.max(top + 40, bottom) / h,
-  } };
+  const below = { left: 16 / w, right: (w - 16) / w, top: top / h, bottom: Math.max(top + 40, bottom) / h };
+  // The left overlay stack and colour key sit in a left column. Treating them as a
+  // full-width top/bottom band left a thin strip, so the block shrank whenever a
+  // layer switch resized the legend. Use the open area to their right when larger.
+  const leftEdge = Math.max(overlay ? overlay.right - rect.left : 0, ...cards.map((r) => r.right - rect.left)) + 16;
+  const rightEdge = (controls?.left ? controls.left - rect.left : w) - 12;
+  const beside = { left: leftEdge / w, right: rightEdge / w, top: 16 / h, bottom: (h - 16) / h };
+  const area = (r) => Math.max(0, r.right - r.left) * Math.max(0, r.bottom - r.top);
+  return { region: area(beside) > area(below) ? beside : below };
 }
 
 function fitPerspective(data, close = false) {
