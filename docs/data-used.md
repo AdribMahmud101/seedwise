@@ -8,7 +8,7 @@ Every dataset below is used in the live app or in our model training. The list i
 
 | Dataset name | Link | How you used it |
 |---|---|---|
-| NASA POWER (MERRA-2 based, daily + monthly API) | https://power.larc.nasa.gov/docs/services/api/temporal/daily/ | Weather per field, 1981–2025; trained fine-tuned model 1 (Chronos-Bolt forecaster). |
+| NASA POWER (MERRA-2 based, daily + monthly API) | https://power.larc.nasa.gov/docs/services/api/temporal/daily/ | Weather per field, 1981–now (last 10 days on Weather page); trained fine-tuned model 1. |
 | NASA POWER soil wetness (GWETTOP / GWETROOT) | https://power.larc.nasa.gov/docs/services/api/temporal/daily/ | Soil wetness history and forecast; powers the dry-soil alert. |
 | FAO-56 reference evapotranspiration from NASA POWER | https://power.larc.nasa.gov/ | Crop water demand for water scores and plans. |
 | NASA GPM IMERG (0.1° precipitation) | https://gpm.nasa.gov/data/imerg | Monthly rainfall 2021–2025 per field in Past seasons. |
@@ -45,6 +45,7 @@ Every dataset below is used in the live app or in our model training. The list i
 | Esri World Imagery Wayback (Maxar, 28 Nov 2022 release) | https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9 | High-detail photo map for drawing fields (credited). |
 | OpenStreetMap (via Overpass API) | https://www.openstreetmap.org/copyright | Roads, rivers and place names, offline. |
 | geoBoundaries gbOpen BGD ADM2/ADM3 | https://www.geoboundaries.org/ | District and upazila boundaries. |
+| Open-Meteo forecast API (CC BY 4.0) | https://open-meteo.com/ | Live 7-day and hourly forecast on the Weather page. |
 
 ### Agriculture and crop research
 

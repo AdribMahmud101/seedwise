@@ -77,6 +77,7 @@ import {
 import { deriveChecklist } from './plan.js';
 import { outlookSummaryLine, floodSummaryLine } from './outlook-flood.js';
 import { calendar, mountCalendar, disposeCalendar } from './calendar.js';
+import { weather, mountWeather } from './weather.js';
 
 const pages = [
   ["field", "My field", "আমার জমি", home],
@@ -84,6 +85,7 @@ const pages = [
   ["planner", "Planting planner", "বপনের পরিকল্পনা", planner],
   ["plans", "My plans", "আমার পরিকল্পনা", plans],
   ["calendar", "Calendar", "ক্যালেন্ডার", calendar],
+  ["weather", "Weather", "আবহাওয়া", weather],
   ["seasons", "Past seasons", "পুরনো মৌসুম", seasonView],
   ["water", "Water & resilience", "পানি ও সহনশীলতা", water],
   ["recovery", "Disaster recovery", "দুর্যোগের পর করণীয়", recovery],
@@ -274,6 +276,7 @@ function render() {
   else disposeCalendar();
   mountJourney(current[0], navigate, () => pages.some(([id]) => id === "plan"));
   if (current[0] === "field") mountMap();
+  if (current[0] === "weather") mountWeather();
   if (current[0] === "planner") mountPlanner();
   else disposePlanner();
   disposePlantyHub = mountPlanty(() => {

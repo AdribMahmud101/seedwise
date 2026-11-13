@@ -1,0 +1,76 @@
+/* Weather page: hero, hourly strip, 7-day ranges, farm tips, NASA observed bars. */
+.wx-hero { position: relative; margin: 18px 0; padding: 24px; border-radius: 8px; color: #f3f6ea; background: linear-gradient(135deg, #233d2b 0%, #2f6946 100%); overflow: hidden; }
+.wx-hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle, rgba(217,233,166,.28), transparent 70%); pointer-events: none; }
+.wx-hero.wx-bg-rain, .wx-hero.wx-bg-showers, .wx-hero.wx-bg-drizzle { background: linear-gradient(135deg, #22343a 0%, #3f6b78 100%); }
+.wx-hero.wx-bg-storm { background: linear-gradient(135deg, #1e2a2c 0%, #46543f 100%); }
+.wx-hero.wx-bg-cloudy, .wx-hero.wx-bg-fog { background: linear-gradient(135deg, #2c3a31 0%, #5d6d58 100%); }
+.wx-loading { min-height: 160px; display: grid; place-items: center; opacity: .85; }
+.wx-loading p { animation: wx-pulse 1.4s ease-in-out infinite; }
+@keyframes wx-pulse { 50% { opacity: .45; } }
+.wx-now { display: flex; align-items: center; gap: 18px; position: relative; z-index: 1; }
+.wx-now .wx-glyph { color: #dce9b6; flex: none; }
+.wx-temp { font-family: Fraunces, Georgia, serif; font-size: 64px; line-height: 1; font-weight: 500; letter-spacing: -.02em; }
+.wx-temp span { font-size: 24px; margin-left: 4px; opacity: .8; }
+.wx-now p { margin: 6px 0 0; font-size: 14px; opacity: .9; }
+.wx-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 22px; position: relative; z-index: 1; }
+.wx-stats div { padding: 10px 12px; border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); }
+.wx-stats small { display: block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; opacity: .75; }
+.wx-stats b { display: block; margin-top: 3px; font-size: 15px; font-weight: 600; }
+.wx-meta { margin: 14px 0 0; font-size: 11px; color: var(--muted); }
+.wx-hero .wx-meta { color: rgba(243,246,234,.72); position: relative; z-index: 1; }
+.wx-hero .wx-meta a { color: #dce9b6; }
+.wx-grid { align-items: start; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; margin-bottom: 18px; }
+.wx-card .wx-meta { padding: 0 20px 16px; margin: 0; }
+.wx-card .note { padding: 0 20px; margin: 0 0 8px; }
+.wx-card .wx-hours { display: flex; gap: 8px; list-style: none; margin: 0; padding: 4px 20px 18px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
+.wx-hours li { flex: none; width: 64px; padding: 10px 0; display: grid; justify-items: center; gap: 6px; border-radius: 6px; background: var(--paper); border: 1px solid var(--line); scroll-snap-align: start; }
+.wx-hours li:first-child { background: var(--lime); border-color: #c4d68c; }
+.wx-hours small { font-size: 11px; color: var(--muted); }
+.wx-hours b { font-size: 15px; }
+.wx-glyph { color: var(--green); }
+.wx-glyph.wx-rain, .wx-glyph.wx-showers, .wx-glyph.wx-drizzle { color: var(--blue); }
+.wx-glyph.wx-clear, .wx-glyph.wx-partly { color: var(--gold); }
+.wx-pop { font-size: 11px; color: var(--blue); font-weight: 600; }
+.wx-days { list-style: none; margin: 0; padding: 0 20px 10px; }
+.wx-days li { display: grid; grid-template-columns: 64px 32px minmax(0, 1fr) minmax(0, 1.3fr); align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.wx-days li:first-child { border-top: 0; }
+.wx-day { font-size: 14px; }
+.wx-rain { position: relative; height: 22px; display: flex; align-items: center; }
+.wx-rain i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: rgba(82,127,141,.16); }
+.wx-rain small { position: relative; padding-left: 8px; font-size: 12px; color: #3c6370; font-weight: 600; }
+.wx-range { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; gap: 8px; font-size: 13px; }
+.wx-range small:last-child { text-align: right; font-weight: 600; color: var(--ink); }
+.wx-range small:first-child { color: var(--muted); }
+.wx-track { position: relative; height: 6px; border-radius: 3px; background: var(--light); }
+.wx-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #527f8d, #be8e3e); }
+.wx-tips { display: grid; gap: 10px; padding: 0 20px 14px; }
+.wx-tip { padding: 12px 14px; border-radius: 6px; border-left: 3px solid; background: var(--paper); }
+.wx-tip strong { font-size: 13px; }
+.wx-tip p { margin: 4px 0 0; font-size: 13px; color: #46543f; }
+.wx-good { border-color: #2f6946; background: #eef3e4; }
+.wx-warn { border-color: var(--gold); background: #f7f0e1; }
+.wx-bad { border-color: var(--danger); background: #f6e9e3; }
+.wx-observed { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; list-style: none; margin: 0; padding: 6px 20px 4px; }
+.wx-observed li { display: grid; justify-items: center; gap: 3px; text-align: center; }
+.wx-bar { width: 100%; max-width: 30px; height: 90px; display: flex; align-items: flex-end; border-radius: 4px; background: var(--light); overflow: hidden; }
+.wx-bar i { width: 100%; min-height: 2px; background: linear-gradient(180deg, #6f9aa7, #527f8d); }
+.wx-observed b { font-size: 12px; }
+.wx-observed small, .wx-observed em { font-size: 10px; color: var(--muted); font-style: normal; }
+.wx-empty { margin: 18px 0; }
+@media (max-width: 900px) {
+  .wx-grid { grid-template-columns: 1fr; }
+  .wx-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .wx-hero { padding: 18px; margin: 14px 0; }
+  .wx-temp { font-size: 52px; }
+  .wx-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .wx-days { padding: 0 14px 6px; }
+  .wx-days li { grid-template-columns: 48px 28px minmax(0, 1fr); gap: 10px; }
+  .wx-range { grid-column: 1 / -1; }
+  .wx-card .wx-hours, .wx-tips { padding-left: 14px; padding-right: 14px; }
+  .wx-observed { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 12px; padding: 6px 14px 4px; }
+  .wx-bar { height: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { .wx-loading p { animation: none; } }
+#wx-live > .wx-card { margin-bottom: 18px; }
