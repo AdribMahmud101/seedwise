@@ -9,6 +9,7 @@ import "./rotation-tool.css";
 import "./planner3d.css";
 import "./plangen.css";
 import "./weather.css";
+import "./calendar.css";
 
 export const metadata = {
   title: "SeedWise · Rangpur Field Lab",
