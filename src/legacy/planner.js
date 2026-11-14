@@ -100,6 +100,7 @@ function savePlannerPlan() {
     state.planner.savedPlanId = saved.id;
     persist();
     sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
+    if (typeof window !== 'undefined') window.dispatchEvent?.(new CustomEvent('ropon:plan-done'));
     // A draft (e.g. crops changed since Planty's check) has no report yet: show it in My plans.
     if (saved.status !== 'ready') {
       toast(t('Saved as a draft. Re-check with Planty to finish it.', 'খসড়া হিসেবে সংরক্ষিত। শেষ করতে Planty দিয়ে আবার যাচাই করুন।'));

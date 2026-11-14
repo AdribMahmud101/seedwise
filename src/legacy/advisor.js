@@ -360,6 +360,13 @@ export function customPlanFor3d() {
   const c = p.planting[Math.min(customSeasonIdx, p.planting.length - 1)];
   return { ...p, planting: [{ ...c, sharePct: 100 }] };
 }
+// A finished plan starts the next one fresh: clear Planty's last answer, picked crops and the handoff.
+export function resetAdvisor() {
+  Object.assign(ui, { crops: [], notes: '', anchor: '', result: null, stream: null, error: '', status: 'idle', sequence: false, planMode: null });
+  revealed = false;
+  clearCustomPlan();
+}
+if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('ropon:plan-done', resetAdvisor);
 export function clearCustomPlan() { try { localStorage.removeItem(CUSTOM_KEY); } catch { /* ignore */ } }
 // Same rule as the planner 3D (distinctColors): crops whose hues are within 40° get the farthest palette colour.
 const CONTRAST = ['#2f8f46', '#b8c93a', '#c98a2a', '#4fa39b', '#7d9b3c'];

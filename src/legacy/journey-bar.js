@@ -238,6 +238,7 @@ export async function journeyAction(action, value) {
       const plan = markPlanGenerated({});
       savePlan(plan, { status: 'ready' });
       if (plan.mode === 'demo') resetPlan();
+      if (typeof window !== 'undefined') window.dispatchEvent?.(new CustomEvent('ropon:plan-done'));
       celebrate('planting', t('Planting confirmed!', 'বপনের মাপ নিশ্চিত হয়েছে!'));
       sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
       queueToastSequence();
