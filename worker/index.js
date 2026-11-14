@@ -540,7 +540,7 @@ For "planting": one entry per crop in YOUR recommended plan (empty if not_suitab
           { role: 'system', content: system },
           { role: 'user', content: `Research data (Rangpur, reviewed): ${JSON.stringify(research || {}).slice(0, 14000)}` },
           { role: 'user', content: `Field context: ${JSON.stringify(req.context)}` },
-          { role: 'user', content: `Proposal — mode: ${req.mode}${req.category ? `; category: ${req.category} (crop_fruit = main field crop with a suitable secondary fruit, e.g. potato + strawberry; crop_crop = two field crops together; fruit_only/fruit_fruit = fruit plants only)` : ''}; crops: ${req.crops.join(', ')}${req.notes ? `; farmer note: ${req.notes}` : ''}` },
+          { role: 'user', content: `Proposal — mode: ${req.mode}${req.mode === 'rotation' ? ' (sequential: judge each crop in its own season, not as an intercrop)' : req.mode === 'mixed' ? ' (both crops on the land at the same time)' : ''}${req.category ? `; category: ${req.category} (crop_fruit = main field crop with a suitable secondary fruit, e.g. potato + strawberry; crop_crop = two field crops; ${req.mode === 'rotation' ? 'grown ONE AFTER ANOTHER in different seasons on the same land (a sequential rotation), never at the same time' : 'grown together at the same time'}; fruit_only/fruit_fruit = fruit plants only)` : ''}; crops: ${req.crops.join(', ')}${req.notes ? `; farmer note: ${req.notes}` : ''}` },
         ],
       }),
     });
