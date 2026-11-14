@@ -85,3 +85,29 @@ Every dataset below is used in the live app or in our model training. The list i
 | Amazon Chronos-Bolt (small) | https://huggingface.co/amazon/chronos-bolt-small | Fine-tuned model 1: 1–3 month weather outlook. |
 | Meta SAM 3.1 | https://github.com/facebookresearch/sam3 | Finds the leaf in clinic photos. |
 | Meta Muse models (Meta AI API) | https://ai.meta.com/ | Planty chat, crop advice and clinic answers. |
+
+### Code, tools and assets
+
+| Dataset name | Link | How you used it |
+|---|---|---|
+| Next.js | https://nextjs.org/ | Web app framework (static offline build). |
+| React | https://react.dev/ | User interface. |
+| three.js | https://threejs.org/ | 3D field, soil and planting views. |
+| Recharts | https://recharts.org/ | Charts for weather, soil and history. |
+| Leaflet | https://leafletjs.com/ | Field map and boundary drawing. |
+| MapLibre GL JS | https://maplibre.org/ | 3D landscape map. |
+| TerraTorch | https://github.com/IBM/terratorch | Fine-tuning Prithvi for flood mapping. |
+| PyTorch + Lightning | https://pytorch.org/ | Model training. |
+| TorchGeo | https://github.com/microsoft/torchgeo | Loading Sen1Floods11 training data. |
+| AutoGluon TimeSeries | https://auto.gluon.ai/ | Fine-tuning Chronos-Bolt on NASA POWER. |
+| rasterio, xarray, pystac-client | https://rasterio.readthedocs.io/ | Reading satellite rasters and STAC search. |
+| Albumentations | https://albumentations.ai/ | Image augmentation in flood training. |
+| Modal | https://modal.com/ | GPU (A10G) for training and running both models. |
+| Cloudflare Workers + KV | https://workers.cloudflare.com/ | Hosting, API and the daily 06:00 analytics job. |
+| HyperFrames + GSAP | https://hyperframes.heygen.com/ | Motion graphics in the demo video. |
+| Google Flow (Veo 3) | https://labs.google/flow/ | One short SI-generated clip in the demo video (watermarked). |
+| AI coding assistants (Claude Code, OpenAI Codex, Google Antigravity, Mistral Vibe) | https://www.anthropic.com/claude-code | Code writing and debugging, reviewed by the team. |
+| IBM Plex fonts (OFL) | https://github.com/IBM/plex | App and video typography. |
+| Fraunces font (OFL) | https://github.com/undercasetype/Fraunces | Headings. |
+| Noto Sans Bengali (OFL) | https://fonts.google.com/noto/specimen/Noto+Sans+Bengali | Bangla text. |
+| SeedWise source code (Apache-2.0) | https://github.com/AdribMahmud101/seedwise | Our own code, open source. |
