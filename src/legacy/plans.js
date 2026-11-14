@@ -149,7 +149,9 @@ export function mountPlans() {
     if (card) {
       card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       guide.celebrate(t('Your plan is saved!', 'আপনার পরিকল্পনা সংরক্ষিত হয়েছে!'));
-      guide.hint(card, t('Here is your plan. Click Open to view it.', 'এই আপনার পরিকল্পনা। দেখতে ‘পরিকল্পনা দেখুন’ চাপুন।'));
+      const recheck = card.querySelector('[data-plans-action="recheck"]');
+      if (recheck) guide.hint(recheck, t('Saved as a draft. Tap Re-check with Planty to finish your plan.', 'খসড়া হিসেবে সংরক্ষিত। পরিকল্পনা শেষ করতে Planty দিয়ে আবার যাচাই চাপুন।'));
+      else guide.hint(card, t('Here is your plan. Click Open to view it.', 'এই আপনার পরিকল্পনা। দেখতে ‘পরিকল্পনা দেখুন’ চাপুন।'));
     }
   }
 }

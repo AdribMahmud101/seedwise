@@ -100,6 +100,12 @@ function savePlannerPlan() {
     state.planner.savedPlanId = saved.id;
     persist();
     sessionStorage.setItem('ropon_highlight_plan_id', plan.id);
+    // A draft (e.g. crops changed since Planty's check) has no report yet: show it in My plans.
+    if (saved.status !== 'ready') {
+      toast(t('Saved as a draft. Re-check with Planty to finish it.', 'খসড়া হিসেবে সংরক্ষিত। শেষ করতে Planty দিয়ে আবার যাচাই করুন।'));
+      location.hash = '#plans';
+      return;
+    }
     // Open the new plan's report so Planty's generation pipeline plays right away.
     queueToastSequence();
     location.hash = '#plan';
