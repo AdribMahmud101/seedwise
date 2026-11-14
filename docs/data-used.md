@@ -40,11 +40,10 @@ Every dataset below is used in the live app or in our model training. The list i
 |---|---|---|
 | Microsoft Planetary Computer (STAC + data API) | https://planetarycomputer.microsoft.com/ | Access to HLS, Landsat, Sentinel and NASADEM data. |
 | ISRIC SoilGrids 2.0 (250 m) | https://soilgrids.org | Soil texture, pH, carbon and nitrogen per field. |
-| SRDI Upazila Nirdeshika (Land & Soil Resource Utilization Guide) | https://srdi.portal.gov.bd/ | Local P, K, S, Zn and B levels for each upazila. |
 | Global water table depth (Fan et al. 2017, PNAS) | https://doi.org/10.1073/pnas.1712381114 | Water-table depth in the 3D soil view. |
 | Esri World Imagery Wayback (Maxar, 28 Nov 2022 release) | https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9 | High-detail photo map for drawing fields (credited). |
 | OpenStreetMap (via Overpass API) | https://www.openstreetmap.org/copyright | Roads, rivers and place names, offline. |
-| geoBoundaries gbOpen BGD ADM2/ADM3 | https://www.geoboundaries.org/ | District and upazila boundaries. |
+| geoBoundaries gbOpen BGD ADM2/ADM3 | https://github.com/wmgeolab/geoBoundaries | District and upazila boundaries. |
 | Open-Meteo forecast API (CC BY 4.0) | https://open-meteo.com/ | Live 7-day and hourly forecast on the Weather page. |
 
 ### Agriculture and crop research
@@ -98,6 +97,13 @@ Every dataset below is used in the live app or in our model training. The list i
 | MapLibre GL JS | https://maplibre.org/ | 3D landscape map. |
 | TerraTorch | https://github.com/IBM/terratorch | Fine-tuning Prithvi for flood mapping. |
 | PyTorch + Lightning | https://pytorch.org/ | Model training. |
+| timm | https://github.com/huggingface/pytorch-image-models | Vision backbone utilities in flood training. |
+| FastAPI | https://fastapi.tiangolo.com/ | Model endpoints on Modal. |
+| NumPy, pandas, SciPy | https://numpy.org/ | Data preparation and backtests. |
+| Shapely, pyproj | https://shapely.readthedocs.io/ | Field geometry and map projections. |
+| Pillow, netCDF4, requests | https://python-pillow.org/ | Image tiles, GRACE files and data downloads. |
+| Playwright | https://playwright.dev/ | Capturing the in-app how-to screenshots. |
+| @meta-sam/parser | https://www.npmjs.com/package/@meta-sam/parser | Reading SAM 3.1 results in the crop clinic. |
 | TorchGeo | https://github.com/microsoft/torchgeo | Loading Sen1Floods11 training data. |
 | AutoGluon TimeSeries | https://auto.gluon.ai/ | Fine-tuning Chronos-Bolt on NASA POWER. |
 | rasterio, xarray, pystac-client | https://rasterio.readthedocs.io/ | Reading satellite rasters and STAC search. |
