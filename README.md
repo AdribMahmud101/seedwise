@@ -17,6 +17,21 @@ SeedWise turns NASA Earth data into one decision for one small farm field: what 
 - **AI crop clinic:** snap a photo of a sick leaf to get likely pests or diseases and recovery steps, with sources.
 - **Disaster recovery:** step-by-step flood, drought and fire recovery, tolerant varieties, and one-tap emergency numbers.
 
+## Views
+
+| # | Route | English | বাংলা | Module |
+|---|---|---|---|---|
+| 01 | `#field` (default) | My field | আমার জমি | `fields.js` (crop clinic opens from here) |
+| 02 | `#rotations` | Rotation studio | ফসলচক্র বাছাই | `rotations.js`, `studio3d.js` |
+| 03 | `#planner` | Planting planner | বপনের পরিকল্পনা | `planner.js` |
+| 04 | `#plans` | My plans | আমার পরিকল্পনা | `plans.js`, `plan.js` |
+| 05 | `#calendar` | Calendar | ক্যালেন্ডার | `calendar.js` |
+| 06 | `#weather` | Weather | আবহাওয়া | `weather.js` |
+| 07 | `#seasons` | Past seasons | পুরনো মৌসুম | `fields.js` → `seasonView` |
+| 08 | `#recovery` | Disaster recovery | দুর্যোগের পর করণীয় | `recovery.js` |
+
+Hidden from the menu but reachable by URL: `#water` (Water & resilience) and `#research` (Research lab).
+
 ## NASA data used
 
 | NASA data | Used for |
