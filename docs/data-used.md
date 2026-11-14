@@ -89,25 +89,12 @@ Every dataset below is used in the live app or in our model training. The list i
 
 | Dataset name | Link | How you used it |
 |---|---|---|
-| Next.js | https://nextjs.org/ | Web app framework (static offline build). |
-| React | https://react.dev/ | User interface. |
+| Next.js + React | https://nextjs.org/ | Web app framework (static offline build). |
 | three.js | https://threejs.org/ | 3D field, soil and planting views. |
-| Recharts | https://recharts.org/ | Charts for weather, soil and history. |
 | Leaflet | https://leafletjs.com/ | Field map and boundary drawing. |
-| MapLibre GL JS | https://maplibre.org/ | 3D landscape map. |
-| TerraTorch | https://github.com/IBM/terratorch | Fine-tuning Prithvi for flood mapping. |
-| PyTorch + Lightning | https://pytorch.org/ | Model training. |
-| timm | https://github.com/huggingface/pytorch-image-models | Vision backbone utilities in flood training. |
-| FastAPI | https://fastapi.tiangolo.com/ | Model endpoints on Modal. |
-| NumPy, pandas, SciPy | https://numpy.org/ | Data preparation and backtests. |
-| Shapely, pyproj | https://shapely.readthedocs.io/ | Field geometry and map projections. |
-| Pillow, netCDF4, requests | https://python-pillow.org/ | Image tiles, GRACE files and data downloads. |
-| Playwright | https://playwright.dev/ | Capturing the in-app how-to screenshots. |
-| @meta-sam/parser | https://www.npmjs.com/package/@meta-sam/parser | Reading SAM 3.1 results in the crop clinic. |
-| TorchGeo | https://github.com/microsoft/torchgeo | Loading Sen1Floods11 training data. |
+| TerraTorch + PyTorch | https://github.com/IBM/terratorch | Fine-tuning Prithvi for flood mapping. |
+| Other open-source libraries (Recharts, MapLibre, FastAPI, NumPy, pandas, rasterio, xarray and more) | https://github.com/AdribMahmud101/seedwise | Charts, maps, data processing and model serving; full list in our repo. |
 | AutoGluon TimeSeries | https://auto.gluon.ai/ | Fine-tuning Chronos-Bolt on NASA POWER. |
-| rasterio, xarray, pystac-client | https://rasterio.readthedocs.io/ | Reading satellite rasters and STAC search. |
-| Albumentations | https://albumentations.ai/ | Image augmentation in flood training. |
 | Modal | https://modal.com/ | GPU (A10G) for training and running both models. |
 | Cloudflare Workers + KV | https://workers.cloudflare.com/ | Hosting, API and the daily 06:00 analytics job. |
 | HyperFrames + GSAP | https://hyperframes.heygen.com/ | Motion graphics in the demo video. |
