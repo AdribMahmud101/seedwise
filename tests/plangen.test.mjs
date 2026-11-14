@@ -164,7 +164,7 @@ test('worker passes the tolerant excerpt to plan-summary context', async t => {
   const { tolerantShortlist } = await import('../worker/index.js');
   const note = tolerantShortlist(['aman'], ['flood', 'submergence'], tolerant);
   assert.match(note, /BRRI dhan51/);
-  assert.match(note, /official_trait/);
+  assert.match(note, /officially rated/);
   assert.equal(tolerantShortlist(['mustard'], ['flood'], tolerant), '');
   assert.equal(tolerantShortlist([], [], tolerant), '');
 

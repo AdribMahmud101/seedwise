@@ -306,6 +306,7 @@ export function normaliseSuggestions(list) {
     crops: (Array.isArray(x?.crops) ? x.crops : []).filter((c) => typeof c === 'string' && c.trim()).slice(0, 2).map((c) => c.trim().slice(0, 40)),
     line: typeof x?.line === 'string' ? x.line.trim().slice(0, 160) : '',
     ...(ADVISOR_MODES.has(x?.mode) ? { mode: x.mode } : {}),
+    ...(['recommended', 'possible_with_conditions'].includes(x?.verdict) ? { verdict: x.verdict } : {}),
   })).filter((x) => x.crops.length);
 }
 const ADVISOR_CONTEXT_KEYS = ['fieldId', 'fieldName', 'areaHa', 'irrigation', 'budget', 'soil', 'outlook', 'flood', 'waterTable'];
@@ -388,9 +389,12 @@ export function tolerantShortlist(crops, hazards, pack, limit = 6) {
   }
   scored.sort((a, b) => b.hit - a.hit || a.official - b.official);
   return scored.slice(0, limit)
-    .map(({ v }) => `${v.variety} (${v.tolerance}; ${v.evidence[0] || 'requires_local_validation'})`)
+    .map(({ v }) => `${v.variety} (${v.tolerance}; ${EVIDENCE_WORDS[v.evidence[0]] || EVIDENCE_WORDS.requires_local_validation})`)
     .join('; ').slice(0, 600);
 }
+
+// Farmer-facing words for tolerant-varieties.json evidence labels (the model copies whatever it is given).
+const EVIDENCE_WORDS = { official_trait: 'officially rated', research_candidate: 'research result, not yet official', requires_local_validation: 'needs local testing' };
 
 function cleanList(value, maxItems = 6, maxLen = 220) {
   return Array.isArray(value)
@@ -525,8 +529,8 @@ Your job: judge suitability for THIS field honestly and build the best 12-month 
 BE BRUTALLY HONEST: if the proposal is unsuitable (climate, waterlogging, soil, season clash, perennial vs annual conflict, no market/input reality, needs inputs the farmer lacks), set verdict "not_suitable", say clearly why in the summary, and give better alternatives. Use "possible_with_conditions" only when it can work with specific, realistic requirements. Do not flatter.
 Rules: use only the facts in the field context and research data for field-specific claims; general agronomy knowledge for Bangladesh is allowed but say it is general; never invent measurements, yields, prices or chemical doses; cite evidence ONLY by source ids from the research "sources" list (omit if none fit).
 Respond with ONE JSON object only, no prose, in ${req.lang === 'bn' ? 'Bengali' : 'English'} for all text values:
-{"verdict":"recommended|possible_with_conditions|not_suitable","title":"short plan name","summary":"2-4 plain sentences","calendar":[{"month":1,"crop":"name or null","stage":"sow|grow|harvest|fallow|orchard"}... all 12 months],"reasons":["..."],"risks":["..."],"requirements":["..."],"alternatives":["..."],"confidence":"low|medium|high","evidence":["source-id"],"dropLine":"ONE plain sentence telling the farmer to drop this idea and why (empty if recommended)","suggestions":[{"crops":["crop","optional 2nd crop"],"mode":"rotation|mixed|single|orchard","line":"one short reason it suits this field"}],"planting":[{"crop":"name","model":"tree|shrub|herb|grass|vine|rice|potato|mustard|mungbean|wheat|maize","color":"#RRGGBB foliage","fruitColor":"#RRGGBB or null","heightM":number,"rowSpacingCm":number,"withinRowCm":number,"sharePct":number}]}
-For "suggestions": set "mode" to how the crops are grown ("rotation" = one after another in different seasons, "mixed" = together at the same time). When verdict is not_suitable or possible_with_conditions, give 1-3 better proposals with at most 2 crops each that DO suit this field (prefer the same category as the farmer asked, e.g. another secondary fruit); empty when recommended.
+{"verdict":"recommended|possible_with_conditions|not_suitable","title":"short plan name","summary":"2-4 plain sentences","calendar":[{"month":1,"crop":"name or null","stage":"sow|grow|harvest|fallow|orchard"}... all 12 months],"reasons":["..."],"risks":["..."],"requirements":["..."],"alternatives":["..."],"confidence":"low|medium|high","evidence":["source-id"],"dropLine":"ONE plain sentence telling the farmer to drop this idea and why (empty if recommended)","suggestions":[{"crops":["crop","optional 2nd crop"],"mode":"rotation|mixed|single|orchard","verdict":"recommended|possible_with_conditions","line":"one short reason it suits this field"}],"planting":[{"crop":"name","model":"tree|shrub|herb|grass|vine|rice|potato|mustard|mungbean|wheat|maize","color":"#RRGGBB foliage","fruitColor":"#RRGGBB or null","heightM":number,"rowSpacingCm":number,"withinRowCm":number,"sharePct":number}]}
+For "suggestions": each one must be a plan you would give exactly that "verdict" if the farmer checked it on its own for this same field, flood and irrigation context; list "recommended" ones first and never suggest one you would rate not_suitable. Set "mode" to how the crops are grown ("rotation" = one after another in different seasons, "mixed" = together at the same time). When verdict is not_suitable or possible_with_conditions, give 1-3 better proposals with at most 2 crops each that DO suit this field (prefer the same category as the farmer asked, e.g. another secondary fruit); empty when recommended.
 For "planting": one entry per crop in YOUR recommended plan (empty if not_suitable); choose the 3D model type that best represents the plant (fruit trees like mango/jackfruit = tree; strawberry/chilli/tomato = shrub; rice = rice; potato = potato; mustard = mustard; pulses = mungbean; maize/wheat; leafy/other = herb; climbers = vine); realistic foliage and fruit colours; typical Bangladesh spacing (general guidance); sharePct = share of the field each crop occupies AT THE SAME TIME (mixed/hybrid splits the land; a season rotation gives each crop 100 on its own season — then use the share of the field for the crop in its season, normally 100).${tolerantNote ? ` Disaster-tolerant shortlist for these crops (Rangpur research): ${tolerantNote}. You may name at most 2 of these varieties with their tolerance and evidence label; never invent other variety names.` : ''}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35000);
