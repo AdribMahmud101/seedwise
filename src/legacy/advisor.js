@@ -111,7 +111,7 @@ function resultHtml(r) {
     <div class="adv-grid">${list(t('Why', 'কেন'), r.reasons, renderItems)}${list(t('Risks', 'ঝুঁকি'), r.risks, renderItems)}${list(t("What you'd need", 'যা লাগবে'), r.requirements, renderItems)}${list(t('Better options for this field', 'এই জমির জন্য ভালো বিকল্প'), r.alternatives, renderItems)}</div>
     ${r.evidence?.length ? `<p class="adv-evidence stream-late">${t('Evidence', 'প্রমাণ')}: ${r.evidence.map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>`).join(' · ')}</p>` : ''}
     ${r.verdict !== 'recommended' && (r.dropLine || r.suggestions?.length) ? `<div class="adv-drop stream-late"><p><strong>${t('Planty suggests dropping this idea.', 'Planty এই পরিকল্পনা বাদ দিতে বলছে।')}</strong> ${esc(r.dropLine || '')}</p>
-      ${r.suggestions?.length ? `<p class="adv-drop-label">${t('Crops that suit this field better — tap one to check it:', 'এই জমিতে বেশি মানানসই — যাচাই করতে একটিতে চাপুন:')}</p><div class="adv-suggest">${r.suggestions.map((g, i) => `<button type="button" class="adv-suggest-btn" data-action="adv-try" data-value="${i}"><strong>${esc(g.crops.join(' + '))}</strong><small>${esc(g.line)}</small></button>`).join('')}</div>` : ''}
+      ${r.suggestions?.length ? `<p class="adv-drop-label">${t('Crops that suit this field better — tap one to check it:', 'এই জমিতে বেশি মানানসই — যাচাই করতে একটিতে চাপুন:')}</p><div class="adv-suggest">${r.suggestions.map((g, i) => `<button type="button" class="adv-suggest-btn" data-action="adv-try" data-value="${i}"><strong>${esc(g.crops.join((g.mode ? g.mode === 'rotation' : /\b(then|after|followed|rotation|sequen)/i.test(g.line || '')) ? ' → ' : ' + '))}</strong><small>${esc(g.line)}</small></button>`).join('')}</div>` : ''}
       <div class="adv-drop-actions">${r.verdict === 'possible_with_conditions' ? `<span class="note">${t('Or keep your idea with the conditions above.', 'অথবা ওপরের শর্ত মেনে নিজের পরিকল্পনা রাখুন।')}</span>` : ''}<button type="button" class="button small" data-action="adv-exit">${t('Exit', 'বন্ধ করুন')}</button></div></div>` : ''}
     ${r.verdict !== 'not_suitable' && r.planting?.length ? `<div class="adv-use stream-late"><button type="button" class="button primary" data-action="adv-use">${t('Use this plan in the planner →', 'এই পরিকল্পনা বপনে ব্যবহার করুন →')}</button><span class="note">${r.planting.map((p) => `${esc(p.crop)} ${p.sharePct}%`).join(' · ')}</span></div>` : ''}
     <div class="adv-compare stream-late"><button type="button" class="button small" data-action="show-rotations">${t('Compare with standard rotations (scores) ↓', 'সাধারণ ফসলচক্রের সঙ্গে তুলনা (স্কোর) ↓')}</button></div>
@@ -263,7 +263,9 @@ export async function advisorAction(action, value) {
   if (action === 'adv-try') {
     const g = ui.result?.suggestions?.[Number(value)];
     if (!g) return;
-    ui.crops = g.crops.slice(0, 2); ui.notes = '';
+    ui.crops = g.crops.slice(0, 2); ui.notes = ''; ui.planMode = null;
+    // Keep the suggestion's own plan type; older answers carry no mode, so read it from the line.
+    ui.sequence = g.mode ? g.mode === 'rotation' : /\b(then|after|followed|rotation|sequen)/i.test(g.line || '');
     return advisorAction('adv-check');
   }
   if (action === 'show-rotations') {

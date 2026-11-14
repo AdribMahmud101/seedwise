@@ -43,6 +43,8 @@ test('decide-first: categories from up to 2 crops; scored list hidden until reve
   const s = normaliseSuggestions([{ crops: ['Potato', 'Strawberry', 'Mango'], line: 'x' }, { crops: [] }, { crops: ['Mustard'] }, { crops: ['A'] }, { crops: ['B'] }]);
   assert.equal(s.length, 2);
   assert.deepEqual(s[0].crops, ['Potato', 'Strawberry']);
+  assert.equal(normaliseSuggestions([{ crops: ['Aman rice', 'Tomato'], mode: 'rotation' }])[0].mode, 'rotation');
+  assert.equal(normaliseSuggestions([{ crops: ['Aman rice'], mode: 'bogus' }])[0].mode, undefined);
 });
 
 test('hybrid colours: two similar greens become clearly different', async () => {
