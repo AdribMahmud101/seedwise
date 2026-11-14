@@ -123,16 +123,17 @@ export const ROTATION_HOWTO_STEPS = [
     title: { en: 'Compare the top 2', bn: 'শীর্ষ ২টি তুলনা করুন' },
     why: { en: 'Scores and trade-offs show each rotation’s fit', bn: 'স্কোর ও সুবিধা-অসুবিধা ফসলচক্রের মানানসই দিক দেখায়' },
     how: { en: 'Review score, seasons, fit, checks, and irrigation cost', bn: 'স্কোর, মৌসুম, মানানসই দিক, যাচাই ও সেচ খরচ দেখুন' },
-    target: '#rotation-list .rotation-card:nth-child(-n+2)',
+    target: '#rotation-scored .rotation-card, [data-action="show-rotations"]',
     doneEvent: 'top-two-compared',
     clip: `${HOWTO_ASSET_DIR}/rotation-compare.webp`,
     poster: `${HOWTO_ASSET_DIR}/rotation-compare.jpg`,
     seconds: 7,
     micro: [
+      // Scores stay hidden behind Planty's advisor until the farmer asks for them.
+      { target: '[data-action="show-rotations"]', action: 'click', ifPresent: true, text: { en: 'Tap Compare to see the scored rotations', bn: 'স্কোরসহ ফসলচক্র দেখতে তুলনা চাপুন' } },
       ...['.score', '.timeline-scroll', '.rotation-info > div:nth-child(1)', '.rotation-info > div:nth-child(2)', '.rotation-cost-badge']
-        .map((selector, index) => ({ target: `#rotation-list .rotation-card:nth-child(1) ${selector}`, action: 'none', text: { en: ['Card 01 score', 'Card 01 season calendar', 'Why it fits', 'What to check', 'Irrigation cost and NASA sources'][index], bn: ['কার্ড ০১-এর স্কোর', 'কার্ড ০১-এর মৌসুমের ক্যালেন্ডার', 'কেন মানানসই', 'কী যাচাই করবেন', 'সেচ খরচ ও NASA সূত্র'][index] } })),
-      ...['.score', '.timeline-scroll', '.rotation-info > div:nth-child(1)', '.rotation-info > div:nth-child(2)', '.rotation-cost-badge']
-        .map((selector, index) => ({ target: `#rotation-list .rotation-card:nth-child(2) ${selector}`, action: 'none', text: { en: ['Now compare card 02 score', 'Card 02 season calendar', 'Why it fits', 'What to check', 'Irrigation cost and NASA sources'][index], bn: ['এবার কার্ড ০২-এর স্কোর তুলনা করুন', 'কার্ড ০২-এর মৌসুমের ক্যালেন্ডার', 'কেন মানানসই', 'কী যাচাই করবেন', 'সেচ খরচ ও NASA সূত্র'][index] } })),
+        .map((selector, index) => ({ target: `#rotation-scored > .rotation-card ${selector}`, action: 'none', text: { en: ['Card 01 score', 'Card 01 season calendar', 'Why it fits', 'What to check', 'Irrigation cost and NASA sources'][index], bn: ['কার্ড ০১-এর স্কোর', 'কার্ড ০১-এর মৌসুমের ক্যালেন্ডার', 'কেন মানানসই', 'কী যাচাই করবেন', 'সেচ খরচ ও NASA সূত্র'][index] } })),
+      { target: '#rotation-scored .rotation-candidate-row', action: 'none', text: { en: 'Now compare 02: its score and gap from the best. Tap Show details for more', bn: 'এবার ০২ তুলনা করুন: স্কোর ও সেরার থেকে পার্থক্য। আরও দেখতে বিস্তারিত চাপুন' } },
     ],
   },
   {

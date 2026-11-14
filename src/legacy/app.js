@@ -390,7 +390,9 @@ document.addEventListener("click", (event) => {
     value = el.dataset.value;
   if (!action) return;
   if (action === "guide-field") {
-    runShowMe();
+    // The last field step needs "Use this field", which only renders inside a plan.
+    if (!getPlan()) journeyAction("own").then(() => setTimeout(runShowMe, 400));
+    else runShowMe();
     return;
   }
   if (action === "menu") {

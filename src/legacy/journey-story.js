@@ -237,7 +237,7 @@ export function getPageChecklist(page = activePage) {
       id: 'rotation-compare',
       text: t('Compare the top 2', 'শীর্ষ ২টি তুলনা করুন'),
       done: comparedTop2,
-      target: '.rotation-card:nth-of-type(1), .rotation-card:nth-of-type(2), #rotation-list',
+      target: '#rotation-scored .rotation-card, [data-action="show-rotations"], #rotation-list',
     });
     items.push({
       id: 'rotation-choose',
@@ -499,27 +499,28 @@ export function runHowtoShowMe(id) {
   coachCollapsed = false;
   renderCoach();
   if (typeof document === 'undefined') return;
-  const onDone = (id === 'plan-calendar' && (activePage === 'plan' || activePage === 'plans'))
-    ? () => {
-      pageActivity.plan.calendarViewed = true;
-      renderCoach();
-    }
-    : (id === 'rotation-intro' && activePage === 'rotations')
-    ? () => {
-      pageActivity.rotation.introViewed = true;
-      renderCoach();
-    }
-    : undefined;
-  const steps = step.micro.map((micro, index) => ({
+  // Review-only sub-steps (the user just reads and taps Next) count as done when
+  // the walkthrough finishes; otherwise accepting the defaults loops forever.
+  const reviewed = {
+    'plan-calendar': () => { pageActivity.plan.calendarViewed = true; },
+    'rotation-intro': () => { pageActivity.rotation.introViewed = true; },
+    'rotation-priorities': () => { pageActivity.rotation.prioritiesChanged = true; },
+    'rotation-compare': () => { pageActivity.rotation.compared.add('0'); pageActivity.rotation.compared.add('1'); },
+    'planting-adjust-spacing': () => { pageActivity.planner.spacingChanged = true; },
+  }[id];
+  const onDone = reviewed ? () => { reviewed(); renderCoach(); } : undefined;
+  const micros = step.micro.filter(m => !m.ifPresent || document.querySelector(m.target));
+  const steps = micros.map((micro, index) => ({
     target: micro.target,
     targetAll: !!micro.targetAll,
     scrollBehavior: id === 'rotation-intro' ? 'instant' : undefined,
     text: { en: micro.text.en, bn: micro.text.bn },
-    action: micro.action,
+    // Optional steps only point (e.g. Reset would undo the user's changes).
+    action: micro.optional ? 'none' : micro.action,
     pose: 'pointing',
     timeout: 8000,
     inDialog: !!micro.inDialog,
-    onDone: index === step.micro.length - 1 ? onDone : undefined,
+    onDone: index === micros.length - 1 ? onDone : undefined,
     onSkip: id === 'rotation-intro' ? onDone : undefined,
   }));
   guide.sequence(steps);

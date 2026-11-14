@@ -99,7 +99,7 @@ test('rotation sub-steps start with the 3D intro, then priorities, top two, sele
     '#weight-water', '#weight-soil', '#weight-income', '#weight-stability',
   ]);
   assert.ok(ROTATION_HOWTO_STEPS[1].micro.every(step => step.action === 'none'));
-  assert.equal(ROTATION_HOWTO_STEPS[2].micro.length, 10);
+  assert.equal(ROTATION_HOWTO_STEPS[2].micro.length, 7);
   assert.equal(ROTATION_HOWTO_STEPS[3].micro[0].action, 'click');
   assert.equal(ROTATION_HOWTO_STEPS[4].optional, true);
   assert.ok(ROTATION_HOWTO_STEPS[4].micro.slice(1).every(step => step.inDialog));

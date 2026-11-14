@@ -1066,7 +1066,7 @@ function rotationAction(action, value) {
     best?.classList.remove('rot-flash'); void best?.offsetWidth; best?.classList.add('rot-flash');
     return;
   }
-  if (String(action).startsWith('adv-')) return advisorAction(action, value);
+  if (String(action).startsWith('adv-') || action === 'show-rotations') return advisorAction(action, value);
   if (action === 'rotation-details') {
     const list = document.querySelector('#rotation-list');
     if (!list) return;
