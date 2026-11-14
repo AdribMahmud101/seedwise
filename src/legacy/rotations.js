@@ -361,8 +361,9 @@ function syncRotationPickerOrder() {
 export function getSelectedRotationId() {
   if (activeRotationId) return activeRotationId;
   const plan = getPlan();
-  if (plan?.rotation && plan.field.id === field()?.id) return plan.rotation.id;
   const items = ranking();
+  // A Planty custom plan has id 'custom', which the 3D studio cannot draw; fall back to the ranking.
+  if (plan?.rotation && plan.field.id === field()?.id && items.some((r) => r.id === plan.rotation.id)) return plan.rotation.id;
   return items.length > 0 ? items[0].id : 'mustard';
 }
 
